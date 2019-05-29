@@ -10,7 +10,7 @@ from simulation import vrep
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file):
+                 is_testing, test_preset_cases, test_preset_file, place = True):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -645,8 +645,8 @@ class Robot(object):
             gripper_full_closed = self.close_gripper()
             grasp_success = not gripper_full_closed
 
-            # Move the grasped object elsewhere
-            if grasp_success:
+            # Move the grasped object elsewhere if place = false
+            if grasp_success and not self.place:
                 object_positions = np.asarray(self.get_obj_positions())
                 object_positions = object_positions[:,2]
                 grasped_object_ind = np.argmax(object_positions)
@@ -886,6 +886,49 @@ class Robot(object):
         return push_success
 
 
+    def place(self, position, heightmap_rotation_angle, workspace_limits):
+        print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
+
+        if self.is_sim:
+
+            # Compute tool orientation from heightmap rotation angle
+            tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+
+            # Avoid collision with floor
+            position[2] = max(position[2] + 0.04 + 0.02, workspace_limits[2][0] + 0.02)
+
+            # Move gripper to location above place target
+            place_location_margin = 0.1
+            sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+            location_above_place_target = (position[0], position[1], position[2] + place_location_margin)
+            self.move_to(location_above_place_target, None)
+
+            sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
+            if tool_rotation_angle - gripper_orientation[1] > 0:
+                increment = 0.2
+            else:
+                increment = -0.2
+            while abs(tool_rotation_angle - gripper_orientation[1]) >= 0.2:
+                vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + increment, np.pi/2), vrep.simx_opmode_blocking)
+                time.sleep(0.01)
+                sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
+            vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
+
+            # Approach place target
+            self.move_to(position, None)
+
+            # Ensure gripper is open
+            self.open_gripper()
+
+            # Move gripper to location above place target
+            self.move_to(location_above_place_target, None)
+
+            place_success = True
+            return place_success
+
+
+
+
     def restart_real(self):
 
         # Compute tool orientation from heightmap rotation angle
@@ -956,64 +999,22 @@ class Robot(object):
             tool_analog_input2 = new_tool_analog_input2
 
 
-    # def place(self, position, orientation, workspace_limits):
-    #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
+        # def place(self, position, orientation, workspace_limits):
+        #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
 
-    #     # Attempt placing
-    #     position[2] = max(position[2], workspace_limits[2][0])
-    #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-    #     self.move_to([position[0], position[1], position[2] + 0.05], orientation)
-    #     self.tool_acc = 1 # 0.05
-    #     self.tool_vel = 0.02 # 0.02
-    #     self.move_to([position[0], position[1], position[2]], orientation)
-    #     self.open_gripper()
-    #     self.tool_acc = 1 # 0.5
-    #     self.tool_vel = 0.2 # 0.2
-    #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-    #     self.close_gripper()
-    #     self.go_home()
-
-    # def place(self, position, heightmap_rotation_angle, workspace_limits):
-    #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
-
-    #     if self.is_sim:
-
-    #         # Compute tool orientation from heightmap rotation angle
-    #         tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-
-    #         # Avoid collision with floor
-    #         position[2] = max(position[2] + 0.04 + 0.02, workspace_limits[2][0] + 0.02)
-
-    #         # Move gripper to location above place target
-    #         place_location_margin = 0.1
-    #         sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-    #         location_above_place_target = (position[0], position[1], position[2] + place_location_margin)
-    #         self.move_to(location_above_place_target, None)
-
-    #         sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
-    #         if tool_rotation_angle - gripper_orientation[1] > 0:
-    #             increment = 0.2
-    #         else:
-    #             increment = -0.2
-    #         while abs(tool_rotation_angle - gripper_orientation[1]) >= 0.2:
-    #             vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + increment, np.pi/2), vrep.simx_opmode_blocking)
-    #             time.sleep(0.01)
-    #             sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
-    #         vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-
-    #         # Approach place target
-    #         self.move_to(position, None)
-
-    #         # Ensure gripper is open
-    #         self.open_gripper()
-
-    #         # Move gripper to location above place target
-    #         self.move_to(location_above_place_target, None)
-
-    #         place_success = True
-    #         return place_success
-
-
+        #     # Attempt placing
+        #     position[2] = max(position[2], workspace_limits[2][0])
+        #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
+        #     self.move_to([position[0], position[1], position[2] + 0.05], orientation)
+        #     self.tool_acc = 1 # 0.05
+        #     self.tool_vel = 0.02 # 0.02
+        #     self.move_to([position[0], position[1], position[2]], orientation)
+        #     self.open_gripper()
+        #     self.tool_acc = 1 # 0.5
+        #     self.tool_vel = 0.2 # 0.2
+        #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
+        #     self.close_gripper()
+        #     self.go_home()
 
 
 
