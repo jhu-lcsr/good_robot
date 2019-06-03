@@ -47,7 +47,7 @@ def main(args):
     grasp_only = args.grasp_only
 
 
-    # -------------- Testing options --------------
+    # -------------- Test grasp_onlying options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases 
@@ -67,7 +67,7 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file, args.place)
+                  is_testing, test_preset_cases, test_preset_file, args.place, args.grasp_color_task)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -91,7 +91,8 @@ def main(args):
                           'primitive_action' : None,
                           'best_pix_ind' : None,
                           'push_success' : False,
-                          'grasp_success' : False} 
+                          'grasp_success' : False
+                          'color_success' : False} # HK: added color_success nonlocal_variable
 
 
     # Parallel thread to process network output and execute actions
@@ -190,15 +191,22 @@ def main(args):
                 # Initialize variables that influence reward
                 nonlocal_variables['push_success'] = False
                 nonlocal_variables['grasp_success'] = False
+                # HK: Added color variable
+                nonlocal_variables['color_success'] = False
                 change_detected = False
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push successful: %r' % (nonlocal_variables['push_success']))
+                # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
-                    nonlocal_variables['grasp_success'] = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
+                    # HK: color
+                    grasp_output = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
+                    nonlocal_variables['color_success'] = grasp_output[1]
+                    nonlocal_variables['grasp_success'] = grasp_output[0]
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+                    print('Color successful: %r' % (nonlocal_variables['color_success']))
 
                 nonlocal_variables['executing_action'] = False
 
@@ -292,7 +300,7 @@ def main(args):
                     no_change_count[1] += 1
 
             # Compute training labels
-            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap)
+            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, prev_color_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap)
             trainer.label_value_log.append([label_value]) 
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
@@ -355,6 +363,7 @@ def main(args):
 
                     sample_push_success = sample_reward_value == 0.5
                     sample_grasp_success = sample_reward_value == 1
+                    #TODO
                     sample_change_detected = sample_push_success
                     new_sample_label_value, _ = trainer.get_label_value(sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap)
 
@@ -400,6 +409,12 @@ def main(args):
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_best_pix_ind = nonlocal_variables['best_pix_ind']
+        # HK: check color_success arguments
+        if grasp_color_task:
+            prev_color_success = nonlocal_variables['color_success']
+        else:
+            prev_color_success = None
+        
 
         trainer.iteration += 1
         iteration_time_1 = time.time()
@@ -446,6 +461,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--grasp_color_task', dest='grasp_color_task ', action='store_true', default=False,              help='enable grasping specific colored objects')
 
 
     # Run main program with specified arguments

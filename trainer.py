@@ -198,7 +198,7 @@ class Trainer(object):
         return push_predictions, grasp_predictions, state_feat
 
 
-    def get_label_value(self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, next_color_heightmap, next_depth_heightmap):
+    def get_label_value(self, primitive_action, push_success, grasp_success, color_success = None, change_detected, prev_push_predictions, prev_grasp_predictions, next_color_heightmap, next_depth_heightmap):
 
         if self.method == 'reactive':
 
@@ -222,8 +222,17 @@ class Trainer(object):
                 if change_detected:
                     current_reward = 0.5
             elif primitive_action == 'grasp':
-                if grasp_success:
-                    current_reward = 1.0
+                if color_success is None:
+                    if grasp_success:
+                        current_reward = 1.0
+                elif color_success is not None:
+                    # HK add if statement
+                    if grasp_success and not color_success:
+                        #current_reward = 1.0
+                        current_reward = 0.7
+                    # HK: Color: Compute current reward 
+                    elif grasp_success and color_success:
+                        current_reward = 1.0
 
             # Compute future reward
             if not change_detected and not grasp_success:

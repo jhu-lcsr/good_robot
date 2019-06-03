@@ -10,10 +10,15 @@ from simulation import vrep
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file, place = False):
+                 is_testing, test_preset_cases, test_preset_file, place = False, grasp_color_task = False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
+
+        # HK: If grasping specific block color...
+        # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
+        if self.grasp_color_task:
+            self.block_color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0])
 
         # If in simulation...
         if self.is_sim:
@@ -588,6 +593,18 @@ class Robot(object):
         state_data = self.get_state()
         tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
         return tool_analog_input2 > 0.26
+    
+    # HK: added a function to check if the right color is grasped
+    def check_color(self, color):
+        object_positions = np.asarray(self.get_obj_positions())
+        object_positions = object_positions[:,2]
+        grasped_object_ind = np.argmax(object_positions)
+        grasped_object_handle = self.object_handles[grasped_object_ind]
+        color_index = np.where(color==1)
+        if grasped_object_ind == color_index[0]:
+            return True
+        else:
+            return False
 
 
     # Primitives ----------------------------------------------------------
@@ -645,8 +662,34 @@ class Robot(object):
             gripper_full_closed = self.close_gripper()
             grasp_success = not gripper_full_closed
 
+            # HK: Check if right color is grasped
+            color_success = False
+            if grasp_success and self.grasp_color_task:
+                if self.check_color(self.block_color):
+                    color_success = True
+                    print('Right color: %r' % (self.check_color(self.block_color)))
+
             # Move the grasped object elsewhere if place = false
-            if grasp_success and not self.place:
+            if grasp_success and not self.place and self.grasp_color_task:
+                object_positions = np.asarray(self.get_obj_positions())
+                object_positions = object_positions[:,2]
+                grasped_object_ind = np.argmax(object_positions)
+                grasped_object_handle = self.object_handles[grasped_object_ind]
+                # HK: check if red is grasped and put it back at a random place
+                color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
+                color_index = np.where(color==1)
+                vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+                if grasped_object_ind == color_index[0]:
+                    workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
+                    drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
+                    drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
+                    object_position = [drop_x, drop_y, 0.15]
+                    object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+                    vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
+                    vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
+
+            # HK: Original Method
+            elif grasp_success and not self.place and not self.grasp_color_task:
                 object_positions = np.asarray(self.get_obj_positions())
                 object_positions = object_positions[:,2]
                 grasped_object_ind = np.argmax(object_positions)
@@ -765,7 +808,8 @@ class Robot(object):
                     break
                 tool_analog_input2 = new_tool_analog_input2
 
-        return grasp_success
+        # TODO: change to 1 and 2 arguments
+        return grasp_success, color_success
 
 
     def push(self, position, heightmap_rotation_angle, workspace_limits):
