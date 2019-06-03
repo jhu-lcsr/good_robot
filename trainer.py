@@ -1,5 +1,6 @@
 import os
 import time
+from collections import OrderedDict
 import numpy as np
 import cv2
 import torch
@@ -62,7 +63,17 @@ class Trainer(object):
 
         # Load pre-trained model
         if load_snapshot:
-            self.model.load_state_dict(torch.load(snapshot_file))
+
+            # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
+            loaded_snapshot_state_dict = torch.load(snapshot_file)
+            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+            self.model.load_state_dict(loaded_snapshot_state_dict)
+
+            # self.model.load_state_dict(torch.load(snapshot_file)) # Old loading command pre v0.4
+
             print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
 
         # Convert model from CPU to GPU
@@ -269,7 +280,11 @@ class Trainer(object):
                 else:
                     loss = self.push_criterion(self.model.output_prob[0][0], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                loss_value = loss.cpu().data.numpy()[0]
+                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value = loss.cpu().data.numpy()[0]
+                except:
+                    loss_value = loss.cpu().data.numpy()
 
             elif primitive_action == 'grasp':
                 # loss = self.grasp_criterion(self.model.output_prob[best_pix_ind[0]][1], Variable(torch.from_numpy(label).long().cuda()))
@@ -283,7 +298,11 @@ class Trainer(object):
                 else:
                     loss = self.grasp_criterion(self.model.output_prob[0][1], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                loss_value += loss.cpu().data.numpy()[0]
+                #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value += loss.cpu().data.numpy()[0]
+                except:
+                    loss_value += loss.cpu().data.numpy()
                 
                 # Since grasping is symmetric, train with another forward pass of opposite rotation angle
                 opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
@@ -295,7 +314,11 @@ class Trainer(object):
                 else:
                     loss = self.grasp_criterion(self.model.output_prob[0][1], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                loss_value += loss.cpu().data.numpy()[0]
+                #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value += loss.cpu().data.numpy()[0]
+                except:
+                    loss_value += loss.cpu().data.numpy()
 
                 loss_value = loss_value/2
 
@@ -334,7 +357,11 @@ class Trainer(object):
                     loss = self.criterion(self.model.output_prob[0][0].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
-                loss_value = loss.cpu().data.numpy()[0]
+                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value = loss.cpu().data.numpy()[0]
+                except:
+                    loss_value = loss.cpu().data.numpy()
 
             elif primitive_action == 'grasp':
 
@@ -347,7 +374,11 @@ class Trainer(object):
                     loss = self.criterion(self.model.output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
-                loss_value = loss.cpu().data.numpy()[0]
+                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value = loss.cpu().data.numpy()[0]
+                except:
+                    loss_value = loss.cpu().data.numpy()
 
                 opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
                 
@@ -360,7 +391,11 @@ class Trainer(object):
                 
                 loss = loss.sum()
                 loss.backward()
-                loss_value = loss.cpu().data.numpy()[0]
+                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                try: 
+                    loss_value = loss.cpu().data.numpy()[0]
+                except:
+                    loss_value = loss.cpu().data.numpy()
 
                 loss_value = loss_value/2
 
