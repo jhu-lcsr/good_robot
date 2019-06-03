@@ -10,7 +10,7 @@ from simulation import vrep
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file, place = True):
+                 is_testing, test_preset_cases, test_preset_file, place = False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits

@@ -67,7 +67,7 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file)
+                  is_testing, test_preset_cases, test_preset_file, args.place)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -445,7 +445,9 @@ if __name__ == '__main__':
     parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
-    
+    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+
+
     # Run main program with specified arguments
     args = parser.parse_args()
     main(args)
