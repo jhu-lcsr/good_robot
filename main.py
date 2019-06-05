@@ -70,7 +70,7 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file, args.place, args.grasp_color_task)
+                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
