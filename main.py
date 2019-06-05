@@ -60,6 +60,9 @@ def main(args):
     logging_directory = os.path.abspath(args.logging_directory) if continue_logging else os.path.abspath('logs')
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
+    # ------ HK: Added Options -----
+    grasp_color_task = args.grasp_color_task
+    place = args.place
 
     # Set random seed
     np.random.seed(random_seed)
