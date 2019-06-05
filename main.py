@@ -91,7 +91,7 @@ def main(args):
                           'primitive_action' : None,
                           'best_pix_ind' : None,
                           'push_success' : False,
-                          'grasp_success' : False
+                          'grasp_success' : False,
                           'color_success' : False} # HK: added color_success nonlocal_variable
 
 
@@ -363,7 +363,7 @@ def main(args):
 
                     sample_push_success = sample_reward_value == 0.5
                     sample_grasp_success = sample_reward_value == 1
-                    #TODO
+                    #TODO HK
                     sample_change_detected = sample_push_success
                     new_sample_label_value, _ = trainer.get_label_value(sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap)
 
