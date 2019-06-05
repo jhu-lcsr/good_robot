@@ -91,7 +91,7 @@ def main(args):
                           'primitive_action' : None,
                           'best_pix_ind' : None,
                           'push_success' : False,
-                          'grasp_success' : False
+                          'grasp_success' : False,
                           'color_success' : False} # HK: added color_success nonlocal_variable
 
 
