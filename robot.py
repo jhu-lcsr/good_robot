@@ -14,6 +14,8 @@ class Robot(object):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
+        self.place = place
+        self.grasp_color_task = grasp_color_task
 
         # HK: If grasping specific block color...
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
