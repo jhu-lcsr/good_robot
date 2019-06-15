@@ -109,7 +109,8 @@ void Server::update_buffer(const unsigned char * data, int offset, unsigned long
 // Configure all streams to run at 1280x720 resolution at 30 frames per second
 const int stream_width = 1280;
 const int stream_height = 720;
-const int stream_fps = 30;
+//const int stream_fps = 30;
+const int stream_fps = 6;
 const int depth_disparity_shift = 50;
 
 // Capture color and depth video streams, render them to the screen, send them through TCP
@@ -196,16 +197,17 @@ int main(int argc, char * argv[]) try {
     while(app) // Application still alive?
     {
         // Wait for next set of frames from the camera
-        rs2::frameset data = pipe.wait_for_frames(); 
-        rs2::frame color = data.get_color_frame(); 
-        // rs2::depth_frame raw_depth = data.get_depth_frame();       
+        rs2::frameset data = pipe.wait_for_frames();
+        rs2::frame color = data.get_color_frame();
+        // rs2::depth_frame raw_depth = data.get_depth_frame();
 
         // Get both raw and aligned depth frames
         auto processed = align.process(data);
         rs2::depth_frame aligned_depth = processed.get_depth_frame();
 
         // Find and colorize the depth data
-        rs2::frame depth_colorized = color_map(aligned_depth);  
+        //rs2::frame depth_colorized = color_map(aligned_depth);
+        rs2::frame depth_colorized = aligned_depth.apply_filter(color_map);
 
         int depth_size = aligned_depth.get_width()*aligned_depth.get_height()*aligned_depth.get_bytes_per_pixel();
         realsense_server.update_buffer((unsigned char*)aligned_depth.get_data(), 10*4, depth_size);
@@ -234,6 +236,3 @@ catch (const std::exception& e)
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
 }
-
-
-
