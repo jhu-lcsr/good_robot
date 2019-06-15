@@ -12,10 +12,13 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # User options (change me)
 # --------------- Setup options ---------------
-tcp_host_ip = '100.127.7.223' # IP and port to robot arm as TCP client (UR5)
+# tcp_host_ip = '100.127.7.223' # IP and port to robot arm as TCP client (UR5)
+tcp_host_ip = "10.75.15.94"
 tcp_port = 30002
-rtc_host_ip = '100.127.7.223' # IP and port to robot arm as real-time client (UR5)
+# rtc_host_ip = '100.127.7.223' # IP and port to robot arm as real-time client (UR5)
+rtc_host_ip = "10.75.15.94"
 rtc_port = 30003
+
 workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 calib_grid_step = 0.05
 checkerboard_offset_from_tool = [0,-0.13,0.02]
@@ -46,8 +49,10 @@ robot = Robot(False, None, None, workspace_limits,
 robot.open_gripper()
 
 # Slow down robot
-robot.joint_acc = 1.4
-robot.joint_vel = 1.05
+robot.joint_acc = 0.1
+robot.joint_vel = 0.1
+# robot.joint_acc = 1.4
+# robot.joint_vel = 1.05
 
 # Make robot gripper point upwards
 robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
