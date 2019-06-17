@@ -138,7 +138,7 @@ class Robot(object):
             # Move robot to home pose
             self.close_gripper()
             # TODO FIX GOING HOME
-            # self.go_home()
+            self.go_home()
 
             # Fetch RGB-D data from RealSense camera
             # TODO Fix camera
