@@ -120,8 +120,8 @@ class Robot(object):
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.1
-            self.joint_vel = 0.1
+            self.joint_acc = 0.3  # Safe when set 30% speed on pendant
+            self.joint_vel = 0.3
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
@@ -129,22 +129,21 @@ class Robot(object):
             # Default tool speed configuration
             # self.tool_acc = 1.2 # Safe: 0.5
             # self.tool_vel = 0.25 # Safe: 0.2
-            self.tool_acc = 0.1
-            self.tool_vel = 0.1
+            self.tool_acc = 0.3  # Safe when set 30% speed on pendant
+            self.tool_vel = 0.3
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
 
             # Move robot to home pose
             self.close_gripper()
-            # TODO FIX GOING HOME
             self.go_home()
 
             # Fetch RGB-D data from RealSense camera
             # TODO Fix camera
-            # from real.camera import Camera
-            # self.camera = Camera()
-            # self.cam_intrinsics = self.camera.intrinsics
+            from real.camera import Camera
+            self.camera = Camera()
+            self.cam_intrinsics = self.camera.intrinsics
 
             # Load camera pose (from running calibrate.py), intrinsics and depth scale
             # TODO fix camera
@@ -383,6 +382,8 @@ class Robot(object):
         data_bytes.extend(state_data)
         data_length = struct.unpack("!i", data_bytes[0:4])[0]
         robot_message_type = data_bytes[4]
+        print('bytes', data_bytes)
+        print('robot message type', robot_message_type)
         assert(robot_message_type == 16)
         byte_idx = 5
 
@@ -523,7 +524,6 @@ class Robot(object):
             if not async:
                 time.sleep(1.5)
 
-    # TODO: Is this solely ur5? I think there's no gripper in this.
     def get_state(self):
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -660,10 +660,12 @@ class Robot(object):
 
         # Block until robot reaches home state
         state_data = self.tcp_socket.recv(2048)
+        state_data = self.tcp_socket.recv(2048)
         actual_joint_positions = self.parse_tcp_state_data(
             state_data, 'joint_data')
         while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
-            state_data = self.tcp_socket.recv(2048)
+            # state_data = self.tcp_socket.recv(2048)
+            state_data = self.tcp_socket.recv(4096)
             actual_joint_positions = self.parse_tcp_state_data(
                 state_data, 'joint_data')
             time.sleep(0.01)
