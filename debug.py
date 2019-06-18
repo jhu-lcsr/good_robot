@@ -7,13 +7,17 @@ from robot import Robot
 
 # User options (change me)
 # --------------- Setup options ---------------
-tcp_host_ip = '100.127.7.223' # IP and port to robot arm as TCP client (UR5)
+tcp_host_ip = "10.75.15.94"  # IP and port to robot arm as TCP client (UR5)
 tcp_port = 30002
-workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# NOTE: original
+# workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
+# NOTE: mine
+workspace_limits = np.asarray([[0.5, 0.55], [-0.2, 0.15], [-0.15, -0.1]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
-robot = Robot(False, None, None, workspace_limits,
+robot = Robot(False, False, None, workspace_limits,
               tcp_host_ip, tcp_port, None, None,
               False, None, None)
 

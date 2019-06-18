@@ -20,7 +20,12 @@ rtc_host_ip = "10.75.15.94"
 rtc_port = 30003
 
 # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]])
+# TODO: are these in degrees or in millimeters??
+# workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]])
+# workspace_limits = np.asarray([[0.4, 0.75], [-0.25, 0.15], [-0.2, -0.15]])
+workspace_limits = np.asarray([[0.5, 0.55], [-0.2, 0.15], [-0.15, -0.1]])
+
+# 0.4 to 0.75; -.25 to .15; -0.2 to -0.1
 calib_grid_step = 0.05
 checkerboard_offset_from_tool = [0, -0.13, 0.02]
 tool_orientation = [-np.pi/2, 0, 0]  # [0,-2.22,2.22] # [2.22,2.22,0]
@@ -53,7 +58,9 @@ print('Connecting to robot...')
 robot = Robot(False, False, None, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None)
+print('!--------------------- Initialized robot -------------------- \n\n')
 robot.open_gripper()
+print('!--------------------- Gripper opened -------------------- \n\n')
 
 # Slow down robot
 robot.joint_acc = 0.1
@@ -63,11 +70,15 @@ robot.joint_vel = 0.1
 
 # Make robot gripper point upwards
 robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
+print('!--------------------- Moved gripper upward -------------------- \n\n')
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
+print('num calib pts', num_calib_grid_pts)
 for calib_pt_idx in range(num_calib_grid_pts):
     tool_position = calib_grid_pts[calib_pt_idx, :]
+    print('!--------------------- Moving to:', tool_position, tool_orientation,
+          '-------------------- \n\n')
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
 
@@ -112,7 +123,9 @@ for calib_pt_idx in range(num_calib_grid_pts):
         cv2.waitKey(10)
 
 # Move robot back to home pose
+print('!--------------------- Going home now -------------------- \n\n')
 robot.go_home()
+print('!--------------------- Homed -------------------- \n\n')
 
 measured_pts = np.asarray(measured_pts)
 observed_pts = np.asarray(observed_pts)

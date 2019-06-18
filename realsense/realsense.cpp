@@ -121,7 +121,7 @@ int main(int argc, char * argv[]) try {
 
     // Create a simple OpenGL window for rendering:
     //window app(2560, 720, "RealSense Stream");
-    window app(1280, 360, "RealSense Stream");
+    window app(640, 180, "RealSense Stream");
 
     // Check if RealSense device is connected
     rs2::context ctx;

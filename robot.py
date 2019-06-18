@@ -8,6 +8,8 @@ import utils
 from simulation import vrep
 import serial
 
+import urx
+
 
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
@@ -114,14 +116,17 @@ class Robot(object):
 
             # Default home joint configuration
             # self.home_joint_config = [-np.pi, -np.pi/2, np.pi/2, -np.pi/2, -np.pi/2, 0]
-            self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
-                                      (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
+            # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
+            # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
+            # TODO this is only for calibrate.py !!!
+            self.home_joint_config = [-np.pi, -
+                                      np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.3  # Safe when set 30% speed on pendant
-            self.joint_vel = 0.3
+            self.joint_acc = 0.1  # Safe when set 30% speed on pendant
+            self.joint_vel = 0.1
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
@@ -129,14 +134,15 @@ class Robot(object):
             # Default tool speed configuration
             # self.tool_acc = 1.2 # Safe: 0.5
             # self.tool_vel = 0.25 # Safe: 0.2
-            self.tool_acc = 0.3  # Safe when set 30% speed on pendant
-            self.tool_vel = 0.3
+            self.tool_acc = 0.1  # Safe when set 30% speed on pendant
+            self.tool_vel = 0.1
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
 
             # Move robot to home pose
             self.close_gripper()
+            self.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
             self.go_home()
 
             # Fetch RGB-D data from RealSense camera
@@ -382,7 +388,6 @@ class Robot(object):
         data_bytes.extend(state_data)
         data_length = struct.unpack("!i", data_bytes[0:4])[0]
         robot_message_type = data_bytes[4]
-        print('bytes', data_bytes)
         print('robot message type', robot_message_type)
         assert(robot_message_type == 16)
         byte_idx = 5
@@ -410,6 +415,7 @@ class Robot(object):
                 target_joint_positions[joint_idx] = struct.unpack(
                     '!d', data_bytes[(byte_idx+8):(byte_idx+16)])[0]
                 byte_idx += 41
+            print('joint pos', actual_joint_positions)
             return actual_joint_positions
 
         def parse_cartesian_info(data_bytes, byte_idx):
@@ -418,6 +424,7 @@ class Robot(object):
                 actual_tool_pose[pose_value_idx] = struct.unpack(
                     '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
                 byte_idx += 8
+            print('tool pos', actual_tool_pose)
             return actual_tool_pose
 
         def parse_tool_data(data_bytes, byte_idx):
@@ -529,6 +536,7 @@ class Robot(object):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
         state_data = self.tcp_socket.recv(2048)
+        state_data = self.tcp_socket.recv(2048)
         self.tcp_socket.close()
         return state_data
 
@@ -555,18 +563,23 @@ class Robot(object):
                                        (tool_position[0], tool_position[1], tool_position[2]), vrep.simx_opmode_blocking)
 
         else:
-            # TODO convert to robotiq
+            print('Entered move_to function, going to ', tool_position,
+                  tool_orientation)
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+            # NOTE: has p ! why is it acting as if it doesn't
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0], tool_position[1],
                                                                                tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
+            # have to run twice TODO figure out why
+            tcp_state_data = self.tcp_socket.recv(2048)
             tcp_state_data = self.tcp_socket.recv(2048)
             actual_tool_pose = self.parse_tcp_state_data(
                 tcp_state_data, 'cartesian_info')
             while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
+                print('MoveL!, but not quite there yet, hold on...')
                 # [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) < self.tool_pose_tolerance[j] for j in range(3,6)]
                 # print([np.abs(actual_tool_pose[j] - tool_position[j]) for j in range(3)] + [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) for j in range(3,6)])
                 tcp_state_data = self.tcp_socket.recv(2048)
@@ -585,6 +598,7 @@ class Robot(object):
         self.rtc_socket.connect((self.rtc_host_ip, self.rtc_port))
 
         # Read actual tool position
+        tcp_state_data = self.tcp_socket.recv(2048)
         tcp_state_data = self.tcp_socket.recv(2048)
         actual_tool_pose = self.parse_tcp_state_data(
             tcp_state_data, 'cartesian_info')
@@ -613,10 +627,12 @@ class Robot(object):
 
             time_start = time.time()
             tcp_state_data = self.tcp_socket.recv(2048)
+            tcp_state_data = self.tcp_socket.recv(2048)
             actual_tool_pose = self.parse_tcp_state_data(
                 tcp_state_data, 'cartesian_info')
             while not all([np.abs(actual_tool_pose[j] - increment_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
                 # print([np.abs(actual_tool_pose[j] - increment_position[j]) for j in range(3)])
+                tcp_state_data = self.tcp_socket.recv(2048)
                 tcp_state_data = self.tcp_socket.recv(2048)
                 actual_tool_pose = self.parse_tcp_state_data(
                     tcp_state_data, 'cartesian_info')
@@ -647,10 +663,10 @@ class Robot(object):
         return execute_success
 
     def move_joints(self, joint_configuration):
-
+        print('Entered move_joints function')
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        tcp_command = "movej([%f" % joint_configuration[0]
+        tcp_command = "movej([%f" % joint_configuration[0]  # NOTE: no p
         for joint_idx in range(1, 6):
             tcp_command = tcp_command + \
                 (",%f" % joint_configuration[joint_idx])
@@ -659,7 +675,7 @@ class Robot(object):
         self.tcp_socket.send(str.encode(tcp_command))
 
         # Block until robot reaches home state
-        state_data = self.tcp_socket.recv(2048)
+        state_data = self.tcp_socket.recv(2048)  # TODO why need to run twice
         state_data = self.tcp_socket.recv(2048)
         actual_joint_positions = self.parse_tcp_state_data(
             state_data, 'joint_data')
@@ -669,6 +685,7 @@ class Robot(object):
             actual_joint_positions = self.parse_tcp_state_data(
                 state_data, 'joint_data')
             time.sleep(0.01)
+            print('MoveJ, but not quite there yet, hold on...')
 
         self.tcp_socket.close()
 
@@ -688,6 +705,7 @@ class Robot(object):
 
     # Primitives ----------------------------------------------------------
 
+    # TODO probably need to change bin and home positions
     def grasp(self, position, heightmap_rotation_angle, workspace_limits):
         print('Executing: grasp at (%f, %f, %f)' %
               (position[0], position[1], position[2]))
@@ -823,6 +841,7 @@ class Robot(object):
             # # Check if grasp is successful
             # grasp_success =  tool_analog_input2 > 0.26
 
+            # TODO probably need to change this
             home_position = [0.49, 0.11, 0.03]
             bin_position = [0.5, -0.45, 0.1]
 

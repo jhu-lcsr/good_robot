@@ -1,3 +1,5 @@
+# https://github.com/SintefManufacturing/python-urx/blob/master/urx/urrobot.py
+# Must be run with library from the repo
 import urx
 import logging
 
