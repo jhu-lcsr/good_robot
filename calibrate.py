@@ -9,7 +9,7 @@ from real.camera import Camera
 from robot import Robot
 from scipy import optimize
 from mpl_toolkits.mplot3d import Axes3D
-
+import time
 
 # User options (change me)
 # --------------- Setup options ---------------
@@ -31,7 +31,8 @@ workspace_limits = np.asarray(
     [[0.4, 0.75], [-0.25, 0.15], [-0.2 + 0.4, -0.1 + 0.4]])
 
 calib_grid_step = 0.05
-checkerboard_offset_from_tool = [0, -0.13, 0.02]
+# checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
+checkerboard_offset_from_tool = [0.02, 0.002, 0.011]
 
 # Original
 # tool_orientation = [-np.pi/2, 0, 0]
@@ -67,27 +68,32 @@ print('Connecting to robot...')
 robot = Robot(False, False, None, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None)
-print('!--------------------- Initialized robot -------------------- \n\n')
-robot.open_gripper()
-print('!--------------------- Gripper opened -------------------- \n\n')
+print('!------------ Initialized robot -------------------- \n\n')
+robot.close_gripper()
+print('!------------- Gripper Closed -------------------- \n\n')
 
 # Slow down robot
-robot.joint_acc = 0.1
+robot.joint_acc = 0.2
 robot.joint_vel = 0.1
 # robot.joint_acc = 1.4
 # robot.joint_vel = 1.05
 
 # Make robot gripper point upwards
 robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
-print('!--------------------- Moved gripper to point upward -------------------- \n\n')
+print('!--------------- Moved gripper to point upward -------------------- \n\n')
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
+start = time.time()
 print('num calib pts', num_calib_grid_pts)
 for calib_pt_idx in range(num_calib_grid_pts):
     tool_position = calib_grid_pts[calib_pt_idx, :]
-    print('!--------------------- Moving to:', tool_position, tool_orientation,
-          '-------------------- \n\n')
+
+    print('!----- #: ', calib_pt_idx, '/ Total: ', num_calib_grid_pts,
+          '. Moving to: ', tool_position, tool_orientation, '---------')
+    dt = time.time() - start
+    print('!----- Elapsed Time: ', dt, '-----\n\n')
+
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
 
@@ -140,6 +146,10 @@ measured_pts = np.asarray(measured_pts)
 observed_pts = np.asarray(observed_pts)
 observed_pix = np.asarray(observed_pix)
 world2camera = np.eye(4)
+
+np.savetxt('real/measured_pts.txt', measured_pts, delimiter=' ')
+np.savetxt('real/observed_pts.txt', observed_pts, delimiter=' ')
+np.savetxt('real/observed_pix.txt', observed_pix, delimiter=' ')
 
 # Estimate rigid transform with SVD (from Nghia Ho)
 

@@ -382,7 +382,8 @@ class Robot(object):
     # def parse_tcp_state_data(self, state_data, subpackage):
     def parse_tcp_state_data(self, tcp_socket, subpackage):
 
-        tcp_state_data = tcp_socket.recv(2048)
+        state_data = tcp_socket.recv(1024)
+        state_data = tcp_socket.recv(1024)
         # Read package header
 
         data_bytes = bytearray()
@@ -392,7 +393,14 @@ class Robot(object):
         print('robot message type', robot_message_type)
         while (robot_message_type != 16):
             print('Wrong message type, trying again')
-            tcp_state_data = tcp_socket.recv(2048)
+            tcp_state_data = tcp_socket.recv(1024)
+            tcp_state_data = tcp_socket.recv(1024)
+            data_bytes = bytearray()
+            data_bytes.extend(state_data)
+            data_length = struct.unpack("!i", data_bytes[0:4])[0]
+            robot_message_type = data_bytes[4]
+            print('robot message type', robot_message_type)
+
         byte_idx = 5
 
         # Parse sub-packages
@@ -578,8 +586,8 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
-            # 
-            # TODO figure out why, have to run twice 
+            #
+            # TODO figure out why, have to run twice
             # tcp_state_data = self.tcp_socket.recv(2048)
             # tcp_state_data = self.tcp_socket.recv(2048)
             actual_tool_pose = self.parse_tcp_state_data(
@@ -603,7 +611,7 @@ class Robot(object):
 
         # Read actual tool position
         tcp_state_data = self.tcp_socket.recv(2048)
-        tcp_state_data = self.tcp_socket.recv(2048)
+        # TODO this will break if run
         actual_tool_pose = self.parse_tcp_state_data(
             tcp_state_data, 'cartesian_info')
         execute_success = True
@@ -679,15 +687,15 @@ class Robot(object):
         self.tcp_socket.send(str.encode(tcp_command))
 
         # Block until robot reaches home state
-        state_data = self.tcp_socket.recv(2048)  # TODO why need to run twice
-        state_data = self.tcp_socket.recv(2048)
+        # state_data = self.tcp_socket.recv(2048)  # TODO why need to run twice
+        # state_data = self.tcp_socket.recv(2048)
         actual_joint_positions = self.parse_tcp_state_data(
-            state_data, 'joint_data')
+            self.tcp_socket, 'joint_data')
         while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
             # state_data = self.tcp_socket.recv(2048)
             state_data = self.tcp_socket.recv(4096)
             actual_joint_positions = self.parse_tcp_state_data(
-                state_data, 'joint_data')
+                self.tcp_socket, 'joint_data')
             time.sleep(0.01)
             print('MoveJ, but not quite there yet, hold on...')
 
@@ -1219,4 +1227,3 @@ class Robot(object):
 
     #         place_success = True
     #         return place_success
-
