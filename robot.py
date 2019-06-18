@@ -390,7 +390,7 @@ class Robot(object):
         data_bytes.extend(state_data)
         data_length = struct.unpack("!i", data_bytes[0:4])[0]
         robot_message_type = data_bytes[4]
-        print('robot message type', robot_message_type)
+        # print('robot message type', robot_message_type)
         while (robot_message_type != 16):
             print('Wrong message type, trying again')
             tcp_state_data = tcp_socket.recv(1024)
@@ -399,7 +399,7 @@ class Robot(object):
             data_bytes.extend(state_data)
             data_length = struct.unpack("!i", data_bytes[0:4])[0]
             robot_message_type = data_bytes[4]
-            print('robot message type', robot_message_type)
+            # print('robot message type', robot_message_type)
 
         byte_idx = 5
 
@@ -435,7 +435,7 @@ class Robot(object):
                 actual_tool_pose[pose_value_idx] = struct.unpack(
                     '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
                 byte_idx += 8
-            print('tool pos', actual_tool_pose)
+            # print('tool pos', actual_tool_pose)
             return actual_tool_pose
 
         def parse_tool_data(data_bytes, byte_idx):

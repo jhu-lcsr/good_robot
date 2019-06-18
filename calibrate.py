@@ -27,8 +27,13 @@ rtc_port = 30003
 # NOTE: Mine as measured on pendant (in meters) 0.4 to 0.75; -.25 to .15; -0.2 to -0.1
 
 # Magic constant = 0.4; my z axis has an offset of 0.4 from the pendant somehow
+# Takes 10 minutes (at very safe 0.2 acc / 0.1 vel / 35% speeds):
 workspace_limits = np.asarray(
     [[0.4, 0.75], [-0.25, 0.15], [-0.2 + 0.4, -0.1 + 0.4]])
+
+# This takes only 1 minute (at very safe 0.2 acc / 0.1 vel / 35% speeds):
+# workspace_limits = np.asarray(
+# [[0.4, 0.75], [-0.25, -.25], [-0.2 + 0.4, -0.1 + 0.4]])
 
 calib_grid_step = 0.05
 # checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
