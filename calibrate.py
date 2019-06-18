@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Checkerboard courtesy of https://calib.io/pages/camera-calibration-pattern-generator
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,19 +21,21 @@ rtc_host_ip = "10.75.15.94"
 rtc_port = 30003
 
 # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-# NOTE: vpg original: workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]])
+# Original:
+# workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]])
 
-# NOTE: these are my limits (in meters) 0.4 to 0.75; -.25 to .15; -0.2 to -0.1
-# measured workspace limits = np.asarray([[0.4, 0.75], [-0.25, 0.15], [-0.2, -0.15]])
+# NOTE: Mine as measured on pendant (in meters) 0.4 to 0.75; -.25 to .15; -0.2 to -0.1
 
 # Magic constant = 0.4; my z axis has an offset of 0.4 from the pendant somehow
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
+    [[0.4, 0.75], [-0.25, 0.15], [-0.2 + 0.4, -0.1 + 0.4]])
 
 calib_grid_step = 0.05
 checkerboard_offset_from_tool = [0, -0.13, 0.02]
-# NOTE: originally
-# tool_orientation = [-np.pi/2, 0, 0]  # [0,-2.22,2.22] # [2.22,2.22,0]
+
+# Original
+# tool_orientation = [-np.pi/2, 0, 0]
+
 # NOTE: Mine is experimentally measured (from TCP pose status)
 tool_orientation = [-1.22, 1.19, -1.17]
 # ---------------------------------------------
@@ -76,7 +79,7 @@ robot.joint_vel = 0.1
 
 # Make robot gripper point upwards
 robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
-print('!--------------------- Moved gripper upward -------------------- \n\n')
+print('!--------------------- Moved gripper to point upward -------------------- \n\n')
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
