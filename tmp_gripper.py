@@ -27,9 +27,23 @@ robot.open_gripper()
 print('Gripper opened')
 time.sleep(1)
 
-robot.close_gripper()
-print('Gripper closed')
+
+robot.joint_acc = 0.1
+robot.joint_vel = 0.1
+
+calib_home = [-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+workspace_center = [0.5, 0, -0.1, 0, np.pi/2, np.pi]
+workspace_relative = [0, 0, 0, 0, 0, 0]
+
+movel = workspace_relative
+
+print('!--------------------- Moving joints to',
+      calib_home, ' -------------------- \n\n')
+robot.move_joints(calib_home)
+print('!--------------------- Moved to calib home. next: ------------')
 time.sleep(1)
-robot.open_gripper()
-print('Gripper opened')
+
+print('!--------------------- Moving l (pos) to', calib_home[0:3],
+      calib_home[3:], ' -------------------- \n\n')
+robot.move_to(movel[0:3], movel[3:])
 time.sleep(1)
