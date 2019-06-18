@@ -8,8 +8,6 @@ import utils
 from simulation import vrep
 import serial
 
-import urx
-
 
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
@@ -477,11 +475,6 @@ class Robot(object):
             gripper_fully_closed = True
 
         else:
-            # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-            # tcp_command = "set_digital_out(8,True)\n"
-            # self.tcp_socket.send(str.encode(tcp_command))
-            # self.tcp_socket.close()
             ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=1,
                                 parity=serial.PARITY_NONE,
                                 stopbits=serial.STOPBITS_ONE,
@@ -494,6 +487,12 @@ class Robot(object):
             else:
                 time.sleep(1.5)
                 gripper_fully_closed = self.check_grasp()
+
+            # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+            # tcp_command = "set_digital_out(8,True)\n"
+            # self.tcp_socket.send(str.encode(tcp_command))
+            # self.tcp_socket.close()
 
             return gripper_fully_closed
 
@@ -516,12 +515,14 @@ class Robot(object):
                     self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
 
         else:
+            # NOTE: for robotiq gripper
             ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200,
                                 timeout=1, parity=serial.PARITY_NONE,
                                 stopbits=serial.STOPBITS_ONE,
                                 bytesize=serial.EIGHTBITS)
             ser.write(
                 "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19")
+            # NOTE: Originally for RG2
             # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             # tcp_command = "set_digital_out(8,False)\n"
@@ -563,11 +564,10 @@ class Robot(object):
                                        (tool_position[0], tool_position[1], tool_position[2]), vrep.simx_opmode_blocking)
 
         else:
-            print('Entered move_to function, going to ', tool_position,
-                  tool_orientation)
+            # print('DEBUG: Entered move_to function, going to ', tool_position,
+                  # tool_orientation)
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-            # NOTE: has p ! why is it acting as if it doesn't
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0], tool_position[1],
                                                                                tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
             self.tcp_socket.send(str.encode(tcp_command))
@@ -579,9 +579,7 @@ class Robot(object):
             actual_tool_pose = self.parse_tcp_state_data(
                 tcp_state_data, 'cartesian_info')
             while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-                print('MoveL!, but not quite there yet, hold on...')
-                # [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) < self.tool_pose_tolerance[j] for j in range(3,6)]
-                # print([np.abs(actual_tool_pose[j] - tool_position[j]) for j in range(3)] + [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) for j in range(3,6)])
+                # print('DEBUG: MoveL!, but not quite there yet, hold on...')
                 tcp_state_data = self.tcp_socket.recv(2048)
                 prev_actual_tool_pose = np.asarray(actual_tool_pose).copy()
                 actual_tool_pose = self.parse_tcp_state_data(
@@ -694,7 +692,7 @@ class Robot(object):
         self.move_joints(self.home_joint_config)
 
     # Note: must be preceded by close_gripper()
-    # TODO convert to robotiq
+    # TODO convert to robotiq -- important as tells us if successful grasp
     def check_grasp(self):
 
         # state_data = self.get_state()
@@ -1216,45 +1214,3 @@ class Robot(object):
     #         place_success = True
     #         return place_success
 
-
-# JUNK
-
-# command = "movel(p[%f,%f,%f,%f,%f,%f],0.5,0.2,0,0,a=1.2,v=0.25)\n" % (-0.5,-0.2,0.1,2.0171,2.4084,0)
-
-# import socket
-
-# HOST = "192.168.1.100"
-# PORT = 30002
-# s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-# s.connect((HOST,PORT))
-
-# j0 = 0
-# j1 = -3.1415/2
-# j2 = 3.1415/2
-# j3 = -3.1415/2
-# j4 = -3.1415/2
-# j5 = 0;
-
-# joint_acc = 1.2
-# joint_vel = 0.25
-
-# # command = "movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f)\n" % (j0,j1,j2,j3,j4,j5,joint_acc,joint_vel)
-
-
-# #
-
-
-# # True closes
-# command = "set_digital_out(8,True)\n"
-
-# s.send(str.encode(command))
-# data = s.recv(1024)
-
-
-# s.close()
-# print("Received",repr(data))
-
-
-# print()
-
-# String.Format ("movej([%f,%f,%f,%f,%f, %f], a={6}, v={7})\n", j0, j1, j2, j3, j4, j5, a, v);

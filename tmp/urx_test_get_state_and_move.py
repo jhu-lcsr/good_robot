@@ -17,14 +17,27 @@ if __name__ == "__main__":
         v = 0.05
         a = 0.3
         pose = rob.getl()
-        print("robot tcp is at: ", pose)
+        print("robot tcp is at: ", pose, '\n')
+
         print("absolute move in base coordinate ")
         pose[2] += l
         rob.movel(pose, acc=a, vel=v)
+        pose = rob.getl()
+        print("robot tcp is at: ", pose, '\n')
+
         print("relative move in base coordinate ")
         rob.translate((0, 0, -l), acc=a, vel=v)
+        pose = rob.getl()
+        print("robot tcp is at: ", pose, '\n')
+
         print("relative move back and forth in tool coordinate")
         rob.translate_tool((0, 0, -l), acc=a, vel=v)
+        pose = rob.getl()
+        print("robot tcp is at: ", pose, '\n')
+
+        print("relative move back and forth in tool coordinate")
         rob.translate_tool((0, 0, l), acc=a, vel=v)
+        pose = rob.getl()
+        print("robot tcp is at: ", pose, '\n')
     finally:
         rob.close()
