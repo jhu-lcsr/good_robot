@@ -379,15 +379,20 @@ class Robot(object):
 
         return color_img, depth_img
 
-    def parse_tcp_state_data(self, state_data, subpackage):
+    # def parse_tcp_state_data(self, state_data, subpackage):
+    def parse_tcp_state_data(self, tcp_socket, subpackage):
 
+        tcp_state_data = tcp_socket.recv(2048)
         # Read package header
+
         data_bytes = bytearray()
         data_bytes.extend(state_data)
         data_length = struct.unpack("!i", data_bytes[0:4])[0]
         robot_message_type = data_bytes[4]
         print('robot message type', robot_message_type)
-        assert(robot_message_type == 16)
+        while (robot_message_type != 16):
+            print('Wrong message type, trying again')
+            tcp_state_data = tcp_socket.recv(2048)
         byte_idx = 5
 
         # Parse sub-packages
@@ -573,17 +578,18 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
-            # have to run twice TODO figure out why
-            tcp_state_data = self.tcp_socket.recv(2048)
-            tcp_state_data = self.tcp_socket.recv(2048)
+            # 
+            # TODO figure out why, have to run twice 
+            # tcp_state_data = self.tcp_socket.recv(2048)
+            # tcp_state_data = self.tcp_socket.recv(2048)
             actual_tool_pose = self.parse_tcp_state_data(
-                tcp_state_data, 'cartesian_info')
+                self.tcp_socket, 'cartesian_info')
             while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
                 # print('DEBUG: MoveL!, but not quite there yet, hold on...')
                 tcp_state_data = self.tcp_socket.recv(2048)
                 prev_actual_tool_pose = np.asarray(actual_tool_pose).copy()
                 actual_tool_pose = self.parse_tcp_state_data(
-                    tcp_state_data, 'cartesian_info')
+                    self.tcp_socket, 'cartesian_info')
                 time.sleep(0.01)
             self.tcp_socket.close()
 
