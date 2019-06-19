@@ -12,8 +12,10 @@ tcp_port = 30002
 # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 # NOTE: original
 # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
+
 # NOTE: mine
-workspace_limits = np.asarray([[0.5, 0.55], [-0.2, 0.15], [-0.15, -0.1]])
+workspace_limits = np.asarray(
+    [[0.4, 0.75], [-0.25, 0.15], [-0.2 + 0.4, -0.1 + 0.4]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
@@ -30,7 +32,9 @@ grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
 grasp_position[2] = workspace_limits[2][0]
 
 while True:
+    print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
     robot.grasp(grasp_position, 11*np.pi/8, workspace_limits)
+    print('!----Grasp completed')
     # robot.push(push_position, 0, workspace_limits)
     # robot.restart_real()
     time.sleep(1)

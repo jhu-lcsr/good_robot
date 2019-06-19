@@ -726,10 +726,9 @@ class Robot(object):
             "\x09\x03\x07\xD0\x00\x03\x04\x0E")
         data_raw = ser.readline()
         data = binascii.hexlify(data_raw)
-        print('Data', data)
         position = int(data[14:16], 16)  # hex to dec
-        print("Position ", position)
         ser.close()
+        print('Position', position, ' is grasp closed? ', position > 215)
         return position > 215  # 230 is closed
 
         # Note: Original
@@ -815,7 +814,7 @@ class Robot(object):
                 vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1,
                                            (-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1), vrep.simx_opmode_blocking)
 
-        # TODO: define grasp
+        # NOT simulation
         else:
 
             # Compute tool orientation from heightmap rotation angle
@@ -865,6 +864,8 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
 
+            print('\n !------ movej process() defined ---')
+
             # Block until robot reaches target tool position and gripper fingers have stopped moving
             # state_data = self.get_state()
             # tool_analog_input2 = self.parse_tcp_state_data(
@@ -876,21 +877,25 @@ class Robot(object):
             tool_analog_input2 = self.parse_tcp_state_data(
                 self.tcp_socket, 'tool_data')
             timeout_t0 = time.time()
+
             while True:
                 # state_data = self.get_state()
 
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+
                 new_tool_analog_input2 = self.parse_tcp_state_data(
                     self.tcp_socket, 'tool_data')
                 actual_tool_pose = self.parse_tcp_state_data(
                     self.tcp_socket, 'cartesian_info')
                 timeout_t1 = time.time()
+                self.tcp_socket.close()
+
                 if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > 5:
+                    print('Breaking')
                     break
                 tool_analog_input2 = new_tool_analog_input2
-                self.tcp_socket.close()
 
             # Check if gripper is open (grasp might be successful)
                 # gripper_full_closed = self.close_gripper()
@@ -907,11 +912,13 @@ class Robot(object):
             # bin_position = [0.5, -0.45, 0.1]
 
             # NOTE: mine
-            home_position = [0.5, -0.5, -0.15 + 0.4]
-            bin_position = [0.75, -0.5, -0.1 + 0.4]
+            home_position = [0.5, 0, -0.15 + 0.4]
+            bin_position = [0.75, 0, -0.1 + 0.4]
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
             if not gripper_full_closed:
+
+                print('\n !------ Gripper not closed ---')
 
                 # Pre-compute blend radius
                 blend_radius = min(
@@ -939,6 +946,7 @@ class Robot(object):
                 tcp_command += "end\n"
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
+                print('\n !------ Gripper not closed ; defined process() ---')
                 # print(tcp_command) # Debug
 
                 # Measure gripper width until robot reaches near bin location
@@ -955,16 +963,25 @@ class Robot(object):
                     actual_tool_pose = self.parse_tcp_state_data(
                         self.tcp_socket, 'cartesian_info')
                     self.tcp_socket.close()
+
                     measurements.append(tool_analog_input2)
                     if abs(actual_tool_pose[1] - bin_position[1]) < 0.2 or all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
+                        print('\n !------ Gripper not closed; breaking --')
                         break
 
+                # TODO!
+                # TODO: this appears to continuously try to close to keep object
+                # in grasp (in case of slip when moving); mine just closes !
                 # If gripper width did not change before reaching bin location, then object is in grip and grasp is successful
                 if len(measurements) >= 2:
                     if abs(measurements[0] - measurements[1]) < 0.1:
+                        print('\n !------ Grasp success, did not fall out!---')
                         grasp_success = True
 
             else:
+
+                print('\n !------ Gripper closed ---')
+
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -980,6 +997,7 @@ class Robot(object):
                 tcp_command += "end\n"
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
+                print('\n !------ Gripper closed, process() defined ---')
 
             # Block until robot reaches home location
             # state_data = self.get_state()
@@ -1005,7 +1023,9 @@ class Robot(object):
                 self.tcp_socket.close()
 
                 if (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
+                    print('\n !------ Gripper closed; loop breaking ---')
                     break
+
                 tool_analog_input2 = new_tool_analog_input2
 
         return grasp_success

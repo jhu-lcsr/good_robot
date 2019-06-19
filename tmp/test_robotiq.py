@@ -42,6 +42,10 @@ while(True):
     position = data[14:16]
     print("Position ", int(position, 16))
     time.sleep(.5)
+    # Example response:
+    # ('Raw data', '\t\x03\x06\xf9\x00\t\xff\xe6\x00+\x10')
+    # ('Response 4 ', '090306f90009ffe6002b10')
+    # ('Position ', 230
 
     print("Open gripper")
     ser.write("\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19")

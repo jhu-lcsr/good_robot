@@ -75,7 +75,7 @@ robot = Robot(False, False, None, workspace_limits,
               False, None, None)
 print('!------------ Initialized robot -------------------- \n\n')
 robot.close_gripper()
-print('!------------- Gripper Closed -------------------- \n\n')
+print('!------ Gripper Closed, moving gripper so checkerboard is facing up\n\n')
 
 # Slow down robot
 robot.joint_acc = 0.2
@@ -97,7 +97,7 @@ for calib_pt_idx in range(num_calib_grid_pts):
     print('!----- #: ', calib_pt_idx, '/ Total: ', num_calib_grid_pts,
           '. Moving to: ', tool_position, tool_orientation, '---------')
     dt = time.time() - start
-    print('!----- Elapsed Time: ', dt, '-----\n\n')
+    print('!----- Elapsed Time: ' + str(dt) + ' secs  ----- \n\n')
 
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
