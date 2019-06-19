@@ -22,7 +22,7 @@ while counter < 1:
     print('Raw data', data_raw)
     data = binascii.hexlify(data_raw)
     print("Response 2 ", data)
-    time.sleep(1)
+    time.sleep(.5)
 
 while(True):
     print("Close gripper")
@@ -31,7 +31,17 @@ while(True):
     print('Raw data', data_raw)
     data = binascii.hexlify(data_raw)
     print("Data Response 3 ", data)
-    time.sleep(2)
+    time.sleep(0.5)
+
+    print("!----- Read status")
+    ser.write("\x09\x03\x07\xD0\x00\x03\x04\x0E")
+    data_raw = ser.readline()
+    print('Raw data', data_raw)
+    data = binascii.hexlify(data_raw)
+    print("Response 4 ", data)
+    position = data[14:16]
+    print("Position ", int(position, 16))
+    time.sleep(.5)
 
     print("Open gripper")
     ser.write("\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19")
@@ -39,4 +49,22 @@ while(True):
     print('Raw data', data_raw)
     data = binascii.hexlify(data_raw)
     print("Response 4 ", data)
-    time.sleep(2)
+    time.sleep(0.5)
+
+    print("!----- Read status")
+    ser.write("\x09\x03\x07\xD0\x00\x03\x04\x0E")
+    data_raw = ser.readline()
+    print('Raw data', data_raw)
+    data = binascii.hexlify(data_raw)
+    print("Response 4 ", data)
+    position = data[14:16]
+    print("Position ", int(position, 16))
+    time.sleep(.5)
+
+data_raw = ser.readline()
+data = binascii.hexlify(data_raw)
+# Example of response if the grip is not completed: 09 03 06    39 00 00 FF 0E 0A F7 8B
+# Example of response if the grip is completed: 09 03 06        B9 00 00 FF BD 00 1D 7C
+# BD = 188, aka position = 188/255
+
+# 255 = fully closed
