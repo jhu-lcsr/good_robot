@@ -32,16 +32,20 @@ grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
 grasp_position[2] = workspace_limits[2][0]
 
 while True:
-    print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
-    robot.grasp(grasp_position, 11*np.pi/8, workspace_limits)
-    print('!----Grasp completed')
-    # robot.push(push_position, 0, workspace_limits)
-    # robot.restart_real()
-    time.sleep(1)
+    #     print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
+    # robot.grasp(grasp_position, 11*np.pi/8, workspace_limits)
+    # print('!----Grasp completed')
+    # # robot.push(push_position, 0, workspace_limits)
+    # # robot.restart_real()
+    # time.sleep(1)
 
-# Repeatedly move to workspace corners
-# while True:
-#     robot.move_to([workspace_limits[0][0], workspace_limits[1][0], workspace_limits[2][0]], [2.22,-2.22,0])
-#     robot.move_to([workspace_limits[0][0], workspace_limits[1][1], workspace_limits[2][0]], [2.22,-2.22,0])
-#     robot.move_to([workspace_limits[0][1], workspace_limits[1][1], workspace_limits[2][0]], [2.22,-2.22,0])
-#     robot.move_to([workspace_limits[0][1], workspace_limits[1][0], workspace_limits[2][0]], [2.22,-2.22,0])
+    # Repeatedly move to workspace corners
+    # while True:
+    robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                   [0], workspace_limits[2][0]], [2.22, -2.22, 0])
+    robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                   [1], workspace_limits[2][0]], [2.22, -2.22, 0])
+    robot.move_to([workspace_limits[0][1], workspace_limits[1]
+                   [1], workspace_limits[2][0]], [2.22, -2.22, 0])
+    robot.move_to([workspace_limits[0][1], workspace_limits[1]
+                   [0], workspace_limits[2][0]], [2.22, -2.22, 0])
