@@ -24,8 +24,8 @@ class Robot(object):
             self.block_color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0])
             # TODO: check if the block color is in the workspace
             # TODO: one hot encoding
-            #self.color_names = ['blue', 'green', 'yellow', 'red']
-            #self.vrep_names = ['shape_06', 'shape_01', 'shape__04', ]
+            self.color_names = ['blue', 'green', 'yellow', 'red']
+            self.vrep_names = ['shape_06', 'shape_01', 'shape__04', ]
             
             self.stored_action_labels = [
                 b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
@@ -44,10 +44,10 @@ class Robot(object):
 
             # HK: Dictionary for grasping
             # TODO: change to better name
-            self.info = {'self.color_names': self.color_names,
-            'self.vrep_names': self.vrep_names, 
-            'self.stored_action_labels': self.stored_action_labels,
-            'self.encoding_indices': self.encoding_indices}
+            self.info = {'color_names': self.color_names,
+            'vrep_names': self.vrep_names, 
+            'stored_action_labels': self.stored_action_labels,
+            'encoding_indices': self.encoding_indices}
 
         # If in simulation...
         if self.is_sim:
