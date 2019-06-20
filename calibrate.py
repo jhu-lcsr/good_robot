@@ -27,24 +27,32 @@ rtc_port = 30003
 
 # Magic constant = 0.4; my z axis has an offset of 0.4 from the pendant somehow
 # Takes 10 minutes (at very safe 0.2 acc / 0.1 vel / 35% speeds):
-workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, 0.15], [-0.21 + 0.4, -0.1 + 0.4]])
+workspace_limits = np.asarray(  # true-ish
+    [[0.4, 0.75], [-0.1, 0.15], [-0.21 + 0.4, -0.1 + 0.4]])
 
-# This takes only 1 minute (at very safe 0.2 acc / 0.1 vel / 35% speeds):
-workspace_limits = np.asarray(
-    [[0.4, 0.75], [0.05, .15], [-0.21 + 0.4, -0.15 + 0.4]])
+workspace_limits = np.asarray(  # smaller true-ish (63 pts)
+    [[0.400, 0.750], [0.000, 0.150], [-0.210 + 0.400, -0.100 + 0.400]])
 
-calib_grid_step = 0.05
+# workspace_limits = np.asarray(  # quick test -- 12 pts should still be pretty
+# accurate ! within 10 cm for sure. Good check that the offset is in the right
+# direction..
+workspace_limits = np.asarray(
+    [[0.400, 0.600], [-0.00, .150], [0.100, 0.300]])
+
+# calib_grid_step = 0.05
+calib_grid_step = 0.1
 # checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
-#checkerboard_offset_from_tool = [0.02, 0.002, 0.011]
-# I manually centered the x,y of the checkerboard:
-checkerboard_offset_from_tool = [0.00, 0.00, 0.011]
+
+# NOTE: measured
+checkerboard_offset_from_tool = [0.157, 0.000, 0.010]  # gripper is 2cm high
 
 # Original
 # tool_orientation = [-np.pi/2, 0, 0]
 
 # NOTE: Mine is experimentally measured (from TCP pose status)
+# NOTE: Can I provide this in not-axis angle?
 tool_orientation = [-1.22, 1.19, -1.17]
+# from pendant, this is equivalent to 0, pi/2, pi
 # ---------------------------------------------
 
 
@@ -79,8 +87,8 @@ robot.close_gripper()
 print('!------ Gripper Closed, moving gripper so checkerboard is facing up\n\n')
 
 # Slow down robot
-robot.joint_acc = 0.2
-robot.joint_vel = 0.1
+robot.joint_acc = 0.200
+robot.joint_vel = 0.150
 # robot.joint_acc = 1.4
 # robot.joint_vel = 1.05
 
@@ -95,10 +103,10 @@ print('num calib pts', num_calib_grid_pts)
 for calib_pt_idx in range(num_calib_grid_pts):
     tool_position = calib_grid_pts[calib_pt_idx, :]
 
-    print('!----- #: ', calib_pt_idx, '/ Total: ', num_calib_grid_pts,
-          '. Moving to: ', tool_position, tool_orientation, '---------')
+    print('!----- #: ' + str(calib_pt_idx) + ' / ' + str(num_calib_grid_pts),
+          '. Moving to: ', tool_position, tool_orientation, ' ---------')
     dt = time.time() - start
-    print('!----- Elapsed Time: ' + str(dt) + ' secs  ----- \n\n')
+    print('!- Elapsed Time: ' + str(dt) + ' secs  ----- \n\n')
 
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
@@ -108,6 +116,7 @@ for calib_pt_idx in range(num_calib_grid_pts):
     refine_criteria = (cv2.TERM_CRITERIA_EPS +
                        cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
     camera_color_img, camera_depth_img = robot.get_camera_data()
+    # print('camera data', robot.get_camera_data())
     bgr_color_data = cv2.cvtColor(camera_color_img, cv2.COLOR_RGB2BGR)
     gray_data = cv2.cvtColor(bgr_color_data, cv2.COLOR_RGB2GRAY)
     checkerboard_found, corners = cv2.findChessboardCorners(
@@ -121,18 +130,26 @@ for calib_pt_idx in range(num_calib_grid_pts):
         checkerboard_pix = np.round(corners_refined[4, 0, :]).astype(int)
         checkerboard_z = camera_depth_img[checkerboard_pix[1]
                                           ][checkerboard_pix[0]]
+        # print('checkerboard', checkerboard_pix,  'depth', checkerboard_z)
         checkerboard_x = np.multiply(
             checkerboard_pix[0]-robot.cam_intrinsics[0][2], checkerboard_z/robot.cam_intrinsics[0][0])
         checkerboard_y = np.multiply(
             checkerboard_pix[1]-robot.cam_intrinsics[1][2], checkerboard_z/robot.cam_intrinsics[1][1])
         if checkerboard_z == 0:
+            print('no depth info found')
             continue
 
         # Save calibration point and observed checkerboard center
         observed_pts.append([checkerboard_x, checkerboard_y, checkerboard_z])
         # tool_position[2] += checkerboard_offset_from_tool
+        # TODO: Is this offset in the right direction?
+        # TODO: Is this offset from the gripper jaws or from the tool of the
+        # robot?
         tool_position = tool_position + checkerboard_offset_from_tool
 
+        print('I measured (calculated)', tool_position)
+        print('I observed (realsense)', checkerboard_x, checkerboard_y,
+              checkerboard_z)
         measured_pts.append(tool_position)
         observed_pix.append(checkerboard_pix)
 
@@ -140,6 +157,7 @@ for calib_pt_idx in range(num_calib_grid_pts):
         # vis = cv2.drawChessboardCorners(robot.camera.color_data, checkerboard_size, corners_refined, checkerboard_found)
         vis = cv2.drawChessboardCorners(
             bgr_color_data, (1, 1), corners_refined[4, :, :], checkerboard_found)
+        print('saving file')
         cv2.imwrite('%06d.png' % len(measured_pts), vis)
         cv2.imshow('Calibration', vis)
         cv2.waitKey(10)
@@ -181,6 +199,7 @@ def get_rigid_transform(A, B):
 def get_rigid_transform_error(z_scale):
     global measured_pts, observed_pts, observed_pix, world2camera, camera
 
+    # NOTE: Camera intrinsics supplied by realsense camera over TCP
     # Apply z offset and compute new observed points using camera intrinsics
     observed_z = observed_pts[:, 2:] * z_scale
     observed_x = np.multiply(observed_pix[:, [
@@ -190,6 +209,7 @@ def get_rigid_transform_error(z_scale):
     new_observed_pts = np.concatenate(
         (observed_x, observed_y, observed_z), axis=1)
 
+    # NOTE: ENH why not just use openCV for estimating where camera is in world
     # Estimate rigid transform between measured points and new observed points
     R, t = get_rigid_transform(np.asarray(
         measured_pts), np.asarray(new_observed_pts))

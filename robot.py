@@ -295,7 +295,7 @@ class Robot(object):
         if self.btw(tool_position[0], limits[0][0], limits[0][1]) and \
                 self.btw(tool_position[1], limits[1][0], limits[1][1]) and \
                 self.btw(tool_position[2], limits[2][0], limits[2][1]):
-            print("I guess it's safe")
+            # print("I guess it's safe")
             # print('DEBUG: Entered move_to function, going to ', tool_position,
             # tool_orientation)
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
