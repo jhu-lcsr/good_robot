@@ -19,23 +19,60 @@ class Robot(object):
 
         # HK: If grasping specific block color...
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
+        # after grasping, put the block back
         if self.grasp_color_task:
             self.block_color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0])
+            # TODO: check if the block color is in the workspace
+            # TODO: one hot encoding
+            #self.color_names = ['blue', 'green', 'yellow', 'red']
+            #self.vrep_names = ['shape_06', 'shape_01', 'shape__04', ]
+            
+            self.stored_action_labels = [
+                b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
+                b'place_blue_on_red', b'grab_blue', b'place_red_on_blueyellow', b'place_green_on_redyellow',
+                b'place_red_on_yellow', b'place_green_on_blueyellow', b'place_red_on_greenblue', b'place_blue_on_green',
+                b'place_blue_on_redgreen',b'place_yellow_on_greenblue', b'place_yellow_on_blue', b'place_blue_on_greenyellow',
+                b'place_blue_on_yellowgreen', b'place_blue_on_greenred', b'place_yellow_on_redgreen', b'grab_yellow',
+                b'place_red_on_greenyellow', b'grab_green', b'place_red_on_green', b'place_yellow_on_bluered',
+                b'place_yellow_on_green', b'place_green_on_blue', b'place_yellow_on_bluegreen', b'place_blue_on_redyellow',
+                b'place_red_on_blue', b'place_red_on_yellowgreen', b'place_yellow_on_greenred', b'place_green_on_yellowblue',
+                b'place_red_on_bluegreen', b'place_green_on_red', b'place_red_on_yellowblue', b'place_green_on_yellowred',
+                b'place_green_on_redblue', b'grab_red', b'place_yellow_on_redblue', b'place_green_on_bluered', b'place_blue_on_yellow']
+            
+            # HK: Grasping indices
+            self.encoding_indices = [5,19,21,37]
+
+            # HK: Dictionary for grasping
+            # TODO: change to better name
+            self.info = {'color_names': self.color_names,
+            'vrep_names': self.vrep_names, 
+            'stored_action_labels': self.stored_action_labels,
+            'encoding_indices': self.encoding_indices}
 
         # If in simulation...
         if self.is_sim:
 
             # Define colors for object meshes (Tableau palette)
+            # self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+            #                                [89.0, 161.0, 79.0], # green
+            #                                [156, 117, 95], # brown
+            #                                [242, 142, 43], # orange
+            #                                [237.0, 201.0, 72.0], # yellow
+            #                                [186, 176, 172], # gray
+            #                                [255.0, 87.0, 89.0], # red
+            #                                [176, 122, 161], # purple
+            #                                [118, 183, 178], # cyan
+            #                                [255, 157, 167]])/255.0 #pink 
             self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
-                                           [89.0, 161.0, 79.0], # green
-                                           [156, 117, 95], # brown
-                                           [242, 142, 43], # orange
-                                           [237.0, 201.0, 72.0], # yellow
-                                           [186, 176, 172], # gray
-                                           [255.0, 87.0, 89.0], # red
-                                           [176, 122, 161], # purple
-                                           [118, 183, 178], # cyan
-                                           [255, 157, 167]])/255.0 #pink 
+                                [89.0, 161.0, 79.0], # green
+                                [237.0, 201.0, 72.0], # yellow
+                                [255.0, 87.0, 89.0], # red
+                                [156, 117, 95], # brown
+                                [242, 142, 43], # orange
+                                [186, 176, 172], # gray
+                                [176, 122, 161], # purple
+                                [118, 183, 178], # cyan
+                                [255, 157, 167]])/255.0 #pink 
 
             # Read files in object mesh directory 
             self.obj_mesh_dir = obj_mesh_dir
@@ -672,23 +709,43 @@ class Robot(object):
                     print('Right color: %r' % (self.check_color(self.block_color)))
 
             # Move the grasped object elsewhere if place = false
+            # if grasp_success and not self.place and self.grasp_color_task:
+            #     object_positions = np.asarray(self.get_obj_positions())
+            #     object_positions = object_positions[:,2]
+            #     grasped_object_ind = np.argmax(object_positions)
+            #     grasped_object_handle = self.object_handles[grasped_object_ind]
+            #     # TODO: HK: check if any block is grasped and put it back at a random place
+            #     color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
+            #     color_index = np.where(color==1)
+            #     vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+            #     if grasped_object_ind == color_index[0]:
+            #         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
+            #         drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
+            #         drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
+            #         object_position = [drop_x, drop_y, 0.15]
+            #         object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+            #         vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
+            #         vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
+
+            # HK: Place grasped object at a random place
             if grasp_success and not self.place and self.grasp_color_task:
                 object_positions = np.asarray(self.get_obj_positions())
                 object_positions = object_positions[:,2]
                 grasped_object_ind = np.argmax(object_positions)
                 grasped_object_handle = self.object_handles[grasped_object_ind]
-                # HK: check if red is grasped and put it back at a random place
-                color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
-                color_index = np.where(color==1)
-                vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-                if grasped_object_ind == color_index[0]:
-                    workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
-                    drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
-                    drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
-                    object_position = [drop_x, drop_y, 0.15]
-                    object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-                    vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
-                    vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
+                # TODO: HK: check if any block is grasped and put it back at a random place
+                # color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
+                # color_index = np.where(color==1)
+                # vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+
+                #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
+                drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
+                drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
+                object_position = [drop_x, drop_y, 0.15]
+                object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+                vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
+                vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
+
 
             # HK: Original Method
             elif grasp_success and not self.place and not self.grasp_color_task:
