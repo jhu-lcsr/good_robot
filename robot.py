@@ -44,10 +44,10 @@ class Robot(object):
 
             # HK: Dictionary for grasping
             # TODO: change to better name
-            self.info = {'color_names': self.color_names,
-            'vrep_names': self.vrep_names, 
-            'stored_action_labels': self.stored_action_labels,
-            'encoding_indices': self.encoding_indices}
+            self.info = {'self.color_names': self.color_names,
+            'self.vrep_names': self.vrep_names, 
+            'self.stored_action_labels': self.stored_action_labels,
+            'self.encoding_indices': self.encoding_indices}
 
         # If in simulation...
         if self.is_sim:
