@@ -32,11 +32,13 @@ workspace_limits = np.asarray(
 
 # This takes only 1 minute (at very safe 0.2 acc / 0.1 vel / 35% speeds):
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, -.25], [-0.2 + 0.4, -0.1 + 0.4]])
+    [[0.4, 0.75], [-0.05, .15], [-0.21 + 0.4, -0.15 + 0.4]])
 
 calib_grid_step = 0.05
 # checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
-checkerboard_offset_from_tool = [0.02, 0.002, 0.011]
+#checkerboard_offset_from_tool = [0.02, 0.002, 0.011]
+# I manually centered the x,y of the checkerboard:
+checkerboard_offset_from_tool = [0.00, 0.00, 0.011]
 
 # Original
 # tool_orientation = [-np.pi/2, 0, 0]
@@ -111,6 +113,7 @@ for calib_pt_idx in range(num_calib_grid_pts):
     checkerboard_found, corners = cv2.findChessboardCorners(
         gray_data, checkerboard_size, None, cv2.CALIB_CB_ADAPTIVE_THRESH)
     if checkerboard_found:
+        print("Found checkerboard.")
         corners_refined = cv2.cornerSubPix(
             gray_data, corners, (3, 3), (-1, -1), refine_criteria)
 

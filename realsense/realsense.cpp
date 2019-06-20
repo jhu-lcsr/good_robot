@@ -109,8 +109,8 @@ void Server::update_buffer(const unsigned char * data, int offset, unsigned long
 // Configure all streams to run at 1280x720 resolution at 30 frames per second
 const int stream_width = 1280;
 const int stream_height = 720;
-//const int stream_fps = 30;
-const int stream_fps = 6;
+const int stream_fps = 30;
+//const int stream_fps = 6;
 const int depth_disparity_shift = 50;
 
 // Capture color and depth video streams, render them to the screen, send them through TCP

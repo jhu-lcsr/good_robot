@@ -40,8 +40,8 @@ class Robot(object):
             # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
 
             # TODO this is only for calibrate.py !!!
-            # self.home_joint_config = [-np.pi, -
-            # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+            self.home_joint_config = [-np.pi, -
+                                      np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
@@ -62,7 +62,8 @@ class Robot(object):
             self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
 
             # Move robot to home pose
-            self.open_gripper()
+            # TODO: activate gripper function
+            # self.open_gripper()
             self.close_gripper()
             self.go_home()
 
