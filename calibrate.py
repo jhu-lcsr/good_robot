@@ -9,7 +9,6 @@ from real.camera import Camera
 from robot import Robot
 from scipy import optimize
 from mpl_toolkits.mplot3d import Axes3D
-import time
 
 # User options (change me)
 # --------------- Setup options ---------------
@@ -29,11 +28,11 @@ rtc_port = 30003
 # Magic constant = 0.4; my z axis has an offset of 0.4 from the pendant somehow
 # Takes 10 minutes (at very safe 0.2 acc / 0.1 vel / 35% speeds):
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, 0.15], [-0.2 + 0.4, -0.1 + 0.4]])
+    [[0.4, 0.75], [-0.25, 0.15], [-0.21 + 0.4, -0.1 + 0.4]])
 
 # This takes only 1 minute (at very safe 0.2 acc / 0.1 vel / 35% speeds):
-# workspace_limits = np.asarray(
-# [[0.4, 0.75], [-0.25, -.25], [-0.2 + 0.4, -0.1 + 0.4]])
+workspace_limits = np.asarray(
+    [[0.4, 0.75], [-0.25, -.25], [-0.2 + 0.4, -0.1 + 0.4]])
 
 calib_grid_step = 0.05
 # checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
