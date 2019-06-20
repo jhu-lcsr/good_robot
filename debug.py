@@ -14,8 +14,10 @@ tcp_port = 30002
 # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
 
 # NOTE: mine
+# workspace_limits = np.asarray(
+# [[0.4, 0.75], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
+    [[0.3, 0.4], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
@@ -41,11 +43,19 @@ while True:
 
     # Repeatedly move to workspace corners
     # while True:
+
+    print('Attempting to debug.')
     robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                   [0], workspace_limits[2][0]], [2.22, -2.22, 0])
-    robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                   [1], workspace_limits[2][0]], [2.22, -2.22, 0])
-    robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                   [1], workspace_limits[2][0]], [2.22, -2.22, 0])
-    robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                   [0], workspace_limits[2][0]], [2.22, -2.22, 0])
+                   [0], workspace_limits[2][0]], None)
+    time.sleep(1)
+    robot.move_to([workspace_limits[0][0] + 0.1, workspace_limits[1]
+                   [0], workspace_limits[2][0]], None)
+    time.sleep(1)
+    # robot.move_to([workspace_limits[0][0], workspace_limits[1]
+    # [0], workspace_limits[2][0]], [2.22, -2.22, 0])
+    # robot.move_to([workspace_limits[0][0], workspace_limits[1]
+    # [1], workspace_limits[2][0]], [2.22, -2.22, 0])
+    # robot.move_to([workspace_limits[0][1], workspace_limits[1]
+    # [1], workspace_limits[2][0]], [2.22, -2.22, 0])
+    # robot.move_to([workspace_limits[0][1], workspace_limits[1]
+    # [0], workspace_limits[2][0]], [2.22, -2.22, 0])

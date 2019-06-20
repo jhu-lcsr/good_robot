@@ -39,9 +39,9 @@ class Robot(object):
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
             # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
 
-            # TODO this is only for calibrate.py !!!
-            self.home_joint_config = [-np.pi, -
-                                      np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+            # NOTE this is only for calibrate.py (reduce retry time)
+            # self.home_joint_config = [-np.pi, -
+            # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
@@ -63,7 +63,7 @@ class Robot(object):
 
             # Move robot to home pose
             # TODO: activate gripper function
-            # self.open_gripper()
+            self.open_gripper()
             self.close_gripper()
             self.go_home()
 
@@ -300,8 +300,19 @@ class Robot(object):
             # tool_orientation)
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-            tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0], tool_position[1],
-                                                                               tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
+
+            if tool_orientation == None:
+                curr_pose = self.parse_tcp_state_data(self.tcp_socket,
+                                                      'cartesian_info')
+                print('Attempting to only move position')
+                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
+                    (tool_position[0], tool_position[1], tool_position[2],
+                     curr_pose[3], curr_pose[4], curr_pose[5], self.tool_acc,
+                     self.tool_vel)
+                print('tcp command', tcp_command)
+            else:
+                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0], tool_position[1],
+                                                                                   tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
