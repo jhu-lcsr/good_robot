@@ -17,7 +17,7 @@ tcp_port = 30002
 # workspace_limits = np.asarray(
 # [[0.4, 0.75], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
 workspace_limits = np.asarray(
-    [[0.3, 0.4], [-0.25, 0.15], [-0.15 + 0.4, -0.1 + 0.4]])
+    [[0.300, 0.500], [-0.250, 0.150], [0.200, 0.300]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
@@ -27,35 +27,46 @@ robot = Robot(False, False, None, workspace_limits,
 
 # Repeatedly grasp at middle of workspace
 grasp_position = np.sum(workspace_limits, axis=1) / 2
-grasp_position[2] = -0.25
+# NOPE grasp_position[2] = -0.25 # extra NOPE this would be through the table for me
 
-grasp_position[0] = 86 * 0.002 + workspace_limits[0][0]
-grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
-grasp_position[2] = workspace_limits[2][0]
+# grasp_position[0] = 86 * 0.002 + workspace_limits[0][0]
+# grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
+# grasp_position[2] = workspace_limits[2][0]
 
 while True:
-    #     print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
+    print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
     # robot.grasp(grasp_position, 11*np.pi/8, workspace_limits)
     # print('!----Grasp completed')
+
     # # robot.push(push_position, 0, workspace_limits)
     # # robot.restart_real()
-    # time.sleep(1)
+    time.sleep(1)
 
     # Repeatedly move to workspace corners
     # while True:
 
     print('Attempting to debug.')
+    # robot.move_to([workspace_limits[0][0], workspace_limits[1]
+    # [0], workspace_limits[2][0]], None)
+    # time.sleep(1)
+    # robot.move_to([workspace_limits[0][0] + 0.1, workspace_limits[1]
+    # [0], workspace_limits[2][0]], None)
+    # time.sleep(1)
     robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                   [0], workspace_limits[2][0]], None, acc_scaling=1,
+                  vel_scaling=1)
+    time.sleep(0.5)
+
+    """
+    robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                   [1], workspace_limits[2][0]], None)
+    time.sleep(0.5)
+
+    robot.move_to([workspace_limits[0][1], workspace_limits[1]
+                   [1], workspace_limits[2][0]], None)
+    time.sleep(0.5)
+
+    robot.move_to([workspace_limits[0][1], workspace_limits[1]
                    [0], workspace_limits[2][0]], None)
-    time.sleep(1)
-    robot.move_to([workspace_limits[0][0] + 0.1, workspace_limits[1]
-                   [0], workspace_limits[2][0]], None)
-    time.sleep(1)
-    # robot.move_to([workspace_limits[0][0], workspace_limits[1]
-    # [0], workspace_limits[2][0]], [2.22, -2.22, 0])
-    # robot.move_to([workspace_limits[0][0], workspace_limits[1]
-    # [1], workspace_limits[2][0]], [2.22, -2.22, 0])
-    # robot.move_to([workspace_limits[0][1], workspace_limits[1]
-    # [1], workspace_limits[2][0]], [2.22, -2.22, 0])
-    # robot.move_to([workspace_limits[0][1], workspace_limits[1]
-    # [0], workspace_limits[2][0]], [2.22, -2.22, 0])
+    time.sleep(0.5)
+    """

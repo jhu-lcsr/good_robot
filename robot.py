@@ -5,9 +5,10 @@ import time
 import os
 import numpy as np
 import utils
-from simulation import vrep
 import serial
 import binascii
+
+from simulation import vrep
 
 
 class Robot(object):
@@ -286,7 +287,9 @@ class Robot(object):
             return True
         return False
 
-    def move_to(self, tool_position, tool_orientation):
+    def move_to(self, tool_position, tool_orientation, acc_scaling=1,
+                vel_scaling=1):
+        acc, vel = self.tool_acc * acc_scaling, self.tool_vel * vel_scaling
 
         if self.is_sim:
             pass
@@ -307,12 +310,13 @@ class Robot(object):
                 print('Attempting to only move position')
                 tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
                     (tool_position[0], tool_position[1], tool_position[2],
-                     curr_pose[3], curr_pose[4], curr_pose[5], self.tool_acc,
-                     self.tool_vel)
+                     curr_pose[3], curr_pose[4], curr_pose[5], acc, vel)
                 print('tcp command', tcp_command)
             else:
-                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0], tool_position[1],
-                                                                                   tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
+                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % \
+                    (tool_position[0], tool_position[1], tool_position[2],
+                     tool_orientation[0], tool_orientation[1], tool_orientation[2],
+                     acc, vel)
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
@@ -334,6 +338,7 @@ class Robot(object):
         else:
             print("It's not safe to move here!", tool_position)
 
+    """
     def guarded_move_to(self, tool_position, tool_orientation):
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -406,6 +411,7 @@ class Robot(object):
         self.rtc_socket.close()
 
         return execute_success
+    """
 
     def move_joints(self, joint_configuration):
         # DEBUG:
@@ -465,6 +471,17 @@ class Robot(object):
 
     # TODO probably need to change bin and home positions
 
+    def grasp_primitive(self, position, orientation):
+        self.open_gripper()
+        # move fast to right above the object
+        self.move_to([position[0], position[1], position[2] + 0.1], None,
+                     self.joint_acc, self.joint_vel)
+        # then slowly move down
+        self.move_to(position, orientation,
+                     self.joint_acc * 0.1, self.joint_vel * 0.1)
+        # and grasp it
+        self.close_gripper()
+
     def grasp(self, position, heightmap_rotation_angle, workspace_limits):
         print('Executing: grasp at (%f, %f, %f)' %
               (position[0], position[1], position[2]))
@@ -501,31 +518,29 @@ class Robot(object):
             tilted_tool_orientation = tilted_tool_orientation_axis_angle[0]*np.asarray(
                 tilted_tool_orientation_axis_angle[1:4])
             """
-            # 2.21, 2.19, -0.04  = rx, ry, rz for straight down grasping
             # position
+            # TODO: FIX
             # tool_orientation = [2.21, 2.19, -0.04]
+            tool_orientation = [2.22, -2.22, 0]
             tilted_tool_orientation = tool_orientation
 
             # Attempt grasp
             position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.05, workspace_limits[2][0])
-            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+
+            """
             tcp_command = "def process():\n"
+            # ... is this a way to close the gripper
             tcp_command += " set_digital_out(8,False)\n"
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" \
-                % (position[0], position[1], position[2]+0.1, tool_orientation[0],
-                   tool_orientation[1], 0.0, self.joint_acc*0.5, self.joint_vel*0.5)
+                % (position[0], position[1], position[2] + 0.1, tool_orientation[0],
+                   tool_orientation[1], 0.0, self.joint_acc * 0.5, self.joint_vel * 0.5)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" \
                 % (position[0], position[1], position[2], tool_orientation[0],
-                   tool_orientation[1], 0.0, self.joint_acc*0.1, self.joint_vel*0.1)
+                   tool_orientation[1], 0.0, self.joint_acc * 0.1, self.joint_vel * 0.1)
             tcp_command += " set_digital_out(8,True)\n"
             tcp_command += "end\n"
-            self.tcp_socket.send(str.encode(tcp_command))
-            self.tcp_socket.close()
-
-            print('\n !------ movej process() defined ---')
-
+            """
             # Block until robot reaches target tool position and gripper fingers have stopped moving
             # state_data = self.get_state()
             # tool_analog_input2 = self.parse_tcp_state_data(
@@ -588,6 +603,7 @@ class Robot(object):
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+                """
                 tcp_command = "def process():\n"
                 tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
                     (position[0], position[1], bin_position[2],
@@ -604,6 +620,7 @@ class Robot(object):
                      tool_orientation[0], tool_orientation[1], 0.0,
                      self.joint_acc*0.5, self.joint_vel*0.5)
                 tcp_command += "end\n"
+                """
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
                 print('\n !------ Gripper not closed ; defined process() ---')
