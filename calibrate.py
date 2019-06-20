@@ -32,7 +32,7 @@ workspace_limits = np.asarray(
 
 # This takes only 1 minute (at very safe 0.2 acc / 0.1 vel / 35% speeds):
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.05, .15], [-0.21 + 0.4, -0.15 + 0.4]])
+    [[0.4, 0.75], [0.05, .15], [-0.21 + 0.4, -0.15 + 0.4]])
 
 calib_grid_step = 0.05
 # checkerboard_offset_from_tool = [0, -0.13, 0.02] # ORIGINAL
