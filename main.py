@@ -284,11 +284,16 @@ def main(args):
             trainer.iteration, color_heightmap, valid_depth_heightmap, '0')
 
         # Reset simulation or pause real-world training if table is empty
+        # TODO: what is valid_depth_heightmap
         stuff_count = np.zeros(valid_depth_heightmap.shape)
+        # stuff_count[valid_depth_heightmap > 0.02] = 1 # orig
         stuff_count[valid_depth_heightmap > 0.02] = 1
-        empty_threshold = 300
+        # TODO: what is empty threshold
+        # empty_threshold = 300 # origi
+        empty_threshold = 10
         if is_sim and is_testing:
             empty_threshold = 10
+        print('DEBUG: stuff count', np.sum(stuff_count))
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             no_change_count = [0, 0]
             if is_sim:

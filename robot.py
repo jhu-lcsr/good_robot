@@ -35,8 +35,15 @@ class Robot(object):
             self.rtc_port = rtc_port
 
             # Default home joint configuration
-            self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
-                                      -np.pi/2, -np.pi/2, 0]
+            # NOTE: this is for debug (hardcode calib) testing
+            # self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
+            # -np.pi/2, -np.pi/2, 0]
+
+            # NOTE: This is home so arm does not block depth cam
+            home_in_deg = np.array([-191, -117, 116, -80, -91, -11]) * 1.0
+            self.home_joint_config = np.deg2rad(home_in_deg)
+
+            # NOTE: this is orig
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
             # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
 
