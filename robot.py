@@ -40,7 +40,9 @@ class Robot(object):
             # -np.pi/2, -np.pi/2, 0]
 
             # NOTE: This is home so arm does not block depth cam
-            home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
+            # home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
+            # NOTE: This is for main.py to unblock
+            home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
             self.home_joint_config = np.deg2rad(home_in_deg)
 
             # NOTE: this is orig
@@ -55,7 +57,7 @@ class Robot(object):
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.1  # Safe when set 30% speed on pendant
+            self.joint_acc = 0.12  # Safe when set 30% speed on pendant
             self.joint_vel = 0.35
 
             # Joint tolerance for blocking calls
@@ -362,7 +364,7 @@ class Robot(object):
                 time.sleep(0.01)
                 self.tcp_socket.close()
         else:
-            print("DEBUG: It's not safe to move here!", tool_position)
+            print("DEBUG: It's not safe to move here!", tool_position, limits)
 
     """
     def guarded_move_to(self, tool_position, tool_orientation):
@@ -624,10 +626,16 @@ class Robot(object):
             # bin_position = [0.5, -0.45, 0.1]
 
             # NOTE: mine
-            bin_position = [0.630, -0.040, 0.300]
-            home_position = [0.400, 0.000, 0.260]
+            bin_position = [0.580, -0.040, 0.300]
+            # home_position = [0.400, 0.000, 0.260]
+            # NOTE: mine, and doesn't block the view
+            # home_position = [0.400, -0.100, 0.420]
+            home_position = [0.254, 0.218, 0.434]
+
             # If gripper is open, drop object in bin and check if grasp is successful
-            grasp_success = False
+            # grasp_success = False
+            # NOTE: last minute change (why keep grasping same spot)
+            grasp_success = True
 
             # gripper_full_closed = self.check_grasp()
             gripper_full_closed = False

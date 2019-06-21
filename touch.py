@@ -68,8 +68,8 @@ def mouseclick_callback(event, x, y, flags, param):
             camera2robot[0:3, 0:3], click_point) + camera2robot[0:3, 3:]
 
         target_position = target_position[0:3, 0]
-        print('Moving to ', target_position, ' with z offset of 0.2')
-        target_position[2] += 0.2
+        print('Moving to ', target_position, ' with z offset of 0.200')
+        target_position[2] += 0.200
         robot.move_to(target_position, tool_orientation)
 
 

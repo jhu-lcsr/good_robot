@@ -45,7 +45,7 @@ def main(args):
 
         # NOTE: mine
         workspace_limits = np.asarray(
-            [[0.300, 0.700], [-0.250, 0.150], [0.195, 0.400]])
+            [[0.250, 0.700], [-0.250, 0.220], [0.195, 0.440]])
     heightmap_resolution = args.heightmap_resolution  # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
@@ -189,14 +189,19 @@ def main(args):
                                     trainer.predicted_value_log)
 
                 # Compute 3D position of pixel
-                print('Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables[
+                print('!------------------ Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables[
                       'best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]))
                 best_rotation_angle = np.deg2rad(
                     nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
                 best_pix_x = nonlocal_variables['best_pix_ind'][2]
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
+
+                # NOTE: original
+                # primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution +
+                # workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
+                # NOTE: mine, less safe 0:
                 primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution +
-                                      workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
+                                      workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x]]
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
                 # or nonlocal_variables['primitive_action'] == 'place':
@@ -227,6 +232,7 @@ def main(args):
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
+                    """
                     push_pred_vis = trainer.get_prediction_vis(
                         push_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
                     logger.save_visualizations(
@@ -237,6 +243,7 @@ def main(args):
                     logger.save_visualizations(
                         trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
+                    """
 
                 # Initialize variables that influence reward
                 nonlocal_variables['push_success'] = False
@@ -293,7 +300,9 @@ def main(args):
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
-        stuff_count[valid_depth_heightmap > 0.01] = 1
+        stuff_count[valid_depth_heightmap > 0.001] = 1
+        print('DEBUG: depthmap avg', np.average(valid_depth_heightmap))
+        # stuff_count[valid_depth_heightmap > 0.02] = 1
         # empty_threshold = 300 # ORIG
         empty_threshold = 20  # ORIG
         if is_sim and is_testing:
