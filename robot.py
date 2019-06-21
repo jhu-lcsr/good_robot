@@ -42,8 +42,8 @@ class Robot(object):
             # NOTE: This is home so arm does not block depth cam
             # home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
             # NOTE: This is for main.py to unblock
-            home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
-            self.home_joint_config = np.deg2rad(home_in_deg)
+            # home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
+            # self.home_joint_config = np.deg2rad(home_in_deg)
 
             # NOTE: this is orig
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
@@ -51,8 +51,8 @@ class Robot(object):
 
             # NOTE this is only for calibrate.py (reduce retry time) - #
             # checkerboard flat and pointing up
-            # self.home_joint_config = [-np.pi, -
-            # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+            self.home_joint_config = [-np.pi, -
+                                      np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
