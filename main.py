@@ -284,13 +284,10 @@ def main(args):
             trainer.iteration, color_heightmap, valid_depth_heightmap, '0')
 
         # Reset simulation or pause real-world training if table is empty
-        # TODO: what is valid_depth_heightmap
         stuff_count = np.zeros(valid_depth_heightmap.shape)
-        # stuff_count[valid_depth_heightmap > 0.02] = 1 # orig
-        stuff_count[valid_depth_heightmap > 0.02] = 1
-        # TODO: what is empty threshold
-        # empty_threshold = 300 # origi
-        empty_threshold = 10
+        stuff_count[valid_depth_heightmap > 0.01] = 1
+        # empty_threshold = 300 # ORIG
+        empty_threshold = 20  # ORIG
         if is_sim and is_testing:
             empty_threshold = 10
         print('DEBUG: stuff count', np.sum(stuff_count))
@@ -321,11 +318,13 @@ def main(args):
             continue
 
         if not exit_called:
+            print("Let's get some grasp predictions")
 
             # TODO: edit
             # Run forward pass with network to get affordances
             push_predictions, grasp_predictions, state_feat = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True)
+            print("DEBUG: Grasp predictions", grasp_predictions)
 
             # TODO: edit
             # Execute best primitive action on robot in another thread
@@ -359,18 +358,21 @@ def main(args):
 
             '''
             # Compute training labels
-            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap)
-            trainer.label_value_log.append([label_value]) 
+            label_value, prev_reward_value = trainer.get_label_value(
+                prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap)
+            trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
 
             # Backpropagate
-            trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value)
+            trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
+                             prev_primitive_action, prev_best_pix_ind, label_value)
 
             # Adjust exploration probability
             if not is_testing:
-                explore_prob = max(0.5 * np.power(0.9998, trainer.iteration),0.1) if explore_rate_decay else 0.5
+                explore_prob = max(
+                    0.5 * np.power(0.9998, trainer.iteration),0.1) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
             if experience_replay and not is_testing:
@@ -378,7 +380,8 @@ def main(args):
                 if sample_primitive_action == 'push':
                     sample_primitive_action_id = 0
                     if method == 'reactive':
-                        sample_reward_value = 0 if prev_reward_value == 1 else 1 # random.randint(1, 2) # 2
+                        # random.randint(1, 2) # 2
+                        sample_reward_value = 0 if prev_reward_value == 1 else 1
                     elif method == 'reinforcement':
                         sample_reward_value = 0 if prev_reward_value == 0.5 else 0.5
                 elif sample_primitive_action == 'grasp':
@@ -389,56 +392,77 @@ def main(args):
                         sample_reward_value = 0 if prev_reward_value == 1 else 1
 
                 # Get samples of the same primitive but with different results
-                sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
-                
+                sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(
+                    trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
+
                 if sample_ind.size > 0:
 
                     # Find sample with highest surprise value
                     if method == 'reactive':
-                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - (1 - sample_reward_value))
+                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[
+                                                        sample_ind[:,0]] - (1 - sample_reward_value))
                     elif method == 'reinforcement':
-                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
-                    sorted_surprise_ind = np.argsort(sample_surprise_values[:,0])
+                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[
+                                                        sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+                    sorted_surprise_ind = np.argsort(
+                        sample_surprise_values[:,0])
                     sorted_sample_ind = sample_ind[sorted_surprise_ind,0]
                     pow_law_exp = 2
-                    rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
+                    rand_sample_ind = int(
+                        np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
                     sample_iteration = sorted_sample_ind[rand_sample_ind]
-                    print('Experience replay: iteration %d (surprise value: %f)' % (sample_iteration, sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
+                    print('Experience replay: iteration %d (surprise value: %f)' % (
+                        sample_iteration, sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
 
                     # Load sample RGB-D heightmap
-                    sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
-                    sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
-                    sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
-                    sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
+                    sample_color_heightmap = cv2.imread(os.path.join(
+                        logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
+                    sample_color_heightmap = cv2.cvtColor(
+                        sample_color_heightmap, cv2.COLOR_BGR2RGB)
+                    sample_depth_heightmap = cv2.imread(os.path.join(
+                        logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
+                    sample_depth_heightmap = sample_depth_heightmap.astype(
+                        np.float32)/100000
 
                     # Compute forward pass with sample
-                    sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(sample_color_heightmap, sample_depth_heightmap, is_volatile=True)
+                    sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
+                        sample_color_heightmap, sample_depth_heightmap, is_volatile=True)
 
                     # Load next sample RGB-D heightmap
-                    next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
-                    next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-                    next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
-                    next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
+                    next_sample_color_heightmap = cv2.imread(os.path.join(
+                        logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
+                    next_sample_color_heightmap = cv2.cvtColor(
+                        next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
+                    next_sample_depth_heightmap = cv2.imread(os.path.join(
+                        logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
+                    next_sample_depth_heightmap = next_sample_depth_heightmap.astype(
+                        np.float32)/100000
 
                     sample_push_success = sample_reward_value == 0.5
                     sample_grasp_success = sample_reward_value == 1
                     sample_change_detected = sample_push_success
-                    new_sample_label_value, _ = trainer.get_label_value(sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap)
+                    new_sample_label_value, _ = trainer.get_label_value(sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+                                                                        sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap)
 
                     # Get labels for sample and backpropagate
-                    sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration,1:4]).astype(int)
-                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind, trainer.label_value_log[sample_iteration])
+                    sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[
+                                           sample_iteration,1:4]).astype(int)
+                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action,
+                                     sample_best_pix_ind, trainer.label_value_log[sample_iteration])
 
                     # Recompute prediction value and label for replay buffer
                     if sample_primitive_action == 'push':
-                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
+                        trainer.predicted_value_log[sample_iteration] = [
+                            np.max(sample_push_predictions)]
                         # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
                     elif sample_primitive_action == 'grasp':
-                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+                        trainer.predicted_value_log[sample_iteration] = [
+                            np.max(sample_grasp_predictions)]
                         # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
                 else:
-                    print('Not enough prior training samples. Skipping experience replay.')
+                    print(
+                        'Not enough prior training samples. Skipping experience replay.')
             '''
 
             # Save model snapshot
