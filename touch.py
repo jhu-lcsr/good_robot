@@ -20,7 +20,6 @@ rtc_port = 30003
 # tool_orientation = [2.22, -2.22, 0]
 workspace_limits = np.asarray(
     [[0.4, 0.75], [-0.25, 0.15], [-0.21 + 0.4, -0.0 + 0.4]])
-# tool_orientation = [-1.22, 1.19, -1.17]  # gripper facing upward, for calib
 tool_orientation = [-1.22, 1.19, -1.17]  # gripper facing upward, for calib
 # ---------------------------------------------
 

@@ -35,8 +35,8 @@ class Robot(object):
             self.rtc_port = rtc_port
 
             # Default home joint configuration
-            self.home_joint_config = [-np.pi, -
-                                      np.pi/2, np.pi/2, -np.pi/2, -np.pi/2, 0]
+            self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
+                                      -np.pi/2, -np.pi/2, 0]
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
             # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
 
@@ -48,7 +48,7 @@ class Robot(object):
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
             self.joint_acc = 0.1  # Safe when set 30% speed on pendant
-            self.joint_vel = 0.1
+            self.joint_vel = 0.35
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
@@ -64,9 +64,11 @@ class Robot(object):
 
             # Move robot to home pose
             # TODO: activate gripper function
-            self.open_gripper()
-            self.close_gripper()
+            # self.activate_gripper()
             self.go_home()
+            # time.sleep(1)
+            # self.close_gripper()
+            # self.open_gripper()
 
             # Fetch RGB-D data from RealSense camera
             # TODO Fix camera
@@ -206,7 +208,26 @@ class Robot(object):
 
         return TCP_forces
 
+    def activate_gripper(self, async=False):
+        print('!-- activating gripper')
+        ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=1,
+                            parity=serial.PARITY_NONE,
+                            stopbits=serial.STOPBITS_ONE,
+                            bytesize=serial.EIGHTBITS)
+        # closing_force = '\xFF' # 255
+        clear_rACT = "\x09\x10\x03\xE8\x00\x03\x06\x00\x00\x00\x00\x00\x00\x73\x30"
+        ser.write(clear_rACT)
+        set_rACT = "\x09\x10\x03\xE8\x00\x03\x06\x01\x00\x00\x00\x00\x00\x72\xE1"
+        ser.write(set_rACT)
+
+        # read gripper status until activation completed?
+        ser.write("\x09\x03\x07\xD0\x00\x01\x85\xCF")
+        ser.readline()
+
+        ser.close()
+
     def close_gripper(self, async=False):
+        print("!-- close gripper")
 
         if self.is_sim:
             pass
@@ -217,16 +238,22 @@ class Robot(object):
                                 parity=serial.PARITY_NONE,
                                 stopbits=serial.STOPBITS_ONE,
                                 bytesize=serial.EIGHTBITS)
-            # closing_force = '\xFF' # 255
+            ser.write(
+                "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF\xFF\x42\x29")
+
+            """
+            # NOTE: THIS DOESN'T WORK (probably some hex vs str thing)
             closing_force = '\xBB'  # 187
-            close_cmd = "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF" + \
-                closing_force + "\x42\x29"
-            ser.write(close_cmd)
+            # close_cmd = "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF" + \
+                # closing_force + "\x42\x29"
+            # print('close_cmd', close_cmd)
+            # ser.write(close_cmd)
+            """
             ser.close()
             if async:
                 gripper_fully_closed = True
             else:
-                time.sleep(1.5)
+                time.sleep(0.5)
                 gripper_fully_closed = self.check_grasp()
 
             # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -241,21 +268,9 @@ class Robot(object):
     def open_gripper(self, async=False):
 
         if self.is_sim:
-            gripper_motor_velocity = 0.5
-            gripper_motor_force = 20
-            sim_ret, RG2_gripper_handle = vrep.simxGetObjectHandle(
-                self.sim_client, 'RG2_openCloseJoint', vrep.simx_opmode_blocking)
-            sim_ret, gripper_joint_position = vrep.simxGetJointPosition(
-                self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
-            vrep.simxSetJointForce(
-                self.sim_client, RG2_gripper_handle, gripper_motor_force, vrep.simx_opmode_blocking)
-            vrep.simxSetJointTargetVelocity(
-                self.sim_client, RG2_gripper_handle, gripper_motor_velocity, vrep.simx_opmode_blocking)
-            while gripper_joint_position < 0.0536:  # Block until gripper is fully open
-                sim_ret, gripper_joint_position = vrep.simxGetJointPosition(
-                    self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
-
+            pass
         else:
+            print('!-- opening gripper')
             # NOTE: for robotiq gripper
             ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200,
                                 timeout=1, parity=serial.PARITY_NONE,
@@ -271,7 +286,7 @@ class Robot(object):
             # self.tcp_socket.close()
             ser.close()
             if not async:
-                time.sleep(1.5)
+                time.sleep(0.5)
 
     def get_state(self):
 
@@ -289,7 +304,7 @@ class Robot(object):
 
     def move_to(self, tool_position, tool_orientation, acc_scaling=1,
                 vel_scaling=1):
-        acc, vel = self.tool_acc * acc_scaling, self.tool_vel * vel_scaling
+        acc, vel = self.joint_acc * acc_scaling, self.joint_vel * vel_scaling
 
         if self.is_sim:
             pass
@@ -308,10 +323,12 @@ class Robot(object):
                 curr_pose = self.parse_tcp_state_data(self.tcp_socket,
                                                       'cartesian_info')
                 print('Attempting to only move position')
-                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
+                # NOTE: I changed to movej
+                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
                     (tool_position[0], tool_position[1], tool_position[2],
                      curr_pose[3], curr_pose[4], curr_pose[5], acc, vel)
                 print('tcp command', tcp_command)
+
             else:
                 tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % \
                     (tool_position[0], tool_position[1], tool_position[2],
@@ -444,6 +461,7 @@ class Robot(object):
 
     def go_home(self):
 
+        print('Going home!')
         self.move_joints(self.home_joint_config)
 
     # Note: must be preceded by close_gripper()
@@ -471,14 +489,16 @@ class Robot(object):
 
     # TODO probably need to change bin and home positions
 
-    def grasp_primitive(self, position, orientation):
+    def grasp_object(self, position, orientation):
+        # throttle z position
+        position[2] = max(position[2] - 0.050, self.workspace_limits[2][0])
+
         self.open_gripper()
         # move fast to right above the object
-        self.move_to([position[0], position[1], position[2] + 0.1], None,
-                     self.joint_acc, self.joint_vel)
+        self.move_to([position[0], position[1], position[2] + 0.100],
+                     orientation)
         # then slowly move down
-        self.move_to(position, orientation,
-                     self.joint_acc * 0.1, self.joint_vel * 0.1)
+        self.move_to(position, orientation, acc_scaling=0.5, vel_scaling=0.1)
         # and grasp it
         self.close_gripper()
 
@@ -525,12 +545,16 @@ class Robot(object):
             tilted_tool_orientation = tool_orientation
 
             # Attempt grasp
+
+            print('!--- Attempting to open gripper, then go down & close --!')
+            self.grasp_object(position, tool_orientation)
+            """
             position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.05, workspace_limits[2][0])
 
-            """
             tcp_command = "def process():\n"
             # ... is this a way to close the gripper
+            # sure is
             tcp_command += " set_digital_out(8,False)\n"
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" \
                 % (position[0], position[1], position[2] + 0.1, tool_orientation[0],
@@ -542,6 +566,7 @@ class Robot(object):
             tcp_command += "end\n"
             """
             # Block until robot reaches target tool position and gripper fingers have stopped moving
+            """
             # state_data = self.get_state()
             # tool_analog_input2 = self.parse_tcp_state_data(
             # state_data, 'tool_data')
@@ -555,28 +580,31 @@ class Robot(object):
 
             while True:
                 # state_data = self.get_state()
-
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
 
                 new_tool_analog_input2 = self.parse_tcp_state_data(
                     self.tcp_socket, 'tool_data')
+                print('tool analog input', new_tool_analog_input2)
                 actual_tool_pose = self.parse_tcp_state_data(
                     self.tcp_socket, 'cartesian_info')
                 timeout_t1 = time.time()
                 self.tcp_socket.close()
+            """
 
+            # TODO: determine if gripper has force on it
+            """
                 if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > 5:
                     print('Breaking')
                     break
                 tool_analog_input2 = new_tool_analog_input2
+                """
 
             # Check if gripper is open (grasp might be successful)
-                # gripper_full_closed = self.close_gripper()
-                # grasp_success = not gripper_full_closed
+            # gripper_full_closed = self.close_gripper()
+            # grasp_success = not gripper_full_closed
             # gripper_open = tool_analog_input2 > 0.26
-            gripper_full_closed = self.check_grasp()
             # gripper_open = !gripper_full_closed
 
             # # Check if grasp is successful
@@ -587,23 +615,31 @@ class Robot(object):
             # bin_position = [0.5, -0.45, 0.1]
 
             # NOTE: mine
-            home_position = [0.5, 0, -0.15 + 0.4]
-            bin_position = [0.75, 0, -0.1 + 0.4]
+            bin_position = [0.630, -0.040, 0.300]
+            home_position = [0.400, 0.000, 0.260]
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
-            if not gripper_full_closed:
 
-                print('\n !------ Gripper not closed ---')
-
+            gripper_full_closed = self.check_grasp()
+            print('Gripper state', gripper_full_closed)
+            if not gripper_full_closed:  # yay we might have grabbed something
                 # Pre-compute blend radius
-                blend_radius = min(
-                    abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
+                # blend_radius = min(
+                # abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
 
-                # Attempt placing
+                # Attempt placing in bin
+                print("attempting to drop into bin and then go home")
+                self.move_to(bin_position, None)
+                self.open_gripper()
+
+                print('Going home now')
+                self.move_to(home_position, None)
+
+                # NOTE: original code separates into approach and throw (tilted) parts
+                """
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-                """
                 tcp_command = "def process():\n"
                 tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
                     (position[0], position[1], bin_position[2],
@@ -620,15 +656,15 @@ class Robot(object):
                      tool_orientation[0], tool_orientation[1], 0.0,
                      self.joint_acc*0.5, self.joint_vel*0.5)
                 tcp_command += "end\n"
-                """
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
-                print('\n !------ Gripper not closed ; defined process() ---')
+                """
                 # print(tcp_command) # Debug
 
                 # Measure gripper width until robot reaches near bin location
                 # state_data = self.get_state()
                 measurements = []
+                """
                 while True:
                     # state_data = self.get_state()
 
@@ -645,6 +681,7 @@ class Robot(object):
                     if abs(actual_tool_pose[1] - bin_position[1]) < 0.2 or all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
                         print('\n !------ Gripper not closed; breaking --')
                         break
+                    """
 
                 # TODO!
                 # TODO: this appears to continuously try to close to keep object
@@ -659,6 +696,7 @@ class Robot(object):
 
                 print('\n !------ Gripper closed ---')
 
+                """
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -674,11 +712,13 @@ class Robot(object):
                 tcp_command += "end\n"
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
+                """
                 print('\n !------ Gripper closed, process() defined ---')
 
             # Block until robot reaches home location
             # state_data = self.get_state()
 
+            """
             self.tcp_socket = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -704,6 +744,7 @@ class Robot(object):
                     break
 
                 tool_analog_input2 = new_tool_analog_input2
+                """
 
         return grasp_success
 
