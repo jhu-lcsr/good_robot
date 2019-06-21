@@ -36,12 +36,12 @@ class Robot(object):
 
             # Default home joint configuration
             # NOTE: this is for debug (hardcode calib) testing
-            self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
-                                      -np.pi/2, -np.pi/2, 0]
+            # self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
+            # -np.pi/2, -np.pi/2, 0]
 
             # NOTE: This is home so arm does not block depth cam
-            # home_in_deg = np.array([-191, -117, 116, -80, -91, -11]) * 1.0
-            # self.home_joint_config = np.deg2rad(home_in_deg)
+            home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
+            self.home_joint_config = np.deg2rad(home_in_deg)
 
             # NOTE: this is orig
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
@@ -330,12 +330,12 @@ class Robot(object):
             if tool_orientation == None:
                 curr_pose = self.parse_tcp_state_data(self.tcp_socket,
                                                       'cartesian_info')
-                print('Attempting to only move position')
+                print('DEBUG: Attempting to only move position')
                 # NOTE: I changed to movej
                 tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
                     (tool_position[0], tool_position[1], tool_position[2],
                      curr_pose[3], curr_pose[4], curr_pose[5], acc, vel)
-                print('tcp command', tcp_command)
+                # print('DEBUG: tcp command', tcp_command)
 
             else:
                 tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % \

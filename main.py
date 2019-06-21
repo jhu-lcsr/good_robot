@@ -33,9 +33,10 @@ def main(args):
     rtc_host_ip = args.rtc_host_ip if not is_sim else None
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
+        pass
         # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-        workspace_limits = np.asarray(
-            [[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
+        # workspace_limits = np.asarray(
+        # [[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
     else:
         # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         # NOTE: orig
@@ -44,8 +45,7 @@ def main(args):
 
         # NOTE: mine
         workspace_limits = np.asarray(
-            [[0.300, 0.710], [-0.250, 0.150], [0.200, 0.400]])
-
+            [[0.300, 0.700], [-0.250, 0.150], [0.195, 0.400]])
     heightmap_resolution = args.heightmap_resolution  # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
@@ -200,6 +200,7 @@ def main(args):
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
                 # or nonlocal_variables['primitive_action'] == 'place':
+                """
                 if nonlocal_variables['primitive_action'] == 'push':
                     finger_width = 0.02
                     safe_kernel_width = int(
@@ -222,6 +223,7 @@ def main(args):
                         [1, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 1 - grasp
                 logger.write_to_log('executed-action',
                                     trainer.executed_action_log)
+                """
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:

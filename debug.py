@@ -30,7 +30,8 @@ robot = Robot(False, False, None, workspace_limits,
 # Repeatedly grasp at middle of workspace
 grasp_position = np.sum(workspace_limits, axis=1) / 2
 grasp_position[0] -= 0.100
-grasp_position[2] = 0.25
+grasp_position[2] = 0.25  # NOTE this sets z position!
+
 # NOPE grasp_position[2] = -0.25 # extra NOPE this would be through the table for me
 
 # grasp_position[0] = 86 * 0.002 + workspace_limits[0][0]

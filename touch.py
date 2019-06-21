@@ -19,7 +19,7 @@ rtc_port = 30003
 # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
 # tool_orientation = [2.22, -2.22, 0]
 workspace_limits = np.asarray(
-    [[0.300, 0.700], [-0.250, 0.150], [0.200, 0.400]])
+    [[0.300, 0.700], [-0.250, 0.150], [0.195, 0.400]])
 # tool_orientation = [-1.22, 1.19, -1.17]  # gripper facing upward, for calib
 tool_orientation = None
 # DEBUG NOTE: in robot.py, it should have
@@ -68,8 +68,8 @@ def mouseclick_callback(event, x, y, flags, param):
             camera2robot[0:3, 0:3], click_point) + camera2robot[0:3, 3:]
 
         target_position = target_position[0:3, 0]
-        target_position[2] += 0.25
-        print('Moving to ', target_position)
+        print('Moving to ', target_position, ' with z offset of 0.2')
+        target_position[2] += 0.2
         robot.move_to(target_position, tool_orientation)
 
 
