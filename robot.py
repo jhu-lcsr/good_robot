@@ -64,7 +64,7 @@ class Robot(object):
 
             # Move robot to home pose
             # TODO: activate gripper function
-            # self.activate_gripper()
+            self.activate_gripper()
             self.go_home()
             # time.sleep(1)
             # self.close_gripper()
@@ -253,7 +253,7 @@ class Robot(object):
             if async:
                 gripper_fully_closed = True
             else:
-                time.sleep(0.5)
+                time.sleep(0.2)
                 gripper_fully_closed = self.check_grasp()
 
             # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -286,7 +286,7 @@ class Robot(object):
             # self.tcp_socket.close()
             ser.close()
             if not async:
-                time.sleep(0.5)
+                time.sleep(0.2)
 
     def get_state(self):
 
@@ -620,8 +620,9 @@ class Robot(object):
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
 
-            gripper_full_closed = self.check_grasp()
-            print('Gripper state', gripper_full_closed)
+            # gripper_full_closed = self.check_grasp()
+            gripper_full_closed = False
+            # print('Gripper state', gripper_full_closed)
             if not gripper_full_closed:  # yay we might have grabbed something
                 # Pre-compute blend radius
                 # blend_radius = min(
