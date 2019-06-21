@@ -19,9 +19,13 @@ rtc_port = 30003
 # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
 # tool_orientation = [2.22, -2.22, 0]
 workspace_limits = np.asarray(
-    [[0.4, 0.75], [-0.25, 0.15], [-0.21 + 0.4, -0.0 + 0.4]])
-tool_orientation = [-1.22, 1.19, -1.17]  # gripper facing upward, for calib
+    [[0.300, 0.700], [-0.250, 0.150], [0.200, 0.400]])
+# tool_orientation = [-1.22, 1.19, -1.17]  # gripper facing upward, for calib
+tool_orientation = None
+# DEBUG NOTE: in robot.py, it should have
 # ---------------------------------------------
+# self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
+# -np.pi/2, -np.pi/2, 0]
 
 
 # Move robot to home pose
@@ -64,7 +68,7 @@ def mouseclick_callback(event, x, y, flags, param):
             camera2robot[0:3, 0:3], click_point) + camera2robot[0:3, 3:]
 
         target_position = target_position[0:3, 0]
-        target_position[2] += 0.2
+        target_position[2] += 0.25
         print('Moving to ', target_position)
         robot.move_to(target_position, tool_orientation)
 

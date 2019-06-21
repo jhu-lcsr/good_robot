@@ -38,8 +38,14 @@ def main(args):
             [[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
     else:
         # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        # NOTE: orig
+        # workspace_limits = np.asarray(
+            # [[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
+
+        # NOTE: mine
         workspace_limits = np.asarray(
-            [[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
+            [[0.300, 0.710], [-0.250, 0.150], [0.200, 0.400]])
+
     heightmap_resolution = args.heightmap_resolution  # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
@@ -324,7 +330,7 @@ def main(args):
             # Run forward pass with network to get affordances
             push_predictions, grasp_predictions, state_feat = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True)
-            print("DEBUG: Grasp predictions", grasp_predictions)
+            # print("DEBUG: Grasp predictions", grasp_predictions)
 
             # TODO: edit
             # Execute best primitive action on robot in another thread
