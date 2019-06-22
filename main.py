@@ -108,6 +108,10 @@ def main(args):
                 best_push_conf = np.max(push_predictions)
                 best_grasp_conf = np.max(grasp_predictions)
                 print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
+                # # TODO: Delete! TEMP Print future_reward values
+                # print('push_predictions: ' push_predictions)
+                # print('grasp_predictions: ' grasp_predictions)
+
                 nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
                 if not grasp_only:
@@ -365,7 +369,8 @@ def main(args):
                     next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
 
                     sample_push_success = sample_reward_value == 0.5
-                    sample_grasp_success = sample_reward_value == 1
+                    #TODO HK: tune sample_reward_value? 
+                    sample_grasp_success = sample_reward_value == 0.5
                     #TODO HK
                     sample_change_detected = sample_push_success
                     sample_color_success = sample_reward_value == 1

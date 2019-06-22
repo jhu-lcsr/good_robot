@@ -21,11 +21,11 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         if self.grasp_color_task:
-            self.block_color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0])
+            self.block_color = 3
             # TODO: check if the block color is in the workspace
             # TODO: one hot encoding
             self.color_names = ['blue', 'green', 'yellow', 'red']
-            self.vrep_names = ['shape_06', 'shape_01', 'shape__04', ]
+            self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape__03']
             
             self.stored_action_labels = [
                 b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
@@ -634,13 +634,14 @@ class Robot(object):
         return tool_analog_input2 > 0.26
     
     # HK: added a function to check if the right color is grasped
-    def check_color(self, color):
+    def check_color(self, color_ind):
         object_positions = np.asarray(self.get_obj_positions())
         object_positions = object_positions[:,2]
         grasped_object_ind = np.argmax(object_positions)
         grasped_object_handle = self.object_handles[grasped_object_ind]
-        color_index = np.where(color==1)
-        if grasped_object_ind == color_index[0]:
+        # color_index = np.where(color==1)
+        # if grasped_object_ind == color_index[0]:
+        if grasped_object_ind == color_ind:
             return True
         else:
             return False

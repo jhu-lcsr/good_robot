@@ -194,7 +194,9 @@ class Trainer(object):
                 else:
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-
+        # TODO: TEMP Print predictions
+        print('push_predictions: ' push_predictions)
+        print('grasp_predictions: ' grasp_predictions)
         return push_predictions, grasp_predictions, state_feat
 
 
@@ -229,7 +231,8 @@ class Trainer(object):
                     # HK add if statement
                     if grasp_success and not color_success:
                         #current_reward = 1.0
-                        current_reward = 0.7
+                        # TODO: fine tune reward function 
+                        current_reward = 0
                     # HK: Color: Compute current reward 
                     elif grasp_success and color_success:
                         current_reward = 1.0
@@ -240,6 +243,8 @@ class Trainer(object):
             else:
                 next_push_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color_heightmap, next_depth_heightmap, is_volatile=True)
                 future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions))
+
+
                 
                 # # Experiment: use Q differences
                 # push_predictions_difference = next_push_predictions - prev_push_predictions
