@@ -195,8 +195,8 @@ class Trainer(object):
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         # TODO: TEMP Print predictions
-        print('push_predictions: ' (push_predictions))
-        print('grasp_predictions: ' (grasp_predictions))
+        print('push_predictions: ' push_predictions)
+        print('grasp_predictions: ' grasp_predictions)
         return push_predictions, grasp_predictions, state_feat
 
 
