@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pyth
 
 import time
 import os
@@ -44,8 +44,19 @@ def main(args):
             # [[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]])
 
         # NOTE: mine
+        # workspace_limits = np.asarray(
+            # [[0.250, 0.700], [-0.250, 0.220], [0.195, 0.460]])
+
+        # NOTE: D415
+        # workspace_limits = np.asarray(
+            # [[0.340, 0.600], [-0.250, 0.150], [0.200, 0.460]])
+
+        # NOTE: D415 foam (should this include the bin?)
         workspace_limits = np.asarray(
-            [[0.250, 0.700], [-0.250, 0.220], [0.195, 0.440]])
+            [[0.350, 0.650], [-0.250, 0.180], [0.080, 0.350]])
+        # [[0.360, 0.620], [-0.200, 0.170], [0.080, 0.300]])
+        # [[0.340, 0.500], [-0.200, 0.170], [0.185, 0.300]])
+
     heightmap_resolution = args.heightmap_resolution  # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu

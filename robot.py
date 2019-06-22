@@ -17,7 +17,10 @@ class Robot(object):
                  is_testing, test_preset_cases, test_preset_file):
 
         self.is_sim = is_sim
+
         self.workspace_limits = workspace_limits
+        self.moveto_limits = (
+            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.504]])
 
         # If in simulation...
         if self.is_sim:
@@ -33,26 +36,10 @@ class Robot(object):
             # Connect as real-time client to parse state data
             self.rtc_host_ip = rtc_host_ip
             self.rtc_port = rtc_port
-
-            # Default home joint configuration
-            # NOTE: this is for debug (hardcode calib) testing
-            # self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
-            # -np.pi/2, -np.pi/2, 0]
-
-            # NOTE: This is home so arm does not block depth cam
-            # home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
-            # NOTE: This is for main.py to unblock
-            # home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
-            # self.home_joint_config = np.deg2rad(home_in_deg)
-
-            # NOTE: this is orig
-            # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
-            # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
-
-            # NOTE this is only for calibrate.py (reduce retry time) - #
-            # checkerboard flat and pointing up
-            self.home_joint_config = [-np.pi, -
-                                      np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+            # NOTE: this is for D415
+            home_in_deg = np.array(
+                [-151.4, -93.7, 85.4, -90, -90, 0]) * 1.0
+            self.home_joint_config = np.deg2rad(home_in_deg)
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
@@ -76,12 +63,33 @@ class Robot(object):
             # TODO: activate gripper function
             self.activate_gripper()
             self.go_home()
+            """
             # time.sleep(1)
             # self.close_gripper()
             # self.open_gripper()
 
+            # Default home joint configuration
+            # NOTE: this is for debug (hardcode calib) testing
+            # self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
+            # -np.pi/2, -np.pi/2, 0]
+
+            # NOTE: This is home so arm does not block depth cam
+            # home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
+            # NOTE: This is for main.py to unblock
+            # home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
+            # self.home_joint_config = np.deg2rad(home_in_deg)
+
+            # NOTE: this is orig
+            # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
+            # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
+
+            # NOTE this is only for calibrate.py (reduce retry time) - #
+            # checkerboard flat and pointing up
+            # self.home_joint_config = [-np.pi, -
+            # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
+
             # Fetch RGB-D data from RealSense camera
-            # TODO Fix camera
+            """
             from real.camera import Camera
             self.camera = Camera()
             self.cam_intrinsics = self.camera.intrinsics
@@ -318,7 +326,7 @@ class Robot(object):
 
         if self.is_sim:
             pass
-        limits = self.workspace_limits
+        limits = self.moveto_limits
         # is_safe = False
         if self.btw(tool_position[0], limits[0][0], limits[0][1]) and \
                 self.btw(tool_position[1], limits[1][0], limits[1][1]) and \
@@ -364,7 +372,8 @@ class Robot(object):
                 time.sleep(0.01)
                 self.tcp_socket.close()
         else:
-            print("DEBUG: It's not safe to move here!", tool_position, limits)
+            print("DEBUG: It's Not safe to move here!", tool_position,
+                  'limits', limits)
 
     """
     def guarded_move_to(self, tool_position, tool_orientation):
@@ -502,11 +511,13 @@ class Robot(object):
 
     def grasp_object(self, position, orientation):
         # throttle z position
-        position[2] = max(position[2] - 0.050, self.workspace_limits[2][0])
+        # position[2] = max(position[2] - 0.050, self.workspace_limits[2][0])
+        position[2] = max(position[2] - 0.050, self.moveto_limits[2][0])
 
         self.open_gripper()
         # move fast to right above the object
-        self.move_to([position[0], position[1], position[2] + 0.100],
+        # height of gripper?
+        self.move_to([position[0], position[1], position[2] + 0.150],
                      orientation)
         # then slowly move down
         self.move_to(position, orientation, acc_scaling=0.5, vel_scaling=0.1)
@@ -630,7 +641,10 @@ class Robot(object):
             # home_position = [0.400, 0.000, 0.260]
             # NOTE: mine, and doesn't block the view
             # home_position = [0.400, -0.100, 0.420]
-            home_position = [0.254, 0.218, 0.434]
+            # D435 home_position = [0.254, 0.218, 0.434]
+            # D415
+            home_position = [0.360, 0.180, 0.504]
+            home_orientation = [2.78, -1.67, 0.17]
 
             # If gripper is open, drop object in bin and check if grasp is successful
             # grasp_success = False
@@ -651,7 +665,7 @@ class Robot(object):
                 self.open_gripper()
 
                 print('Going home now')
-                self.move_to(home_position, None)
+                self.move_to(home_position, home_orientation)
 
                 # NOTE: original code separates into approach and throw (tilted) parts
                 """
