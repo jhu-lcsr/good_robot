@@ -9,6 +9,7 @@ import serial
 import binascii
 
 from simulation import vrep
+from real.camera import Camera
 
 
 class Robot(object):
@@ -20,7 +21,7 @@ class Robot(object):
 
         self.workspace_limits = workspace_limits
         self.moveto_limits = (
-            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.504]])
+            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.554]])
 
         # If in simulation...
         if self.is_sim:
@@ -37,14 +38,18 @@ class Robot(object):
             self.rtc_host_ip = rtc_host_ip
             self.rtc_port = rtc_port
             # NOTE: this is for D415
+            # home_in_deg = np.array(
+            # [-151.4, -93.7, 85.4, -90, -90, 0]) * 1.0
+
+            # NOTE: this is for throw practice
             home_in_deg = np.array(
-                [-151.4, -93.7, 85.4, -90, -90, 0]) * 1.0
+                [-197, -105, 130, -110, -90, -30]) * 1.0
             self.home_joint_config = np.deg2rad(home_in_deg)
 
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.12  # Safe when set 30% speed on pendant
+            self.joint_acc = 0.50  # Safe when set 30% speed on pendant
             self.joint_vel = 0.35
 
             # Joint tolerance for blocking calls
@@ -89,8 +94,6 @@ class Robot(object):
             # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
             # Fetch RGB-D data from RealSense camera
-            """
-            from real.camera import Camera
             self.camera = Camera()
             self.cam_intrinsics = self.camera.intrinsics
 
@@ -99,6 +102,7 @@ class Robot(object):
             self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
             self.cam_depth_scale = np.loadtxt(
                 'real/camera_depth_scale.txt', delimiter=' ')
+            """
 
     def reposition_objects(self, workspace_limits):
 
@@ -321,7 +325,7 @@ class Robot(object):
         return False
 
     def move_to(self, tool_position, tool_orientation, acc_scaling=1,
-                vel_scaling=1):
+                vel_scaling=1, radius=0):
         acc, vel = self.joint_acc * acc_scaling, self.joint_vel * vel_scaling
 
         if self.is_sim:
@@ -337,18 +341,20 @@ class Robot(object):
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
 
+            # t = 0, r = radius
             if tool_orientation == None:
                 curr_pose = self.parse_tcp_state_data(self.tcp_socket,
                                                       'cartesian_info')
+
                 print('DEBUG: Attempting to only move position')
                 # NOTE: I changed to movej
-                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" %  \
+                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.100)\n" %  \
                     (tool_position[0], tool_position[1], tool_position[2],
                      curr_pose[3], curr_pose[4], curr_pose[5], acc, vel)
                 # print('DEBUG: tcp command', tcp_command)
 
             else:
-                tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % \
+                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.100)\n" % \
                     (tool_position[0], tool_position[1], tool_position[2],
                      tool_orientation[0], tool_orientation[1], tool_orientation[2],
                      acc, vel)
@@ -370,10 +376,11 @@ class Robot(object):
                 actual_tool_pose = self.parse_tcp_state_data(self.tcp_socket,
                                                              'cartesian_info')
                 time.sleep(0.01)
-                self.tcp_socket.close()
         else:
             print("DEBUG: It's Not safe to move here!", tool_position,
                   'limits', limits)
+
+        self.tcp_socket.close()
 
     """
     def guarded_move_to(self, tool_position, tool_orientation):
@@ -506,8 +513,80 @@ class Robot(object):
         # return tool_analog_input2 > 0.26
 
     # Primitives ----------------------------------------------------------
-
     # TODO probably need to change bin and home positions
+    def throw(self):
+        self.close_gripper()
+        start_position = [0.350, 0.000, 0.250]
+        start_axisangle = [2.12, -2.21, -0.009]
+
+        curled_config_deg = [-196, -107, 126, -90, -90, -12]
+        curled_config = np.deg2rad(curled_config_deg)
+
+        curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
+                                                    'joint_data')
+        print('joints', curr_joint_pose)
+
+        # end_position = [0.600, 0.000, 0.450]
+        # end_axisangle = [2.55, -2.06, 0.80]
+        end_position = [0.597, 0.000, 0.570]
+        end_axisangle = [2.18, -2.35, 2.21]
+        r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
+        print(r)
+        # self.move_to(start_position, start_axisangle,
+        # acc_scaling=3.5, vel_scaling=4)
+        # self.move_to(end_position, end_axisangle,
+        # acc_scaling=3.5, vel_scaling=4)
+        # radius=r)
+
+        blend_radius = 0.100
+
+        K = 25.
+
+        self.tcp_socket = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+        print('throw acc will be', self.joint_acc * 14)
+        print('throw vel will be', self.joint_vel * 10)
+        tcp_command = "def throw_traj():\n"
+        # start
+        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+        # (start_position[0], start_position[1], start_position[2],
+        # start_axisangle[0], start_axisangle[1], start_axisangle[2],
+        # self.joint_acc * K, self.joint_vel * K, blend_radius)
+        # # curl
+        tcp_command += " movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+            (curled_config[0], curled_config[1], curled_config[2],
+             curled_config[3], curled_config[4], curled_config[5],
+             self.joint_acc * K, self.joint_vel * K, 0)
+        # unwind
+        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+            (end_position[0], end_position[1], end_position[2],
+             end_axisangle[0], end_axisangle[1], end_axisangle[2],
+             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.5)
+        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+            (end_position[0] - 0.020, end_position[1], end_position[2]+0.030,
+             end_axisangle[0], end_axisangle[1], end_axisangle[2],
+             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.3)
+        # go home
+        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.0)\n" % \
+            (start_position[0], start_position[1], start_position[2],
+             start_axisangle[0], start_axisangle[1], start_axisangle[2],
+             self.joint_acc * K * 0.1, self.joint_vel * K * 0.1)
+        tcp_command += "end\n"
+        self.tcp_socket.send(str.encode(tcp_command))
+        self.tcp_socket.close()
+
+        # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
+        time.sleep(1.25)
+        self.open_gripper()
+        robot.sleep(2)
+
+        # Pre-compute blend radius
+        # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
+        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+        # (position[0], position[1], bin_position[2],
+        # tool_orientation[0], tool_orientation[1], 0.0,
+        # self.joint_acc, self.joint_vel, blend_radius)
 
     def grasp_object(self, position, orientation):
         # throttle z position
@@ -520,7 +599,8 @@ class Robot(object):
         self.move_to([position[0], position[1], position[2] + 0.150],
                      orientation)
         # then slowly move down
-        self.move_to(position, orientation, acc_scaling=0.5, vel_scaling=0.1)
+        self.move_to(position, orientation,
+                     acc_scaling=0.5, vel_scaling=0.1)
         # and grasp it
         self.close_gripper()
 
@@ -785,6 +865,8 @@ class Robot(object):
 
 
 """
+
+
 def restart_real(self):
 
         # Compute tool orientation from heightmap rotation angle
@@ -871,7 +953,7 @@ def restart_real(self):
         if tool_analog_input2 > 3.0 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
             break
         tool_analog_input2 = new_tool_analog_input2
-        """
+"""
 
 # def place(self, position, orientation, workspace_limits):
 #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))

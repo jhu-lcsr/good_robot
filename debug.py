@@ -41,15 +41,24 @@ grasp_position[2] = 0.25  # NOTE this sets z position!
 
 while True:
     print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
-    robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
-    time.sleep(1)
-    print('!----Grasp completed')
-    """
-    robot.close_gripper()
-    time.sleep(1)
+    # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
+    # time.sleep(0.1)
+    # print('!----Grasp completed')
+    # robot.close_gripper()
+    # time.sleep(0.1)
+
     robot.open_gripper()
-    time.sleep(1)
-    """
+    prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
+    if str(prompt1) == 'y':
+        time.sleep(0.01)
+        robot.close_gripper()
+        time.sleep(0.01)
+    prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
+    if str(prompt2) == 'yes':
+        time.sleep(0.05)
+        print('!----Throw started')
+        robot.throw()
+        print('!----Throw completed')
 
     # # robot.push(push_position, 0, workspace_limits)
     # # robot.restart_real()

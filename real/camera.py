@@ -17,15 +17,17 @@ class Camera(object):
         self.im_width = 1280
         self.tcp_host_ip = '127.0.0.1'
         self.tcp_port = 50000
-        self.buffer_size = 4098 # 4 KiB
+        self.buffer_size = 4098  # 4 KiB
 
         # Connect to server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+        try:
+            self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+        except:
+            print('Conn failed, Is the realsense server running? ./realsense/realsense')
 
         self.intrinsics = None
         self.get_data()
-
 
     def get_data(self):
 
@@ -42,13 +44,15 @@ class Camera(object):
             data += self.tcp_socket.recv(self.buffer_size)
 
         # Reorganize TCP data into color and depth frame
-        self.intrinsics = np.fromstring(data[0:(9*4)], np.float32).reshape(3, 3)
+        self.intrinsics = np.fromstring(
+            data[0:(9*4)], np.float32).reshape(3, 3)
         depth_scale = np.fromstring(data[(9*4):(10*4)], np.float32)[0]
-        depth_img = np.fromstring(data[(10*4):((10*4)+self.im_width*self.im_height*2)], np.uint16).reshape(self.im_height, self.im_width)
-        color_img = np.fromstring(data[((10*4)+self.im_width*self.im_height*2):], np.uint8).reshape(self.im_height, self.im_width, 3)
+        depth_img = np.fromstring(
+            data[(10*4):((10*4)+self.im_width*self.im_height*2)], np.uint16).reshape(self.im_height, self.im_width)
+        color_img = np.fromstring(data[((10*4)+self.im_width*self.im_height*2):],
+                                  np.uint8).reshape(self.im_height, self.im_width, 3)
         depth_img = depth_img.astype(float) * depth_scale
         return color_img, depth_img
-
 
 
 # DEPRECATED CAMERA CLASS FOR REALSENSE WITH ROS
@@ -111,4 +115,3 @@ class Camera(object):
 #         self.is_recording = True
 #     def stop_recording(self):
 #         self.is_recording = False
-

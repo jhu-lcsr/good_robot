@@ -22,7 +22,7 @@ while counter < 1:
     print('Raw data', data_raw)
     data = binascii.hexlify(data_raw)
     print("Response 2 ", data)
-    time.sleep(.5)
+    time.sleep(.2)
 
 while(True):
     print("Close gripper")
@@ -31,7 +31,9 @@ while(True):
     print('Raw data', data_raw)
     data = binascii.hexlify(data_raw)
     print("Data Response 3 ", data)
-    time.sleep(0.5)
+    time.sleep(0.2)
+    # closing_force = '\xFF' # 255
+    clear_rACT = "\x09\x10\x03\xE8\x00\x03\x06\x00\x00\x00\x00\x00\x00\x73\x30"
 
     print("!----- Read status")
     ser.write("\x09\x03\x07\xD0\x00\x03\x04\x0E")
@@ -40,20 +42,23 @@ while(True):
     data = binascii.hexlify(data_raw)
     print("Response 4 ", data)
     position = data[14:16]
-    print("Position ", int(position, 16))
+    print("!--Position ", int(position, 16))
     time.sleep(.5)
     # Example response:
     # ('Raw data', '\t\x03\x06\xf9\x00\t\xff\xe6\x00+\x10')
     # ('Response 4 ', '090306f90009ffe6002b10')
-    # ('Position ', 230
+    # ('Position ', 230 """
 
     print("Open gripper")
-    ser.write("\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19")
+    open_cmd = "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19"
+    ser.write(open_cmd)
+    print('open_cmd', open_cmd)
+
     data_raw = ser.readline()
-    print('Raw data', data_raw)
-    data = binascii.hexlify(data_raw)
-    print("Response 4 ", data)
-    time.sleep(0.5)
+    # print('Raw data', data_raw)
+    # data = binascii.hexlify(data_raw)
+    # print("Response 4 ", data)
+    time.sleep(0.2)
 
     print("!----- Read status")
     ser.write("\x09\x03\x07\xD0\x00\x03\x04\x0E")
@@ -62,8 +67,22 @@ while(True):
     data = binascii.hexlify(data_raw)
     print("Response 4 ", data)
     position = data[14:16]
-    print("Position ", int(position, 16))
+    print("!-- Position ", int(position, 16))
     time.sleep(.5)
+
+    # ser.write(
+    # "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF\xFF\x42\x29")
+    """
+    closing_force = '\xBB'  # 187
+    close_cmd = "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF" + \
+        closing_force + "\x42\x29"
+    print('close_cmd', close_cmd)
+    ser.write(close_cmd)
+    time.sleep(.5)
+    """
+
+
+# ----------------------------------
 
 data_raw = ser.readline()
 data = binascii.hexlify(data_raw)
