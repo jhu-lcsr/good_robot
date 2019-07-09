@@ -216,7 +216,7 @@ def main(args):
                     nonlocal_variables['color_success'] = grasp_output[1]
                     nonlocal_variables['grasp_success'] = grasp_output[0]
                     # HK: TODO 
-                    if nonlocal_variables['color_success']:
+                    if nonlocal_variables['grasp_success']:
                         robot.restart_sim()
                         grasp_count += 1
 
