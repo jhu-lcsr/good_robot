@@ -217,6 +217,7 @@ def main(args):
                     nonlocal_variables['grasp_success'] = grasp_output[0]
                     # HK: TODO 
                     if nonlocal_variables['color_success']:
+                        robot.restart_sim()
                         grasp_count += 1
 
                     
@@ -263,9 +264,9 @@ def main(args):
         if is_sim and is_testing:
             empty_threshold = 10  
         # TODO: change to if red block not in view
-        # if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
-        print(nonlocal_variables['color_success'])
-        if nonlocal_variables['color_success'] :
+        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        #print(nonlocal_variables['color_success'])
+        #if nonlocal_variables['color_success'] :
             no_change_count = [0, 0]
             if is_sim:
                 # TODO: ADD red block

@@ -17,7 +17,8 @@ class Robot(object):
         self.place = place
         self.grasp_color_task = grasp_color_task
 
-        # HK: If grasping specific block color...
+        # HK: If grasping specific block color... 
+        # 
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         if self.grasp_color_task:
@@ -199,6 +200,35 @@ class Robot(object):
         self.bg_color_img, self.bg_depth_img = self.get_camera_data()
         self.bg_depth_img = self.bg_depth_img * self.cam_depth_scale
 
+# # TODO: HK add picked up object
+#     def add_objects(self), :
+
+#         # Add each object to robot workspace at x,y location and orientation (random or pre-loaded)
+#         self.object_handles = []
+#         sim_obj_handles = []
+#         for object_idx in range(len(self.obj_mesh_ind)):
+#             curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+#             if self.is_testing and self.test_preset_cases:
+#                 curr_mesh_file = self.test_obj_mesh_files[object_idx]
+#             curr_shape_name = 'shape_%02d' % object_idx
+#             drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
+#             drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
+#             object_position = [drop_x, drop_y, 0.15]
+#             object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+#             if self.is_testing and self.test_preset_cases:
+#                 object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
+#                 object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+#             object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
+#             ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+#             if ret_resp == 8:
+#                 print('Failed to add new objects to simulation. Please restart.')
+#                 exit()
+#             curr_shape_handle = ret_ints[0]
+#             self.object_handles.append(curr_shape_handle)
+#             if not (self.is_testing and self.test_preset_cases):
+#                 time.sleep(2)
+#         self.prev_obj_positions = []
+#         self.obj_positions = []
 
     def add_objects(self):
 
