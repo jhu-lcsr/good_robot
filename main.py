@@ -246,7 +246,7 @@ def main(args):
         # Get latest RGB-D image
         color_img, depth_img = robot.get_camera_data()
         depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
-        print(color_img)
+        #print(color_img)
         # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
         color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
         valid_depth_heightmap = depth_heightmap.copy()
@@ -265,7 +265,7 @@ def main(args):
         # TODO: change to if red block not in view
         # if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
         print(nonlocal_variables['color_success'])
-        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10) or nonlocal_variables['color_success'] :
+        if nonlocal_variables['color_success'] :
             no_change_count = [0, 0]
             if is_sim:
                 # TODO: ADD red block
