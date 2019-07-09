@@ -63,9 +63,7 @@ def main(args):
     # ------ HK: Added Options -----
     grasp_color_task = args.grasp_color_task
     place = args.place
-
-    # ------ HK: Added Options -----
-    grasp_count = args.grasp_count
+    #grasp_count = args.grasp_count
 
     # Set random seed
     np.random.seed(random_seed)
@@ -105,6 +103,7 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+        grasp_count = 0
         while True:
             if nonlocal_variables['executing_action']:
 
@@ -221,12 +220,12 @@ def main(args):
                         grasp_count += 1
 
                     
-
+                    print('Grasp Count: %r' % (grasp_count))
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     print('Color successful: %r' % (nonlocal_variables['color_success']))
 
                 nonlocal_variables['executing_action'] = False
-
+    # TODO:
             time.sleep(0.01)
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
@@ -444,7 +443,8 @@ def main(args):
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
         # HK: TODO
-        print('Red Blocked Grasped: %f' % (grasp_count/trainer.iteration))
+
+        print('Red Blocked Grasped: %f' % (trainer.iteration))
 
 
 if __name__ == '__main__':
