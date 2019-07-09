@@ -64,6 +64,9 @@ def main(args):
     grasp_color_task = args.grasp_color_task
     place = args.place
 
+    # ------ HK: Added Options -----
+    grasp_count = args.grasp_count
+
     # Set random seed
     np.random.seed(random_seed)
 
@@ -96,6 +99,7 @@ def main(args):
                           'push_success' : False,
                           'grasp_success' : False,
                           'color_success' : False} # HK: added color_success nonlocal_variable
+
 
 
     # Parallel thread to process network output and execute actions
@@ -212,6 +216,12 @@ def main(args):
                     grasp_output = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
                     nonlocal_variables['color_success'] = grasp_output[1]
                     nonlocal_variables['grasp_success'] = grasp_output[0]
+                    # HK: TODO 
+                    if nonlocal_variables['color_success']:
+                        grasp_count += 1
+
+                    
+
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     print('Color successful: %r' % (nonlocal_variables['color_success']))
 
@@ -237,7 +247,7 @@ def main(args):
         # Get latest RGB-D image
         color_img, depth_img = robot.get_camera_data()
         depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
-
+        print(color_img)
         # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
         color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
         valid_depth_heightmap = depth_heightmap.copy()
@@ -253,9 +263,12 @@ def main(args):
         empty_threshold = 300
         if is_sim and is_testing:
             empty_threshold = 10  
-        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        # TODO: change to if red block not in view
+        # if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10) or nonlocal_variables['color_success'] :
             no_change_count = [0, 0]
             if is_sim:
+                # TODO: ADD red block
                 print('Not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
@@ -271,6 +284,8 @@ def main(args):
             logger.write_to_log('clearance', trainer.clearance_log)
             if is_testing and len(trainer.clearance_log) >= max_test_trials:
                 exit_called = True # Exit after training thread (backprop and saving labels)
+            
+            # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
 
         if not exit_called: 
@@ -428,6 +443,8 @@ def main(args):
         trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
+        # HK: TODO
+        print('Red Blocked Grasped: %f' % (grasp_count/trainer.iteration))
 
 
 if __name__ == '__main__':
@@ -471,7 +488,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
-
+    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
     # Run main program with specified arguments
     args = parser.parse_args()
