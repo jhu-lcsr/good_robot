@@ -1,5 +1,8 @@
 # https://github.com/SintefManufacturing/python-urx/blob/master/urx/urrobot.py
 # Must be run with library from the repo
+
+# 10 July 2019 -- this works even while inputting commands from pendant
+
 import urx
 import logging
 import time
