@@ -66,7 +66,7 @@ class Robot(object):
 
             # Move robot to home pose
             # TODO: activate gripper function
-            self.activate_gripper()
+            # self.activate_gripper()
             self.go_home()
             """
             # time.sleep(1)
@@ -540,7 +540,7 @@ class Robot(object):
 
         blend_radius = 0.100
 
-        K = 25.
+        K = 28.
 
         self.tcp_socket = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
