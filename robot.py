@@ -17,17 +17,18 @@ class Robot(object):
         self.place = place
         self.grasp_color_task = grasp_color_task
 
-        # HK: If grasping specific block color... 
-        # 
+        # HK: If grasping specific block color...
+        #
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
+        self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+
         if self.grasp_color_task:
             self.block_color = 3
             # TODO: check if the block color is in the workspace
             # TODO: one hot encoding
-            self.color_names = ['blue', 'green', 'yellow', 'red']
-            self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape__03']
-            
+            # self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape_03']
+
             self.stored_action_labels = [
                 b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
                 b'place_blue_on_red', b'grab_blue', b'place_red_on_blueyellow', b'place_green_on_redyellow',
@@ -39,16 +40,9 @@ class Robot(object):
                 b'place_red_on_blue', b'place_red_on_yellowgreen', b'place_yellow_on_greenred', b'place_green_on_yellowblue',
                 b'place_red_on_bluegreen', b'place_green_on_red', b'place_red_on_yellowblue', b'place_green_on_yellowred',
                 b'place_green_on_redblue', b'grab_red', b'place_yellow_on_redblue', b'place_green_on_bluered', b'place_blue_on_yellow']
-            
-            # HK: Grasping indices
-            self.encoding_indices = [5,19,21,37]
 
-            # HK: Dictionary for grasping
-            # TODO: change to better name
-            self.info = {'color_names': self.color_names,
-            'vrep_names': self.vrep_names, 
-            'stored_action_labels': self.stored_action_labels,
-            'encoding_indices': self.encoding_indices}
+            # create dictionary to lookup index of various strings
+            self.stored_action_label_to_index_dict = {k: v for v, k in enumerate(stored_action_labels)}
 
         # If in simulation...
         if self.is_sim:
@@ -63,7 +57,7 @@ class Robot(object):
             #                                [255.0, 87.0, 89.0], # red
             #                                [176, 122, 161], # purple
             #                                [118, 183, 178], # cyan
-            #                                [255, 157, 167]])/255.0 #pink 
+            #                                [255, 157, 167]])/255.0 #pink
             self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
@@ -73,18 +67,19 @@ class Robot(object):
                                 [186, 176, 172], # gray
                                 [176, 122, 161], # purple
                                 [118, 183, 178], # cyan
-                                [255, 157, 167]])/255.0 #pink 
+                                [255, 157, 167]])/255.0 #pink
 
-            # Read files in object mesh directory 
+            # Read files in object mesh directory
             self.obj_mesh_dir = obj_mesh_dir
             self.num_obj = num_obj
+            # TODO(HK) specify which objects to load here from a command line parameter, should be able ot load one repeatedly
             self.mesh_list = os.listdir(self.obj_mesh_dir)
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
             self.obj_mesh_color = self.color_space[np.asarray(range(self.num_obj)) % 10, :]
 
-            # Make sure to have the server side running in V-REP: 
+            # Make sure to have the server side running in V-REP:
             # in a child script of a V-REP scene, add following command
             # to be executed just once, at simulation start:
             #
@@ -95,7 +90,7 @@ class Robot(object):
             # IMPORTANT: for each successful call to simxStart, there
             # should be a corresponding call to simxFinish at the end!
 
-            # MODIFY remoteApiConnections.txt 
+            # MODIFY remoteApiConnections.txt
 
             # Connect to simulator
             vrep.simxFinish(-1) # Just in case, close all opened connections
@@ -117,7 +112,7 @@ class Robot(object):
             # If testing, read object meshes and poses from test case file
             if self.is_testing and self.test_preset_cases:
                 file = open(self.test_preset_file, 'r')
-                file_content = file.readlines() 
+                file_content = file.readlines()
                 self.test_obj_mesh_files = []
                 self.test_obj_mesh_colors = []
                 self.test_obj_positions = []
@@ -229,25 +224,44 @@ class Robot(object):
 #                 time.sleep(2)
 #         self.prev_obj_positions = []
 #         self.obj_positions = []
+    def generate_random_object_pose(self):
+        drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
+        drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
+        object_position = [drop_x, drop_y, 0.15]
+        object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+        return drop_x, drop_y, object_position, object_orientation
+
+    def reposition_object(self, object_list_idx):
+        drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
+        # TODO(HK) finish this function to reset a specific object, see reposition_objects, and only do it for one index instead of looping over all of them as done in reposition_objects.
+
 
     def add_objects(self):
 
         # Add each object to robot workspace at x,y location and orientation (random or pre-loaded)
+        # object_handles is the list of unique vrep object integer identifiers, and it is how you control objects with the vrep API.
+        # We need to keep track of the object names and the corresponding colors.
         self.object_handles = []
         sim_obj_handles = []
+        self.vrep_names = []
+        self.object_colors = []
         for object_idx in range(len(self.obj_mesh_ind)):
             curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
             if self.is_testing and self.test_preset_cases:
                 curr_mesh_file = self.test_obj_mesh_files[object_idx]
+            # TODO(HK) define more predictable object names for when the number of objects is beyond the number of colors
             curr_shape_name = 'shape_%02d' % object_idx
-            drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
-            drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
-            object_position = [drop_x, drop_y, 0.15]
-            object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
+            self.vrep_names.append(curr_shape_name)
+            drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
             if self.is_testing and self.test_preset_cases:
                 object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
                 object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+            # Set the colors in order
             object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
+            # TODO(HK) if there are more objects than total colors this line will break, fix it with mod (%), aka division remainder, to loop back to the first color.
+            object_color_name = self.color_names[object_idx]
+            # add the color of this object to the list.
+            self.object_colors.append(object_color_name)
             ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
             if ret_resp == 8:
                 print('Failed to add new objects to simulation. Please restart.')
@@ -386,7 +400,7 @@ class Robot(object):
             color_img *= 255
             color_img = np.fliplr(color_img)
             color_img = color_img.astype(np.uint8)
-            
+
             # Get depth image from simulation
             sim_ret, resolution, depth_buffer = vrep.simxGetVisionSensorDepthBuffer(self.sim_client, self.cam_handle, vrep.simx_opmode_blocking)
             depth_img = np.asarray(depth_buffer)
@@ -557,7 +571,7 @@ class Robot(object):
             # Block until robot reaches target tool position
             tcp_state_data = self.tcp_socket.recv(2048)
             actual_tool_pose = self.parse_tcp_state_data(tcp_state_data, 'cartesian_info')
-            while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]): 
+            while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
                 # [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) < self.tool_pose_tolerance[j] for j in range(3,6)]
                 # print([np.abs(actual_tool_pose[j] - tool_position[j]) for j in range(3)] + [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) for j in range(3,6)])
                 tcp_state_data = self.tcp_socket.recv(2048)
@@ -609,7 +623,7 @@ class Robot(object):
                     break
                 time.sleep(0.01)
 
-            # Reading TCP forces from real-time client connection 
+            # Reading TCP forces from real-time client connection
             rtc_state_data = self.rtc_socket.recv(6496)
             TCP_forces = self.parse_rtc_state_data(rtc_state_data)
 
@@ -662,9 +676,9 @@ class Robot(object):
         state_data = self.get_state()
         tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
         return tool_analog_input2 > 0.26
-    
+
     # HK: added a function to check if the right color is grasped
-    def check_color(self, color_ind):
+    def check_correct_color_grasped(self, color_ind):
         object_positions = np.asarray(self.get_obj_positions())
         object_positions = object_positions[:,2]
         grasped_object_ind = np.argmax(object_positions)
@@ -695,7 +709,7 @@ class Robot(object):
             grasp_location_margin = 0.15
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             location_above_grasp_target = (position[0], position[1], position[2] + grasp_location_margin)
-            
+
             # Compute gripper position and linear movement increments
             tool_position = location_above_grasp_target
             sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
@@ -735,9 +749,9 @@ class Robot(object):
             # HK: Check if right color is grasped
             color_success = False
             if grasp_success and self.grasp_color_task:
-                if self.check_color(self.block_color):
+                if self.check_correct_color_grasped(self.block_color):
                     color_success = True
-                    print('Right color: %r' % (self.check_color(self.block_color)))
+                    print('Right color: %r' % (self.check_correct_color_grasped(self.block_color)))
 
             # Move the grasped object elsewhere if place = false
             # if grasp_success and not self.place and self.grasp_color_task:
@@ -797,7 +811,7 @@ class Robot(object):
             tool_orientation_angle = np.linalg.norm(tool_orientation)
             tool_orientation_axis = tool_orientation/tool_orientation_angle
             tool_orientation_rotm = utils.angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
-            
+
             # Compute tilted tool orientation during dropping into bin
             tilt_rotm = utils.euler2rotm(np.asarray([-np.pi/4,0,0]))
             tilted_tool_orientation_rotm = np.dot(tilt_rotm, tool_orientation_rotm)
@@ -920,7 +934,7 @@ class Robot(object):
             # Move gripper to location above pushing point
             pushing_point_margin = 0.1
             location_above_pushing_point = (position[0], position[1], position[2] + pushing_point_margin)
-            
+
             # Compute gripper position and linear movement increments
             tool_position = location_above_pushing_point
             sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
@@ -970,7 +984,7 @@ class Robot(object):
             tool_orientation_angle = np.linalg.norm(tool_orientation)
             tool_orientation_axis = tool_orientation/tool_orientation_angle
             tool_orientation_rotm = utils.angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
-            
+
             # Compute push direction and endpoint (push to right of rotated heightmap)
             push_direction = np.asarray([push_orientation[0]*np.cos(heightmap_rotation_angle) - push_orientation[1]*np.sin(heightmap_rotation_angle), push_orientation[0]*np.sin(heightmap_rotation_angle) + push_orientation[1]*np.cos(heightmap_rotation_angle), 0.0])
             target_x = min(max(position[0] + push_direction[0]*0.1, workspace_limits[0][0]), workspace_limits[0][1])
@@ -1200,7 +1214,7 @@ class Robot(object):
 
 
 
-# # 
+# #
 
 
 # # True closes

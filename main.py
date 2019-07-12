@@ -10,7 +10,7 @@ import numpy as np
 import scipy as sc
 import cv2
 from collections import namedtuple
-import torch  
+import torch
 from torch.autograd import Variable
 from robot import Robot
 from trainer import Trainer
@@ -50,7 +50,7 @@ def main(args):
     # -------------- Test grasp_onlying options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
-    test_preset_cases = args.test_preset_cases 
+    test_preset_cases = args.test_preset_cases
     test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
 
     # ------ Pre-loading and logging options ------
@@ -130,7 +130,7 @@ def main(args):
                         nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0,2) == 0 else 'grasp'
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
-                trainer.is_exploit_log.append([0 if explore_actions else 1]) 
+                trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
@@ -157,11 +157,11 @@ def main(args):
                     elif nonlocal_variables['primitive_action'] == 'grasp':
                         nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape)
                         predicted_value = np.max(grasp_predictions)
-                trainer.use_heuristic_log.append([1 if use_heuristic else 0]) 
+                trainer.use_heuristic_log.append([1 if use_heuristic else 0])
                 logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
 
                 # Save predicted confidence value
-                trainer.predicted_value_log.append([predicted_value]) 
+                trainer.predicted_value_log.append([predicted_value])
                 logger.write_to_log('predicted-value', trainer.predicted_value_log)
 
                 # Compute 3D position of pixel
@@ -212,15 +212,14 @@ def main(args):
                 # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     # HK: color
-                    grasp_output = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
-                    nonlocal_variables['color_success'] = grasp_output[1]
-                    nonlocal_variables['grasp_success'] = grasp_output[0]
-                    # HK: TODO 
+                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
+                    # HK: TODO fix color success check
                     if nonlocal_variables['grasp_success']:
-                        robot.restart_sim()
+                        # robot.restart_sim()
+                        robot.reposition_objects(workspace_limits)
                         grasp_count += 1
 
-                    
+
                     print('Grasp Count: %r' % (grasp_count))
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     print('Color successful: %r' % (nonlocal_variables['color_success']))
@@ -262,7 +261,7 @@ def main(args):
         stuff_count[valid_depth_heightmap > 0.02] = 1
         empty_threshold = 300
         if is_sim and is_testing:
-            empty_threshold = 10  
+            empty_threshold = 10
         # TODO: change to if red block not in view
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
         #print(nonlocal_variables['color_success'])
@@ -281,15 +280,15 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
                 robot.restart_real()
 
-            trainer.clearance_log.append([trainer.iteration]) 
+            trainer.clearance_log.append([trainer.iteration])
             logger.write_to_log('clearance', trainer.clearance_log)
             if is_testing and len(trainer.clearance_log) >= max_test_trials:
                 exit_called = True # Exit after training thread (backprop and saving labels)
-            
+
             # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
 
-        if not exit_called: 
+        if not exit_called:
 
             # Run forward pass with network to get affordances
             push_predictions, grasp_predictions, state_feat = trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True)
@@ -324,7 +323,7 @@ def main(args):
 
             # Compute training labels
             label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap, prev_color_success)
-            trainer.label_value_log.append([label_value]) 
+            trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
@@ -354,7 +353,7 @@ def main(args):
 
                 # Get samples of the same primitive but with different results
                 sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
-                
+
                 if sample_ind.size > 0:
 
                     # Find sample with highest surprise value
@@ -385,7 +384,7 @@ def main(args):
                     next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
 
                     sample_push_success = sample_reward_value == 0.5
-                    #TODO HK: tune sample_reward_value? 
+                    #TODO HK: tune sample_reward_value?
                     sample_grasp_success = sample_reward_value == 0.5
                     #TODO HK
                     sample_change_detected = sample_push_success
@@ -409,7 +408,7 @@ def main(args):
 
             # Save model snapshot
             if not is_testing:
-                logger.save_backup_model(trainer.model, method) 
+                logger.save_backup_model(trainer.model, method)
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.iteration, trainer.model, method)
                     if trainer.use_cuda:
@@ -419,7 +418,7 @@ def main(args):
         while nonlocal_variables['executing_action']:
             time.sleep(0.01)
 
-        if exit_called: 
+        if exit_called:
             break
 
         # Save information for next training step
@@ -439,7 +438,7 @@ def main(args):
             prev_color_success = nonlocal_variables['color_success']
         else:
             prev_color_success = None
-        
+
 
         trainer.iteration += 1
         iteration_time_1 = time.time()
@@ -481,7 +480,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=30,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
-    
+
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
