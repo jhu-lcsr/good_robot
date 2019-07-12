@@ -1,20 +1,18 @@
-urx is a python library to control the robots from [Universal Robots](https://www.universal-robots.com/). It is published under the LGPL license and comes with absolutely no guarantee.
+# python-urx 
+
+urx is a python library to control the robots from 'Universal robot'. It is published under the LGPL license and comes with absolutely no guarantee.
 
 It is meant as an easy to use module for pick and place operations, although it has been used for welding and other sensor based applications that do not require high control frequency.
 
-Both the 'secondary port' interface and the real-time/matlab interface of the UR controller are used. urx can optionally use the [python-math3d](https://github.com/mortlind/pymath3d)(GPL) library to receive and send transformation matrices to the robot urx is known to work with all release robots from Universal Robot.
+Both the 'secondary port' interface and the real-time/matlab interface of the UR controller are used. urx can optionally use the [python-math3d](https://github.com/mortlind/pymath3d)(GPL) library to receive and send transformation matrices to the robot urx is known to work with all release robots from Universal Robot. 
 
 urx was primarily developed by [Olivier Roulet-Dubonnet](https://github.com/oroulet) for [Sintef Raufoss Manufacturing](http://www.sintef.no/manufacturing/).
 
+# Changelog
 
-
-# Install
-
-The easiest is probably to use pip:
-```
-pip install urx
-```
-
+ * 2018/02/02: Support for SW 3.5.x
+   This version supports the UR10 software version 3.5.x as of January 2018
+   Fixes issues with speed(x) commands 
 
 # Example use:
 
@@ -25,7 +23,7 @@ rob = urx.Robot("192.168.0.100")
 rob.set_tcp((0, 0, 0.1, 0, 0, 0))
 rob.set_payload(2, (0, 0, 0.1))
 sleep(0.2)  #leave some time to robot to process the setup commands
-rob.movej((1, 2, 3, 4, 5, 6), a, v)
+rob.movej((1, 2, 3, 4, 5, 6), a, v) 
 rob.movel((x, y, z, rx, ry, rz), a, v)
 print "Current tool pose is: ",  rob.getl()
 rob.movel((0.1, 0, 0, 0, 0, 0), a, v, relative=true)  # move relative to current pose

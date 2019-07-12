@@ -59,7 +59,7 @@ class ParserUtils(object):
         # print "Total size ", len(data)
         while data:
             psize, ptype, pdata, data = self.analyze_header(data)
-            # print "We got packet with size %i and type %s" % (psize, ptype)
+            self.logger.debug("We got packet with size %i and type %s" % (psize, ptype))
             if ptype == 16:
                 allData["SecondaryClientData"] = self._get_data(pdata, "!iB", ("size", "type"))
                 data = (pdata + data)[5:]  # This is the total size so we resend data to parser
@@ -67,29 +67,23 @@ class ParserUtils(object):
                 # this parses RobotModeData for versions >=3.0 (i.e. 3.0)
                 if psize == 38:
                     self.version = (3, 0)
-                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling"))
+                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling"))
                 elif psize == 46:  # It's 46 bytes in 3.2
                     self.version = (3, 2)
-                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling", "speedFractionLimit"))
-                elif psize == 47:
+                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling", "speedFractionLimit"))
+                elif psize == 47:  # It's 47 bytes in 3.5
                     self.version = (3, 5)
-                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBddc", ("size", "type", "timestamp", "isRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling", "speedFractionLimit", "reservedByUR"))
+                    allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBddB", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling", "speedFractionLimit", "ur_private"))
                 else:
-                    allData["RobotModeData"] = self._get_data(pdata, "!iBQ???????Bd", ("size", "type", "timestamp", "isRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "speedFraction"))
+                    allData["RobotModeData"] = self._get_data(pdata, "!iBQ???????Bd", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "speedFraction"))
             elif ptype == 1:
                 tmpstr = ["size", "type"]
                 for i in range(0, 6):
                     tmpstr += ["q_actual%s" % i, "q_target%s" % i, "qd_actual%s" % i, "I_actual%s" % i, "V_actual%s" % i, "T_motor%s" % i, "T_micro%s" % i, "jointMode%s" % i]
 
                 allData["JointData"] = self._get_data(pdata, "!iB dddffffB dddffffB dddffffB dddffffB dddffffB dddffffB", tmpstr)
-
-            elif ptype == 4:
-                if self.version < (3, 2):
-                    allData["CartesianInfo"] = self._get_data(pdata, "iBdddddd", ("size", "type", "X", "Y", "Z", "Rx", "Ry", "Rz"))
-                else:
-                    allData["CartesianInfo"] = self._get_data(pdata, "iBdddddddddddd", ("size", "type", "X", "Y", "Z", "Rx", "Ry", "Rz", "tcpOffsetX", "tcpOffsetY", "tcpOffsetZ", "tcpOffsetRx", "tcpOffsetRy", "tcpOffsetRz"))
-            elif ptype == 5:
-                allData["LaserPointer(OBSOLETE)"] = self._get_data(pdata, "iBddd", ("size", "type"))
+            elif ptype == 2:
+                allData["ToolData"] = self._get_data(pdata, "iBbbddfBffB", ("size", "type", "analoginputRange2", "analoginputRange3", "analogInput2", "analogInput3", "toolVoltage48V", "toolOutputVoltage", "toolCurrent", "toolTemperature", "toolMode"))
             elif ptype == 3:
 
                 if self.version >= (3, 0):
@@ -98,12 +92,13 @@ class ParserUtils(object):
                     fmt = "iBhhbbddbbddffffBBb"     # firmware < 3.0
 
                 allData["MasterBoardData"] = self._get_data(pdata, fmt, ("size", "type", "digitalInputBits", "digitalOutputBits", "analogInputRange0", "analogInputRange1", "analogInput0", "analogInput1", "analogInputDomain0", "analogInputDomain1", "analogOutput0", "analogOutput1", "masterBoardTemperature", "robotVoltage48V", "robotCurrent", "masterIOCurrent"))  # , "masterSafetyState" ,"masterOnOffState", "euromap67InterfaceInstalled"   ))
-            elif ptype == 2:
-                allData["ToolData"] = self._get_data(pdata, "iBbbddfBffB", ("size", "type", "analoginputRange2", "analoginputRange3", "analogInput2", "analogInput3", "toolVoltage48V", "toolOutputVoltage", "toolCurrent", "toolTemperature", "toolMode"))
-            elif ptype == 9:
-                continue  # This package has a length of 53 bytes. It is used internally by Universal Robots software only and should be skipped.
-            elif ptype == 8 and self.version >= (3, 2):
-                allData["AdditionalInfo"] = self._get_data(pdata, "iB??", ("size", "type", "teachButtonPressed", "teachButtonEnabled"))
+            elif ptype == 4:
+                if self.version < (3, 2):
+                    allData["CartesianInfo"] = self._get_data(pdata, "iBdddddd", ("size", "type", "X", "Y", "Z", "Rx", "Ry", "Rz"))
+                else:
+                    allData["CartesianInfo"] = self._get_data(pdata, "iBdddddddddddd", ("size", "type", "X", "Y", "Z", "Rx", "Ry", "Rz", "tcpOffsetX", "tcpOffsetY", "tcpOffsetZ", "tcpOffsetRx", "tcpOffsetRy", "tcpOffsetRz"))
+            elif ptype == 5:
+                allData["LaserPointer(OBSOLETE)"] = self._get_data(pdata, "iBddd", ("size", "type"))
             elif ptype == 7 and self.version >= (3, 2):
                 allData["ForceModeData"] = self._get_data(pdata, "iBddddddd", ("size", "type", "x", "y", "z", "rx", "ry", "rz", "robotDexterity"))
             # elif ptype == 8:
@@ -111,6 +106,12 @@ class ParserUtils(object):
             # elif ptype == 7:
             #     allData["keyMessage"] = self._get_data(pdata, "!iBQbb iiBAcAc", ("size", "type", "timestamp", "source", "robotMessageType", "code", "argument", "titleSize", "messageTitle", "messageText"))
 
+            elif ptype == 8 and self.version >= (3, 2):
+                allData["AdditionalInfo"] = self._get_data(pdata, "iB??", ("size", "type", "teachButtonPressed", "teachButtonEnabled"))
+            elif ptype == 9:
+                continue  # This package has a length of 53 bytes. It is used internally by Universal Robots software only and should be skipped.
+            elif ptype == 10: # and self.version >= (3, 2):
+                continue  # This is safety data
             elif ptype == 20:
                 tmp = self._get_data(pdata, "!iB Qbb", ("size", "type", "timestamp", "source", "robotMessageType"))
                 if tmp["robotMessageType"] == 3:
@@ -202,7 +203,7 @@ class ParserUtils(object):
         returns None if none found
         """
         counter = 0
-        limit = 10
+        limit = 100
         while True:
             if len(data) >= 5:
                 psize, ptype = self.get_header(data)
@@ -234,7 +235,7 @@ class SecondaryMonitor(Thread):
     Monitor data from secondary port and send programs to robot
     """
 
-    def __init__(self, host):
+    def __init__(self, host, use_simulation=False):
         Thread.__init__(self)
         self.logger = logging.getLogger("ursecmon")
         self._parser = ParserUtils()
@@ -250,6 +251,7 @@ class SecondaryMonitor(Thread):
         self.running = False  # True when robot is on and listening
         self._dataEvent = Condition()
         self.lastpacket_timestamp = 0
+        self.simulation = use_simulation
 
         self.start()
         self.wait()  # make sure we got some data before someone calls us
@@ -309,7 +311,7 @@ class SecondaryMonitor(Thread):
                     and self._dict["RobotModeData"]["isRealRobotEnabled"] is True \
                     and self._dict["RobotModeData"]["isEmergencyStopped"] is False \
                     and self._dict["RobotModeData"]["isSecurityStopped"] is False \
-                    and self._dict["RobotModeData"]["isRobotConnected"] is True \
+                    and (self._dict["RobotModeData"]["isPhysicalRobotConnected"] or self.simulation) \
                     and self._dict["RobotModeData"]["isPowerOnRobot"] is True:
                 self.running = True
             else:
