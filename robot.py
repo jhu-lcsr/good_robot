@@ -192,7 +192,7 @@ class Robot(object):
                 curr_pose = self.r.getl()
                 print('DEBUG: Attempting to only move position')
                 self.r.translate(tool_position, acc=acc, vel=vel, wait=True,
-                                 threshold=self.joint_tolerance)
+                                 threshold=self.joint_tolerance, relative=False)
             else:
                 self.r.movel(np.concatenate(tool_position, tool_orientation),
                              acc=acc, vel=vel, wait=True,
