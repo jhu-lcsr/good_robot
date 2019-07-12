@@ -3,7 +3,7 @@
 import urx
 import logging
 
-tcp_host_ip = "10.75.15.94"
+tcp_host_ip = "10.75.15.91"
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.WARN)

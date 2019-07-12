@@ -1,0 +1,126 @@
+Goal:
+Modify tossingbot network to accomodate orientation (with fewest changes
+possible)
+
+
+
+
+Input:
+- RGB-D heightmap (positive height from bottom)
+ - RGB different than D: mean-subtract and divided by std dev
+ - Heightmap is 180 x 140 pixels (not sure where this comes from)
+
+Output:
+
+
+Loss:
+
+Perception Network Details:
+- Input (dims of RGBD  - 180 x 140 x 4 = I? )
+- 7 layer FC residual network
+  - (interleaved with 2 layers of spatial 2x2 max pools)
+- Output: 45 x 35 x 512, mu
+  - Separatedly to Grasp and Throw
+
+Grasping Network Details:
+- Pixelwise probabilities for end effector locations and orientations
+ - Dimension of heightmap, I
+- 7 layer FC residual network
+  - (interleaved with 2 layers of spatial bilinear 2x2 upsampling)
+  - Feed in 16 rotated versions of mu
+  - Pick out pixel with highest probability success, in any rotation
+  - 3D location of pixel + orientation of heightmap
+
+Throwing Network Details:
+- Predict release position and velocity (v,xyz)
+- Primitive:
+ - antipodal line b/tw fingers remains orthogonal to intended aerial trajectory
+   of projectile (during throwing motion)
+ - executed only on grasp success
+- Release position (r,xyz) hardcoded, given target landing location (p,xyz)
+  - Assume goes in straight line (according to shadow on x-y plane)
+   - (Line may be truncated though due to drag)
+  - Sweep out x,y circle for rx, ry with fixed distance from base, plus constant
+    height rz
+- Release velocity: assume 45deg upward at release position, in direction of p
+- Only unknown is magnitude of final release velocity since ‖vx,y‖=vz
+- Network outputs pixelwise residual estimate -- pick pixel per grasping network
+
+BOTH NETWORKS -- fed in not just mu (RGBD heightmap) but also 3-channel v,
+constant across the whole image, also of same pixels dimension
+
+
+Physical setup:
+0.9 x 0.7 m
+
+
+OKAY, but how was velocity encoded into the throwing motion itself? In terms of
+UR script programming.
+
+-----------------------------------------------
+Math
+-----------------------------------------------
+
+
+
+The math follow simply, despite apparently taking me 2 hours
+Let us consider a slice that turns our problem into a 2D one.
+
+z axis (instead of 'y' axis)
+^
+|
+----> xy axis (instead of 'x' axis)
+
+~ Horizontally,
+delta p_xy = v_xy * t
+where delta p_xy = p_xyinit - r_xy
+
+~ Vertically, we have gravity.
+delta p_z = v_z * t - (1/2) g * t^2
+where delta p_z = p_zinit - r_z
+
+
+Solving for t, we have
+
+t = (delta p_xy) / v_xy
+
+Plugging into 2nd equation,
+
+delta p_z = v_z * (delta_p_xy / v_xy)  - (1/2) a * ( delta_p_xy / v_xy) ^2
+
+Note that as we have 45 deg angle, then v_z = v_xy . Cancelling out and rearranging.
+
+delta_p_z = delta_p_xy - (1/2) * a * (delta_p_xy / v_xy)^2
+delta_p_z - delta_p_xy = - (1/2) * a * (delta_p_xy / v_xy)^2
+delta_p_xy - delta_p_z =  (1/2) * a * ( delta_p_xy^2 / v_xy^2 )
+
+v_xy^2 =  (1/2) * a * (delta_p_xy^2) / ( delta_p_xy - delta_p_z)
+
+Now we want the magnitude, which is V = sqrt(v_xy^2 + v_z^2)
+Since v_xy = v_z we have
+V = sqrt( 2 * v_xy^2 )
+
+Thus,
+V = sqrt( (2 * (1/2) * a * delta_p_xy^2) / (delta_p_xy - delta_p_z) )
+
+And thus
+V = sqrt( a * delta_p_xy^2 / ( delta_p_xy - delta_p_z ) )
+
+
+Now to convert back into x,y coordinates, instead of our planar xy
+simplification.
+
+delta_p_z = p_z - r_z
+
+p_xy = sqrt( p_x^2 + p_y^2 )
+
+Thus,
+V = sqrt( a * delta_p_xy^2 / ( r_z - p_z + delta_p_xy ) )
+And so
+V = sqrt( a * (px^2 + py^2) / ( r_z - p_z + sqrt(p_x^2 + p_y^2)) )
+
+EXCEPT:
+Still something funky going on with the signs in the denominator. And ... this
+seems to imply that delta_p_xy = p_xy....
+
+WELL LET'S JUST IGNORE THAT FOR NOW AND MOVE ON ~___~''''''''''''

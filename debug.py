@@ -2,12 +2,13 @@
 
 import numpy as np
 import time
+import os
 from robot import Robot
 
 
 # User options (change me)
 # --------------- Setup options ---------------
-tcp_host_ip = "10.75.15.94"  # IP and port to robot arm as TCP client (UR5)
+tcp_host_ip = "10.75.15.91"  # IP and port to robot arm as TCP client (UR5)
 tcp_port = 30002
 # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 # NOTE: original
@@ -20,7 +21,7 @@ tcp_port = 30002
 # [[0.300, 0.500], [-0.250, 0.150], [0.200, 0.300]])
 workspace_limits = np.asarray(
     # [[0.300, 0.600], [-0.250, 0.150], [0.200, 0.400]])
-    [[0.400, 0.600], [-0.250, 0.150], [0.100, 0.300]])
+    [[0.400, 0.600], [-0.250, 0.150], [0.200, 0.300]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
@@ -39,58 +40,66 @@ grasp_position[2] = 0.25  # NOTE this sets z position!
 # grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
 # grasp_position[2] = workspace_limits[2][0]
 
-while True:
-    print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
-    # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
-    # time.sleep(0.1)
-    # print('!----Grasp completed')
-    # robot.close_gripper()
-    # time.sleep(0.1)
+try:
+    while True:
+        print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
+        # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
+        # time.sleep(0.1)
+        # print('!----Grasp completed')
+        # robot.close_gripper()
+        # time.sleep(0.1)
 
-    robot.open_gripper()
-    prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
-    if str(prompt1) == 'y':
-        time.sleep(0.01)
-        robot.close_gripper()
-        time.sleep(0.01)
-    prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
-    if str(prompt2) == 'yes':
-        time.sleep(0.05)
-        print('!----Throw started')
-        robot.throw()
-        print('!----Throw completed')
+        robot.open_gripper()
+        '''
+        prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
+        if str(prompt1) == 'y':
+            time.sleep(0.01)
+            robot.close_gripper()
+            time.sleep(0.01)
+        prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
+        if str(prompt2) == 'yes':
+            time.sleep(0.05)
+            print('!----Throw started')
+            # robot.throw()
+            print('!----Throw completed')
+        '''
 
-    # # robot.push(push_position, 0, workspace_limits)
-    # # robot.restart_real()
+        # # robot.push(push_position, 0, workspace_limits)
+        # # robot.restart_real()
 
-    # Repeatedly move to workspace corners
-    # while True:
+        # Repeatedly move to workspace corners
+        # while True:
 
-    print('Attempting to debug.')
-    ''' move back and forth
-    robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                   [0], workspace_limits[2][0]], None)
-    time.sleep(1)
-    robot.move_to([workspace_limits[0][0] + 0.1, workspace_limits[1]
-                   [0], workspace_limits[2][0]], None)
-    time.sleep(1)
-    '''
+        print('Attempting to debug.')
+        robot.move_to([workspace_limits[0][0],
+                       workspace_limits[1][0], workspace_limits[2][0]], None)
+        time.sleep(0.1)
+        robot.move_to([workspace_limits[0][0] + 0.1,
+                       workspace_limits[1][0], workspace_limits[2][0]], None)
+        time.sleep(0.1)
+        """ move in a sqaure
+            robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                           [0], workspace_limits[2][0]], None, acc_scaling=1,
+                          vel_scaling=1)
+            time.sleep(0.5)
 
-    """ move in a sqaure
-    robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                   [0], workspace_limits[2][0]], None, acc_scaling=1,
-                  vel_scaling=1)
-    time.sleep(0.5)
+            robot.move_to([workspace_limits[0][0], workspace_limits[1]
+                           [1], workspace_limits[2][0]], None)
+            time.sleep(0.5)
 
-    robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                   [1], workspace_limits[2][0]], None)
-    time.sleep(0.5)
+            robot.move_to([workspace_limits[0][1], workspace_limits[1]
+                           [1], workspace_limits[2][0]], None)
+            time.sleep(0.5)
 
-    robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                   [1], workspace_limits[2][0]], None)
-    time.sleep(0.5)
-
-    robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                   [0], workspace_limits[2][0]], None)
-    time.sleep(0.5)
-    """
+            robot.move_to([workspace_limits[0][1], workspace_limits[1]
+                           [0], workspace_limits[2][0]], None)
+            time.sleep(0.5)
+            """
+except Exception as e:  # RobotError, ex:
+    print("Robot could not execute move (emergency stop for example), do something", e)
+    robot.r.close()
+    print('closing robot')
+    # print('exiting')
+    # sys.exit()
+    print('exiting again')
+    os._exit(1)

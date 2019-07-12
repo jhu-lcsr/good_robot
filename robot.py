@@ -7,9 +7,11 @@ import numpy as np
 import utils
 import serial
 import binascii
+from urx.robotiq_two_finger_gripper import Robotiq_Two_Finger_Gripper
 
 from simulation import vrep
 from real.camera import Camera
+import urx
 
 
 class Robot(object):
@@ -23,6 +25,12 @@ class Robot(object):
         self.moveto_limits = (
             [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.554]])
 
+        # Tool pose tolerance for blocking calls
+        self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
+
+        # Joint tolerance for blocking calls
+        self.joint_tolerance = 0.01
+
         # If in simulation...
         if self.is_sim:
             pass
@@ -33,10 +41,16 @@ class Robot(object):
             self.tcp_host_ip = tcp_host_ip
             self.tcp_port = tcp_port
             # self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.r = urx.Robot(tcp_host_ip)
+            self.r.set_tcp((0, 0, 0, 0, 0, 0))
+            self.r.set_payload(0.5, (0, 0, 0))
+
+            self.gripper = Robotiq_Two_Finger_Gripper(self.r)
 
             # Connect as real-time client to parse state data
-            self.rtc_host_ip = rtc_host_ip
-            self.rtc_port = rtc_port
+            # self.rtc_host_ip = rtc_host_ip
+            # self.rtc_port = rtc_port
+
             # NOTE: this is for D415
             # home_in_deg = np.array(
             # [-151.4, -93.7, 85.4, -90, -90, 0]) * 1.0
@@ -52,26 +66,16 @@ class Robot(object):
             self.joint_acc = 0.50  # Safe when set 30% speed on pendant
             self.joint_vel = 0.35
 
-            # Joint tolerance for blocking calls
-            self.joint_tolerance = 0.01
-
             # Default tool speed configuration
             # self.tool_acc = 1.2 # Safe: 0.5
             # self.tool_vel = 0.25 # Safe: 0.2
             self.tool_acc = 0.1  # Safe when set 30% speed on pendant
             self.tool_vel = 0.1
 
-            # Tool pose tolerance for blocking calls
-            self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
-
             # Move robot to home pose
-            # TODO: activate gripper function
-            # self.activate_gripper()
             self.go_home()
-            """
-            # time.sleep(1)
-            # self.close_gripper()
-            # self.open_gripper()
+            self.close_gripper()
+            self.open_gripper()
 
             # Default home joint configuration
             # NOTE: this is for debug (hardcode calib) testing
@@ -93,21 +97,21 @@ class Robot(object):
             # self.home_joint_config = [-np.pi, -
             # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
-            # Fetch RGB-D data from RealSense camera
-            self.camera = Camera()
-            self.cam_intrinsics = self.camera.intrinsics
+            # # Fetch RGB-D data from RealSense camera
+            # self.camera = Camera()
+            # self.cam_intrinsics = self.camera.intrinsics
 
-            # Load camera pose (from running calibrate.py), intrinsics and depth scale
-            # NOTE: Is this independent of where the camera is?
-            self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
-            self.cam_depth_scale = np.loadtxt(
-                'real/camera_depth_scale.txt', delimiter=' ')
-            """
+            # # Load camera pose (from running calibrate.py), intrinsics and depth scale
+            # # NOTE: Is this independent of where the camera is?
+            # self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
+            # self.cam_depth_scale = np.loadtxt(
+            # 'real/camera_depth_scale.txt', delimiter=' ')
 
+    '''
     def reposition_objects(self, workspace_limits):
 
         # Move gripper out of the way
-        self.move_to([-0.1, 0, 0.3], None)
+        self.r.movel([-0.100, 0.000, 0.300])
         # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
         # time.sleep(1)
@@ -127,6 +131,7 @@ class Robot(object):
             vrep.simxSetObjectOrientation(
                 self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
             time.sleep(2)
+    '''
 
     def get_camera_data(self):
 
@@ -141,183 +146,25 @@ class Robot(object):
 
         return color_img, depth_img
 
-    # def parse_tcp_state_data(self, state_data, subpackage):
-    def parse_tcp_state_data(self, tcp_socket, subpackage):
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-
-        state_data = tcp_socket.recv(1024)
-        state_data = tcp_socket.recv(1024)
-        # Read package header
-
-        data_bytes = bytearray()
-        data_bytes.extend(state_data)
-        data_length = struct.unpack("!i", data_bytes[0:4])[0]
-        robot_message_type = data_bytes[4]
-        # print('robot message type', robot_message_type)
-        while (robot_message_type != 16):
-            print('Wrong message type, trying again')
-            state_data = tcp_socket.recv(1024)
-            state_data = tcp_socket.recv(2048)
-            data_bytes = bytearray()
-            data_bytes.extend(state_data)
-            data_length = struct.unpack("!i", data_bytes[0:4])[0]
-            robot_message_type = data_bytes[4]
-            print('robot message type', robot_message_type)
-
-        byte_idx = 5
-
-        # Parse sub-packages
-        subpackage_types = {
-            'joint_data': 1, 'cartesian_info': 4, 'force_mode_data': 7, 'tool_data': 2}
-        while byte_idx < data_length:
-            # package_length = int.from_bytes(data_bytes[byte_idx:(byte_idx+4)], byteorder='big', signed=False)
-            package_length = struct.unpack(
-                "!i", data_bytes[byte_idx:(byte_idx+4)])[0]
-            byte_idx += 4
-            package_idx = data_bytes[byte_idx]
-            if package_idx == subpackage_types[subpackage]:
-                byte_idx += 1
-                break
-            byte_idx += package_length - 4
-        tcp_socket.close()
-
-        def parse_joint_data(data_bytes, byte_idx):
-            actual_joint_positions = [0, 0, 0, 0, 0, 0]
-            target_joint_positions = [0, 0, 0, 0, 0, 0]
-            for joint_idx in range(6):
-                actual_joint_positions[joint_idx] = struct.unpack(
-                    '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
-                target_joint_positions[joint_idx] = struct.unpack(
-                    '!d', data_bytes[(byte_idx+8):(byte_idx+16)])[0]
-                byte_idx += 41
-            # DEBUG:
-            # print('joint pos', actual_joint_positions)
-            return actual_joint_positions
-
-        def parse_cartesian_info(data_bytes, byte_idx):
-            actual_tool_pose = [0, 0, 0, 0, 0, 0]
-            for pose_value_idx in range(6):
-                actual_tool_pose[pose_value_idx] = struct.unpack(
-                    '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
-                byte_idx += 8
-            # print('tool pos', actual_tool_pose)
-            return actual_tool_pose
-
-        def parse_tool_data(data_bytes, byte_idx):
-            byte_idx += 2
-            tool_analog_input2 = struct.unpack(
-                '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
-            return tool_analog_input2
-
-        parse_functions = {'joint_data': parse_joint_data,
-                           'cartesian_info': parse_cartesian_info, 'tool_data': parse_tool_data}
-        return parse_functions[subpackage](data_bytes, byte_idx)
-
-    def parse_rtc_state_data(self, state_data):
-
-        # Read package header
-        data_bytes = bytearray()
-        data_bytes.extend(state_data)
-        data_length = struct.unpack("!i", data_bytes[0:4])[0]
-        assert(data_length == 812)
-        byte_idx = 4 + 8 + 8*48 + 24 + 120
-        TCP_forces = [0, 0, 0, 0, 0, 0]
-        for joint_idx in range(6):
-            TCP_forces[joint_idx] = struct.unpack(
-                '!d', data_bytes[(byte_idx+0):(byte_idx+8)])[0]
-            byte_idx += 8
-
-        return TCP_forces
-
-    def activate_gripper(self, async=False):
-        print('!-- activating gripper')
-        ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=1,
-                            parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS)
-        # closing_force = '\xFF' # 255
-        clear_rACT = "\x09\x10\x03\xE8\x00\x03\x06\x00\x00\x00\x00\x00\x00\x73\x30"
-        ser.write(clear_rACT)
-        set_rACT = "\x09\x10\x03\xE8\x00\x03\x06\x01\x00\x00\x00\x00\x00\x72\xE1"
-        ser.write(set_rACT)
-
-        # read gripper status until activation completed?
-        ser.write("\x09\x03\x07\xD0\x00\x01\x85\xCF")
-        ser.readline()
-
-        ser.close()
+    def open_gripper(self, async=False):
+        self.gripper.open_gripper()
 
     def close_gripper(self, async=False):
         print("!-- close gripper")
+        self.gripper.close_gripper()
+        # gripper_fully_closed = self.check_grasp()
+        gripper_fully_closed = True
+        return gripper_fully_closed
 
-        if self.is_sim:
-            pass
-
-        else:
-            # NOTE: Adapted to Robotiq
-            ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=1,
-                                parity=serial.PARITY_NONE,
-                                stopbits=serial.STOPBITS_ONE,
-                                bytesize=serial.EIGHTBITS)
-            ser.write(
-                "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF\xFF\x42\x29")
-
-            """
-            # NOTE: THIS DOESN'T WORK (probably some hex vs str thing)
-            closing_force = '\xBB'  # 187
-            # close_cmd = "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\xFF\xFF" + \
-                # closing_force + "\x42\x29"
-            # print('close_cmd', close_cmd)
-            # ser.write(close_cmd)
-            """
-            ser.close()
-            if async:
-                gripper_fully_closed = True
-            else:
-                time.sleep(0.2)
-                gripper_fully_closed = self.check_grasp()
-
-            # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-            # tcp_command = "set_digital_out(8,True)\n"
-            # self.tcp_socket.send(str.encode(tcp_command))
-            # self.tcp_socket.close()
-
-            return gripper_fully_closed
-
-    # DONE convert to robotiq
-    def open_gripper(self, async=False):
-
-        if self.is_sim:
-            pass
-        else:
-            print('!-- opening gripper')
-            # NOTE: for robotiq gripper
-            ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200,
-                                timeout=1, parity=serial.PARITY_NONE,
-                                stopbits=serial.STOPBITS_ONE,
-                                bytesize=serial.EIGHTBITS)
-            ser.write(
-                "\x09\x10\x03\xE8\x00\x03\x06\x09\x00\x00\x00\xFF\xFF\x72\x19")
-            # NOTE: Originally for RG2
-            # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-            # tcp_command = "set_digital_out(8,False)\n"
-            # self.tcp_socket.send(str.encode(tcp_command))
-            # self.tcp_socket.close()
-            ser.close()
-            if not async:
-                time.sleep(0.2)
-
+    '''
     def get_state(self):
-
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
         state_data = self.tcp_socket.recv(2048)
         state_data = self.tcp_socket.recv(2048)
         self.tcp_socket.close()
         return state_data
+    '''
 
     def btw(self, a, min, max):
         if (a >= min) and (a <= max):
@@ -330,59 +177,34 @@ class Robot(object):
 
         if self.is_sim:
             pass
+
         limits = self.moveto_limits
         # is_safe = False
         if self.btw(tool_position[0], limits[0][0], limits[0][1]) and \
                 self.btw(tool_position[1], limits[1][0], limits[1][1]) and \
                 self.btw(tool_position[2], limits[2][0], limits[2][1]):
-            # print("I guess it's safe")
-            # print('DEBUG: Entered move_to function, going to ', tool_position,
-            # tool_orientation)
-            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+            print("I guess it's safe")
+            print('DEBUG: Entered move_to function, going to ', tool_position,
+                  tool_orientation)
 
             # t = 0, r = radius
             if tool_orientation == None:
-                curr_pose = self.parse_tcp_state_data(self.tcp_socket,
-                                                      'cartesian_info')
-
+                curr_pose = self.r.getl()
                 print('DEBUG: Attempting to only move position')
-                # NOTE: I changed to movej
-                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.100)\n" %  \
-                    (tool_position[0], tool_position[1], tool_position[2],
-                     curr_pose[3], curr_pose[4], curr_pose[5], acc, vel)
-                # print('DEBUG: tcp command', tcp_command)
-
+                self.r.translate(tool_position, acc=acc, vel=vel, wait=True,
+                                 threshold=self.joint_tolerance)
             else:
-                tcp_command = "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.100)\n" % \
-                    (tool_position[0], tool_position[1], tool_position[2],
-                     tool_orientation[0], tool_orientation[1], tool_orientation[2],
-                     acc, vel)
-                print('move_to', tool_position, tool_orientation)
-            self.tcp_socket.send(str.encode(tcp_command))
+                self.r.movel(np.concatenate(tool_position, tool_orientation),
+                             acc=acc, vel=vel, wait=True,
+                             threshold=self.joint_tolerance)
 
-            # Block until robot reaches target tool position
-            #
-            # TODO figure out why, have to run twice tcp_state_data =
-            # self.tcp_socket.recv(2048) tcp_state_data =
-            # self.tcp_socket.recv(2048)
-            actual_tool_pose = self.parse_tcp_state_data(self.tcp_socket,
-                                                         'cartesian_info')
-            while not all([np.abs(actual_tool_pose[j] - tool_position[j]) <
-                           self.tool_pose_tolerance[j] for j in range(3)]):
-                # print('DEBUG: MoveL!, but not quite there yet, hold on...')
-                # tcp_state_data = self.tcp_socket.recv(2048)
-                prev_actual_tool_pose = np.asarray(actual_tool_pose).copy()
-                actual_tool_pose = self.parse_tcp_state_data(self.tcp_socket,
-                                                             'cartesian_info')
-                time.sleep(0.01)
+                print('move_to', tool_position, tool_orientation)
+
         else:
             print("DEBUG: It's Not safe to move here!", tool_position,
                   'limits', limits)
 
-        self.tcp_socket.close()
-
-    """
+    '''
     def guarded_move_to(self, tool_position, tool_orientation):
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -455,36 +277,14 @@ class Robot(object):
         self.rtc_socket.close()
 
         return execute_success
-    """
+    '''
 
     def move_joints(self, joint_configuration):
         # DEBUG:
         # print('Entered move_joints function')
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        tcp_command = "movej([%f" % joint_configuration[0]  # NOTE: no p
-        for joint_idx in range(1, 6):
-            tcp_command = tcp_command + \
-                (",%f" % joint_configuration[joint_idx])
-        tcp_command = tcp_command + \
-            "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
-        self.tcp_socket.send(str.encode(tcp_command))
-
-        # Block until robot reaches home state
-        # state_data = self.tcp_socket.recv(2048)  # TODO why need to run twice
-        # state_data = self.tcp_socket.recv(2048)
-        actual_joint_positions = self.parse_tcp_state_data(
-            self.tcp_socket, 'joint_data')
-        while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
-            # state_data = self.tcp_socket.recv(2048)
-            # state_data = self.tcp_socket.recv(4096)
-            actual_joint_positions = self.parse_tcp_state_data(
-                self.tcp_socket, 'joint_data')
-            time.sleep(0.01)
-            # DEBUG:
-            # print('MoveJ, but not quite there yet, hold on...')
-
-        self.tcp_socket.close()
+        self.r.movej(joint_configuration, acc=self.joint_acc,
+                     vel=self.joint_vel, wait=True,
+                     threshold=self.joint_tolerance)
 
     def go_home(self):
 
@@ -611,14 +411,13 @@ class Robot(object):
         if self.is_sim:
             pass
 
-        else:
-
             # Compute tool orientation from heightmap rotation angle
             # Basically, how should I rotate the gripper...
             # I GUESS THIS IS KIND OF IMPORTANT
             # It would be nice to specify in terms of ... pis, and not rx ry rz
+        else:
             grasp_orientation = [1.0, 0.0]
-            """
+            '''
             if heightmap_rotation_angle > np.pi:
                 heightmap_rotation_angle = heightmap_rotation_angle - 2*np.pi
             tool_rotation_angle = heightmap_rotation_angle/2
@@ -628,10 +427,8 @@ class Robot(object):
             tool_orientation_axis = tool_orientation/tool_orientation_angle
             tool_orientation_rotm = utils.angle2rotm(
                 tool_orientation_angle, tool_orientation_axis, point=None)[:3, :3]
-            """
 
             # Compute tilted tool orientation during dropping into bin
-            """
             tilt_rotm = utils.euler2rotm(np.asarray([-np.pi/4, 0, 0]))
             tilted_tool_orientation_rotm = np.dot(
                 tilt_rotm, tool_orientation_rotm)
@@ -639,18 +436,16 @@ class Robot(object):
                 tilted_tool_orientation_rotm)
             tilted_tool_orientation = tilted_tool_orientation_axis_angle[0]*np.asarray(
                 tilted_tool_orientation_axis_angle[1:4])
-            """
+            '''
             # position
             # TODO: FIX
             # tool_orientation = [2.21, 2.19, -0.04]
             tool_orientation = [2.22, -2.22, 0]
             tilted_tool_orientation = tool_orientation
-
             # Attempt grasp
-
             print('!--- Attempting to open gripper, then go down & close --!')
             self.grasp_object(position, tool_orientation)
-            """
+            '''
             position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.05, workspace_limits[2][0])
 
@@ -666,9 +461,9 @@ class Robot(object):
                    tool_orientation[1], 0.0, self.joint_acc * 0.1, self.joint_vel * 0.1)
             tcp_command += " set_digital_out(8,True)\n"
             tcp_command += "end\n"
-            """
+            '''
             # Block until robot reaches target tool position and gripper fingers have stopped moving
-            """
+            '''
             # state_data = self.get_state()
             # tool_analog_input2 = self.parse_tcp_state_data(
             # state_data, 'tool_data')
@@ -693,15 +488,14 @@ class Robot(object):
                     self.tcp_socket, 'cartesian_info')
                 timeout_t1 = time.time()
                 self.tcp_socket.close()
-            """
-
+            '''
             # TODO: determine if gripper has force on it
-            """
+            '''
                 if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > 5:
                     print('Breaking')
                     break
                 tool_analog_input2 = new_tool_analog_input2
-                """
+            '''
 
             # Check if gripper is open (grasp might be successful)
             # gripper_full_closed = self.close_gripper()
@@ -748,7 +542,7 @@ class Robot(object):
                 self.move_to(home_position, home_orientation)
 
                 # NOTE: original code separates into approach and throw (tilted) parts
-                """
+                '''
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -770,13 +564,13 @@ class Robot(object):
                 tcp_command += "end\n"
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
-                """
+                '''
                 # print(tcp_command) # Debug
 
                 # Measure gripper width until robot reaches near bin location
                 # state_data = self.get_state()
                 measurements = []
-                """
+                '''
                 while True:
                     # state_data = self.get_state()
 
@@ -793,7 +587,7 @@ class Robot(object):
                     if abs(actual_tool_pose[1] - bin_position[1]) < 0.2 or all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
                         print('\n !------ Gripper not closed; breaking --')
                         break
-                    """
+                '''
 
                 # TODO!
                 # TODO: this appears to continuously try to close to keep object
@@ -805,10 +599,8 @@ class Robot(object):
                         grasp_success = True
 
             else:
-
                 print('\n !------ Gripper closed ---')
-
-                """
+                '''
                 self.tcp_socket = socket.socket(
                     socket.AF_INET, socket.SOCK_STREAM)
                 self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -824,13 +616,12 @@ class Robot(object):
                 tcp_command += "end\n"
                 self.tcp_socket.send(str.encode(tcp_command))
                 self.tcp_socket.close()
-                """
-                print('\n !------ Gripper closed, process() defined ---')
+                '''
 
+            print('\n !------ Gripper closed, process() defined ---')
             # Block until robot reaches home location
             # state_data = self.get_state()
-
-            """
+            '''
             self.tcp_socket = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -856,7 +647,7 @@ class Robot(object):
                     break
 
                 tool_analog_input2 = new_tool_analog_input2
-                """
+            '''
 
         return grasp_success
 
@@ -864,12 +655,9 @@ class Robot(object):
         print('DEBUG: restarting real')
 
 
-"""
-
-
+'''
 def restart_real(self):
-
-        # Compute tool orientation from heightmap rotation angle
+    # Compute tool orientation from heightmap rotation angle
     grasp_orientation = [1.0, 0.0]
     tool_rotation_angle = -np.pi/4
     tool_orientation = np.asarray([grasp_orientation[0]*np.cos(tool_rotation_angle) - grasp_orientation[1]*np.sin(
@@ -953,7 +741,7 @@ def restart_real(self):
         if tool_analog_input2 > 3.0 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
             break
         tool_analog_input2 = new_tool_analog_input2
-"""
+'''
 
 # def place(self, position, orientation, workspace_limits):
 #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
