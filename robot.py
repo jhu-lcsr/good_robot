@@ -74,8 +74,8 @@ class Robot(object):
 
             # Move robot to home pose
             self.go_home()
-            self.close_gripper()
-            self.open_gripper()
+            # self.close_gripper()
+            # self.open_gripper()
 
             # Default home joint configuration
             # NOTE: this is for debug (hardcode calib) testing
@@ -188,13 +188,15 @@ class Robot(object):
                   tool_orientation)
 
             # t = 0, r = radius
-            if tool_orientation == None:
-                curr_pose = self.r.getl()
+            if tool_orientation is None:
                 print('DEBUG: Attempting to only move position')
                 self.r.translate(tool_position, acc=acc, vel=vel, wait=True,
                                  threshold=self.joint_tolerance, relative=False)
             else:
-                self.r.movel(np.concatenate(tool_position, tool_orientation),
+                print(tool_position, tool_orientation)
+                print("DEBUG: We're moving! to ", np.concatenate((tool_position,
+                                                                  tool_orientation)))
+                self.r.movel(np.concatenate((tool_position, tool_orientation)),
                              acc=acc, vel=vel, wait=True,
                              threshold=self.joint_tolerance)
 
@@ -204,7 +206,7 @@ class Robot(object):
             print("DEBUG: It's Not safe to move here!", tool_position,
                   'limits', limits)
 
-    '''
+    """
     def guarded_move_to(self, tool_position, tool_orientation):
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -277,7 +279,7 @@ class Robot(object):
         self.rtc_socket.close()
 
         return execute_success
-    '''
+    """
 
     def move_joints(self, joint_configuration):
         # DEBUG:
@@ -322,9 +324,9 @@ class Robot(object):
         curled_config_deg = [-196, -107, 126, -90, -90, -12]
         curled_config = np.deg2rad(curled_config_deg)
 
-        curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
-                                                    'joint_data')
-        print('joints', curr_joint_pose)
+        # curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
+        # 'joint_data')
+        # print('joints', curr_joint_pose)
 
         # end_position = [0.600, 0.000, 0.450]
         # end_axisangle = [2.55, -2.06, 0.80]
@@ -340,13 +342,18 @@ class Robot(object):
 
         blend_radius = 0.100
 
-        K = 28.
+        K = 1.   # 28.
 
         self.tcp_socket = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        print('throw acc will be', self.joint_acc * 14)
-        print('throw vel will be', self.joint_vel * 10)
+        print('throw acc will be', self.joint_acc * 1)  # 4)
+        print('throw vel will be', self.joint_vel * 1)  # 0)
+        self.move_to(start_position, start_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0)  # last # is blend radius
+        # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
+        self.move_joints(curled_config)
+        '''
         tcp_command = "def throw_traj():\n"
         # start
         # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
@@ -375,11 +382,12 @@ class Robot(object):
         tcp_command += "end\n"
         self.tcp_socket.send(str.encode(tcp_command))
         self.tcp_socket.close()
+        '''
 
         # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
         time.sleep(1.25)
         self.open_gripper()
-        robot.sleep(2)
+        time.sleep(2)
 
         # Pre-compute blend radius
         # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)

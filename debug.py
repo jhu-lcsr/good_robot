@@ -21,7 +21,7 @@ tcp_port = 30002
 # [[0.300, 0.500], [-0.250, 0.150], [0.200, 0.300]])
 workspace_limits = np.asarray(
     # [[0.300, 0.600], [-0.250, 0.150], [0.200, 0.400]])
-    [[0.400, 0.600], [-0.250, 0.150], [0.200, 0.300]])
+    [[0.300, 0.600], [-0.250, 0.150], [0.200, 0.300]])
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
@@ -40,66 +40,60 @@ grasp_position[2] = 0.25  # NOTE this sets z position!
 # grasp_position[1] = 120 * 0.002 + workspace_limits[1][0]
 # grasp_position[2] = workspace_limits[2][0]
 
-try:
-    while True:
-        print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
+# try:
+while True:
+        # print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
         # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
         # time.sleep(0.1)
         # print('!----Grasp completed')
         # robot.close_gripper()
         # time.sleep(0.1)
 
-        robot.open_gripper()
-        '''
+        # robot.open_gripper()
         prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
-        if str(prompt1) == 'y':
-            time.sleep(0.01)
-            robot.close_gripper()
-            time.sleep(0.01)
+        # if str(prompt1) == 'y':
+        # time.sleep(0.01)
+        # robot.close_gripper()
+        # time.sleep(0.01)
         prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
         if str(prompt2) == 'yes':
             time.sleep(0.05)
             print('!----Throw started')
-            # robot.throw()
+            robot.throw()
             print('!----Throw completed')
-        '''
 
         # # robot.push(push_position, 0, workspace_limits)
         # # robot.restart_real()
 
         # Repeatedly move to workspace corners
         # while True:
-
+        '''
         print('Attempting to debug.')
-        robot.move_to([workspace_limits[0][0],
-                       workspace_limits[1][0], workspace_limits[2][0]], None)
-        time.sleep(0.1)
-        robot.move_to([workspace_limits[0][0] + 0.1,
-                       workspace_limits[1][0], workspace_limits[2][0]], None)
-        time.sleep(0.1)
-        """ move in a sqaure
-            robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                           [0], workspace_limits[2][0]], None, acc_scaling=1,
-                          vel_scaling=1)
-            time.sleep(0.5)
+        # move in a sqaure
+        robot.move_to([workspace_limits[0][0], workspace_limits[1][0],
+                       workspace_limits[2][0]], None, acc_scaling=1,
+                      vel_scaling=1)
+        time.sleep(0.2)
 
-            robot.move_to([workspace_limits[0][0], workspace_limits[1]
-                           [1], workspace_limits[2][0]], None)
-            time.sleep(0.5)
+        robot.move_to([workspace_limits[0][0], workspace_limits[1][1],
+                       workspace_limits[2][0]], None)
+        time.sleep(0.2)
+        robot.close_gripper()
 
-            robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                           [1], workspace_limits[2][0]], None)
-            time.sleep(0.5)
+        robot.move_to([workspace_limits[0][1], workspace_limits[1][1],
+                       workspace_limits[2][0]], None)
+        time.sleep(0.2)
 
-            robot.move_to([workspace_limits[0][1], workspace_limits[1]
-                           [0], workspace_limits[2][0]], None)
-            time.sleep(0.5)
-            """
-except Exception as e:  # RobotError, ex:
-    print("Robot could not execute move (emergency stop for example), do something", e)
-    robot.r.close()
-    print('closing robot')
-    # print('exiting')
-    # sys.exit()
-    print('exiting again')
-    os._exit(1)
+        robot.move_to([workspace_limits[0][1], workspace_limits[1][0],
+                       workspace_limits[2][0]], None)
+        time.sleep(0.2)
+        robot.open_gripper()
+        '''
+# except Exception as e:  # RobotError, ex:
+    # print("Robot could not execute move (emergency stop for example), do something", e)
+    # robot.r.close()
+    # print('closing robot')
+    # # print('exiting')
+    # # sys.exit()
+    # print('exiting again')
+    # os._exit(1)

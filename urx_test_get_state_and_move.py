@@ -14,7 +14,7 @@ if __name__ == "__main__":
     rob = urx.Robot(tcp_host_ip)
     #rob = urx.Robot("localhost")
 
-    rob.set_tcp((0, 0, 0.1, 0, 0, 0))
+    rob.set_tcp((0, 0, 0, 0, 0, 0))
     rob.set_payload(0.5, (0, 0, 0))
     try:
         delta = 0.05
