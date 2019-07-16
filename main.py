@@ -230,7 +230,7 @@ def main(args):
                             if nonlocal_variables['color_success']:
                                 successful_color_grasp_count += 1
                             grasped_obj_ind, grasped_obj_handle = robot.get_highest_object_list_index_and_handle()
-                            robot.reposition_object_randomly(grasped_obj_handle)
+                            robot.reposition_objects(grasped_obj_handle)
                             print('Successful color-specific grasp: %r' % (nonlocal_variables['color_success']))
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, float(successful_grasp_count)/float(grasp_count), float(successful_color_grasp_count)/float(grasp_count)))
 

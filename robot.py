@@ -282,7 +282,7 @@ class Robot(object):
             curr_shape_handle = ret_ints[0]
             self.object_handles.append(curr_shape_handle)
             if not (self.is_testing and self.test_preset_cases):
-                time.sleep(2)
+                time.sleep(0.5)
         self.prev_obj_positions = []
         self.obj_positions = []
 
@@ -383,7 +383,7 @@ class Robot(object):
     def reposition_objects(self, workspace_limits=None):
 
         # Move gripper out of the way
-        self.move_to([-0.1, 0, 0.3], None)
+        self.move_to([-0.3, 0, 0.3], None)
         # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
         # time.sleep(1)
@@ -392,7 +392,7 @@ class Robot(object):
 
             # Drop object at random x,y location and random orientation in robot workspace
             self.reposition_object_randomly(object_handle)
-            time.sleep(1)
+            time.sleep(0.5)
 
 
     def get_camera_data(self):
