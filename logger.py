@@ -3,8 +3,8 @@ import datetime
 import os
 import numpy as np
 import cv2
-import torch 
-# import h5py 
+import torch
+# import h5py
 
 class Logger():
 
@@ -63,18 +63,18 @@ class Logger():
         cv2.imwrite(os.path.join(self.color_images_directory, '%06d.%s.color.png' % (iteration, mode)), color_image)
         depth_image = np.round(depth_image * 10000).astype(np.uint16) # Save depth in 1e-4 meters
         cv2.imwrite(os.path.join(self.depth_images_directory, '%06d.%s.depth.png' % (iteration, mode)), depth_image)
-    
+
     def save_heightmaps(self, iteration, color_heightmap, depth_heightmap, mode):
         color_heightmap = cv2.cvtColor(color_heightmap, cv2.COLOR_RGB2BGR)
         cv2.imwrite(os.path.join(self.color_heightmaps_directory, '%06d.%s.color.png' % (iteration, mode)), color_heightmap)
         depth_heightmap = np.round(depth_heightmap * 100000).astype(np.uint16) # Save depth in 1e-5 meters
         cv2.imwrite(os.path.join(self.depth_heightmaps_directory, '%06d.%s.depth.png' % (iteration, mode)), depth_heightmap)
-    
+
     def write_to_log(self, log_name, log):
         np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
 
-    def save_model(self, iteration, model, name):
-        torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot-%06d.%s.pth' % (iteration, name)))
+    def save_model(self, model, name):
+        torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
 
     def save_backup_model(self, model, name):
         torch.save(model.state_dict(), os.path.join(self.models_directory, 'snapshot-backup.%s.pth' % (name)))
