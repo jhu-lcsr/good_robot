@@ -211,13 +211,20 @@ def main(args):
                     print('Push successful: %r' % (nonlocal_variables['push_success']))
                 # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
-                    # HK: color
-                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, workspace_limits)
-                    # HK: TODO fix color success check
+                    # TODO(hkwon214): random grasp of a specific color
+                    if grasp_color_task:
+                        # 3 is currently the red block
+                        object_color_index = 3
+                    else:
+                        object_color_index = None
+                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color_index)
+                    # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
-                        robot.reposition_objects(workspace_limits)
                         grasp_count += 1
+                        if grasp_color_task:
+                            grasped_obj_ind, grasped_obj_handle = robot.get_highest_object_list_index_and_handle()
+                            robot.reposition_object_randomly(grasped_obj_handle)
 
 
                     print('Grasp Count: %r' % (grasp_count))

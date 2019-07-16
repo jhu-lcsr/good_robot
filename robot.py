@@ -8,9 +8,17 @@ import utils
 from simulation import vrep
 
 class Robot(object):
+    """
+    Key member variables:
+       self.color_space: list of colors to give objects
+       self.color_names: list of strings identifying colors in color_space
+       self.stored_action_labels: name of actions for stacking one hot encoding, set if self.grasp_color_task = True.
+       self.object_handles: list of vrep object handles, the unique identifier integer indices needed for controlling objects in the vrep simulator
+       self.workspace_limits: bounds of the valid object workspace.
+    """
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file, place = False, grasp_color_task = False):
+                 is_testing, test_preset_cases, test_preset_file, place=False, grasp_color_task=False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -24,7 +32,6 @@ class Robot(object):
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
         if self.grasp_color_task:
-            self.block_color = 3
             # TODO: check if the block color is in the workspace
             # TODO: one hot encoding
             # self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape_03']
@@ -231,10 +238,16 @@ class Robot(object):
         object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
         return drop_x, drop_y, object_position, object_orientation
 
-    def reposition_object(self, object_list_idx):
+    def reposition_object_randomly(self, object_handle):
         drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
+        # Drop object at random x,y location and random orientation in robot workspace
+        vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
+        vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
         # TODO(HK) finish this function to reset a specific object, see reposition_objects, and only do it for one index instead of looping over all of them as done in reposition_objects.
 
+    def reposition_object_at_list_index_randomly(self, list_index):
+        object_handle = self.object_handles[list_index]
+        self.reposition_object_randomly(object_handle)
 
     def add_objects(self):
 
@@ -367,7 +380,7 @@ class Robot(object):
         return obj_positions, obj_orientations
 
 
-    def reposition_objects(self, workspace_limits):
+    def reposition_objects(self, workspace_limits=None):
 
         # Move gripper out of the way
         self.move_to([-0.1, 0, 0.3], None)
@@ -378,13 +391,8 @@ class Robot(object):
         for object_handle in self.object_handles:
 
             # Drop object at random x,y location and random orientation in robot workspace
-            drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
-            drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
-            object_position = [drop_x, drop_y, 0.15]
-            object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-            vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
-            vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
-            time.sleep(2)
+            self.reposition_object_randomly(object_handle)
+            time.sleep(1)
 
 
     def get_camera_data(self):
@@ -679,6 +687,9 @@ class Robot(object):
 
     # HK: added a function to check if the right color is grasped
     def check_correct_color_grasped(self, color_ind):
+        '''
+        color_ind: the index in color_names to grasp.
+        '''
         object_positions = np.asarray(self.get_obj_positions())
         object_positions = object_positions[:,2]
         grasped_object_ind = np.argmax(object_positions)
@@ -691,9 +702,28 @@ class Robot(object):
             return False
 
 
+    def get_highest_object_list_index_and_handle(self):
+        """
+        Of the objects in self.object_handles, get the one with the highest z position and its handle.
+
+        # Returns
+
+           grasped_object_ind, grasped_object_handle
+        """
+        object_positions = np.asarray(self.get_obj_positions())
+        object_positions = object_positions[:,2]
+        grasped_object_ind = np.argmax(object_positions)
+        grasped_object_handle = self.object_handles[grasped_object_ind]
+        return grasped_object_ind, grasped_object_handle
+
     # Primitives ----------------------------------------------------------
 
-    def grasp(self, position, heightmap_rotation_angle, workspace_limits):
+    def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None):
+        """
+        object_color: The index in the list self.color_names expected for the object to be grasped. If object_color is None the color does not matter.
+        """
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
         print('Executing: grasp at (%f, %f, %f)' % (position[0], position[1], position[2]))
 
         if self.is_sim:
@@ -749,9 +779,8 @@ class Robot(object):
             # HK: Check if right color is grasped
             color_success = False
             if grasp_success and self.grasp_color_task:
-                if self.check_correct_color_grasped(self.block_color):
-                    color_success = True
-                    print('Right color: %r' % (self.check_correct_color_grasped(self.block_color)))
+                color_success = self.check_correct_color_grasped(object_color)
+                print('Correct color was grasped: ' + str(color_success))
 
             # Move the grasped object elsewhere if place = false
             # if grasp_success and not self.place and self.grasp_color_task:
@@ -773,24 +802,14 @@ class Robot(object):
             #         vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
             # HK: Place grasped object at a random place
-            if grasp_success and not self.place and self.grasp_color_task:
-                object_positions = np.asarray(self.get_obj_positions())
-                object_positions = object_positions[:,2]
-                grasped_object_ind = np.argmax(object_positions)
-                grasped_object_handle = self.object_handles[grasped_object_ind]
+            if grasp_success and not self.place and object_color is not None:
+                high_obj_list_index, high_obj_handle = self.get_highest_object_list_index_and_handle()
+                self.reposition_object_randomly(high_obj_handle)
                 # TODO: HK: check if any block is grasped and put it back at a random place
                 # color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
                 # color_index = np.where(color==1)
                 # vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-
                 #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
-                drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
-                drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
-                object_position = [drop_x, drop_y, 0.15]
-                object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-                vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
-                vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
-
 
             # HK: Original Method
             elif grasp_success and not self.place and not self.grasp_color_task:
@@ -799,6 +818,10 @@ class Robot(object):
                 grasped_object_ind = np.argmax(object_positions)
                 grasped_object_handle = self.object_handles[grasped_object_ind]
                 vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+            else:
+                raise NotImplementedError(
+                    'grasp() call specified a task which does not match color specific stacking or grasp+pushing... '
+                    'this is a bug or is not yet implemented, you will need to make a code change or run the program with different settings.')
 
         else:
 
