@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-
 """
 Python library to control Robotiq Two Finger Gripper connected to UR robot via
 Python-URX
@@ -151,7 +150,10 @@ class Robotiq_Two_Finger_Gripper(object):
         self.payload = payload
         self.speed = speed
         self.force = force
-        self.socket_host = socket_host
+        # self.socket_host = socket_host
+        print('init gripper')
+        self.socket_host = "127.0.0.1"
+        # self.socket_host = "128.0.0.1"
         self.socket_port = socket_port
         self.socket_name = socket_name
         self.logger = logging.getLogger(u"robotiq")
@@ -184,7 +186,7 @@ class Robotiq_Two_Finger_Gripper(object):
         urscript._set_gripper_activate()
 
         # Wait on activation to avoid USB conflicts
-        urscript._sleep(0.1)
+        urscript._sleep(0.005)
 
         return urscript
 
@@ -198,7 +200,8 @@ class Robotiq_Two_Finger_Gripper(object):
         urscript = self._get_new_urscript()
 
         # Move to the position
-        sleep = 2.0
+        # sleep = 2.0
+        sleep = 0.005
         urscript._set_gripper_position(value)
         urscript._sleep(sleep)
 

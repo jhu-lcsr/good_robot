@@ -42,18 +42,19 @@ robot.joint_vel = 0.1
 # calib_home = [-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 # python 0.47 = 0.07 on the pendant
 # workspace_fixoffset = [0.5, 0.2, 0.47, -1.22, 1.19, -1.17]
-home_in_deg = np.array(
-    [-197, -105, 130, -110, -90, -30]) * 1.0
-home_joint_config = np.deg2rad(home_in_deg)
 
-# --------------------- NOTE: Change me!! -------------------
-commanded = [0.348, 0.0000, 0.268, 2.107, -2.200, -0.065]
+# home_in_deg = np.array(
+# [-197, -105, 130, -110, -90, -30]) * 1.0
+# home_joint_config = np.deg2rad(home_in_deg)
 
-print('!-------- Moving joints to', home_joint_config, ' ----------\n\n')
-robot.move_joints(home_joint_config)
-time.sleep(1)
+# # --------------------- NOTE: Change me!! -------------------
+# commanded = [0.348, 0.0000, 0.268, 2.107, -2.200, -0.065]
 
-print('!--------------------- Moved to calib home. next: ------------')
-print('!----- Moving l (pos) to', commanded[0:3], commanded[3:], ' ---\n\n')
-robot.move_to(commanded[0:3], commanded[3:])
-time.sleep(1)
+# print('!-------- Moving joints to', home_joint_config, ' ----------\n\n')
+# robot.move_joints(home_joint_config)
+# time.sleep(1)
+
+# print('!--------------------- Moved to calib home. next: ------------')
+# print('!----- Moving l (pos) to', commanded[0:3], commanded[3:], ' ---\n\n')
+# robot.move_to(commanded[0:3], commanded[3:])
+# time.sleep(1)

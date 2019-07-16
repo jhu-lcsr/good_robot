@@ -3,6 +3,7 @@
 import numpy as np
 import time
 import os
+import sys
 from robot import Robot
 
 
@@ -42,22 +43,24 @@ grasp_position[2] = 0.25  # NOTE this sets z position!
 
 # try:
 while True:
-        # print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
-        # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
-        # time.sleep(0.1)
-        # print('!----Grasp completed')
-        # robot.close_gripper()
-        # time.sleep(0.1)
+    # print('\n !------Attempting grasp at pos:  ', grasp_position, ' ---')
+    # robot.grasp(grasp_position, 11 * np.pi / 8, workspace_limits)
+    # time.sleep(0.1)
+    # print('!----Grasp completed')
+    # robot.close_gripper()
+    # time.sleep(0.1)
 
-        # robot.open_gripper()
+    # robot.open_gripper()
+    try:
         prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
-        # if str(prompt1) == 'y':
-        # time.sleep(0.01)
-        # robot.close_gripper()
-        # time.sleep(0.01)
+        if str(prompt1) == 'y':
+            time.sleep(0.01)
+            robot.close_gripper()
+            # time.sleep(0.01)
         prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
         if str(prompt2) == 'yes':
             time.sleep(0.05)
+
             print('!----Throw started')
             robot.throw()
             print('!----Throw completed')
@@ -89,11 +92,14 @@ while True:
         time.sleep(0.2)
         robot.open_gripper()
         '''
-# except Exception as e:  # RobotError, ex:
-    # print("Robot could not execute move (emergency stop for example), do something", e)
-    # robot.r.close()
-    # print('closing robot')
-    # # print('exiting')
-    # # sys.exit()
-    # print('exiting again')
-    # os._exit(1)
+
+    except KeyboardInterrupt:
+        print('closing robot')
+        sys.exit()
+    # except Exception as e:  # RobotError, ex:
+        # print("Robot could not execute move (emergency stop for example), do something", e)
+        # robot.r.close()
+        # # print('exiting')
+        # # sys.exit()
+        # print('exiting again')
+        # os._exit(1)

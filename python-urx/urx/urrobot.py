@@ -270,14 +270,15 @@ class URRobot(object):
         prog = "{}([{},{},{},{},{},{}], a={}, t={})".format(command, *vels)
         self.send_program(prog)
 
-    def movej(self, joints, acc=0.1, vel=0.05, wait=True, relative=False, threshold=None):
+    def movej(self, joints, acc=0.1, vel=0.05, wait=True, relative=False,
+              threshold=None, radius=0):
         """
         move in joint space
         """
         if relative:
             l = self.getj()
             joints = [v + l[i] for i, v in enumerate(joints)]
-        prog = self._format_move("movej", joints, acc, vel)
+        prog = self._format_move("movej", joints, acc, vel, radius=radius)
         self.send_program(prog)
         if wait:
             self._wait_for_move(joints[:6], threshold=threshold, joints=True)
@@ -361,7 +362,7 @@ class URRobot(object):
         """
         Concatenate several movex commands and applies a blending radius
         pose_list is a list of pose.
-        This method is usefull since any new command from python
+        This method is useful since any new command from python
         to robot make the robot stop
         """
         header = "def myProg():\n"
@@ -377,6 +378,76 @@ class URRobot(object):
         if wait:
             self._wait_for_move(target=pose_list[-1], threshold=threshold)
             return self.getl()
+
+    def throw_primitive(self, pose_list, wait=True, threshold=0.001):
+        radius = 0.2
+        command = 'movel'
+        header = "def myProg():\n"
+        acc = 1
+        vel = 1
+        end = "end\n"
+        prog = header
+        prog += 'socket_open(\"{}\",{},\"{}\")'.format("127.0.0.1",
+                                                       63352,
+                                                       "gripper_socket")
+        prog += "\n"
+        for idx, pose in enumerate(pose_list):
+            if idx == (len(pose_list) - 1):
+                radius = 0
+            if str(pose) == 'open':
+                SOCKET_NAME = "gripper_socket"
+                msg = "socket_set_var(\"{}\",{},\"{}\")".format("POS", 0,
+                                                                SOCKET_NAME)  # noqa
+                # self._socket_set_var(POS, value, self.socket_name)
+                prog += msg + "\n"
+            else:
+                prog += self._format_move(command, pose,
+                                          acc, vel, radius, prefix="p") + "\n"
+        prog += end
+        print('prog', prog)
+        self.send_program(prog)
+        if wait:
+            self._wait_for_move(target=pose_list[-1], threshold=threshold)
+            return self.getl()
+
+        # self.move_to(start_position, start_axisangle, acc_scaling=K,
+        # vel_scaling=K, radius=0)  # last # is blend radius
+        # # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
+        # self.move_joints(curled_config)
+        # self.move_to(end_position, end_axisangle, acc_scaling=K,
+        # vel_scaling=K, radius=0.5)  # last # is blend radius
+
+    # def _format_move(self, command, tpose, acc, vel, radius=0, prefix=""):
+    # tpose = [round(i, self.max_float_length) for i in tpose]
+    # tpose.append(acc)
+    # tpose.append(vel)
+    # tpose.append(radius)
+    # return "{}({}[{},{},{},{},{},{}], a={}, v={}, r={})".format(command, prefix, *tpose)
+
+    # def _socket_set_var(self, var, value, socket_name):
+   # msg = "socket_set_var(\"{}\",{},\"{}\")".format(var, value, socket_name)  # noqa
+   # self.add_line_to_program(msg)
+   # self._sync()
+
+   # def _set_gripper_position(self, value):
+   # """
+   # SPE is the variable
+   # range is 0 - 255
+   # 0 is no speed
+   # 255 is full speed
+   # """
+   # value = self._constrain_unsigned_char(value)
+   # self._socket_set_var(POS, value, self.socket_name)
+
+   # tcp_command += " set_digital_out(8,False)\n"
+   # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" \
+   # % (position[0], position[1], position[2] + 0.1, tool_orientation[0],
+   # tool_orientation[1], 0.0, self.joint_acc * 0.5, self.joint_vel * 0.5)
+   # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" \
+   # % (position[0], position[1], position[2], tool_orientation[0],
+   # tool_orientation[1], 0.0, self.joint_acc * 0.1, self.joint_vel * 0.1)
+   # tcp_command += " set_digital_out(8,True)\n"
+   # tcp_command += "end\n"
 
     def stopl(self, acc=0.5):
         self.send_program("stopl(%s)" % acc)

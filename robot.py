@@ -23,7 +23,7 @@ class Robot(object):
 
         self.workspace_limits = workspace_limits
         self.moveto_limits = (
-            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.554]])
+            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
 
         # Tool pose tolerance for blocking calls
         self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
@@ -41,6 +41,7 @@ class Robot(object):
             self.tcp_host_ip = tcp_host_ip
             self.tcp_port = tcp_port
             # self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
             self.r = urx.Robot(tcp_host_ip)
             self.r.set_tcp((0, 0, 0, 0, 0, 0))
             self.r.set_payload(0.5, (0, 0, 0))
@@ -63,7 +64,7 @@ class Robot(object):
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.50  # Safe when set 30% speed on pendant
+            self.joint_acc = 0.50  # Safe when set 30% spe71ed on pendant
             self.joint_vel = 0.35
 
             # Default tool speed configuration
@@ -147,6 +148,7 @@ class Robot(object):
         return color_img, depth_img
 
     def open_gripper(self, async=False):
+        print("!-- open gripper")
         self.gripper.open_gripper()
 
     def close_gripper(self, async=False):
@@ -206,7 +208,6 @@ class Robot(object):
             print("DEBUG: It's Not safe to move here!", tool_position,
                   'limits', limits)
 
-    """
     def guarded_move_to(self, tool_position, tool_orientation):
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -279,7 +280,6 @@ class Robot(object):
         self.rtc_socket.close()
 
         return execute_success
-    """
 
     def move_joints(self, joint_configuration):
         # DEBUG:
@@ -321,8 +321,10 @@ class Robot(object):
         start_position = [0.350, 0.000, 0.250]
         start_axisangle = [2.12, -2.21, -0.009]
 
+        start_pose = np.concatenate((start_position, start_axisangle))
         curled_config_deg = [-196, -107, 126, -90, -90, -12]
         curled_config = np.deg2rad(curled_config_deg)
+        # TODO
 
         # curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
         # 'joint_data')
@@ -330,8 +332,10 @@ class Robot(object):
 
         # end_position = [0.600, 0.000, 0.450]
         # end_axisangle = [2.55, -2.06, 0.80]
-        end_position = [0.597, 0.000, 0.570]
+        end_position = [0.597, 0.000, 0.550]
         end_axisangle = [2.18, -2.35, 2.21]
+        end_pose = np.concatenate((end_position, end_axisangle))
+
         r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
         print(r)
         # self.move_to(start_position, start_axisangle,
@@ -339,20 +343,39 @@ class Robot(object):
         # self.move_to(end_position, end_axisangle,
         # acc_scaling=3.5, vel_scaling=4)
         # radius=r)
+        middle_position = np.array(end_position) - np.array([0.020, 0, -0.020])
+        middle_pose = np.concatenate((middle_position, end_axisangle))
 
         blend_radius = 0.100
 
         K = 1.   # 28.
 
-        self.tcp_socket = socket.socket(
-            socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+        # self.tcp_socket = socket.socket(
+        # socket.AF_INET, socket.SOCK_STREAM)
+        # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+        gripper = Robotiq_Two_Finger_Gripper(self.r)
+
+        """ this stops between points
         print('throw acc will be', self.joint_acc * 1)  # 4)
         print('throw vel will be', self.joint_vel * 1)  # 0)
         self.move_to(start_position, start_axisangle, acc_scaling=K,
                      vel_scaling=K, radius=0)  # last # is blend radius
         # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
         self.move_joints(curled_config)
+        self.move_to(end_position, end_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0.5)  # last # is blend radius
+        # gripper.open_gripper()
+        self.move_to(np.array(end_position) - np.array((0.020, 0, -0.020)), end_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0.1)  # last # is blend radius
+        self.move_to(start_position, start_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0)  # last # is blend radius
+        """
+
+        pose_list = [start_pose, middle_pose, "open", end_pose, start_pose]
+        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
+        self.r.throw_primitive(pose_list, wait=True)
+        # self.r.throw_primitive(["open"], wait=False)
+
         '''
         tcp_command = "def throw_traj():\n"
         # start
@@ -385,9 +408,9 @@ class Robot(object):
         '''
 
         # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
-        time.sleep(1.25)
-        self.open_gripper()
-        time.sleep(2)
+        # time.sleep(1.25)
+        # self.open_gripper()
+        # time.sleep(2)
 
         # Pre-compute blend radius
         # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
