@@ -49,7 +49,7 @@ class Robot(object):
                 b'place_green_on_redblue', b'grab_red', b'place_yellow_on_redblue', b'place_green_on_bluered', b'place_blue_on_yellow']
 
             # create dictionary to lookup index of various strings
-            self.stored_action_label_to_index_dict = {k: v for v, k in enumerate(stored_action_labels)}
+            self.stored_action_label_to_index_dict = {k: v for v, k in enumerate(self.stored_action_labels)}
 
         # If in simulation...
         if self.is_sim:
@@ -802,26 +802,27 @@ class Robot(object):
             #         vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
             # HK: Place grasped object at a random place
-            if grasp_success and not self.place and object_color is not None:
-                high_obj_list_index, high_obj_handle = self.get_highest_object_list_index_and_handle()
-                self.reposition_object_randomly(high_obj_handle)
-                # TODO: HK: check if any block is grasped and put it back at a random place
-                # color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
-                # color_index = np.where(color==1)
-                # vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-                #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
+            if grasp_success:
+                if not self.place and object_color is not None:
+                    high_obj_list_index, high_obj_handle = self.get_highest_object_list_index_and_handle()
+                    self.reposition_object_randomly(high_obj_handle)
+                    # TODO: HK: check if any block is grasped and put it back at a random place
+                    # color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
+                    # color_index = np.where(color==1)
+                    # vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+                    #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
 
-            # HK: Original Method
-            elif grasp_success and not self.place and not self.grasp_color_task:
-                object_positions = np.asarray(self.get_obj_positions())
-                object_positions = object_positions[:,2]
-                grasped_object_ind = np.argmax(object_positions)
-                grasped_object_handle = self.object_handles[grasped_object_ind]
-                vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-            else:
-                raise NotImplementedError(
-                    'grasp() call specified a task which does not match color specific stacking or grasp+pushing... '
-                    'this is a bug or is not yet implemented, you will need to make a code change or run the program with different settings.')
+                # HK: Original Method
+                elif not self.place and not self.grasp_color_task:
+                    object_positions = np.asarray(self.get_obj_positions())
+                    object_positions = object_positions[:,2]
+                    grasped_object_ind = np.argmax(object_positions)
+                    grasped_object_handle = self.object_handles[grasped_object_ind]
+                    vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
+                else:
+                    raise NotImplementedError(
+                        'grasp() call specified a task which does not match color specific stacking or grasp+pushing... '
+                        'this is a bug or is not yet implemented, you will need to make a code change or run the program with different settings.')
 
         else:
 
