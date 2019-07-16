@@ -104,6 +104,8 @@ def main(args):
     # -------------------------------------------------------------
     def process_actions():
         grasp_count = 0
+        successful_grasp_count = 0
+        successful_color_grasp_count = 0
         while True:
             if nonlocal_variables['executing_action']:
 
@@ -211,6 +213,7 @@ def main(args):
                     print('Push successful: %r' % (nonlocal_variables['push_success']))
                 # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
+                    grasp_count += 1
                     # TODO(hkwon214): random grasp of a specific color
                     if grasp_color_task:
                         # 3 is currently the red block
@@ -218,18 +221,18 @@ def main(args):
                     else:
                         object_color_index = None
                     nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color_index)
+                    print('Grasp success: %r' % (nonlocal_variables['grasp_success']))
                     # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
-                        grasp_count += 1
+                        successful_grasp_count += 1
                         if grasp_color_task:
+                            if nonlocal_variables['color_success']:
+                                successful_color_grasp_count += 1
                             grasped_obj_ind, grasped_obj_handle = robot.get_highest_object_list_index_and_handle()
                             robot.reposition_object_randomly(grasped_obj_handle)
-
-
-                    print('Grasp Count: %r' % (grasp_count))
-                    print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    print('Color successful: %r' % (nonlocal_variables['color_success']))
+                            print('Successful color-specific grasp: %r' % (nonlocal_variables['color_success']))
+                    print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, float(successful_grasp_count)/float(grasp_count), float(successful_color_grasp_count)/float(grasp_count)))
 
                 nonlocal_variables['executing_action'] = False
     # TODO:
