@@ -318,13 +318,12 @@ class Robot(object):
     # TODO probably need to change bin and home positions
     def throw(self):
         self.close_gripper()
-        start_position = [0.350, 0.000, 0.250]
+        start_position = ['p', 0.350, 0.000, 0.250]
         start_axisangle = [2.12, -2.21, -0.009]
 
         start_pose = np.concatenate((start_position, start_axisangle))
-        curled_config_deg = [-196, -107, 126, -90, -90, -12]
+        curled_config_deg = ['j', -196, -107, 126, -90, -90, -12]
         curled_config = np.deg2rad(curled_config_deg)
-        # TODO
 
         # curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
         # 'joint_data')
@@ -332,17 +331,12 @@ class Robot(object):
 
         # end_position = [0.600, 0.000, 0.450]
         # end_axisangle = [2.55, -2.06, 0.80]
-        end_position = [0.597, 0.000, 0.550]
+        end_position = ['p', 0.597, 0.000, 0.550]
         end_axisangle = [2.18, -2.35, 2.21]
         end_pose = np.concatenate((end_position, end_axisangle))
 
         r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
         print(r)
-        # self.move_to(start_position, start_axisangle,
-        # acc_scaling=3.5, vel_scaling=4)
-        # self.move_to(end_position, end_axisangle,
-        # acc_scaling=3.5, vel_scaling=4)
-        # radius=r)
         middle_position = np.array(end_position) - np.array([0.020, 0, -0.020])
         middle_pose = np.concatenate((middle_position, end_axisangle))
 
@@ -350,10 +344,15 @@ class Robot(object):
 
         K = 1.   # 28.
 
-        # self.tcp_socket = socket.socket(
-        # socket.AF_INET, socket.SOCK_STREAM)
-        # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
         gripper = Robotiq_Two_Finger_Gripper(self.r)
+
+        # NOTE: important
+        throw_pose_list = [start_pose, middle_pose,
+                           "open", end_pose, start_pose]
+
+        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
+        self.r.throw_primitive(throw_pose_list, wait=True)
+        # self.r.throw_primitive(["open"], wait=False)
 
         """ this stops between points
         print('throw acc will be', self.joint_acc * 1)  # 4)
@@ -370,11 +369,6 @@ class Robot(object):
         self.move_to(start_position, start_axisangle, acc_scaling=K,
                      vel_scaling=K, radius=0)  # last # is blend radius
         """
-
-        pose_list = [start_pose, middle_pose, "open", end_pose, start_pose]
-        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
-        self.r.throw_primitive(pose_list, wait=True)
-        # self.r.throw_primitive(["open"], wait=False)
 
         '''
         tcp_command = "def throw_traj():\n"

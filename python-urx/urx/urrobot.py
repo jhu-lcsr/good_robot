@@ -379,6 +379,7 @@ class URRobot(object):
             self._wait_for_move(target=pose_list[-1], threshold=threshold)
             return self.getl()
 
+    # NOTE: this is important
     def throw_primitive(self, pose_list, wait=True, threshold=0.001):
         radius = 0.2
         command = 'movel'
@@ -387,27 +388,34 @@ class URRobot(object):
         vel = 1
         end = "end\n"
         prog = header
-        prog += 'socket_open(\"{}\",{},\"{}\")'.format("127.0.0.1",
-                                                       63352,
-                                                       "gripper_socket")
-        prog += "\n"
+        # Activate gripper
+        prog += 'socket_open(\"{}\",{},\"{}\"\n)'.format("127.0.0.1",
+                                                         63352,
+                                                         "gripper_socket")
+        prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("ACT", 1,
+                                                            SOCKET_NAME)
+        prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("GTO", 1,
+                                                            SOCKET_NAME)
         for idx, pose in enumerate(pose_list):
             if idx == (len(pose_list) - 1):
-                radius = 0
+                radius = 0.01
             if str(pose) == 'open':
                 SOCKET_NAME = "gripper_socket"
-                msg = "socket_set_var(\"{}\",{},\"{}\")".format("POS", 0,
-                                                                SOCKET_NAME)  # noqa
-                # self._socket_set_var(POS, value, self.socket_name)
-                prog += msg + "\n"
+                msg = "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
+                                                                  SOCKET_NAME)
             else:
-                prog += self._format_move(command, pose,
-                                          acc, vel, radius, prefix="p") + "\n"
+                if str(pose[0]) == 'j':
+                    prog += self._format_move(
+                        "movej", pose[1:], acc, vel, radius) + "\n"
+                elif str(pose[0]) == 'p':
+                    prog += self._format_move(
+                        'movej', pose[1:], acc, vel, radius, prefix="p") + "\n"
         prog += end
         print('prog', prog)
         self.send_program(prog)
+
         if wait:
-            self._wait_for_move(target=pose_list[-1], threshold=threshold)
+            self._wait_for_move(target=pose_list[-1][1:], threshold=threshold)
             return self.getl()
 
         # self.move_to(start_position, start_axisangle, acc_scaling=K,
