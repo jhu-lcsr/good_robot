@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import time
 
 
-def tile_vector_as_image_channels_np(vector_op, image_shape):
+def tile_vector_as_image_channels_torch(vector_op, image_shape):
     """
     Takes a vector of length n and an image shape BCHW,
     and repeat the vector as channels at each pixel.
@@ -24,15 +24,15 @@ def tile_vector_as_image_channels_np(vector_op, image_shape):
       image_shape: A list of integers [width, height] with the desired dimensions.
     """
     # input vector shape
-    ivs = np.shape(vector_op)
+    ivs = vector_op.shape
     # reshape the vector into a single pixel
     # vector_pixel_shape = [ivs[0], 1, 1, ivs[1]]
     vector_pixel_shape = [ivs[0], ivs[1], 1, 1]
-    vector_op = np.reshape(vector_op, vector_pixel_shape)
+    vector_op = torch.reshape(vector_op, vector_pixel_shape)
     # tile the pixel into a full image
     # tile_dimensions = [1, image_shape[1], image_shape[2], 1]
     tile_dimensions = [1, 1, image_shape[2], image_shape[3]]
-    vector_op = np.tile(vector_op, tile_dimensions)
+    vector_op = torch.tile(vector_op, tile_dimensions)
 
     return vector_op
 
@@ -123,7 +123,11 @@ class reactive_net(nn.Module):
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
                 else:
-                    goal_condition = tile_vector_as_image_channels_np(goal_condition, interm_push_color_feat.shape)
+                    if self.use_cuda:
+                        goal_condition = torch.tensor(goal_condition).float().cuda()
+                    else:
+                        goal_condition = torch.tensor(goal_condition).float()
+                    goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
@@ -180,7 +184,11 @@ class reactive_net(nn.Module):
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             else:
-                goal_condition = tile_vector_as_image_channels_np(goal_condition, interm_push_color_feat.shape)
+                if self.use_cuda:
+                    goal_condition = torch.tensor(goal_condition).float().cuda()
+                else:
+                    goal_condition = torch.tensor(goal_condition).float()
+                goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
             self.interm_feat.append([interm_push_feat, interm_grasp_feat])
@@ -251,6 +259,9 @@ class reinforcement_net(nn.Module):
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
+        if goal_condition is not None:
+            # TODO(ahundt) is there a better place for this?
+            print('<<<<<<<<<<<<<<<<<<' + str(goal_condition))
         if is_volatile:
             torch.set_grad_enabled(False)
             output_prob = []
@@ -287,7 +298,11 @@ class reinforcement_net(nn.Module):
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
                 else:
-                    goal_condition = tile_vector_as_image_channels_np(goal_condition, interm_push_color_feat.shape)
+                    if self.use_cuda:
+                        goal_condition = torch.tensor(goal_condition).float().cuda()
+                    else:
+                        goal_condition = torch.tensor(goal_condition).float()
+                    goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
@@ -344,7 +359,11 @@ class reinforcement_net(nn.Module):
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             else:
-                goal_condition = tile_vector_as_image_channels_np(goal_condition, interm_push_color_feat.shape)
+                if self.use_cuda:
+                    goal_condition = torch.tensor(goal_condition).float().cuda()
+                else:
+                    goal_condition = torch.tensor(goal_condition).float()
+                goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
             self.interm_feat.append([interm_push_feat, interm_grasp_feat])

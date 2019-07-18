@@ -80,6 +80,12 @@ def main(args):
     # ------ HK: Added Options -----
     grasp_color_task = args.grasp_color_task
     place = args.place
+    if grasp_color_task:
+        if not is_sim:
+            raise NotImplementedError('Real execution goal conditioning is not yet implemented')
+        goal_condition_len = num_obj
+    else:
+        goal_condition_len = 0
     #grasp_count = args.grasp_count
 
     # Set random seed
@@ -92,7 +98,7 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu)
+                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -319,7 +325,13 @@ def main(args):
         if not exit_called:
 
             # Run forward pass with network to get affordances
-            push_predictions, grasp_predictions, state_feat = trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True)
+            if nonlocal_variables['object_color_one_hot_encoding'] is not None:
+                goal_condition = np.array([nonlocal_variables['object_color_one_hot_encoding']])
+            else:
+                goal_condition = None
+            push_predictions, grasp_predictions, state_feat = trainer.forward(
+                color_heightmap, valid_depth_heightmap, is_volatile=True,
+                goal_condition=goal_condition)
 
             # Execute best primitive action on robot in another thread
             nonlocal_variables['executing_action'] = True
@@ -403,7 +415,13 @@ def main(args):
                     sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
                     # Compute forward pass with sample
-                    sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(sample_color_heightmap, sample_depth_heightmap, is_volatile=True)
+                    if nonlocal_variables['object_color_one_hot_encoding'] is not None:
+                        goal_condition = np.array([nonlocal_variables['object_color_one_hot_encoding']])
+                    else:
+                        goal_condition = None
+                    sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
+                        sample_color_heightmap, sample_depth_heightmap, is_volatile=True,
+                        goal_condition=goal_condition)
 
                     # Load next sample RGB-D heightmap
                     next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
