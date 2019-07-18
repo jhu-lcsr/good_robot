@@ -18,6 +18,23 @@ from logger import Logger
 import utils
 
 
+def choose_grasp_color(num_obj, is_goal_conditioned_task=True):
+    # TODO(hkwon214): random grasp of a specific color
+    if is_goal_conditioned_task:
+        # 3 is currently the red block
+        # object_color_index = 3
+
+        # Choose a random object to grasp
+        object_color_index = np.random.randint(0, 1, size=num_obj)
+        # TODO(ahundt) This should eventually be the size of robot.stored_action_labels, but making it grasp-only for now.
+        object_color_one_hot_encoding = np.zeros((num_obj))
+        object_color_one_hot_encoding[object_color_index] = 1.0
+    else:
+        object_color_index = None
+        object_color_one_hot_encoding = None
+    return object_color_index, object_color_one_hot_encoding
+
+
 def main(args):
 
 
@@ -89,6 +106,8 @@ def main(args):
     # Initialize variables for heuristic bootstrapping and exploration probability
     no_change_count = [2, 2] if not is_testing else [0, 0]
     explore_prob = 0.5 if not is_testing else 0.0
+    # Choose the first color block to grasp, or None if not running in goal conditioned mode
+    object_color_index, object_color_one_hot_encoding = choose_grasp_color(num_obj, grasp_color_task)
 
     # Quick hack for nonlocal memory between threads in Python 2
     nonlocal_variables = {'executing_action' : False,
@@ -96,7 +115,9 @@ def main(args):
                           'best_pix_ind' : None,
                           'push_success' : False,
                           'grasp_success' : False,
-                          'color_success' : False} # HK: added color_success nonlocal_variable
+                          'color_success' : False,
+                          'object_color_index': object_color_index,
+                          'object_color_one_hot_encoding': object_color_one_hot_encoding} # HK: added color_success nonlocal_variable
 
 
 
@@ -214,13 +235,8 @@ def main(args):
                 # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
-                    # TODO(hkwon214): random grasp of a specific color
-                    if grasp_color_task:
-                        # 3 is currently the red block
-                        object_color_index = 3
-                    else:
-                        object_color_index = None
-                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color_index)
+                    # TODO(ahundt) this probably will cause threading conflicts, add a mutex
+                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['object_color_index'])
                     print('Grasp success: %r' % (nonlocal_variables['grasp_success']))
                     # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
@@ -229,14 +245,16 @@ def main(args):
                         if grasp_color_task:
                             if nonlocal_variables['color_success']:
                                 successful_color_grasp_count += 1
-                            grasped_obj_ind, grasped_obj_handle = robot.get_highest_object_list_index_and_handle()
-                            robot.reposition_objects(grasped_obj_handle)
-                            print('Successful color-specific grasp: %r' % (nonlocal_variables['color_success']))
+                                # Choose the next color block to grasp, or None if not running in goal conditioned mode
+                                nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
+                            robot.reposition_objects()
+                            print('Successful color-specific grasp: %r color: ' % (nonlocal_variables['color_success'], robot.color_names[nonlocal_variables['object_color_index']]))
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, float(successful_grasp_count)/float(grasp_count), float(successful_color_grasp_count)/float(grasp_count)))
 
                 nonlocal_variables['executing_action'] = False
-    # TODO:
+            # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
