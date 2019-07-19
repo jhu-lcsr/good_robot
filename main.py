@@ -369,7 +369,7 @@ def main(args):
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
             if nonlocal_variables['object_color_index'] is not None:
-                trainer.goal_condition_log.append([nonlocal_variables['object_color_one_hot_encoding']])
+                trainer.goal_condition_log.append(nonlocal_variables['object_color_one_hot_encoding'])
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
 
             # Backpropagate
@@ -420,7 +420,7 @@ def main(args):
 
                     # Compute forward pass with sample
                     if nonlocal_variables['object_color_one_hot_encoding'] is not None:
-                        goal_condition = trainer.goal_condition_log[sample_iteration]
+                        goal_condition = [trainer.goal_condition_log[sample_iteration]]
                     else:
                         goal_condition = None
                         sample_color_success = None
@@ -440,7 +440,7 @@ def main(args):
                     #TODO HK
                     sample_change_detected = sample_push_success
                     if goal_condition is not None:
-                        goal_condition = trainer.goal_condition_log[sample_iteration+1]
+                        goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
                         sample_color_success = sample_reward_value == 1
                     # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
                     new_sample_label_value, _ = trainer.get_label_value(
