@@ -25,15 +25,16 @@ def tile_vector_as_image_channels_torch(vector_op, image_shape):
     """
     # input vector shape
     ivs = vector_op.shape
-    # reshape the vector into a single pixel
-    # vector_pixel_shape = [ivs[0], 1, 1, ivs[1]]
-    vector_pixel_shape = [ivs[0], ivs[1], 1, 1]
-    vector_op = torch.reshape(vector_op, vector_pixel_shape)
-    # tile the pixel into a full image
-    # tile_dimensions = [1, image_shape[1], image_shape[2], 1]
-    tile_dimensions = [1, 1, image_shape[2], image_shape[3]]
-    vector_op = torch.tile(vector_op, tile_dimensions)
+    # print('image_shape: ' + str(image_shape))
 
+    # reshape the vector into a single pixel
+    vector_op = vector_op.reshape([ivs[0], ivs[1], 1, 1])
+    # print('vector_op pre-repeat shape:' + str(vector_op.shape))
+
+    # repeat the vector at every pixel according to the specified image shape
+    vector_op = vector_op.expand([ivs[0], ivs[1], image_shape[2], image_shape[3]])
+    # print('vector_op post-repeat shape:' + str(vector_op.shape))
+    # print('vector_op first channel: ' + str(vector_op[0,:,0,0]))
     return vector_op
 
 
@@ -87,6 +88,14 @@ class reactive_net(nn.Module):
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
+        if goal_condition is not None:
+            # TODO(ahundt) is there a better place for this? Is doing this before is_volatile sloppy?
+            if self.use_cuda:
+                goal_condition = torch.tensor(goal_condition).float().cuda()
+            else:
+                goal_condition = torch.tensor(goal_condition).float()
+            tiled_goal_condition = None
+
         if is_volatile:
             torch.set_grad_enabled(False)
             output_prob = []
@@ -123,13 +132,12 @@ class reactive_net(nn.Module):
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
                 else:
-                    if self.use_cuda:
-                        goal_condition = torch.tensor(goal_condition).float().cuda()
-                    else:
-                        goal_condition = torch.tensor(goal_condition).float()
-                    goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
-                    interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
-                    interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
+                    if tiled_goal_condition is None:
+                        # This is part of a big for loop, but tiling only needs to be done once.
+                        # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
+                        tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
+                    interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+                    interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
 
                 # Compute sample grid for rotation AFTER branches
@@ -184,13 +192,12 @@ class reactive_net(nn.Module):
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             else:
-                if self.use_cuda:
-                    goal_condition = torch.tensor(goal_condition).float().cuda()
-                else:
-                    goal_condition = torch.tensor(goal_condition).float()
-                goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
-                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
-                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
+                if tiled_goal_condition is None:
+                    # This is part of a big for loop, but tiling only needs to be done once.
+                    # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
+                    tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
+                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
             self.interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
@@ -260,8 +267,13 @@ class reinforcement_net(nn.Module):
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
         if goal_condition is not None:
-            # TODO(ahundt) is there a better place for this?
-            print('<<<<<<<<<<<<<<<<<<' + str(goal_condition))
+            # TODO(ahundt) is there a better place for this? Is doing this before is_volatile sloppy?
+            if self.use_cuda:
+                goal_condition = torch.tensor(goal_condition).float().cuda()
+            else:
+                goal_condition = torch.tensor(goal_condition).float()
+            tiled_goal_condition = None
+
         if is_volatile:
             torch.set_grad_enabled(False)
             output_prob = []
@@ -298,13 +310,12 @@ class reinforcement_net(nn.Module):
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
                 else:
-                    if self.use_cuda:
-                        goal_condition = torch.tensor(goal_condition).float().cuda()
-                    else:
-                        goal_condition = torch.tensor(goal_condition).float()
-                    goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
-                    interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
-                    interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
+                    if tiled_goal_condition is None:
+                        # This is part of a big for loop, but tiling only needs to be done once.
+                        # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
+                        tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
+                    interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+                    interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
 
                 # Compute sample grid for rotation AFTER branches
@@ -359,13 +370,12 @@ class reinforcement_net(nn.Module):
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             else:
-                if self.use_cuda:
-                    goal_condition = torch.tensor(goal_condition).float().cuda()
-                else:
-                    goal_condition = torch.tensor(goal_condition).float()
-                goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
-                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, goal_condition), dim=1)
-                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, goal_condition), dim=1)
+                if tiled_goal_condition is None:
+                    # This is part of a big for loop, but tiling only needs to be done once.
+                    # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
+                    tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
+                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
             self.interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
@@ -376,7 +386,7 @@ class reinforcement_net(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
             else:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
-
+            print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
             self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])

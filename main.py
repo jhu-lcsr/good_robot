@@ -25,7 +25,7 @@ def choose_grasp_color(num_obj, is_goal_conditioned_task=True):
         # object_color_index = 3
 
         # Choose a random object to grasp
-        object_color_index = np.random.randint(0, 1, size=num_obj)
+        object_color_index = np.random.randint(num_obj, size=1)
         # TODO(ahundt) This should eventually be the size of robot.stored_action_labels, but making it grasp-only for now.
         object_color_one_hot_encoding = np.zeros((num_obj))
         object_color_one_hot_encoding[object_color_index] = 1.0
@@ -114,6 +114,7 @@ def main(args):
     explore_prob = 0.5 if not is_testing else 0.0
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     object_color_index, object_color_one_hot_encoding = choose_grasp_color(num_obj, grasp_color_task)
+    print('object_color_index init: ' + str(object_color_index))
 
     # Quick hack for nonlocal memory between threads in Python 2
     nonlocal_variables = {'executing_action' : False,
@@ -242,6 +243,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
+                    print('nonlocal_variables[object_color_index]: ' + str(nonlocal_variables['object_color_index']))
                     nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['object_color_index'])
                     print('Grasp success: %r' % (nonlocal_variables['grasp_success']))
                     # TODO(hkwon214): TODO fix color success check
@@ -362,14 +364,14 @@ def main(args):
                     no_change_count[1] += 1
 
             # Compute training labels
-            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap, prev_color_success)
+            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap, prev_color_success, goal_condition=prev_goal_condition)
             trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
 
             # Backpropagate
-            trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value)
+            trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
             if not is_testing:
@@ -419,6 +421,7 @@ def main(args):
                         goal_condition = np.array([nonlocal_variables['object_color_one_hot_encoding']])
                     else:
                         goal_condition = None
+                        semple_color_success = None
                     sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
                         sample_color_heightmap, sample_depth_heightmap, is_volatile=True,
                         goal_condition=goal_condition)
@@ -434,12 +437,17 @@ def main(args):
                     sample_grasp_success = sample_reward_value == 0.5
                     #TODO HK
                     sample_change_detected = sample_push_success
-                    sample_color_success = sample_reward_value == 1
-                    new_sample_label_value, _ = trainer.get_label_value(sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,sample_color_success)
+                    if goal_condition is not None:
+                        sample_color_success = sample_reward_value == 1
+                    # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
+                    new_sample_label_value, _ = trainer.get_label_value(
+                        sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+                        sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
+                        sample_color_success, goal_condition=goal_condition)
 
                     # Get labels for sample and backpropagate
                     sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration,1:4]).astype(int)
-                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind, trainer.label_value_log[sample_iteration])
+                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind, trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
 
                     # Recompute prediction value and label for replay buffer
                     if sample_primitive_action == 'push':
@@ -479,6 +487,8 @@ def main(args):
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_best_pix_ind = nonlocal_variables['best_pix_ind']
+        prev_object_color_one_hot_encoding = nonlocal_variables['object_color_one_hot_encoding']
+        prev_goal_condition = goal_condition
         # HK: check color_success arguments
         if grasp_color_task:
             prev_color_success = nonlocal_variables['color_success']
@@ -491,7 +501,7 @@ def main(args):
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
         # HK: TODO
 
-        print('Red Blocked Grasped: %f' % (trainer.iteration))
+        print('Trainer iteration: %f' % (trainer.iteration))
 
 
 if __name__ == '__main__':
