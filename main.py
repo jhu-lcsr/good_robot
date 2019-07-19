@@ -370,7 +370,7 @@ def main(args):
             logger.write_to_log('reward-value', trainer.reward_value_log)
             if nonlocal_variables['object_color_index'] is not None:
                 trainer.goal_condition_log.append([nonlocal_variables['object_color_one_hot_encoding']])
-                logger.write_to_log('goal-condition', trainer.reward_value_log)
+                logger.write_to_log('goal-condition', trainer.goal_condition_log)
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
