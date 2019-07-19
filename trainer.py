@@ -95,6 +95,7 @@ class Trainer(object):
         self.use_heuristic_log = []
         self.is_exploit_log = []
         self.clearance_log = []
+        self.goal_condition_log = []
 
 
     # Pre-load execution info and RL variables
@@ -115,6 +116,10 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration,1)
         self.reward_value_log = self.reward_value_log.tolist()
+        self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
+        self.goal_condition_log = self.goal_condition_log[0:self.iteration]
+        self.goal_condition_log.shape = (self.iteration,1)
+        self.goal_condition_log = self.goal_condition_log.tolist()
         self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), delimiter=' ')
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
         self.use_heuristic_log.shape = (self.iteration,1)

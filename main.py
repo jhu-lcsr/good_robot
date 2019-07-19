@@ -252,8 +252,6 @@ def main(args):
                         if grasp_color_task:
                             if nonlocal_variables['color_success']:
                                 successful_color_grasp_count += 1
-                                # Choose the next color block to grasp, or None if not running in goal conditioned mode
-                                nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
                             robot.reposition_objects()
                             print('Successful color-specific grasp: %r color: %s' % (nonlocal_variables['color_success'], robot.color_names[int(nonlocal_variables['object_color_index'])]))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
@@ -370,6 +368,9 @@ def main(args):
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
+            if nonlocal_variables['object_color_index'] is not None:
+                trainer.goal_condition_log.append([nonlocal_variables['object_color_one_hot_encoding']])
+                logger.write_to_log('goal-condition', trainer.reward_value_log)
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -419,10 +420,10 @@ def main(args):
 
                     # Compute forward pass with sample
                     if nonlocal_variables['object_color_one_hot_encoding'] is not None:
-                        goal_condition = np.array([nonlocal_variables['object_color_one_hot_encoding']])
+                        goal_condition = trainer.goal_condition_log[sample_iteration]
                     else:
                         goal_condition = None
-                        semple_color_success = None
+                        sample_color_success = None
                     sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
                         sample_color_heightmap, sample_depth_heightmap, is_volatile=True,
                         goal_condition=goal_condition)
@@ -439,6 +440,7 @@ def main(args):
                     #TODO HK
                     sample_change_detected = sample_push_success
                     if goal_condition is not None:
+                        goal_condition = trainer.goal_condition_log[sample_iteration+1]
                         sample_color_success = sample_reward_value == 1
                     # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
                     new_sample_label_value, _ = trainer.get_label_value(
@@ -493,6 +495,9 @@ def main(args):
         # HK: check color_success arguments
         if grasp_color_task:
             prev_color_success = nonlocal_variables['color_success']
+            if nonlocal_variables['grasp_success'] and nonlocal_variables['color_success']:
+                # Choose the next color block to grasp, or None if not running in goal conditioned mode
+                nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
         else:
             prev_color_success = None
 
