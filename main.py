@@ -237,14 +237,14 @@ def main(args):
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
-                    print('Push successful: %r' % (nonlocal_variables['push_success']))
+                    print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
                     print('nonlocal_variables[object_color_index]: ' + str(nonlocal_variables['object_color_index']))
                     nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['object_color_index'])
-                    print('Grasp motion success (no crash, need not move blocks): %r' % (nonlocal_variables['grasp_success']))
+                    print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
