@@ -238,8 +238,9 @@ class Trainer(object):
                     # HK add if statement
                     if grasp_success and not color_success:
                         #current_reward = 1.0
-                        # TODO: fine tune reward function
-                        current_reward = 0
+                        # TODO(hkwon14): fine tune reward function
+                        # current_reward = 0
+                        current_reward = 0.5
                     # HK: Color: Compute current reward
                     elif grasp_success and color_success:
                         current_reward = 1.0
