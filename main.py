@@ -244,7 +244,7 @@ def main(args):
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
                     print('nonlocal_variables[object_color_index]: ' + str(nonlocal_variables['object_color_index']))
                     nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['object_color_index'])
-                    print('Grasp success: %r' % (nonlocal_variables['grasp_success']))
+                    print('Grasp motion success (no crash, need not move blocks): %r' % (nonlocal_variables['grasp_success']))
                     # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
