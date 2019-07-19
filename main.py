@@ -256,7 +256,7 @@ def main(args):
                                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                                 nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
                             robot.reposition_objects()
-                            print('Successful color-specific grasp: %r color: ' % (nonlocal_variables['color_success'], robot.color_names[nonlocal_variables['object_color_index']]))
+                            print('Successful color-specific grasp: %r color: %s' % (nonlocal_variables['color_success'], robot.color_names[nonlocal_variables['object_color_index']]))
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, float(successful_grasp_count)/float(grasp_count), float(successful_color_grasp_count)/float(grasp_count)))
 
                 nonlocal_variables['executing_action'] = False
