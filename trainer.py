@@ -52,13 +52,14 @@ class Trainer(object):
                 self.grasp_criterion = CrossEntropyLoss2d(grasp_class_weights)
 
             # TODO(hkwon214): added place to test block testing
-            place_num_classes = 3 # 0 - place, 1 - failed place, 2 - no loss
-            place_class_weights = torch.ones(place_num_classes)
-            place_class_weights[place_num_classes - 1] = 0
-            if self.use_cuda:
-                self.place_criterion = CrossEntropyLoss2d(place_class_weights.cuda()).cuda()
-            else:
-                self.place_criterion = CrossEntropyLoss2d(place_class_weights)
+            if place:
+                place_num_classes = 3 # 0 - place, 1 - failed place, 2 - no loss
+                place_class_weights = torch.ones(place_num_classes)
+                place_class_weights[place_num_classes - 1] = 0
+                if self.use_cuda:
+                    self.place_criterion = CrossEntropyLoss2d(place_class_weights.cuda()).cuda()
+                else:
+                    self.place_criterion = CrossEntropyLoss2d(place_class_weights)
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
@@ -139,7 +140,7 @@ class Trainer(object):
 
 
     # Compute forward pass through model to compute affordances/Q
-    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, place =False):
+    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
@@ -190,13 +191,13 @@ class Trainer(object):
                 if rotate_idx == 0:
                     push_predictions = F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                    if place:
+                    if self.place:
                         place_predictions = F.softmax(output_prob[rotate_idx][2], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                 else:
                     push_predictions = np.concatenate((push_predictions, F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                    if place:
-                        grasp_predictions = np.concatenate((place_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                    if self.place:
+                        place_predictions = np.concatenate((place_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         elif self.method == 'reinforcement':
 
             # Return Q values (and remove extra padding)
@@ -204,55 +205,98 @@ class Trainer(object):
                 if rotate_idx == 0:
                     push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                    if place:
+                    if self.place:
                         place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]                
                 else:
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                    if place:
+                    if self.place:
                         place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-        if place:
+        if self.place:
             return push_predictions, grasp_predictions, place_predictions, state_feat
         else:
             return push_predictions, grasp_predictions, state_feat
 
 
-    def get_label_value(self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None):
+    def get_label_value(self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None, prev_place_predictions=None):
 
         if self.method == 'reactive':
 
             # Compute label value
             label_value = 0
-            if primitive_action == 'push':
-                if not change_detected:
-                    label_value = 1
-            elif primitive_action == 'grasp':
-                if not grasp_success:
-                    label_value = 1
+            if self.place:
+                if primitive_action == 'push':
+                    if not change_detected:
+                        label_value = 1
+                elif primitive_action == 'grasp':
+                    if not grasp_success:
+                        label_value = 1
+                elif primitive_action == 'place':
+                    if not place_success:
+                        label_value = 1
+            else:
+                if primitive_action == 'push':
+                    if not change_detected:
+                        label_value = 1
+                elif primitive_action == 'grasp':
+                    if not grasp_success:
+                        label_value = 1
 
             print('Label value: %d' % (label_value))
             return label_value, label_value
 
         elif self.method == 'reinforcement':
-
             # Compute current reward
             current_reward = 0
-            if primitive_action == 'push':
-                if change_detected:
-                    current_reward = 0.5
-            elif primitive_action == 'grasp':
-                if color_success is None:
-                    if grasp_success:
-                        current_reward = 1.0
-                elif color_success is not None:
-                    # HK add if statement
-                    if grasp_success and not color_success:
-                        #current_reward = 1.0
-                        # TODO: fine tune reward function
-                        current_reward = 0
-                    # HK: Color: Compute current reward
-                    elif grasp_success and color_success:
-                        current_reward = 1.0
+            if self.place:
+                if primitive_action == 'push':
+                    if change_detected:
+                        current_reward = 0.5
+                elif primitive_action == 'grasp':
+                    if color_success is None:
+                        if grasp_success:
+                            current_reward = 1.0
+                    elif color_success is not None:
+                        # HK add if statement
+                        if grasp_success and not color_success:
+                            #current_reward = 1.0
+                            # TODO: fine tune reward function
+                            current_reward = 0
+                        # HK: Color: Compute current reward
+                        elif grasp_success and color_success:
+                            current_reward = 1.0
+                #TODO(hkwon214): resume here think of how to check correct color for place. change 'color success' function so it works with place too
+                elif primitive_action == 'place':
+                    if color_success is None:
+                        if place_success:
+                            current_reward = 1.0
+                    elif color_success is not None:
+                        # HK add if statement
+                        if place_success and not color_success:
+                            #current_reward = 1.0
+                            # TODO: fine tune reward function
+                            current_reward = 0
+                        # HK: Color: Compute current reward
+                        elif place_success and color_success:
+                            current_reward = 1.0
+            else:
+                if primitive_action == 'push':
+                    if change_detected:
+                        current_reward = 0.5
+                elif primitive_action == 'grasp':
+                    if color_success is None:
+                        if grasp_success:
+                            current_reward = 1.0
+                    elif color_success is not None:
+                        # HK add if statement
+                        if grasp_success and not color_success:
+                            #current_reward = 1.0
+                            # TODO: fine tune reward function
+                            current_reward = 0
+                        # HK: Color: Compute current reward
+                        elif grasp_success and color_success:
+                            current_reward = 1.0
+
 
             # Compute future reward
             if not change_detected and not grasp_success:
