@@ -33,7 +33,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = reactive_net(self.use_cuda, goal_condition_len=goal_condition_len)
+            self.model = reactive_net(self.use_cuda, goal_condition_len=goal_condition_len, place = place)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -62,7 +62,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len)
+            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place = place)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
