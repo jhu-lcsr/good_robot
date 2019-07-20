@@ -15,9 +15,10 @@ import matplotlib.pyplot as plt
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0):
+                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place = False):
 
         self.method = method
+        self.place = place
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
@@ -49,6 +50,15 @@ class Trainer(object):
                 self.grasp_criterion = CrossEntropyLoss2d(grasp_class_weights.cuda()).cuda()
             else:
                 self.grasp_criterion = CrossEntropyLoss2d(grasp_class_weights)
+
+            # TODO(hkwon214): added place to test block testing
+            place_num_classes = 3 # 0 - place, 1 - failed place, 2 - no loss
+            place_class_weights = torch.ones(place_num_classes)
+            place_class_weights[place_num_classes - 1] = 0
+            if self.use_cuda:
+                self.place_criterion = CrossEntropyLoss2d(place_class_weights.cuda()).cuda()
+            else:
+                self.place_criterion = CrossEntropyLoss2d(place_class_weights)
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
@@ -129,7 +139,7 @@ class Trainer(object):
 
 
     # Compute forward pass through model to compute affordances/Q
-    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
+    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, place =False):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
@@ -180,10 +190,13 @@ class Trainer(object):
                 if rotate_idx == 0:
                     push_predictions = F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    if place:
+                        place_predictions = F.softmax(output_prob[rotate_idx][2], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                 else:
                     push_predictions = np.concatenate((push_predictions, F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-
+                    if place:
+                        grasp_predictions = np.concatenate((place_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         elif self.method == 'reinforcement':
 
             # Return Q values (and remove extra padding)
@@ -191,15 +204,17 @@ class Trainer(object):
                 if rotate_idx == 0:
                     push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    if place:
+                        place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]                
                 else:
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-        # TODO: TEMP Print predictions
-        # print('push_predictions: ')
-        # print(push_predictions)
-        # print('grasp_predictions: ')
-        # print(grasp_predictions)
-        return push_predictions, grasp_predictions, state_feat
+                    if place:
+                        place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+        if place:
+            return push_predictions, grasp_predictions, place_predictions, state_feat
+        else:
+            return push_predictions, grasp_predictions, state_feat
 
 
     def get_label_value(self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None):

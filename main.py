@@ -123,6 +123,7 @@ def main(args):
                           'push_success' : False,
                           'grasp_success' : False,
                           'color_success' : False,
+                          'place_success' : False,
                           'object_color_index': object_color_index,
                           'object_color_one_hot_encoding': object_color_one_hot_encoding} # HK: added color_success nonlocal_variable
 
@@ -141,9 +142,6 @@ def main(args):
                 best_push_conf = np.max(push_predictions)
                 best_grasp_conf = np.max(grasp_predictions)
                 print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-                # # TODO: Delete! TEMP Print future_reward values
-                # print('push_predictions: ' push_predictions)
-                # print('grasp_predictions: ' grasp_predictions)
 
                 nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
@@ -237,9 +235,9 @@ def main(args):
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
+                    # TODO(hkwon214): check if robot.push returns True correctly
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push successful: %r' % (nonlocal_variables['push_success']))
-                # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex

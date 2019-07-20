@@ -50,6 +50,10 @@ class reactive_net(nn.Module):
         self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
         self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
+        # TODO(hkwon214): added placenet to test block testing
+        self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+        self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+
         self.num_rotations = 16
 
         # Construct network branches for pushing and grasping
@@ -72,9 +76,20 @@ class reactive_net(nn.Module):
             # ('grasp-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
         ]))
 
+        # TODO(hkwon214): added placenet to test block testing
+        self.placenet = nn.Sequential(OrderedDict([
+            ('place-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
+            ('place-relu0', nn.ReLU(inplace=True)),
+            ('place-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
+            ('place-norm1', nn.BatchNorm2d(64)),
+            ('place-relu1', nn.ReLU(inplace=True)),
+            ('place-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
+            # ('place-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
+        ]))
+
         # Initialize network weights
         for m in self.named_modules():
-            if 'push-' in m[0] or 'grasp-' in m[0]:
+            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
                 if isinstance(m[1], nn.Conv2d):
                     nn.init.kaiming_normal_(m[1].weight.data)
                 elif isinstance(m[1], nn.BatchNorm2d):
@@ -86,7 +101,7 @@ class reactive_net(nn.Module):
         self.output_prob = []
 
 
-    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
+    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None, place=False):
 
         if goal_condition is not None:
             # TODO(ahundt) is there a better place for this? Is doing this before is_volatile sloppy?
@@ -127,10 +142,16 @@ class reactive_net(nn.Module):
                 interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
                 interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
                 interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+
+                # TODO(hkwon214): added placenet to test block testing
+                if place:
+                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
                 # Combine features, including the goal condition if appropriate
                 if goal_condition is None:
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
                 else:
                     if tiled_goal_condition is None:
                         # This is part of a big for loop, but tiling only needs to be done once.
@@ -138,7 +159,12 @@ class reactive_net(nn.Module):
                         tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-                interm_feat.append([interm_push_feat, interm_grasp_feat])
+                    if place:
+                        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+                if place: 
+                    interm_feat.append([interm_push_feat, interm_grasp_feat,interm_place_feat])
+                else:
+                    interm_feat.append([interm_push_feat, interm_grasp_feat])
 
                 # Compute sample grid for rotation AFTER branches
                 affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
@@ -150,9 +176,14 @@ class reactive_net(nn.Module):
                     flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
                 # Forward pass through branches, undo rotation on output predictions, upsample results
-                output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
-
+                # TODO(hkwon214): added placenet to test block testing
+                if place:
+                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                else:
+                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                            nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
             torch.set_grad_enabled(True)
             return output_prob, interm_feat
 
@@ -187,10 +218,15 @@ class reactive_net(nn.Module):
             interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+
+            # TODO(hkwon214): added placenet to test block testing
+            interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+            interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
             # Combine features, including the goal condition if appropriate
             if goal_condition is None:
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
             else:
                 if tiled_goal_condition is None:
                     # This is part of a big for loop, but tiling only needs to be done once.
@@ -198,7 +234,12 @@ class reactive_net(nn.Module):
                     tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-            self.interm_feat.append([interm_push_feat, interm_grasp_feat])
+                if place:
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+            if place:
+                self.interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
+            else:
+                self.interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
             affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
@@ -210,9 +251,14 @@ class reactive_net(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
             # Forward pass through branches, undo rotation on output predictions, upsample results
-            self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
-
+            # TODO(hkwon214): added placenet to test block testing
+            if place:
+                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+            else:
+                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                            nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
             return self.output_prob, self.interm_feat
 
 
@@ -227,6 +273,10 @@ class reinforcement_net(nn.Module):
         self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
         self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
         self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+
+        # TODO(hkwon214): added placenet to test block testing
+        self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+        self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
         self.num_rotations = 16
 
@@ -250,9 +300,22 @@ class reinforcement_net(nn.Module):
             # ('grasp-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
         ]))
 
+        # TODO(hkwon214): added placenet to test block testing
+        self.placenet = nn.Sequential(OrderedDict([
+            ('place-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
+            ('place-relu0', nn.ReLU(inplace=True)),
+            ('place-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
+            ('place-norm1', nn.BatchNorm2d(64)),
+            ('place-relu1', nn.ReLU(inplace=True)),
+            ('place-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
+            # ('place-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
+        ]))
+
         # Initialize network weights
         for m in self.named_modules():
-            if 'push-' in m[0] or 'grasp-' in m[0]:
+            #if 'push-' in m[0] or 'grasp-' in m[0]:
+            #TODO(hkwon214): add condition 'if place:'
+            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
                 if isinstance(m[1], nn.Conv2d):
                     nn.init.kaiming_normal_(m[1].weight.data)
                 elif isinstance(m[1], nn.BatchNorm2d):
@@ -264,7 +327,7 @@ class reinforcement_net(nn.Module):
         self.output_prob = []
 
 
-    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
+    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None, place = False):
 
         if goal_condition is not None:
             # TODO(ahundt) is there a better place for this? Is doing this before is_volatile sloppy?
@@ -305,10 +368,17 @@ class reinforcement_net(nn.Module):
                 interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
                 interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
                 interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+
+                # TODO(hkwon214): added placenet to test block testing
+                if place:
+                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
                 # Combine features, including the goal condition if appropriate
                 if goal_condition is None:
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+                    if place:
+                        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
                 else:
                     if tiled_goal_condition is None:
                         # This is part of a big for loop, but tiling only needs to be done once.
@@ -316,7 +386,12 @@ class reinforcement_net(nn.Module):
                         tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-                interm_feat.append([interm_push_feat, interm_grasp_feat])
+                    if place:
+                        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+                if place:
+                    interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
+                else:
+                    interm_feat.append([interm_push_feat, interm_grasp_feat])
 
                 # Compute sample grid for rotation AFTER branches
                 affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
@@ -328,8 +403,14 @@ class reinforcement_net(nn.Module):
                     flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
                 # Forward pass through branches, undo rotation on output predictions, upsample results
-                output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+                # TODO(hkwon214): added placenet to test block testing
+                if place:
+                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                else:
+                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                        nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
 
             torch.set_grad_enabled(True)
             return output_prob, interm_feat
@@ -365,18 +446,30 @@ class reinforcement_net(nn.Module):
             interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+
+            # TODO(hkwon214): added placenet to test block testing
+            if place:
+                interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+
             # Combine features, including the goal condition if appropriate
             if goal_condition is None:
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
                 interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+                if place:
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
             else:
                 if tiled_goal_condition is None:
                     # This is part of a big for loop, but tiling only needs to be done once.
                     # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
                     tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
-                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-            self.interm_feat.append([interm_push_feat, interm_grasp_feat])
+                if place:
+                    interm_place_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
+            if place:
+                self.interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
+            else: 
+                self.interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
             affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
@@ -388,7 +481,13 @@ class reinforcement_net(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
             print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
-            self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+            # TODO(hkwon214): added placenet to test block testing
+            if place:
+                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+            else:
+                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
 
             return self.output_prob, self.interm_feat
