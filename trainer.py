@@ -265,7 +265,7 @@ class Trainer(object):
                         # HK: Color: Compute current reward
                         elif grasp_success and color_success:
                             current_reward = 1.0
-                #TODO(hkwon214): resume here think of how to check correct color for place. change 'color success' function so it works with place too
+                #TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
                 elif primitive_action == 'place':
                     if color_success is None:
                         if place_success:
@@ -299,11 +299,18 @@ class Trainer(object):
 
 
             # Compute future reward
-            if not change_detected and not grasp_success:
-                future_reward = 0
+            if self.place:
+                if not change_detected and not grasp_success and not place_success:
+                    future_reward = 0
+                else:
+                    next_push_predictions, next_grasp_predictions, next_place_predictions, next_state_feat = self.forward(next_color_heightmap, next_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+                    future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions), np.max(next_place_predictions))
             else:
-                next_push_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color_heightmap, next_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
-                future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions))
+                if not change_detected and not grasp_success:
+                    future_reward = 0
+                else:
+                    next_push_predictions, next_grasp_predictions, next_state_feat = self.forward(next_color_heightmap, next_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+                    future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions))
 
 
 
