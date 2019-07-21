@@ -224,23 +224,16 @@ class Trainer(object):
 
             # Compute label value
             label_value = 0
-            if self.place:
-                if primitive_action == 'push':
-                    if not change_detected:
-                        label_value = 1
-                elif primitive_action == 'grasp':
-                    if not grasp_success:
-                        label_value = 1
-                elif primitive_action == 'place':
-                    if not place_success:
-                        label_value = 1
-            else:
-                if primitive_action == 'push':
-                    if not change_detected:
-                        label_value = 1
-                elif primitive_action == 'grasp':
-                    if not grasp_success:
-                        label_value = 1
+            if primitive_action == 'push':
+                if not change_detected:
+                    label_value = 1
+            elif primitive_action == 'grasp':
+                if not grasp_success:
+                    label_value = 1
+            elif primitive_action == 'place':
+                if not place_success:
+                    label_value = 1
+  
 
             print('Label value: %d' % (label_value))
             return label_value, label_value
@@ -248,54 +241,37 @@ class Trainer(object):
         elif self.method == 'reinforcement':
             # Compute current reward
             current_reward = 0
-            if self.place:
-                if primitive_action == 'push':
-                    if change_detected:
-                        current_reward = 0.5
-                elif primitive_action == 'grasp':
-                    if color_success is None:
-                        if grasp_success:
-                            current_reward = 1.0
-                    elif color_success is not None:
-                        # HK add if statement
-                        if grasp_success and not color_success:
-                            #current_reward = 1.0
-                            # TODO: fine tune reward function
-                            current_reward = 0
-                        # HK: Color: Compute current reward
-                        elif grasp_success and color_success:
-                            current_reward = 1.0
-                #TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
-                elif primitive_action == 'place':
-                    if color_success is None:
-                        if place_success:
-                            current_reward = 1.0
-                    elif color_success is not None:
-                        # HK add if statement
-                        if place_success and not color_success:
-                            #current_reward = 1.0
-                            # TODO: fine tune reward function
-                            current_reward = 0
-                        # HK: Color: Compute current reward
-                        elif place_success and color_success:
-                            current_reward = 1.0
-            else:
-                if primitive_action == 'push':
-                    if change_detected:
-                        current_reward = 0.5
-                elif primitive_action == 'grasp':
-                    if color_success is None:
-                        if grasp_success:
-                            current_reward = 1.0
-                    elif color_success is not None:
-                        # HK add if statement
-                        if grasp_success and not color_success:
-                            #current_reward = 1.0
-                            # TODO: fine tune reward function
-                            current_reward = 0
-                        # HK: Color: Compute current reward
-                        elif grasp_success and color_success:
-                            current_reward = 1.0
+            if primitive_action == 'push':
+                if change_detected:
+                    current_reward = 0.5
+            elif primitive_action == 'grasp':
+                if color_success is None:
+                    if grasp_success:
+                        current_reward = 1.0
+                elif color_success is not None:
+                    # HK add if statement
+                    if grasp_success and not color_success:
+                        #current_reward = 1.0
+                        # TODO: fine tune reward function
+                        current_reward = 0
+                    # HK: Color: Compute current reward
+                    elif grasp_success and color_success:
+                        current_reward = 1.0
+            #TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
+            elif primitive_action == 'place':
+                if color_success is None:
+                    if place_success:
+                        current_reward = 1.0
+                elif color_success is not None:
+                    # HK add if statement
+                    if place_success and not color_success:
+                        #current_reward = 1.0
+                        # TODO: fine tune reward function
+                        current_reward = 0
+                    # HK: Color: Compute current reward
+                    elif place_success and color_success:
+                        current_reward = 1.0
+
 
 
             # Compute future reward

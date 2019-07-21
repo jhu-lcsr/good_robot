@@ -91,20 +91,13 @@ class reactive_net(nn.Module):
 
         # Initialize network weights
         for m in self.named_modules():
-            if place:
-                if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
-                    if isinstance(m[1], nn.Conv2d):
-                        nn.init.kaiming_normal_(m[1].weight.data)
-                    elif isinstance(m[1], nn.BatchNorm2d):
-                        m[1].weight.data.fill_(1)
-                        m[1].bias.data.zero_()
-            else:
-                if 'push-' in m[0] or 'grasp-' in m[0]:
-                    if isinstance(m[1], nn.Conv2d):
-                        nn.init.kaiming_normal_(m[1].weight.data)
-                    elif isinstance(m[1], nn.BatchNorm2d):
-                        m[1].weight.data.fill_(1)
-                        m[1].bias.data.zero_()
+            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
+                if isinstance(m[1], nn.Conv2d):
+                    nn.init.kaiming_normal_(m[1].weight.data)
+                elif isinstance(m[1], nn.BatchNorm2d):
+                    m[1].weight.data.fill_(1)
+                    m[1].bias.data.zero_()
+
 
         # Initialize output variable (for backprop)
         self.interm_feat = []
@@ -327,20 +320,13 @@ class reinforcement_net(nn.Module):
         for m in self.named_modules():
             #if 'push-' in m[0] or 'grasp-' in m[0]:
             #TODO(hkwon214): add condition 'if place:'
-            if place:
-                if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
-                    if isinstance(m[1], nn.Conv2d):
-                        nn.init.kaiming_normal_(m[1].weight.data)
-                    elif isinstance(m[1], nn.BatchNorm2d):
-                        m[1].weight.data.fill_(1)
-                        m[1].bias.data.zero_()
-            else:
-                if 'push-' in m[0] or 'grasp-' in m[0]:
-                    if isinstance(m[1], nn.Conv2d):
-                        nn.init.kaiming_normal_(m[1].weight.data)
-                    elif isinstance(m[1], nn.BatchNorm2d):
-                        m[1].weight.data.fill_(1)
-                        m[1].bias.data.zero_()
+            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
+                if isinstance(m[1], nn.Conv2d):
+                    nn.init.kaiming_normal_(m[1].weight.data)
+                elif isinstance(m[1], nn.BatchNorm2d):
+                    m[1].weight.data.fill_(1)
+                    m[1].bias.data.zero_()
+
 
         # Initialize output variable (for backprop)
         self.interm_feat = []
