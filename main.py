@@ -120,7 +120,10 @@ def main(args):
                           'best_pix_ind' : None,
                           'push_success' : False,
                           'grasp_success' : False,
-                          'color_success' : False} # HK: added color_success nonlocal_variable
+                          'color_success' : False,
+                          'place_success' : False,
+                          'object_color_index': object_color_index,
+                          'object_color_one_hot_encoding': object_color_one_hot_encoding} # HK: added color_success nonlocal_variable
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
@@ -140,9 +143,6 @@ def main(args):
                 best_push_conf = np.max(push_predictions)
                 best_grasp_conf = np.max(grasp_predictions)
                 print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-                # # TODO: Delete! TEMP Print future_reward values
-                # print('push_predictions: ' push_predictions)
-                # print('grasp_predictions: ' grasp_predictions)
 
                 nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
@@ -236,6 +236,7 @@ def main(args):
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
+                    # TODO(hkwon214): check if robot.push returns True correctly
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 # TODO

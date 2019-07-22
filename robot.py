@@ -1097,6 +1097,8 @@ class Robot(object):
 
             place_success = True
             return place_success
+    
+        # TODO(hkwon214): Add place function for real robot
 
 
 
