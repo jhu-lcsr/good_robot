@@ -22,7 +22,7 @@ class Robot(object):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
-        self.place = place
+        self.place_task = place
         self.grasp_color_task = grasp_color_task
 
         # HK: If grasping specific block color...
@@ -783,7 +783,7 @@ class Robot(object):
                 print('Correct color was grasped: ' + str(color_success))
 
             # Move the grasped object elsewhere if place = false
-            # if grasp_success and not self.place and self.grasp_color_task:
+            # if grasp_success and not self.place_task and self.grasp_color_task:
             #     object_positions = np.asarray(self.get_obj_positions())
             #     object_positions = object_positions[:,2]
             #     grasped_object_ind = np.argmax(object_positions)
@@ -803,7 +803,9 @@ class Robot(object):
 
             # HK: Place grasped object at a random place
             if grasp_success:
-                if not self.place and object_color is not None:
+                if self.place_task:
+                    return grasp_success, color_success
+                if not self.place_task and object_color is not None:
                     high_obj_list_index, high_obj_handle = self.get_highest_object_list_index_and_handle()
                     self.reposition_object_randomly(high_obj_handle)
                     # TODO: HK: check if any block is grasped and put it back at a random place
@@ -813,7 +815,7 @@ class Robot(object):
                     #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
 
                 # HK: Original Method
-                elif not self.place and not self.grasp_color_task:
+                elif not self.place_task and not self.grasp_color_task:
                     object_positions = np.asarray(self.get_obj_positions())
                     object_positions = object_positions[:,2]
                     grasped_object_ind = np.argmax(object_positions)
@@ -1058,7 +1060,9 @@ class Robot(object):
         return push_success
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None):
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
         print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
 
         if self.is_sim:
@@ -1097,7 +1101,7 @@ class Robot(object):
 
             place_success = True
             return place_success
-    
+
         # TODO(hkwon214): Add place function for real robot
 
 
