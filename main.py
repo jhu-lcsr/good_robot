@@ -142,8 +142,12 @@ def main(args):
                 # Determine whether grasping or pushing should be executed based on network predictions
                 best_push_conf = np.max(push_predictions)
                 best_grasp_conf = np.max(grasp_predictions)
-                print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-
+                if place:
+                    best_place_conf = np.max(place_predictions)
+                    print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
+                else:
+                    print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
+                  
                 nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
                 if not grasp_only:
