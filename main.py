@@ -25,8 +25,12 @@ class StackSequence(object):
         Generates one hot encodings for a list of objects of the specified length.
         Can be used for stacking or simply grasping specific objects.
 
-        num_obj: the number of objects to manage
+        # Member Variables
+
+        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
         is_goal_conditioned_task: do we care about which specific object we are using
+        object_color_sequence: to get the full order of the current stack goal.
+
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
@@ -63,6 +67,18 @@ class StackSequence(object):
         """ Return the one hot encoding for the entire stack sequence.
         """
         return np.concatenate(object_color_one_hot_encodings)
+
+    def current_sequence_progress(self):
+        """ How much of the current stacking sequence we have completed.
+
+        For example, if the sequence should be [0, 1, 3, 2].
+        At initialization this will return [0].
+        After one next() calls it will return [0, 1].
+        After two next() calls it will return [0, 1, 3].
+        After three next() calls it will return [0, 1, 3, 2].
+        After four next() calls a new sequence will be generated and it will return one element again.
+        """
+        return self.object_color_sequence[:self.object_color_index+1]
 
     def next(self):
         self.total_steps += 1
