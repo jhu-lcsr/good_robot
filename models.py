@@ -163,7 +163,7 @@ class reactive_net(nn.Module):
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
                     interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
-                
+
                 if self.place:
                     interm_feat.append([interm_push_feat, interm_grasp_feat,interm_place_feat])
                 else:
@@ -391,7 +391,8 @@ class reinforcement_net(nn.Module):
                         tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+                    if self.place:
+                        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
                 if self.place:
                     interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
                 else:
@@ -467,10 +468,12 @@ class reinforcement_net(nn.Module):
                     # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
                     tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
-                interm_place_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
+                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
+                if self.place:
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
             if self.place:
                 self.interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
-            else: 
+            else:
                 self.interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches

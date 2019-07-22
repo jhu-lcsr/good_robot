@@ -18,22 +18,42 @@ from logger import Logger
 import utils
 
 
-def choose_grasp_color(num_obj, is_goal_conditioned_task=True):
-    """ Choose random specific color to grasp.
-    """
-    if is_goal_conditioned_task:
-        # 3 is currently the red block
-        # object_color_index = 3
+class StackSequence(object):
+    def __init__(self, num_obj, is_goal_conditioned_task=True):
+        """ Choose random specific color to grasp.
+        """
+        self.num_obj = num_obj
+        self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.reset_sequence()
+        self.total_steps = 1
 
-        # Choose a random object to grasp
-        object_color_index = np.random.randint(num_obj, size=1)[0]
-        # TODO(ahundt) This should eventually be the size of robot.stored_action_labels, but making it grasp-only for now.
-        object_color_one_hot_encoding = np.zeros((num_obj))
-        object_color_one_hot_encoding[object_color_index] = 1.0
-    else:
-        object_color_index = None
-        object_color_one_hot_encoding = None
-    return object_color_index, object_color_one_hot_encoding
+    def reset_sequence(self):
+        if self.is_goal_conditioned_task:
+            # 3 is currently the red block
+            # object_color_index = 3
+            self.object_color_index = 0
+
+            # Choose a random sequence to stack
+            self.object_color_sequence = np.random.permutation(self.num_obj)
+            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
+            self.object_color_one_hot_encodings = []
+            for color in self.object_color_sequence:
+                object_color_one_hot_encoding = np.zeros((self.num_obj))
+                object_color_one_hot_encoding[color] = 1.0
+                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
+        else:
+            self.object_color_index = None
+            self.object_color_one_hot_encodings = None
+            self.object_color_sequence = None
+
+    def current_one_hot(self):
+        return self.object_color_one_hot_encodings[self.object_color_index]
+
+    def next(self):
+        self.total_steps += 1
+        self.object_color_index += 1
+        if not self.object_color_index < self.num_obj:
+            self.reset_sequence()
 
 
 def main(args):
@@ -121,14 +141,10 @@ def main(args):
                           'push_success' : False,
                           'grasp_success' : False,
                           'color_success' : False,
-                          'place_success' : False,
-                          'object_color_index': object_color_index,
-                          'object_color_one_hot_encoding': object_color_one_hot_encoding} # HK: added color_success nonlocal_variable
+                          'place_success' : False}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
-
-
+    nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task)
 
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
@@ -147,7 +163,7 @@ def main(args):
                     print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-                  
+
                 nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
                 if not grasp_only:
@@ -243,14 +259,14 @@ def main(args):
                     # TODO(hkwon214): check if robot.push returns True correctly
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
-                # TODO
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    print('nonlocal_variables[object_color_index]: ' + str(nonlocal_variables['object_color_index']))
-                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['object_color_index'])
+                    if nonlocal_variables['stack'].object_color_index is not None:
+                        grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
+                        print('Attempt to grasp color: ' + grasp_color_name)
+                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    # TODO(hkwon214): TODO fix color success check
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -258,7 +274,7 @@ def main(args):
                             if nonlocal_variables['color_success']:
                                 successful_color_grasp_count += 1
                             robot.reposition_objects()
-                            print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['color_success'], robot.color_names[int(nonlocal_variables['object_color_index'])]))
+                            print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, grasp_rate, color_grasp_rate))
@@ -331,8 +347,8 @@ def main(args):
         if not exit_called:
 
             # Run forward pass with network to get affordances
-            if nonlocal_variables['object_color_one_hot_encoding'] is not None:
-                goal_condition = np.array([nonlocal_variables['object_color_one_hot_encoding']])
+            if nonlocal_variables['stack'].is_goal_conditioned_task:
+                goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
             else:
                 goal_condition = None
             push_predictions, grasp_predictions, state_feat = trainer.forward(
@@ -373,8 +389,8 @@ def main(args):
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
-            if nonlocal_variables['object_color_index'] is not None:
-                trainer.goal_condition_log.append(nonlocal_variables['object_color_one_hot_encoding'])
+            if nonlocal_variables['stack'].is_goal_conditioned_task:
+                trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
 
             # Backpropagate
@@ -424,11 +440,12 @@ def main(args):
                     sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
                     # Compute forward pass with sample
-                    if nonlocal_variables['object_color_one_hot_encoding'] is not None:
+                    if nonlocal_variables['stack'].is_goal_conditioned_task:
                         goal_condition = [trainer.goal_condition_log[sample_iteration]]
                     else:
                         goal_condition = None
                         sample_color_success = None
+
                     sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
                         sample_color_heightmap, sample_depth_heightmap, is_volatile=True,
                         goal_condition=goal_condition)
@@ -463,6 +480,8 @@ def main(args):
                         # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
                     elif sample_primitive_action == 'grasp':
                         trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+                    elif sample_primitive_action == 'place':
+                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
                         # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
                 else:
@@ -495,15 +514,15 @@ def main(args):
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_best_pix_ind = nonlocal_variables['best_pix_ind']
-        prev_object_color_one_hot_encoding = nonlocal_variables['object_color_one_hot_encoding']
+        prev_stack = nonlocal_variables['stack']
         prev_goal_condition = goal_condition
         # HK: check color_success arguments
         if grasp_color_task:
             prev_color_success = nonlocal_variables['color_success']
             if nonlocal_variables['grasp_success'] and nonlocal_variables['color_success']:
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
-                nonlocal_variables['object_color_index'], nonlocal_variables['object_color_one_hot_encoding'] = choose_grasp_color(num_obj, grasp_color_task)
-                print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['object_color_index']]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['object_color_one_hot_encoding']))
+                nonlocal_variables['stack'].next()
+                print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
         else:
             prev_color_success = None
 

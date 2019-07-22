@@ -211,7 +211,7 @@ class Trainer(object):
                     push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     if self.place:
-                        place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]                
+                        place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                 else:
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
@@ -238,7 +238,7 @@ class Trainer(object):
             elif primitive_action == 'place':
                 if not place_success:
                     label_value = 1
-  
+
 
             print('Label value: %d' % (label_value))
             return label_value, label_value
@@ -383,7 +383,7 @@ class Trainer(object):
                     loss_value += loss.cpu().data.numpy()[0]
                 except:
                     loss_value += loss.cpu().data.numpy()
-                
+
                 loss_value = loss_value/2
 
             #TODO(hkwon214): confirm that placing symmetric too?
@@ -423,7 +423,7 @@ class Trainer(object):
 
                 loss_value = loss_value/2
 
-                
+
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
@@ -502,8 +502,8 @@ class Trainer(object):
 
                 loss_value = loss_value/2
 
-            
-            elif primitive_action == 'place:
+
+            elif primitive_action == 'place':
 
                 # Do forward pass with specified rotation (to save gradients)
                 push_predictions, grasp_predictions, place_predictions, state_feat = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
