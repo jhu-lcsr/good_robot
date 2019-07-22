@@ -10,6 +10,15 @@ from torch.autograd import Variable
 import torchvision
 import matplotlib.pyplot as plt
 import time
+try:
+    import efficientnet_pytorch
+    from efficientnet_pytorch import EfficientNet
+except ImportError:
+    print('efficientnet_pytorch is not available, using densenet. '
+          'EfficientNets can be installed with the command:'
+          '    pip3 install efficientnet-pytorch --user --upgrade'
+          'See https://github.com/lukemelas/EfficientNet-PyTorch for details')
+    efficientnet_pytorch = None
 
 
 def tile_vector_as_image_channels_torch(vector_op, image_shape):
@@ -38,56 +47,60 @@ def tile_vector_as_image_channels_torch(vector_op, image_shape):
     return vector_op
 
 
+def trunk_net(name='', fc_channels=2048, goal_condition_len=0, channels_out=3):
+    first_fc = fc_channels + goal_condition_len
+    # original behavior of second conv layer
+    # second_fc = 64
+    # new behavior of second conv layer
+    second_fc = fc_channels + goal_condition_len
+    return nn.Sequential(OrderedDict([
+            (name + '-norm0', nn.BatchNorm2d(first_fc)),
+            (name + '-relu0', nn.ReLU(inplace=True)),
+            (name + '-conv0', nn.Conv2d(first_fc, second_fc, kernel_size=1, stride=1, bias=False)),
+            (name + '-norm1', nn.BatchNorm2d(second_fc)),
+            (name + '-relu1', nn.ReLU(inplace=True)),
+            (name + '-conv1', nn.Conv2d(second_fc, channels_out, kernel_size=1, stride=1, bias=False))
+            # ('push-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
+        ]))
+
 class reactive_net(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet'): # , snapshot=None
         super(reactive_net, self).__init__()
         self.use_cuda = use_cuda
-        self.place= place
+        self.place = place
 
-        # Initialize network trunks with DenseNet pre-trained on ImageNet
-        self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+        if network == 'densenet' or efficientnet_pytorch is None:
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
-        # TODO(hkwon214): added placenet to test block testing
-        self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            # TODO(hkwon214): added placenet to test block testing
+            self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            fc_channels = 2048
+        else:
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            self.push_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.push_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.grasp_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.grasp_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+
+            # TODO(hkwon214): added placenet to test block testing
+            self.place_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.place_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            fc_channels = 1280 * 2
 
         self.num_rotations = 16
 
         # Construct network branches for pushing and grasping
-        self.pushnet = nn.Sequential(OrderedDict([
-            ('push-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-            ('push-relu0', nn.ReLU(inplace=True)),
-            ('push-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-            ('push-norm1', nn.BatchNorm2d(64)),
-            ('push-relu1', nn.ReLU(inplace=True)),
-            ('push-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
-            # ('push-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-        ]))
-        self.graspnet = nn.Sequential(OrderedDict([
-            ('grasp-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-            ('grasp-relu0', nn.ReLU(inplace=True)),
-            ('grasp-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-            ('grasp-norm1', nn.BatchNorm2d(64)),
-            ('grasp-relu1', nn.ReLU(inplace=True)),
-            ('grasp-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
-            # ('grasp-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-        ]))
-
+        self.pushnet = trunk_net('push', fc_channels, goal_condition_len, 3)
+        self.graspnet = trunk_net('grasp', fc_channels, goal_condition_len, 3)
         # TODO(hkwon214): added placenet to test block testing
         if place:
-            self.placenet = nn.Sequential(OrderedDict([
-                ('place-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-                ('place-relu0', nn.ReLU(inplace=True)),
-                ('place-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-                ('place-norm1', nn.BatchNorm2d(64)),
-                ('place-relu1', nn.ReLU(inplace=True)),
-                ('place-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
-                # ('place-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-            ]))
+            self.placenet = trunk_net('place', fc_channels, goal_condition_len, 3)
 
         # Initialize network weights
         for m in self.named_modules():
@@ -141,15 +154,28 @@ class reactive_net(nn.Module):
                     rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
 
                 # Compute intermediate features
-                interm_push_color_feat = self.push_color_trunk.features(rotate_color)
-                interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
-                interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
-                interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+                if efficientnet_pytorch is None:
+                    # densenet
+                    interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+                    interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+                    interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                    interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-                # TODO(hkwon214): added placenet to test block testing
-                if self.place:
-                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
-                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                    # TODO(hkwon214): added placenet to test block testing
+                    if self.place:
+                        interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                        interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                else:
+                    # efficientnet
+                    interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
+                    interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
+                    interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
+                    interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+
+                    # TODO(hkwon214): added placenet to test block testing
+                    if self.place:
+                        interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
+                        interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
                 # Combine features, including the goal condition if appropriate
                 if goal_condition is None:
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
@@ -165,7 +191,7 @@ class reactive_net(nn.Module):
                     interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
 
                 if self.place:
-                    interm_feat.append([interm_push_feat, interm_grasp_feat,interm_place_feat])
+                    interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
                 else:
                     interm_feat.append([interm_push_feat, interm_grasp_feat])
 
@@ -217,14 +243,28 @@ class reactive_net(nn.Module):
                 rotate_depth = F.grid_sample(Variable(input_depth_data, requires_grad=False), flow_grid_before, mode='nearest')
 
             # Compute intermediate features
-            interm_push_color_feat = self.push_color_trunk.features(rotate_color)
-            interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
-            interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
-            interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+            if efficientnet_pytorch is None:
+                # densenet
+                interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+                interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+                interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-            # TODO(hkwon214): added placenet to test block testing
-            interm_place_color_feat = self.place_color_trunk.features(rotate_color)
-            interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                # TODO(hkwon214): added placenet to test block testing
+                if self.place:
+                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+            else:
+                # efficientnet
+                interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
+                interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
+                interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
+                interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+
+                # TODO(hkwon214): added placenet to test block testing
+                if self.place:
+                    interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
             # Combine features, including the goal condition if appropriate
             if goal_condition is None:
                 interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
@@ -266,54 +306,42 @@ class reactive_net(nn.Module):
 
 class reinforcement_net(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet'): # , snapshot=None
         super(reinforcement_net, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
 
-        # Initialize network trunks with DenseNet pre-trained on ImageNet
-        self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+        if network == 'densenet' or efficientnet_pytorch is None:
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
-        # TODO(hkwon214): added placenet to test block testing
-        self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-        self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            # TODO(hkwon214): added placenet to test block testing
+            self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            fc_channels = 2048
+        else:
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            self.push_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.push_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.grasp_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.grasp_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+
+            # TODO(hkwon214): added placenet to test block testing
+            self.place_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.place_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            fc_channels = 1280 * 2
 
         self.num_rotations = 16
 
         # Construct network branches for pushing and grasping
-        self.pushnet = nn.Sequential(OrderedDict([
-            ('push-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-            ('push-relu0', nn.ReLU(inplace=True)),
-            ('push-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-            ('push-norm1', nn.BatchNorm2d(64)),
-            ('push-relu1', nn.ReLU(inplace=True)),
-            ('push-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=False))
-            # ('push-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-        ]))
-        self.graspnet = nn.Sequential(OrderedDict([
-            ('grasp-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-            ('grasp-relu0', nn.ReLU(inplace=True)),
-            ('grasp-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-            ('grasp-norm1', nn.BatchNorm2d(64)),
-            ('grasp-relu1', nn.ReLU(inplace=True)),
-            ('grasp-conv1', nn.Conv2d(64, 1, kernel_size=1, stride=1, bias=False))
-            # ('grasp-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-        ]))
-
+        self.pushnet = trunk_net('push', fc_channels, goal_condition_len, 1)
+        self.graspnet = trunk_net('grasp', fc_channels, goal_condition_len, 1)
         # TODO(hkwon214): added placenet to test block testing
         if place:
-            self.placenet = nn.Sequential(OrderedDict([
-                ('place-norm0', nn.BatchNorm2d(2048 + goal_condition_len)),
-                ('place-relu0', nn.ReLU(inplace=True)),
-                ('place-conv0', nn.Conv2d(2048 + goal_condition_len, 64, kernel_size=1, stride=1, bias=False)),
-                ('place-norm1', nn.BatchNorm2d(64)),
-                ('place-relu1', nn.ReLU(inplace=True)),
-                ('place-conv1', nn.Conv2d(64, 3, kernel_size=1, stride=1, bias=False))
-                # ('place-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
-            ]))
+            self.placenet = trunk_net('place', fc_channels, goal_condition_len, 1)
 
         # Initialize network weights
         for m in self.named_modules():
@@ -369,15 +397,29 @@ class reinforcement_net(nn.Module):
                     rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
 
                 # Compute intermediate features
-                interm_push_color_feat = self.push_color_trunk.features(rotate_color)
-                interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
-                interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
-                interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+                if efficientnet_pytorch is None:
+                    # densenet
+                    interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+                    interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+                    interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                    interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-                # TODO(hkwon214): added placenet to test block testing
-                if self.place:
-                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
-                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                    # TODO(hkwon214): added placenet to test block testing
+                    if self.place:
+                        interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                        interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                else:
+                    # efficientnet
+                    interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
+                    interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
+                    interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
+                    interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+
+                    # TODO(hkwon214): added placenet to test block testing
+                    if self.place:
+                        interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
+                        interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
+
                 # Combine features, including the goal condition if appropriate
                 if goal_condition is None:
                     interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
@@ -447,15 +489,28 @@ class reinforcement_net(nn.Module):
                 rotate_depth = F.grid_sample(Variable(input_depth_data, requires_grad=False), flow_grid_before, mode='nearest')
 
             # Compute intermediate features
-            interm_push_color_feat = self.push_color_trunk.features(rotate_color)
-            interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
-            interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
-            interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+            if efficientnet_pytorch is None:
+                # densenet
+                interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+                interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+                interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-            # TODO(hkwon214): added placenet to test block testing
-            if self.place:
-                interm_place_color_feat = self.place_color_trunk.features(rotate_color)
-                interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                # TODO(hkwon214): added placenet to test block testing
+                if self.place:
+                    interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+            else:
+                # efficientnet
+                interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
+                interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
+                interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
+                interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+
+                # TODO(hkwon214): added placenet to test block testing
+                if self.place:
+                    interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
+                    interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
 
             # Combine features, including the goal condition if appropriate
             if goal_condition is None:
