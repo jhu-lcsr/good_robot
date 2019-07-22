@@ -20,7 +20,13 @@ import utils
 
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True):
-        """ Choose random specific color to grasp.
+        """ Oracle to choose a sequence of specific color objects to interact with.
+
+        Generates one hot encodings for a list of objects of the specified length.
+        Can be used for stacking or simply grasping specific objects.
+
+        num_obj: the number of objects to manage
+        is_goal_conditioned_task: do we care about which specific object we are using
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
@@ -28,6 +34,8 @@ class StackSequence(object):
         self.total_steps = 1
 
     def reset_sequence(self):
+        """ Generate a new sequence of specific objects to interact with.
+        """
         if self.is_goal_conditioned_task:
             # 3 is currently the red block
             # object_color_index = 3
@@ -47,13 +55,21 @@ class StackSequence(object):
             self.object_color_sequence = None
 
     def current_one_hot(self):
+        """ Return the one hot encoding for the current specific object.
+        """
         return self.object_color_one_hot_encodings[self.object_color_index]
+
+    def sequence_one_hot(self):
+        """ Return the one hot encoding for the entire stack sequence.
+        """
+        return np.concatenate(object_color_one_hot_encodings)
 
     def next(self):
         self.total_steps += 1
-        self.object_color_index += 1
-        if not self.object_color_index < self.num_obj:
-            self.reset_sequence()
+        if self.is_goal_conditioned_task:
+            self.object_color_index += 1
+            if not self.object_color_index < self.num_obj:
+                self.reset_sequence()
 
 
 def main(args):
