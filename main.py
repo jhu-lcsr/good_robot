@@ -151,7 +151,7 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len)
+                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)

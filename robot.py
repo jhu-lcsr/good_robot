@@ -1099,12 +1099,22 @@ class Robot(object):
             # Move gripper to location above place target
             self.move_to(location_above_place_target, None)
 
+
+
             place_success = True
             return place_success
 
-        # TODO(hkwon214): Add place function for real robot
+#         # TODO(hkwon214): Add place function for real robot
 
-
+    # def check_stack(self, position, goal):
+    #     # goal length: [0] or [0,1] or [0,1,3]
+    #     goal_length = len(goal)
+    #     stack_success = False
+    #     for goal_idx in range(goal_length):
+    #         goal_position = 
+    #         dist = np.linalg.norm(goal_position - position)
+    #         if dist > down and dist < up:
+    #             check_stack
 
 
     def restart_real(self):
