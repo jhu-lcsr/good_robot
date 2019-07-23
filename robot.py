@@ -1106,15 +1106,20 @@ class Robot(object):
 
 #         # TODO(hkwon214): Add place function for real robot
 
-    # def check_stack(self, position, goal):
-    #     # goal length: [0] or [0,1] or [0,1,3]
-    #     goal_length = len(goal)
-    #     stack_success = False
-    #     for goal_idx in range(goal_length):
-    #         goal_position = 
-    #         dist = np.linalg.norm(goal_position - position)
-    #         if dist > down and dist < up:
-    #             check_stack
+    def check_stack(self, position, goal):
+        # goal length: [0] or [0,1] or [0,1,3]
+        goal_length = len(goal)
+        stack_success_list = []
+        partial_success = False
+        for goal_idx in range(goal_length):
+            goal_position = 
+            dist = np.linalg.norm(goal_position - position)
+            up_thres =
+            lower_thres = 
+            if dist > lower_thres and dist < up_thres:
+                partial_success = True
+            stack_success_list.append(stack_success)
+        stack_success = np.all(stack_success_list)
 
 
     def restart_real(self):
