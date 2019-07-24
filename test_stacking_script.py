@@ -15,6 +15,81 @@ from trainer import Trainer
 from logger import Logger
 import utils
 
+############### Testing Block Stacking #######
+
+class StackSequence(object):
+    def __init__(self, num_obj, is_goal_conditioned_task=True):
+        """ Oracle to choose a sequence of specific color objects to interact with.
+
+        Generates one hot encodings for a list of objects of the specified length.
+        Can be used for stacking or simply grasping specific objects.
+
+        # Member Variables
+
+        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
+        is_goal_conditioned_task: do we care about which specific object we are using
+        object_color_sequence: to get the full order of the current stack goal.
+
+        """
+        self.num_obj = num_obj
+        self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.reset_sequence()
+        self.total_steps = 1
+
+    def reset_sequence(self):
+        """ Generate a new sequence of specific objects to interact with.
+        """
+        if self.is_goal_conditioned_task:
+            # 3 is currently the red block
+            # object_color_index = 3
+            self.object_color_index = 0
+
+            # Choose a random sequence to stack
+            self.object_color_sequence = np.random.permutation(self.num_obj)
+            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
+            self.object_color_one_hot_encodings = []
+            for color in self.object_color_sequence:
+                object_color_one_hot_encoding = np.zeros((self.num_obj))
+                object_color_one_hot_encoding[color] = 1.0
+                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
+        else:
+            self.object_color_index = None
+            self.object_color_one_hot_encodings = None
+            self.object_color_sequence = None
+
+    def current_one_hot(self):
+        """ Return the one hot encoding for the current specific object.
+        """
+        return self.object_color_one_hot_encodings[self.object_color_index]
+
+    def sequence_one_hot(self):
+        """ Return the one hot encoding for the entire stack sequence.
+        """
+        return np.concatenate(object_color_one_hot_encodings)
+
+    def current_sequence_progress(self):
+        """ How much of the current stacking sequence we have completed.
+
+        For example, if the sequence should be [0, 1, 3, 2].
+        At initialization this will return [0].
+        After one next() calls it will return [0, 1].
+        After two next() calls it will return [0, 1, 3].
+        After three next() calls it will return [0, 1, 3, 2].
+        After four next() calls a new sequence will be generated and it will return one element again.
+        """
+        return self.object_color_sequence[:self.object_color_index+1]
+
+    def object_color_sequence_func(self):
+        return self.object_color_sequence
+
+    def next(self):
+        self.total_steps += 1
+        if self.is_goal_conditioned_task:
+            self.object_color_index += 1
+            if not self.object_color_index < self.num_obj:
+                self.reset_sequence()
+######################
+
 is_sim = True# Run in simulation?
 obj_mesh_dir = os.path.abspath('objects/blocks') if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
 num_obj = 4 if is_sim else None # Number of objects to add to simulation
@@ -52,6 +127,7 @@ robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               is_testing, test_preset_cases, test_preset_file,
               place=True, grasp_color_task=True)
+stacksequence = StackSequence(num_obj, is_goal_conditioned_task=True)
 
 block = robot.get_obj_positions_and_orientations()
 primitive_position = block[0][0]
@@ -62,18 +138,24 @@ primitive_position2 = block[0][2]
 primitive_position3 = block[0][3]
 
 robot.grasp(primitive_position, best_rotation_angle)
-robot.place(primitive_position1, best_rotation_angle)
+place0 = robot.place(primitive_position1, best_rotation_angle)
 block1 = robot.get_obj_positions_and_orientations()
-
+print('place0 '+ str(place0))
 
 robot.grasp(primitive_position2, best_rotation_angle)
 block1 = robot.get_obj_positions_and_orientations()
-robot.place(block1[0][0], best_rotation_angle)
+place1 = robot.place(block1[0][0], best_rotation_angle)
+print('place1 '+ str(place1))
 
 robot.grasp(primitive_position3, best_rotation_angle)
-robot.place(block1[0][0], best_rotation_angle)
-#goal = [1]
-goal = [1,0,2,3]
-stack_success = robot.check_stack(goal)
+place2 = robot.place(block1[0][0], best_rotation_angle)
+print('place2 '+ str(place2))
+
+
+#stack_goal = stacksequence.object_color_sequence_func()
+stack_goal = [3,0,2]
+print('stack_goal: ' + str(stack_goal))
+
+stack_success = robot.check_stack(stack_goal)
 print('stack '+ str(stack_success))
 

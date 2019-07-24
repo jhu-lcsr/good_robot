@@ -1099,46 +1099,67 @@ class Robot(object):
             # Move gripper to location above place target
             self.move_to(location_above_place_target, None)
 
-
-
-            place_success = True
+            #TODO(hkwon214): check successful place
+            
+            #TODO(hkwon214): double check block height
+            block_height = 0.08599236369132997
+            
+            object_positions = np.asarray(self.get_obj_positions())
+            object_positions = object_positions[:,2]
+            grasped_object_ind, grasped_object_handle = self.get_highest_object_list_index_and_handle()
+            print('current_position: ' + str(grasped_object_ind))
+            current_obj_z_location = object_positions[grasped_object_ind]
+            print('current_obj_z_location: ' + str(current_obj_z_location+block_height/2))
+            print('goal_position: ' + str(position[2]))
+            print('goal_position_margin: ' + str(position[2] + place_location_margin))
+            #if abs(current_obj_z_location - position[2]) < 0.009:
+            if ((current_obj_z_location+block_height/2) >= position[2]) and ((current_obj_z_location+block_height/2) < (position[2]+block_height)):
+                place_success = True
+            else:
+                place_success = False
             return place_success
 
 #         # TODO(hkwon214): Add place function for real robot
 
-    #TODO(hkwon214): function works when there are four blocks -> improve
-    def check_stack(self, goal):
+    #TODO(hkwon214): write function to check if tower toppled
+
+    #TODO(hkwon214): function might only work when there are four blocks -> improve
+    def check_stack(self, object_color_sequence):
         """
         Input: vector length of 1, 2, or 3
         Example: goal = [0] or [0,1] or [0,1,3] 
 
         """ 
         
-        goal_length = len(goal)
+        sequence_length = len(object_color_sequence)
         partial_success_list = []
-        for goal_idx in range(goal_length):
-            partial_success = False
 
+        for idx in range(sequence_length):
+            partial_stack_success = False
+            object_positions_use = np.asarray(self.get_obj_positions())
             object_positions = np.asarray(self.get_obj_positions())
             object_positions = object_positions[:,2]
-            grasped_object_ind = np.argsort(object_positions)[goal_idx]
 
-            placed_position = object_positions[grasped_object_ind]
+            grasped_object_ind = np.argsort(object_positions)[idx]
+
+            placed_position = object_positions_use[grasped_object_ind]
             # print(grasped_object_ind )
             # print('placed_position ' + str(placed_position))
- 
-            goal_position = object_positions[goal[goal_idx]]
+            
+            object_positions_use1 = np.asarray(self.get_obj_positions())
+            object_color_index = object_color_sequence[idx]
+            target_position = object_positions_use1[object_color_index ]
             # print(goal[goal_idx])
             # print('goal position: ' + str(goal_position))
 
-            dist = np.linalg.norm(np.array(goal_position) - np.array(placed_position))
-            # print('distance: ' + str(dist))
+            dist = np.linalg.norm(np.array(target_position[0:2]) - np.array(placed_position[0:2]))
+            print('distance: ' + str(dist))
 
-            threshold = 0.01
+            threshold = 0.001
 
             if dist < threshold:
-                partial_success = True
-            partial_success_list.append(partial_success)
+                partial_stack_success = True
+            partial_success_list.append(partial_stack_success)
             print(partial_success_list)
         stack_success = np.all(partial_success_list)
         return stack_success
