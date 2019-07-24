@@ -52,24 +52,28 @@ robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               is_testing, test_preset_cases, test_preset_file,
               place=True, grasp_color_task=True)
+
 block = robot.get_obj_positions_and_orientations()
 primitive_position = block[0][0]
-print(primitive_position)
 best_rotation_angle = 3.14
-print(best_rotation_angle)
-primitive_position1 = block[0][1]
 
+primitive_position1 = block[0][1]
 primitive_position2 = block[0][2]
 primitive_position3 = block[0][3]
 
 robot.grasp(primitive_position, best_rotation_angle)
 robot.place(primitive_position1, best_rotation_angle)
+block1 = robot.get_obj_positions_and_orientations()
+
+
 robot.grasp(primitive_position2, best_rotation_angle)
 block1 = robot.get_obj_positions_and_orientations()
 robot.place(block1[0][0], best_rotation_angle)
 
 robot.grasp(primitive_position3, best_rotation_angle)
 robot.place(block1[0][0], best_rotation_angle)
-
-
+#goal = [1]
+goal = [1,0,2,3]
+stack_success = robot.check_stack(goal)
+print('stack '+ str(stack_success))
 

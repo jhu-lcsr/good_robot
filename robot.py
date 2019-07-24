@@ -1106,20 +1106,42 @@ class Robot(object):
 
 #         # TODO(hkwon214): Add place function for real robot
 
-    def check_stack(self, position, goal):
-        # goal length: [0] or [0,1] or [0,1,3]
+    #TODO(hkwon214): function works when there are four blocks -> improve
+    def check_stack(self, goal):
+        """
+        Input: vector length of 1, 2, or 3
+        Example: goal = [0] or [0,1] or [0,1,3] 
+
+        """ 
+        
         goal_length = len(goal)
-        stack_success_list = []
-        partial_success = False
+        partial_success_list = []
         for goal_idx in range(goal_length):
-            goal_position = 
-            dist = np.linalg.norm(goal_position - position)
-            up_thres =
-            lower_thres = 
-            if dist > lower_thres and dist < up_thres:
+            partial_success = False
+
+            object_positions = np.asarray(self.get_obj_positions())
+            object_positions = object_positions[:,2]
+            grasped_object_ind = np.argsort(object_positions)[goal_idx]
+
+            placed_position = object_positions[grasped_object_ind]
+            # print(grasped_object_ind )
+            # print('placed_position ' + str(placed_position))
+ 
+            goal_position = object_positions[goal[goal_idx]]
+            # print(goal[goal_idx])
+            # print('goal position: ' + str(goal_position))
+
+            dist = np.linalg.norm(np.array(goal_position) - np.array(placed_position))
+            # print('distance: ' + str(dist))
+
+            threshold = 0.01
+
+            if dist < threshold:
                 partial_success = True
-            stack_success_list.append(stack_success)
-        stack_success = np.all(stack_success_list)
+            partial_success_list.append(partial_success)
+            print(partial_success_list)
+        stack_success = np.all(partial_success_list)
+        return stack_success
 
 
     def restart_real(self):
