@@ -184,6 +184,7 @@ def main(args):
         grasp_count = 0
         successful_grasp_count = 0
         successful_color_grasp_count = 0
+        place_count = 0
         while True:
             if nonlocal_variables['executing_action']:
 
@@ -196,19 +197,24 @@ def main(args):
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
-                nonlocal_variables['primitive_action'] = 'grasp'
+                # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
+                if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
+                    nonlocal_variables['primitive_action'] = 'place'
+                else:
+                    nonlocal_variables['primitive_action'] = 'grasp'
                 explore_actions = False
                 if not grasp_only:
                     if is_testing and method == 'reactive':
-                        if best_push_conf > 2*best_grasp_conf:
+                        if best_push_conf > 2 * best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
                     else:
                         if best_push_conf > best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
                     explore_actions = np.random.uniform() < explore_prob
-                    if explore_actions: # Exploitation (do best action) vs exploration (do other action)
+                    # Exploitation (do best action) vs exploration (do random action)
+                    if explore_actions:
                         print('Strategy: explore (exploration probability: %f)' % (explore_prob))
-                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0,2) == 0 else 'grasp'
+                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, 2) == 0 else 'grasp'
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
@@ -263,11 +269,13 @@ def main(args):
                         safe_z_position = np.max(local_region) + workspace_limits[2][0]
                     primitive_position[2] = safe_z_position
 
-                # Save executed primitive
+                # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 if nonlocal_variables['primitive_action'] == 'push':
-                    trainer.executed_action_log.append([0, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]]) # 0 - push
+                    trainer.executed_action_log.append([0, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 0 - push
                 elif nonlocal_variables['primitive_action'] == 'grasp':
-                    trainer.executed_action_log.append([1, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]]) # 1 - grasp
+                    trainer.executed_action_log.append([1, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 1 - grasp
+                elif nonlocal_variables['primitive_action'] == 'place':
+                    trainer.executed_action_log.append([2, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 2 - place
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
                 # Visualize executed primitive, and affordances
@@ -278,12 +286,18 @@ def main(args):
                     grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
+                    if place:
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                        logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
+                        cv2.imwrite('visualization.place.png', place_pred_vis)
 
                 # Initialize variables that influence reward
                 nonlocal_variables['push_success'] = False
                 nonlocal_variables['grasp_success'] = False
+                nonlocal_variables['place_success'] = False
                 # HK: Added color variable
-                nonlocal_variables['color_success'] = False
+                nonlocal_variables['grasp_color_success'] = False
+                nonlocal_variables['place_color_success'] = False
                 change_detected = False
 
                 # Execute primitive
@@ -297,19 +311,21 @@ def main(args):
                     if nonlocal_variables['stack'].object_color_index is not None:
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
-                    nonlocal_variables['grasp_success'], nonlocal_variables['color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
+                    nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
                         if grasp_color_task:
-                            if nonlocal_variables['color_success']:
+                            if nonlocal_variables['grasp_color_success']:
                                 successful_color_grasp_count += 1
                             robot.reposition_objects()
-                            print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['color_success'], grasp_color_name))
+                            print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, grasp_rate, color_grasp_rate))
+                elif nonlocal_variables['primitive_action'] == 'place':
+                    place_count += 1
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -350,13 +366,11 @@ def main(args):
         empty_threshold = 300
         if is_sim and is_testing:
             empty_threshold = 10
-        # TODO: change to if red block not in view
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
-        #print(nonlocal_variables['color_success'])
-        #if nonlocal_variables['color_success'] :
+        #print(nonlocal_variables['grasp_color_success'])
+        #if nonlocal_variables['grasp_color_success'] :
             no_change_count = [0, 0]
             if is_sim:
-                # TODO: ADD red block
                 print('Not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
@@ -383,9 +397,9 @@ def main(args):
                 goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
             else:
                 goal_condition = None
-            push_predictions, grasp_predictions, state_feat = trainer.forward(
-                color_heightmap, valid_depth_heightmap, is_volatile=True,
-                goal_condition=goal_condition)
+
+            push_predictions, grasp_predictions, place_predictions, state_feat = trainer.forward(
+                color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
             # Execute best primitive action on robot in another thread
             nonlocal_variables['executing_action'] = True
@@ -430,7 +444,7 @@ def main(args):
 
             # Adjust exploration probability
             if not is_testing:
-                explore_prob = max(0.5 * np.power(0.9998, trainer.iteration),0.1) if explore_rate_decay else 0.5
+                explore_prob = max(0.5 * np.power(0.9998, trainer.iteration), 0.1) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
             if experience_replay and not is_testing:
@@ -478,9 +492,13 @@ def main(args):
                         goal_condition = None
                         sample_color_success = None
 
-                    sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
-                        sample_color_heightmap, sample_depth_heightmap, is_volatile=True,
-                        goal_condition=goal_condition)
+                    if place:
+                        sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
+                            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+                    else:
+                        sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
+                            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+                        sample_place_predictions = None
 
                     # Load next sample RGB-D heightmap
                     next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
@@ -500,10 +518,10 @@ def main(args):
                     new_sample_label_value, _ = trainer.get_label_value(
                         sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
                         sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-                        sample_color_success, goal_condition=goal_condition)
+                        sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions)
 
                     # Get labels for sample and backpropagate
-                    sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration,1:4]).astype(int)
+                    sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
                     trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind, trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
 
                     # Recompute prediction value and label for replay buffer
@@ -550,8 +568,8 @@ def main(args):
         prev_goal_condition = goal_condition
         # HK: check color_success arguments
         if grasp_color_task:
-            prev_color_success = nonlocal_variables['color_success']
-            if nonlocal_variables['grasp_success'] and nonlocal_variables['color_success']:
+            prev_color_success = nonlocal_variables['grasp_color_success']
+            if nonlocal_variables['grasp_success'] and nonlocal_variables['grasp_color_success']:
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
