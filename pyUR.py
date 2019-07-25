@@ -238,15 +238,16 @@ class URcomm(object):
         start_position = ['p', 0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
 
         curled_config_deg = [-196, -107, 126, -90, -90, -12]
-        curled_config = np.deg2rad(curled_config_deg)
+        curled_config = [np.deg2rad(i) for i in curled_config_deg]
         curled_config = ['j'] + curled_config
 
-        end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        end_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
 
-        # r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
-        # print(r)
         middle_position = np.array(end_position) - \
             np.array([0.020, 0, -0.020, 0, 0, 0])
+
+        end_position = ['p'] + end_position
+        middle_position = ['p'] + middle_position.tolist()
 
         blend_radius = 0.100
         K = 1.   # 28.
