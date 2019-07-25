@@ -1130,7 +1130,7 @@ class Robot(object):
 #         # TODO(hkwon214): Add place function for real robot
 
     def check_stack(self, object_color_sequence, distance_threshold=0.06):
-        """ Check for a complete stack in the correct order
+        """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
         Example: goal = [0] or [0,1] or [0,1,3]
@@ -1139,6 +1139,10 @@ class Robot(object):
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+
+        # Returns
+
+        True if the stack matches the specified order from bottom to top, False otherwise.
 
         """
         checks = len(object_color_sequence) - 1
