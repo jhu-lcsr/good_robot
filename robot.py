@@ -26,13 +26,6 @@ class Robot(object):
             pass
         # If in real-settings...
         else:
-
-            # Connect to robot client
-            # self.tcp_host_ip = tcp_host_ip
-            # self.tcp_port = tcp_port
-
-            self.r = URcomm(tcp_host_ip, tcp_port, self.joint_acc,
-                            self.joint_vel)
             # self.r = urx.Robot(tcp_host_ip)
             # self.r.set_tcp((0, 0, 0, 0, 0, 0))
             # self.r.set_payload(0.5, (0, 0, 0))
@@ -42,11 +35,6 @@ class Robot(object):
             # NOTE: this is for D415
             # home_in_deg = np.array(
             # [-151.4, -93.7, 85.4, -90, -90, 0]) * 1.0
-
-            # NOTE: this is for throw practice
-            home_in_deg = np.array(
-                [-197, -105, 130, -110, -90, -30]) * 1.0
-            self.home_joint_config = np.deg2rad(home_in_deg)
 
             # Default home joint configuration
             # NOTE: this is orig
@@ -70,18 +58,30 @@ class Robot(object):
             # self.tool_acc = 0.1  # Safe when set 30% speed on pendant
             # self.tool_vtel = 0.1
 
-            # Move robot to home pose
-            self.go_home()
-            # self.close_gripper()
-            # self.open_gripper()
+            # Connect to robot client
+            # self.tcp_host_ip = tcp_host_ip
+            # self.tcp_port = tcp_port
 
+            # port is assumed to be 30002
+            self.r = URcomm(tcp_host_ip, self.joint_vel,
+                            self.joint_acc)
+
+            # Move robot to home pose
+            self.r.go_home()
+            self.r.activate_gripper()
+            # self.r.close_gripper()
+            # self.r.open_gripper()
+
+            '''
             # Fetch RGB-D data from RealSense camera
             self.camera = Camera()
             self.cam_intrinsics = self.camera.intrinsics
 
             # Load camera pose (from running calibrate.py), intrinsics and depth scale
-            self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
-            self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
+            self.cam_pose = np.loadtxt("real/camera_pose.txt", delimiter=" ")
+            self.cam_depth_scale = np.loadtxt(
+                "real/camera_depth_scale.txt", delimiter=" ")
+            '''
 
     def get_camera_data(self):
 
@@ -450,4 +450,3 @@ def restart_real(self):
             break
         tool_analog_input2 = new_tool_analog_input2
 '''
-

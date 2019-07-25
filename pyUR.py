@@ -1,6 +1,8 @@
 """
 """
 import ursecmon
+import logging
+import numpy as np
 
 __author__ = "Olivier Roulet-Dubonnet"
 __copyright__ = "Copyright 2011-2015, Sintef Raufoss Manufacturing"
@@ -8,7 +10,7 @@ __license__ = "LGPLv3"
 
 
 class URcomm(object):
-    def __init__(self, host, joint_vel, joint_acc): 
+    def __init__(self, host, joint_vel, joint_acc):
 
         self.joint_vel = joint_vel
         self.joint_acc = joint_acc
@@ -20,8 +22,12 @@ class URcomm(object):
 
         self.logger.debug("Opening secondary monitor socket")
         self.secmon = ursecmon.SecondaryMonitor(host)
-    
-        self.workspace_limits = workspace_limits
+
+        # NOTE: this is for throw practice
+        home_in_deg = np.array(
+            [-197, -105, 130, -110, -90, -30]) * 1.0
+        self.home_joint_config = np.deg2rad(home_in_deg)
+
         self.moveto_limits = (
             [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
 
@@ -29,38 +35,40 @@ class URcomm(object):
         self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
         self.socket_name = "gripper_socket"
 
-
         # Joint tolerance for blocking calls
         self.joint_tolerance = 0.01
 
         self.socket_open_str = '\tsocket_open("127.0.0.1", 63352, "gripper_socket")\n'
         self.socket_close_str = '\tsocket_close("gripper_socket")\n'
 
+        self.max_float_length = 6  # according to python-urx lib, UR may have max float length
+
     # -- Gripper commands
 
     def activate_gripper(self):
         prog = "def actGrip():\n"
         # Activate gripper
-        prog += 'socket_open(\"{}\",{},\"{}\"\n)'.format("127.0.0.1",
-                                                         63352,
-                                                         self.socket_name)
+        prog += self.socket_close_str
+        prog += self.socket_open_str
         # TODO: does this cause the gripper to open and close? to acitvate
         prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("ACT", 1,
                                                             self.socket_name)
         prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("GTO", 1,
                                                             self.socket_name)
         prog += "end\n"
+        self.logger.debug("Activating gripper")
+        self.send_program(prog)
 
     # We also talk to Robotiq 2F-85 gripper through the UR5 "API"
 
     def open_gripper(self, async=False):
-        # print("!-- open gripper")
         prog = "def openGrip():\n"
         prog += self.socket_close_str
         prog += self.socket_open_str
         prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
-                                                         self.socket_name)
+                                                              self.socket_name)
         prog += "end\n"
+        self.logger.debug("opening gripper")
         self.send_program(prog)
 
     def close_gripper(self, async=False):
@@ -68,12 +76,14 @@ class URcomm(object):
         prog = "def closeGrip():\n"
         prog += self.socket_close_str
         prog += self.socket_open_str
-        prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 1,
-                                                         self.socket_name)
+        prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 255,
+                                                              self.socket_name)
         prog += "end\n"
         self.send_program(prog)
+        self.logger.debug("Closing gripper")
 
-        gripper_fully_closed = self.check_grasp()
+        # gripper_fully_closed = self.check_grasp()
+        gripper_fully_closed = True
         return gripper_fully_closed
 
     def check_grasp(self):
@@ -88,19 +98,17 @@ class URcomm(object):
 
         tool_pos = self.get_state('tool_data')
 
-        return tool_pos > 9 # TODO
+        return tool_pos > 9  # TODO
 
     # -- Data commands
 
-    def get_state(self):
-        parse_functions = {'joint_data': get_joint_data, 'cartesian_info':
-                           get_cartesian_info, 'tool_data': get_tool_data}
+    def get_state(self, subpackage):
 
         def get_joint_data(self, _log=True):
             jts = self.secmon.get_joint_data()
             joint_positions = [jts["q_actual0"], jts["q_actual1"],
                                jts["q_actual2"], jts["q_actual3"],
-                               jts["q_actual4"], jts["q_actual5"]] 
+                               jts["q_actual4"], jts["q_actual5"]]
             if _log:
                 self.logger.debug("Received joint data from robot: %s",
                                   joint_positions)
@@ -116,12 +124,14 @@ class URcomm(object):
             return pose
 
         def get_tool_data():
-            return self.secmon.get_analog_out(0) # TODO: is this a value b/tw 0 and 10?
+            # TODO: is this a value b/tw 0 and 10?
+            return self.secmon.get_analog_out(0)
 
-        return parse_functions[subpackage]() # cute trick
+        parse_functions = {'joint_data': get_joint_data, 'cartesian_info':
+                           get_cartesian_info, 'tool_data': get_tool_data}
+        return parse_functions[subpackage]()  # cute trick
 
-
-    def _send_program(self, prog):
+    def send_program(self, prog):
         # mostly adding a printout for ease of debugging
         self.logger.info("Sending program: " + prog)
         self.secmon.send_program(prog)
@@ -135,18 +145,146 @@ class URcomm(object):
 
     def _is_safe(position, limits):
         safe = self.btw(position[0], limits[0][0], limits[0][1]) and \
-                self.btw(position[1], limits[1][0], limits[1][1]) and \
-                self.btw(position[2], limits[2][0], limits[2][1]):
+            self.btw(position[1], limits[1][0], limits[1][1]) and \
+            self.btw(position[2], limits[2][0], limits[2][1])
         return safe
 
     def _format_move(self, command, tpose, acc, vel, radius=0, prefix=""):
         # prefix= p for position, none for joints
-        # tpose = [round(i, self.max_float_length) for i in tpose]
+        tpose = [round(i, self.max_float_length) for i in tpose]
         tpose.append(acc)
         tpose.append(vel)
         tpose.append(radius)
         return "\t{}({}[{},{},{},{},{},{}], a={}, v={}, r={})\n".format(command, prefix, *tpose)
 
+    # -- Move commands
+
+    def move_to(self, position, orientation, vel=None, acc=None, radius=0, wait=True):
+        if vel is None:
+            vel = self.joint_vel
+        if acc is None:
+            acc = self.joint_acc
+        # position ins meters, orientation is axis-angle
+        if _is_safe(position, self.moveto_limits):
+            prog = "def moveTo():\n"
+            # t = 0, r = radius
+            if orientation is None:
+                self.logger.debug(
+                    "Attempting to move position but not orientation")
+                orientation = self.get_state('cartesian_info')[3:]
+
+            prog += self._format_move("movel", np.concatenate((position, orientation)),
+                                      acc=acc, vel=vel, prefix="p")
+            prog += "end\n"
+            self.send_program(prog)
+        else:
+            self.logger.debug("NOT Safe. NOT moving to: %s, due to LIMITS: %s",
+                              position, self.moveto_limits)
+
+    def move_joints(self, joint_configuration, vel=None, acc=None, wait=True):
+        if vel is None:
+            vel = self.joint_vel
+        if acc is None:
+            acc = self.joint_acc
+
+        # specified in radians
+        prog = "def moveJoint():\n"
+        prog += self._format_move("movel", joint_configuration,
+                                  vel=vel, acc=acc, prefix="")
+        prog += "end\n"
+        self.send_program(prog)
+        # if wait:
+        # self._wait_for_move(tpose[:6], threshold=threshold)
+        #     return self.getl()
+
+    def go_home(self):
+        self.logger.debug("Going home.")
+        self.move_joints(self.home_joint_config)
+
+    def combo_move(self, pose_list, wait=True):
+        """
+        Example use:
+        # end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        # throw_pose_list = [start_pose, middle_pose, "open", end_pose]
+        """
+        acc, vel, radius = 1, 1, 0.3
+        prog = "def combo_move():\n"
+        prog += self.socket_close_str
+        prog += self.socket_open_str
+        for idx, pose in enumerate(pose_list):
+            if idx == (len(pose_list) - 1):
+                radius = 0.01
+            if str(pose) == 'open':
+                msg = "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
+                                                                  self.socket_name)
+            else:
+                # WARNING: this does not have safety checks!
+                if str(pose[0]) == 'j':
+                    prog += self._format_move(
+                        "movej", pose[1:], acc, vel, radius, prefix="") + "\n"
+                elif str(pose[0]) == 'p':
+                    prog += self._format_move(
+                        'movej', pose[1:], acc, vel, radius, prefix="p") + "\n"
+        prog += "end\n"
+        self.send_program(prog)
+
+        if wait:
+            self._wait_for_move(target=pose_list[-1][1:], threshold=threshold)
+            return self.getl()
+
+    def throw(self):
+        self.close_gripper()
+        # currently hard coded positions
+        start_position = ['p', 0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
+
+        curled_config_deg = [-196, -107, 126, -90, -90, -12]
+        curled_config = np.deg2rad(curled_config_deg)
+        curled_config = ['j'] + curled_config
+
+        end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+
+        # r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
+        # print(r)
+        middle_position = np.array(end_position) - \
+            np.array([0.020, 0, -0.020, 0, 0, 0])
+
+        blend_radius = 0.100
+        K = 1.   # 28.
+
+        # NOTE: important
+        throw_pose_list = [start_pose, middle_pose,
+                           "open", end_pose, start_pose]
+
+        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
+        self.combo_move(throw_pose_list, wait=True)
+
+        """ this stops between points
+        print('throw acc will be', self.joint_acc * 1)  # 4)
+        print('throw vel will be', self.joint_vel * 1)  # 0)
+        self.move_to(start_position, start_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0)  # last # is blend radius
+        # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
+        self.move_joints(curled_config)
+        self.move_to(end_position, end_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0.5)  # last # is blend radius
+        # gripper.open_gripper()
+        self.move_to(np.array(end_position) - np.array((0.020, 0, -0.020)), end_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0.1)  # last # is blend radius
+        self.move_to(start_position, start_axisangle, acc_scaling=K,
+                     vel_scaling=K, radius=0)  # last # is blend radius
+        """
+
+        # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
+        # time.sleep(1.25)
+        # self.open_gripper()
+        # time.sleep(2)
+
+        # Pre-compute blend radius
+        # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
+        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
+        # (position[0], position[1], bin_position[2],
+        # tool_orientation[0], tool_orientation[1], 0.0,
+        # self.joint_acc, self.joint_vel, blend_radius)
 
     '''
     def _wait_for_move(self, target, threshold=None, timeout=5, joints=False):
@@ -205,122 +343,3 @@ class URcomm(object):
         for i in range(6):
             dist += (target[i] - joints[i]) ** 2
     '''
-
-    # -- Move commands 
-
-    def move_to(self, position, orientation, acc=self.acc_vel,
-                vel=self.joint_vel, radius=0, wait=True):
-        # position ins meters, orientation is axis-angle
-        if _is_safe(position, self.moveto_limits):
-            prog = "def moveTo():\n"
-            # t = 0, r = radius
-            if orientation is None: 
-                self.logger.debug("Attempting to move position but not orientation")
-                orientation = self.get_state('cartesian_info')[3:]
-
-            prog += self._format_move("movel", np.concatenate((position, orientation)),
-                                      acc=acc, vel=vel, prefix="p")
-            prog += "end\n"
-            self.send_program(prog)
-        else:
-            self.logger.debug("NOT Safe. NOT moving to: %s, due to LIMITS: %s",
-                                  position, self.moveto_limits)
-
-    def move_joints(self, joint_configuration, wait=True):
-        # specified in radians
-        prog = "def moveJoint():\n"
-        prog += self._format_move("movel", joint_configuration,
-                                  acc=acc, vel=vel, prefix="")
-        prog += "end\n"
-        self.send_program(prog)
-        # if wait:
-            # self._wait_for_move(tpose[:6], threshold=threshold)
-        #     return self.getl()
-
-    def go_home(self):
-        self.logger.debug("Going home.")
-        self.move_joints(self.home_joint_config)
-
-    def combo_move(self, pose_list, wait=True):
-        """
-        Example use:
-        # end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
-        # throw_pose_list = [start_pose, middle_pose, "open", end_pose]
-        """
-        acc, vel, radius = 1, 1, 0.3
-        prog = "def combo_move():\n"
-        prog += self.socket_close_str
-        prog += self.socket_open_str
-        for idx, pose in enumerate(pose_list):
-            if idx == (len(pose_list) - 1):
-                radius = 0.01
-            if str(pose) == 'open':
-                msg = "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
-                                                                  self.socket_name)
-            else:
-                # WARNING: this does not have safety checks!
-                if str(pose[0]) == 'j':
-                    prog += self._format_move(
-                        "movej", pose[1:], acc, vel, radius, prefix="") + "\n"
-                elif str(pose[0]) == 'p':
-                    prog += self._format_move(
-                        'movej', pose[1:], acc, vel, radius, prefix="p") + "\n"
-        prog += "end\n"
-        self.send_program(prog)
-
-        if wait:
-            self._wait_for_move(target=pose_list[-1][1:], threshold=threshold)
-            return self.getl()
-
-    def throw():
-        self.close_gripper()
-        # currently hard coded positions
-        start_position = ['p', 0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
-
-        curled_config_deg = [-196, -107, 126, -90, -90, -12]
-        curled_config = np.deg2rad(curled_config_deg)
-        curled_config =  ['j'] + curled_config
-
-        end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
-
-        # r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
-        # print(r)
-        middle_position = np.array(end_position) - \
-                          np.array([0.020, 0, -0.020, 0, 0, 0])
-
-        blend_radius = 0.100
-        K = 1.   # 28.
-
-        # NOTE: important
-        throw_pose_list = [start_pose, middle_pose, "open", end_pose, start_pose]
-
-        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
-        self.combo_move(throw_pose_list, wait=True)
-
-        """ this stops between points
-        print('throw acc will be', self.joint_acc * 1)  # 4)
-        print('throw vel will be', self.joint_vel * 1)  # 0)
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
-        self.move_joints(curled_config)
-        self.move_to(end_position, end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.5)  # last # is blend radius
-        # gripper.open_gripper()
-        self.move_to(np.array(end_position) - np.array((0.020, 0, -0.020)), end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.1)  # last # is blend radius
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        """
-
-        # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
-        # time.sleep(1.25)
-        # self.open_gripper()
-        # time.sleep(2)
-
-        # Pre-compute blend radius
-        # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
-        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-        # (position[0], position[1], bin_position[2],
-        # tool_orientation[0], tool_orientation[1], 0.0,
-        # self.joint_acc, self.joint_vel, blend_radius)

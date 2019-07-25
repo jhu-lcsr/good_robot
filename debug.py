@@ -5,7 +5,10 @@ import time
 import os
 import sys
 from robot import Robot
+import logging
 
+
+logging.basicConfig(level=logging.INFO)
 
 # User options (change me)
 # --------------- Setup options ---------------
@@ -55,7 +58,7 @@ while True:
         prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
         if str(prompt1) == 'y':
             time.sleep(0.01)
-            robot.close_gripper()
+            robot.r.close_gripper()
             # time.sleep(0.01)
         prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
         if str(prompt2) == 'yes':
