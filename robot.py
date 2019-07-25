@@ -745,8 +745,16 @@ class Robot(object):
             sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
             move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
             move_magnitude = np.linalg.norm(move_direction)
-            move_step = 0.05*move_direction/move_magnitude
-            num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
+            # prevent division by 0, source: https://stackoverflow.com/a/37977222/99379
+            move_step = 0.05 * np.divide(move_direction, move_magnitude, out=np.zeros_like(move_direction), where=move_magnitude!=0)
+            # move_step = 0.05*move_direction/move_magnitude
+            # print('move direction: ' + str(move_direction))
+            # print('move step: ' + str(move_step))
+            # TODO(ahundt) 0 steps may still be buggy in certain cases
+            if move_step[0] == 0:
+                num_move_steps = 0
+            else:
+                num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
 
             # Compute gripper orientation and rotation increments
             sim_ret, gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, vrep.simx_opmode_blocking)
