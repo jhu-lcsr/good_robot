@@ -1145,7 +1145,6 @@ class Robot(object):
         # print('bottom: ' + str(object_color_sequence[:-1]))
         # print('top: ' + str(object_color_sequence[1:]))
         for idx in range(checks):
-            partial_stack_success = False
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
             # Check that Z is higher by at least half the distance threshold
