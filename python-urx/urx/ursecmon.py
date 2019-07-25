@@ -68,7 +68,7 @@ class ParserUtils(object):
                 if psize == 38:
                     self.version = (3, 0)
                     allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling"))
-                elif psize == 46:  # It's 46 bytes in 3.2
+                elif psize == 46:  # It's 46 bytes in 3.
                     self.version = (3, 2)
                     allData['RobotModeData'] = self._get_data(pdata, "!IBQ???????BBdd", ("size", "type", "timestamp", "isPhysicalRobotConnected", "isRealRobotEnabled", "isPowerOnRobot", "isEmergencyStopped", "isSecurityStopped", "isProgramRunning", "isProgramPaused", "robotMode", "controlMode", "speedFraction", "speedScaling", "speedFractionLimit"))
                 elif psize == 47:  # It's 47 bytes in 3.5
@@ -271,7 +271,7 @@ class SecondaryMonitor(Thread):
             with self._prog_queue_lock:
                 self._prog_queue.append(data)
             data.condition.wait()
-            self.logger.debug("program sendt: %s", data)
+            self.logger.debug("program sent: %s", data)
 
     def run(self):
         """
@@ -414,6 +414,12 @@ class SecondaryMonitor(Thread):
             self.wait()
         with self._dictLock:
             return self._dict["MasterBoardData"]["analogInput" + str(nb)]
+
+    def get_analog_out(self, nb, wait=False):
+        if wait:
+            self.wait()
+        with self._dictLock:
+            return self._dict["MasterBoardData"]["analogOutput" + str(nb)]
 
     def get_analog_inputs(self, wait=False):
         if wait:

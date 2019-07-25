@@ -62,7 +62,7 @@ while True:
             time.sleep(0.05)
 
             print('!----Throw started')
-            robot.throw()
+            robot.r.throw()
             print('!----Throw completed')
 
         # # robot.push(push_position, 0, workspace_limits)

@@ -8,7 +8,10 @@ __license__ = "LGPLv3"
 
 
 class URcomm(object):
-    def __init__(self, host): 
+    def __init__(self, host, joint_vel, joint_acc): 
+
+        self.joint_vel = joint_vel
+        self.joint_acc = joint_acc
 
         # use_rt=False, use_simulation=False):
         # self.host = host
@@ -130,7 +133,7 @@ class URcomm(object):
             return True
         return False
 
-    def _isSafe(position, limits):
+    def _is_safe(position, limits):
         safe = self.btw(position[0], limits[0][0], limits[0][1]) and \
                 self.btw(position[1], limits[1][0], limits[1][1]) and \
                 self.btw(position[2], limits[2][0], limits[2][1]):
@@ -208,7 +211,7 @@ class URcomm(object):
     def move_to(self, position, orientation, acc=self.acc_vel,
                 vel=self.joint_vel, radius=0, wait=True):
         # position ins meters, orientation is axis-angle
-        if _isSafe(position, self.moveto_limits):
+        if _is_safe(position, self.moveto_limits):
             prog = "def moveTo():\n"
             # t = 0, r = radius
             if orientation is None: 
@@ -225,10 +228,6 @@ class URcomm(object):
 
     def move_joints(self, joint_configuration, wait=True):
         # specified in radians
-
-        if self.is_sim:
-            pass
-
         prog = "def moveJoint():\n"
         prog += self._format_move("movel", joint_configuration,
                                   acc=acc, vel=vel, prefix="")
@@ -238,7 +237,6 @@ class URcomm(object):
             # self._wait_for_move(tpose[:6], threshold=threshold)
         #     return self.getl()
 
-
     def go_home(self):
         self.logger.debug("Going home.")
         self.move_joints(self.home_joint_config)
@@ -246,9 +244,7 @@ class URcomm(object):
     def combo_move(self, pose_list, wait=True):
         """
         Example use:
-        # end_position = ['p', 0.597, 0.000, 0.550]
-        # end_axisangle = [2.18, -2.35, 2.21]
-        # end_pose = np.concatenate((end_position, end_axisangle))
+        # end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
         # throw_pose_list = [start_pose, middle_pose, "open", end_pose]
         """
         acc, vel, radius = 1, 1, 0.3
@@ -276,6 +272,31 @@ class URcomm(object):
             self._wait_for_move(target=pose_list[-1][1:], threshold=threshold)
             return self.getl()
 
+    def throw():
+        self.close_gripper()
+        # currently hard coded positions
+        start_position = ['p', 0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
+
+        curled_config_deg = [-196, -107, 126, -90, -90, -12]
+        curled_config = np.deg2rad(curled_config_deg)
+        curled_config =  ['j'] + curled_config
+
+        end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+
+        # r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
+        # print(r)
+        middle_position = np.array(end_position) - \
+                          np.array([0.020, 0, -0.020, 0, 0, 0])
+
+        blend_radius = 0.100
+        K = 1.   # 28.
+
+        # NOTE: important
+        throw_pose_list = [start_pose, middle_pose, "open", end_pose, start_pose]
+
+        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
+        self.combo_move(throw_pose_list, wait=True)
+
         """ this stops between points
         print('throw acc will be', self.joint_acc * 1)  # 4)
         print('throw vel will be', self.joint_vel * 1)  # 0)
@@ -292,37 +313,6 @@ class URcomm(object):
                      vel_scaling=K, radius=0)  # last # is blend radius
         """
 
-        '''
-        tcp_command = "def throw_traj():\n"
-        # start
-        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-        # (start_position[0], start_position[1], start_position[2],
-        # start_axisangle[0], start_axisangle[1], start_axisangle[2],
-        # self.joint_acc * K, self.joint_vel * K, blend_radius)
-        # # curl
-        tcp_command += " movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (curled_config[0], curled_config[1], curled_config[2],
-             curled_config[3], curled_config[4], curled_config[5],
-             self.joint_acc * K, self.joint_vel * K, 0)
-        # unwind
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (end_position[0], end_position[1], end_position[2],
-             end_axisangle[0], end_axisangle[1], end_axisangle[2],
-             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.5)
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (end_position[0] - 0.020, end_position[1], end_position[2]+0.030,
-             end_axisangle[0], end_axisangle[1], end_axisangle[2],
-             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.3)
-        # go home
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.0)\n" % \
-            (start_position[0], start_position[1], start_position[2],
-             start_axisangle[0], start_axisangle[1], start_axisangle[2],
-             self.joint_acc * K * 0.1, self.joint_vel * K * 0.1)
-        tcp_command += "end\n"
-        self.tcp_socket.send(str.encode(tcp_command))
-        self.tcp_socket.close()
-        '''
-
         # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
         # time.sleep(1.25)
         # self.open_gripper()
@@ -334,56 +324,3 @@ class URcomm(object):
         # (position[0], position[1], bin_position[2],
         # tool_orientation[0], tool_orientation[1], 0.0,
         # self.joint_acc, self.joint_vel, blend_radius)
-
-'''
-    def get_state(self):
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-
-       state_data = tcp_socket.recv(1024)
-        # Read package header
-
-        data_bytes = bytearray()
-        data_bytes.extend(state_data)
-        data_length = struct.unpack("!iB", data_bytes[0:5])[0]
-        robot_message_type = struct.unpack("!iB", data_bytes[0:5])[1]
-
-        # print('robot message type', robot_message_type)
-
-        while (robot_message_type != 16):
-            print('keep trying')
-            state_data = tcp_socket.recv(1024)
-            data_bytes = bytearray()
-            data_bytes.extend(state_data)
-            data_length = struct.unpack("!iB", data_bytes[0:5])[0]
-            robot_message_type = struct.unpack("!iB", data_bytes[0:5])[1]
-
-        byte_idx = 5
-
-            elif ptype == 3:
-        # Parse sub-packages
-        subpackage_types = {
-            'joint_data': 1, 'cartesian_info': 4, 'force_mode_data': 7, 'tool_data': 2}
-        while byte_idx < data_length:
-            # package_length = int.from_bytes(data_bytes[byte_idx:(byte_idx+4)], byteorder='big', signed=False)
-            package_length = struct.unpack(
-                "!i", data_bytes[byte_idx:(byte_idx+4)])[0]
-            byte_idx += 4
-            package_idx = data_bytes[byte_idx]
-            if package_idx == subpackage_types[subpackage]:
-                byte_idx += 1
-                break
-            byte_idx += package_length - 4
-        tcp_socket.close()
-'''
-'''
-elif ptype == 4:
-        allData["CartesianInfo"] = self._get_data(pdata, "iBdddddd", ("size", "type", "X", "Y", "Z", "Rx", "Ry", "Rz"))
-
-elif ptype == 2:
-       allData["ToolData"] = self._get_data(pdata, "iBbbddfBffB", ("size", "type", "analoginputRange2", "analoginputRange3", "analogInput2", "analogInput3", "toolVoltage48V", "toolOutputVoltage", "toolCurrent", "toolTemperature", "toolMode"))
-        
-elif ptype == 3:
-        fmt = "iBhhbbddbbddffffBBb"     # firmware < 3.0
-        allData["MasterBoardData"] = self._get_data(pdata, fmt, ("size", "type", "digitalInputBits", "digitalOutputBits", "analogInputRange0", "analogInputRange1", "analogInput0", "analogInput1", "analogInputDomain0", "analogInputDomain1", "analogOutput0", "analogOutput1", "masterBoardTemperature", "robotVoltage48V", "robotCurrent", "masterIOCurrent"))  # , "masterSafetyState" ,"masterOnOffState", "euromap67InterfaceInstalled"   ))
-'''

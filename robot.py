@@ -7,11 +7,11 @@ import numpy as np
 import utils
 import serial
 import binascii
-from urx.robotiq_two_finger_gripper import Robotiq_Two_Finger_Gripper
+
+from pyUR import URcomm
 
 from simulation import vrep
 from real.camera import Camera
-import urx
 
 
 class Robot(object):
@@ -21,16 +21,6 @@ class Robot(object):
 
         self.is_sim = is_sim
 
-        self.workspace_limits = workspace_limits
-        self.moveto_limits = (
-            [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
-
-        # Tool pose tolerance for blocking calls
-        self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
-
-        # Joint tolerance for blocking calls
-        self.joint_tolerance = 0.01
-
         # If in simulation...
         if self.is_sim:
             pass
@@ -38,19 +28,16 @@ class Robot(object):
         else:
 
             # Connect to robot client
-            self.tcp_host_ip = tcp_host_ip
-            self.tcp_port = tcp_port
-            # self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # self.tcp_host_ip = tcp_host_ip
+            # self.tcp_port = tcp_port
 
-            self.r = urx.Robot(tcp_host_ip)
-            self.r.set_tcp((0, 0, 0, 0, 0, 0))
-            self.r.set_payload(0.5, (0, 0, 0))
+            self.r = URcomm(tcp_host_ip, tcp_port, self.joint_acc,
+                            self.joint_vel)
+            # self.r = urx.Robot(tcp_host_ip)
+            # self.r.set_tcp((0, 0, 0, 0, 0, 0))
+            # self.r.set_payload(0.5, (0, 0, 0))
 
-            self.gripper = Robotiq_Two_Finger_Gripper(self.r)
-
-            # Connect as real-time client to parse state data
-            # self.rtc_host_ip = rtc_host_ip
-            # self.rtc_port = rtc_port
+            # self.gripper = Robotiq_Two_Finger_Gripper(self.r)
 
             # NOTE: this is for D415
             # home_in_deg = np.array(
@@ -61,34 +48,7 @@ class Robot(object):
                 [-197, -105, 130, -110, -90, -30]) * 1.0
             self.home_joint_config = np.deg2rad(home_in_deg)
 
-            # Default joint speed configuration
-            # self.joint_acc = 8 # Safe: 1.4
-            # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.50  # Safe when set 30% spe71ed on pendant
-            self.joint_vel = 0.35
-
-            # Default tool speed configuration
-            # self.tool_acc = 1.2 # Safe: 0.5
-            # self.tool_vel = 0.25 # Safe: 0.2
-            self.tool_acc = 0.1  # Safe when set 30% speed on pendant
-            self.tool_vel = 0.1
-
-            # Move robot to home pose
-            self.go_home()
-            # self.close_gripper()
-            # self.open_gripper()
-
             # Default home joint configuration
-            # NOTE: this is for debug (hardcode calib) testing
-            # self.home_joint_config = [-np.pi, -(80/360.) * 2 * np.pi, np.pi/2,
-            # -np.pi/2, -np.pi/2, 0]
-
-            # NOTE: This is home so arm does not block depth cam
-            # home_in_deg = np.array([-191, -117, 116, -93, -91, -11]) * 1.0
-            # NOTE: This is for main.py to unblock
-            # home_in_deg = np.array([-158, -114, 109, -85, -88, +20]) * 1.0
-            # self.home_joint_config = np.deg2rad(home_in_deg)
-
             # NOTE: this is orig
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi,
             # (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
@@ -98,41 +58,30 @@ class Robot(object):
             # self.home_joint_config = [-np.pi, -
             # np.pi/2, np.pi/2, 0, np.pi/2, np.pi]
 
-            # # Fetch RGB-D data from RealSense camera
-            # self.camera = Camera()
-            # self.cam_intrinsics = self.camera.intrinsics
+            # Default joint speed configuration
+            # self.joint_acc = 8 # Safe: 1.4
+            # self.joint_vel = 3 # Safe: 1.05
+            self.joint_acc = 0.50  # Safe when set 30% spe71ed on pendant
+            self.joint_vel = 0.35
 
-            # # Load camera pose (from running calibrate.py), intrinsics and depth scale
-            # # NOTE: Is this independent of where the camera is?
-            # self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
-            # self.cam_depth_scale = np.loadtxt(
-            # 'real/camera_depth_scale.txt', delimiter=' ')
+            # Default tool speed configuration
+            # self.tool_acc = 1.2 # Safe: 0.5
+            # self.tool_vel = 0.25 # Safe: 0.2
+            # self.tool_acc = 0.1  # Safe when set 30% speed on pendant
+            # self.tool_vtel = 0.1
 
-    '''
-    def reposition_objects(self, workspace_limits):
+            # Move robot to home pose
+            self.go_home()
+            # self.close_gripper()
+            # self.open_gripper()
 
-        # Move gripper out of the way
-        self.r.movel([-0.100, 0.000, 0.300])
-        # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-        # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        # time.sleep(1)
+            # Fetch RGB-D data from RealSense camera
+            self.camera = Camera()
+            self.cam_intrinsics = self.camera.intrinsics
 
-        for object_handle in self.object_handles:
-
-            # Drop object at random x,y location and random orientation in robot workspace
-            drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * \
-                np.random.random_sample() + workspace_limits[0][0] + 0.1
-            drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * \
-                np.random.random_sample() + workspace_limits[1][0] + 0.1
-            object_position = [drop_x, drop_y, 0.15]
-            object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi *
-                                  np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-            vrep.simxSetObjectPosition(
-                self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
-            vrep.simxSetObjectOrientation(
-                self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
-            time.sleep(2)
-    '''
+            # Load camera pose (from running calibrate.py), intrinsics and depth scale
+            self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
+            self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
 
     def get_camera_data(self):
 
@@ -146,272 +95,6 @@ class Robot(object):
             # depth_img = self.camera.depth_data.copy()
 
         return color_img, depth_img
-
-    def open_gripper(self, async=False):
-        print("!-- open gripper")
-        self.gripper.open_gripper()
-
-    def close_gripper(self, async=False):
-        print("!-- close gripper")
-        self.gripper.close_gripper()
-        # gripper_fully_closed = self.check_grasp()
-        gripper_fully_closed = True
-        return gripper_fully_closed
-
-    '''
-    def get_state(self):
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        state_data = self.tcp_socket.recv(2048)
-        state_data = self.tcp_socket.recv(2048)
-        self.tcp_socket.close()
-        return state_data
-    '''
-
-    def btw(self, a, min, max):
-        if (a >= min) and (a <= max):
-            return True
-        return False
-
-    def move_to(self, tool_position, tool_orientation, acc_scaling=1,
-                vel_scaling=1, radius=0):
-        acc, vel = self.joint_acc * acc_scaling, self.joint_vel * vel_scaling
-
-        if self.is_sim:
-            pass
-
-        limits = self.moveto_limits
-        # is_safe = False
-        if self.btw(tool_position[0], limits[0][0], limits[0][1]) and \
-                self.btw(tool_position[1], limits[1][0], limits[1][1]) and \
-                self.btw(tool_position[2], limits[2][0], limits[2][1]):
-            print("I guess it's safe")
-            print('DEBUG: Entered move_to function, going to ', tool_position,
-                  tool_orientation)
-
-            # t = 0, r = radius
-            if tool_orientation is None:
-                print('DEBUG: Attempting to only move position')
-                self.r.translate(tool_position, acc=acc, vel=vel, wait=True,
-                                 threshold=self.joint_tolerance, relative=False)
-            else:
-                print(tool_position, tool_orientation)
-                print("DEBUG: We're moving! to ", np.concatenate((tool_position,
-                                                                  tool_orientation)))
-                self.r.movel(np.concatenate((tool_position, tool_orientation)),
-                             acc=acc, vel=vel, wait=True,
-                             threshold=self.joint_tolerance)
-
-                print('move_to', tool_position, tool_orientation)
-
-        else:
-            print("DEBUG: It's Not safe to move here!", tool_position,
-                  'limits', limits)
-
-    def guarded_move_to(self, tool_position, tool_orientation):
-
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.rtc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        self.rtc_socket.connect((self.rtc_host_ip, self.rtc_port))
-
-        # Read actual tool position
-        tcp_state_data = self.tcp_socket.recv(2048)
-        # TODO this will break if run
-        actual_tool_pose = self.parse_tcp_state_data(
-            tcp_state_data, 'cartesian_info')
-        execute_success = True
-
-        # Increment every cm, check force
-        self.tool_acc = 0.1  # 1.2 # 0.5
-
-        while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-            # [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) < self.tool_pose_tolerance[j] for j in range(3,6)]
-
-            # Compute motion trajectory in 1cm increments
-            increment = np.asarray(
-                [(tool_position[j] - actual_tool_pose[j]) for j in range(3)])
-            if np.linalg.norm(increment) < 0.01:
-                increment_position = tool_position
-            else:
-                increment = 0.01*increment/np.linalg.norm(increment)
-                increment_position = np.asarray(
-                    actual_tool_pose[0:3]) + increment
-
-            # Move to next increment position (blocking call)
-            tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (increment_position[0], increment_position[1],
-                                                                               increment_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2], self.tool_acc, self.tool_vel)
-            self.tcp_socket.send(str.encode(tcp_command))
-
-            time_start = time.time()
-            tcp_state_data = self.tcp_socket.recv(2048)
-            tcp_state_data = self.tcp_socket.recv(2048)
-            actual_tool_pose = self.parse_tcp_state_data(
-                tcp_state_data, 'cartesian_info')
-            while not all([np.abs(actual_tool_pose[j] - increment_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-                # print([np.abs(actual_tool_pose[j] - increment_position[j]) for j in range(3)])
-                tcp_state_data = self.tcp_socket.recv(2048)
-                tcp_state_data = self.tcp_socket.recv(2048)
-                actual_tool_pose = self.parse_tcp_state_data(
-                    tcp_state_data, 'cartesian_info')
-                time_snapshot = time.time()
-                if time_snapshot - time_start > 1:
-                    break
-                time.sleep(0.01)
-
-            # Reading TCP forces from real-time client connection
-            rtc_state_data = self.rtc_socket.recv(6496)
-            TCP_forces = self.parse_rtc_state_data(rtc_state_data)
-
-            # If TCP forces in x/y exceed 20 Newtons, stop moving
-            # print(TCP_forces[0:3])
-            if np.linalg.norm(np.asarray(TCP_forces[0:2])) > 20 or (time_snapshot - time_start) > 1:
-                print('Warning: contact detected! Movement halted. TCP forces: [%f, %f, %f]' % (
-                    TCP_forces[0], TCP_forces[1], TCP_forces[2]))
-                execute_success = False
-                break
-
-            time.sleep(0.01)
-
-        self.tool_acc = 1.2  # 1.2 # 0.5
-
-        self.tcp_socket.close()
-        self.rtc_socket.close()
-
-        return execute_success
-
-    def move_joints(self, joint_configuration):
-        # DEBUG:
-        # print('Entered move_joints function')
-        self.r.movej(joint_configuration, acc=self.joint_acc,
-                     vel=self.joint_vel, wait=True,
-                     threshold=self.joint_tolerance)
-
-    def go_home(self):
-
-        print('Going home!')
-        self.move_joints(self.home_joint_config)
-
-    # Note: must be preceded by close_gripper()
-    def check_grasp(self):
-
-        ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200,
-                            timeout=1, parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE,
-                            bytesize=serial.EIGHTBITS)
-        ser.write(
-            "\x09\x03\x07\xD0\x00\x03\x04\x0E")
-        data_raw = ser.readline()
-        data = binascii.hexlify(data_raw)
-        position = int(data[14:16], 16)  # hex to dec
-        ser.close()
-        print('Position', position, ' is grasp closed? ', position > 215)
-        return position > 215  # 230 is closed
-
-        # Note: Original
-        # state_data = self.get_state()
-        # tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        # return tool_analog_input2 > 0.26
-
-    # Primitives ----------------------------------------------------------
-    # TODO probably need to change bin and home positions
-    def throw(self):
-        self.close_gripper()
-        start_position = ['p', 0.350, 0.000, 0.250]
-        start_axisangle = [2.12, -2.21, -0.009]
-
-        start_pose = np.concatenate((start_position, start_axisangle))
-        curled_config_deg = ['j', -196, -107, 126, -90, -90, -12]
-        curled_config = np.deg2rad(curled_config_deg)
-
-        # curr_joint_pose = self.parse_tcp_state_data(self.tcp_socket,
-        # 'joint_data')
-        # print('joints', curr_joint_pose)
-
-        # end_position = [0.600, 0.000, 0.450]
-        # end_axisangle = [2.55, -2.06, 0.80]
-        end_position = ['p', 0.597, 0.000, 0.550]
-        end_axisangle = [2.18, -2.35, 2.21]
-        end_pose = np.concatenate((end_position, end_axisangle))
-
-        r = min(abs(end_position[0] - start_position[0])/2 - 0.01, 0.2)
-        print(r)
-        middle_position = np.array(end_position) - np.array([0.020, 0, -0.020])
-        middle_pose = np.concatenate((middle_position, end_axisangle))
-
-        blend_radius = 0.100
-
-        K = 1.   # 28.
-
-        gripper = Robotiq_Two_Finger_Gripper(self.r)
-
-        # NOTE: important
-        throw_pose_list = [start_pose, middle_pose,
-                           "open", end_pose, start_pose]
-
-        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
-        self.r.throw_primitive(throw_pose_list, wait=True)
-        # self.r.throw_primitive(["open"], wait=False)
-
-        """ this stops between points
-        print('throw acc will be', self.joint_acc * 1)  # 4)
-        print('throw vel will be', self.joint_vel * 1)  # 0)
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
-        self.move_joints(curled_config)
-        self.move_to(end_position, end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.5)  # last # is blend radius
-        # gripper.open_gripper()
-        self.move_to(np.array(end_position) - np.array((0.020, 0, -0.020)), end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.1)  # last # is blend radius
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        """
-
-        '''
-        tcp_command = "def throw_traj():\n"
-        # start
-        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-        # (start_position[0], start_position[1], start_position[2],
-        # start_axisangle[0], start_axisangle[1], start_axisangle[2],
-        # self.joint_acc * K, self.joint_vel * K, blend_radius)
-        # # curl
-        tcp_command += " movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (curled_config[0], curled_config[1], curled_config[2],
-             curled_config[3], curled_config[4], curled_config[5],
-             self.joint_acc * K, self.joint_vel * K, 0)
-        # unwind
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (end_position[0], end_position[1], end_position[2],
-             end_axisangle[0], end_axisangle[1], end_axisangle[2],
-             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.5)
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-            (end_position[0] - 0.020, end_position[1], end_position[2]+0.030,
-             end_axisangle[0], end_axisangle[1], end_axisangle[2],
-             self.joint_acc * K, self.joint_vel * K, blend_radius * 0.3)
-        # go home
-        tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.0)\n" % \
-            (start_position[0], start_position[1], start_position[2],
-             start_axisangle[0], start_axisangle[1], start_axisangle[2],
-             self.joint_acc * K * 0.1, self.joint_vel * K * 0.1)
-        tcp_command += "end\n"
-        self.tcp_socket.send(str.encode(tcp_command))
-        self.tcp_socket.close()
-        '''
-
-        # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
-        # time.sleep(1.25)
-        # self.open_gripper()
-        # time.sleep(2)
-
-        # Pre-compute blend radius
-        # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
-        # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
-        # (position[0], position[1], bin_position[2],
-        # tool_orientation[0], tool_orientation[1], 0.0,
-        # self.joint_acc, self.joint_vel, blend_radius)
 
     def grasp_object(self, position, orientation):
         # throttle z position
@@ -768,36 +451,3 @@ def restart_real(self):
         tool_analog_input2 = new_tool_analog_input2
 '''
 
-# def place(self, position, orientation, workspace_limits):
-#     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
-
-#     # Attempt placing
-#     position[2] = max(position[2], workspace_limits[2][0])
-#     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-#     self.move_to([position[0], position[1], position[2] + 0.05], orientation)
-#     self.tool_acc = 1 # 0.05
-#     self.tool_vel = 0.02 # 0.02
-#     self.move_to([position[0], position[1], position[2]], orientation)
-#     self.open_gripper()
-#     self.tool_acc = 1 # 0.5
-#     self.tool_vel = 0.2 # 0.2
-#     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-#     self.close_gripper()
-#     self.go_home()
-
-# def place(self, position, heightmap_rotation_angle, workspace_limits):
-#     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
-
-#     if self.is_sim:
-
-#         # Approach place target
-#         self.move_to(position, None)
-
-#         # Ensure gripper is open
-#         self.open_gripper()
-
-#         # Move gripper to location above place target
-#         self.move_to(location_above_place_target, None)
-
-#         place_success = True
-#         return place_success
