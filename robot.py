@@ -1132,45 +1132,33 @@ class Robot(object):
     #TODO(hkwon214): write function to check if tower toppled
 
     #TODO(hkwon214): function might only work when there are four blocks -> improve
-    def check_stack(self, object_color_sequence):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06):
         """
         Input: vector length of 1, 2, or 3
         Example: goal = [0] or [0,1] or [0,1,3]
 
         """
-
-        sequence_length = len(object_color_sequence)
-        partial_success_list = []
-
-        for idx in range(sequence_length):
+        checks = len(object_color_sequence) - 1
+        if checks <= 0:
+            return True
+        pos = np.asarray(self.get_obj_positions())
+        # print('bottom: ' + str(object_color_sequence[:-1]))
+        # print('top: ' + str(object_color_sequence[1:]))
+        for idx in range(checks):
             partial_stack_success = False
-            object_positions_use = np.asarray(self.get_obj_positions())
-            object_positions = np.asarray(self.get_obj_positions())
-            object_positions = object_positions[:,2]
-
-            grasped_object_ind = np.argsort(object_positions)[idx]
-
-            placed_position = object_positions_use[grasped_object_ind]
-            # print(grasped_object_ind )
-            # print('placed_position ' + str(placed_position))
-
-            object_positions_use1 = np.asarray(self.get_obj_positions())
-            object_color_index = object_color_sequence[idx]
-            target_position = object_positions_use1[object_color_index ]
-            # print(goal[goal_idx])
-            # print('goal position: ' + str(goal_position))
-
-            dist = np.linalg.norm(np.array(target_position[0:2]) - np.array(placed_position[0:2]))
-            print('distance: ' + str(dist))
-
-            threshold = 0.001
-
-            if dist < threshold:
-                partial_stack_success = True
-            partial_success_list.append(partial_stack_success)
-            print(partial_success_list)
-        stack_success = np.all(partial_success_list)
-        return stack_success
+            bottom_pos = pos[object_color_sequence[idx]]
+            top_pos = pos[object_color_sequence[idx+1]]
+            # Check that Z is higher by at least half the distance threshold
+            if top_pos[2] < (bottom_pos[2] + distance_threshold/2.0):
+                # print('not high enough')
+                return False
+            # Check that the blocks are near each other
+            dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
+            # print('distance: ' + str(dist))
+            if dist > distance_threshold:
+                # print('too far apart')
+                return False
+        return True
 
 
     def restart_real(self):

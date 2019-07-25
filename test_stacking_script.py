@@ -59,19 +59,21 @@ stacksequence = StackSequence(num_obj, is_goal_conditioned_task=True)
 
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
+blocks_to_move = num_obj - 1
 
-for i in range(num_obj - 1):
+for i in range(blocks_to_move):
     print('----------------------------------------------')
     stacksequence.next()
     stack_goal = stacksequence.current_sequence_progress()
+    block_to_move = stack_goal[-1]
     print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
     block_positions = robot.get_obj_positions_and_orientations()[0]
-    primitive_position = block_positions[stack_goal[-1]]
-    robot.grasp(primitive_position, best_rotation_angle)
+    primitive_position = block_positions[block_to_move]
+    robot.grasp(primitive_position, best_rotation_angle, object_color=block_to_move)
     block_positions = robot.get_obj_positions_and_orientations()[0]
-    primitive_position = block_positions[stack_goal[-2]]
+    base_block_to_place = stack_goal[-2]
+    primitive_position = block_positions[base_block_to_place]
     place = robot.place(primitive_position, best_rotation_angle)
     print('place ' + str(i) + ' : ' + str(place))
-    if i > 0:
-        stack_success = robot.check_stack(stack_goal)
-        print('stack success: ' + str(stack_success))
+    stack_success = robot.check_stack(stack_goal)
+    print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
