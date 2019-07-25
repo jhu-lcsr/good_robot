@@ -31,17 +31,17 @@ class URcomm(object):
         self.moveto_limits = (
             [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
 
-        # Tool pose tolerance for blocking calls
-        self.tool_pose_tolerance = [0.002, 0.002, 0.002, 0.01, 0.01, 0.01]
+        # Tool pose tolerance for blocking calls (meters)
+        self.pose_tolerance = [0.002, 0.002, 0.002, 0.010, 0.010, 0.010]
+
         self.socket_name = "gripper_socket"
 
-        # Joint tolerance for blocking calls
-        self.joint_tolerance = 0.01
 
         self.socket_open_str = '\tsocket_open("127.0.0.1", 63352, "gripper_socket")\n'
         self.socket_close_str = '\tsocket_close("gripper_socket")\n'
 
         self.max_float_length = 6  # according to python-urx lib, UR may have max float length
+
 
     # -- Gripper commands
 
@@ -286,6 +286,34 @@ class URcomm(object):
         # (position[0], position[1], bin_position[2],
         # tool_orientation[0], tool_orientation[1], 0.0,
         # self.joint_acc, self.joint_vel, blend_radius)
+    def is_running(self):
+        """
+        Return True if robot is running (not
+        necessary running a program, it might be idle)
+        """
+        return self.secmon.running
+
+    def _wait_for_move(self, target, threshold=None):
+        """ 
+        wait for a move to complete. Unfortunately there is no good way to know when a move has finished
+        so for every received data from robot we compute a dist equivalent and when it is lower than
+        'threshold' we return.
+        if threshold is not reached within timeout, an exception is raised
+        """
+        self.logger.debug(
+            "Waiting for move completion using threshold %s and target %s", threshold, target)
+        if threshold is None:
+                threshold = [0.001] * 6
+            self.logger.debug("No threshold set, setting it to %s", threshold)
+        while True:
+            if not self.is_running():
+                raise RobotException("Robot stopped")
+            actual_pose = self.get_state('cartesian_info')
+            if all([np.abs( actual_pose[j] - target[j]) < self.pose_tolerance[j] for j in range(6)]):
+                self.logger.debug(
+                        "We are threshold(%s) close to target, move has ended", threshold)
+                return
+
 
     '''
     def _wait_for_move(self, target, threshold=None, timeout=5, joints=False):
@@ -321,6 +349,9 @@ class URcomm(object):
                         timeout, dist, threshold, target, URRobot.getl(self)))
             else:
                 count = 0
+    '''
+
+
 
     def _get_dist(self, target, joints=False):
         if joints:
@@ -343,4 +374,3 @@ class URcomm(object):
         dist = 0
         for i in range(6):
             dist += (target[i] - joints[i]) ** 2
-    '''
