@@ -1100,10 +1100,10 @@ class Robot(object):
             self.move_to(location_above_place_target, None)
 
             #TODO(hkwon214): check successful place
-            
+
             #TODO(hkwon214): double check block height
             block_height = 0.08599236369132997
-            
+
             object_positions = np.asarray(self.get_obj_positions())
             object_positions = object_positions[:,2]
             grasped_object_ind, grasped_object_handle = self.get_highest_object_list_index_and_handle()
@@ -1127,10 +1127,10 @@ class Robot(object):
     def check_stack(self, object_color_sequence):
         """
         Input: vector length of 1, 2, or 3
-        Example: goal = [0] or [0,1] or [0,1,3] 
+        Example: goal = [0] or [0,1] or [0,1,3]
 
-        """ 
-        
+        """
+
         sequence_length = len(object_color_sequence)
         partial_success_list = []
 
@@ -1145,7 +1145,7 @@ class Robot(object):
             placed_position = object_positions_use[grasped_object_ind]
             # print(grasped_object_ind )
             # print('placed_position ' + str(placed_position))
-            
+
             object_positions_use1 = np.asarray(self.get_obj_positions())
             object_color_index = object_color_sequence[idx]
             target_position = object_positions_use1[object_color_index ]
