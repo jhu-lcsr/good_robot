@@ -1129,13 +1129,16 @@ class Robot(object):
 
 #         # TODO(hkwon214): Add place function for real robot
 
-    #TODO(hkwon214): write function to check if tower toppled
-
-    #TODO(hkwon214): function might only work when there are four blocks -> improve
     def check_stack(self, object_color_sequence, distance_threshold=0.06):
-        """
+        """ Check for a complete stack in the correct order
+
         Input: vector length of 1, 2, or 3
         Example: goal = [0] or [0,1] or [0,1,3]
+
+        # Arguments
+
+        object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
 
         """
         checks = len(object_color_sequence) - 1
@@ -1157,6 +1160,7 @@ class Robot(object):
             if dist > distance_threshold:
                 # print('too far apart')
                 return False
+        # TODO(ahundt) add check_stack for real robot
         return True
 
 
