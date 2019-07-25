@@ -57,34 +57,21 @@ robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
               place=True, grasp_color_task=True)
 stacksequence = StackSequence(num_obj, is_goal_conditioned_task=True)
 
-print('stack sequence: ' + str(stacksequence.object_color_sequence))
-block = robot.get_obj_positions_and_orientations()
-primitive_position = block[0][stacksequence.object_color_sequence[0]]
+print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 
-primitive_position1 = block[0][stacksequence.object_color_sequence[1]]
-primitive_position2 = block[0][stacksequence.object_color_sequence[2]]
-primitive_position3 = block[0][stacksequence.object_color_sequence[3]]
-
-robot.grasp(primitive_position, best_rotation_angle)
-place0 = robot.place(primitive_position1, best_rotation_angle)
-block1 = robot.get_obj_positions_and_orientations()
-print('place0 '+ str(place0))
-
-robot.grasp(primitive_position2, best_rotation_angle)
-block1 = robot.get_obj_positions_and_orientations()
-place1 = robot.place(block1[0][0], best_rotation_angle)
-print('place1 '+ str(place1))
-
-robot.grasp(primitive_position3, best_rotation_angle)
-place2 = robot.place(block1[0][0], best_rotation_angle)
-print('place2 '+ str(place2))
-
-
-#stack_goal = stacksequence.object_color_sequence_func()
-stack_goal = [3,0,2]
-print('stack_goal: ' + str(stack_goal))
-
-stack_success = robot.check_stack(stack_goal)
-print('stack '+ str(stack_success))
-
+for i in range(num_obj - 1):
+    print('----------------------------------------------')
+    stacksequence.next()
+    stack_goal = stacksequence.current_sequence_progress()
+    print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
+    block_positions = robot.get_obj_positions_and_orientations()[0]
+    primitive_position = block_positions[stack_goal[-1]]
+    robot.grasp(primitive_position, best_rotation_angle)
+    block_positions = robot.get_obj_positions_and_orientations()[0]
+    primitive_position = block_positions[stack_goal[-2]]
+    place = robot.place(primitive_position, best_rotation_angle)
+    print('place ' + str(i) + ' : ' + str(place))
+    if i > 0:
+        stack_success = robot.check_stack(stack_goal)
+        print('stack success: ' + str(stack_success))
