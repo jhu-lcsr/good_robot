@@ -1108,7 +1108,6 @@ class Robot(object):
             self.move_to(location_above_place_target, None)
 
             #TODO(hkwon214): check successful place
-
             #TODO(hkwon214): double check block height
             block_height = 0.08599236369132997
 
@@ -1126,8 +1125,9 @@ class Robot(object):
             else:
                 place_success = False
             return place_success
-
-#         # TODO(hkwon214): Add place function for real robot
+        else:
+            raise NotImplementedError('place not yet implemented for the real robot')
+            # TODO(hkwon214): Add place function for real robot
 
     def check_stack(self, object_color_sequence, distance_threshold=0.06):
         """ Check for a complete stack in the correct order from bottom to top.
