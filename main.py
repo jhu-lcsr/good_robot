@@ -173,7 +173,8 @@ def main(args):
                           'push_success' : False,
                           'grasp_success' : False,
                           'color_success' : False,
-                          'place_success' : False}
+                          'place_success' : False,
+                          'partial_stack_success': False}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task)
@@ -181,13 +182,18 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+        action_count = 0
         grasp_count = 0
         successful_grasp_count = 0
         successful_color_grasp_count = 0
         place_count = 0
+        # short stacks of blocks
+        partial_stack_count = 0
+        # all the blocks stacked
+        stack_count = 0
         while True:
             if nonlocal_variables['executing_action']:
-
+                action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
                 best_push_conf = np.max(push_predictions)
                 best_grasp_conf = np.max(grasp_predictions)
@@ -319,13 +325,33 @@ def main(args):
                         if grasp_color_task:
                             if nonlocal_variables['grasp_color_success']:
                                 successful_color_grasp_count += 1
-                            robot.reposition_objects()
+                            if not place:
+                                # reposition the objects if we aren't also attempting to place correctly.
+                                robot.reposition_objects()
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, grasp_rate, color_grasp_rate))
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
+                    current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+                    if nonlocal_variables['place_success']:
+                        nonlocal_variables['partial_stack_success'] = robot.check_stack(current_stack_goal)
+                        if nonlocal_variables['partial_stack_success']:
+                            partial_stack_count += 1
+                            partial_stack_rate = float(action_count)/float(partial_stack_count)
+                            print('actions per partial stack (lower is better): ' + str(partial_stack_rate))
+                            nonlocal_variables['stack'].next()
+                            next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+                            if len(next_stack_goal) < len(current_stack_goal):
+                                nonlocal_variables['stack_success'] = True
+                                stack_count += 1
+                                stack_rate = float(action_count)/float(stack_count)
+                                print('actions per full stack (lower is better): ' + str(stack_rate))
+                                # full stack complete! reset the scene
+                                robot.reposition_objects()
+                    # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
