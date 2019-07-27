@@ -161,10 +161,10 @@ class pixel_net(nn.Module):
 
         if self.use_vector_block:
             channels_out = 2048
-            self.grasp_vector_block('grasp', goal_condition_len, channels_out=channels_out)
-            self.push_vector_block('push', goal_condition_len, channels_out=channels_out)
+            self.push_vector_block = vector_block('push', goal_condition_len, channels_out=channels_out)
+            self.grasp_vector_block = vector_block('grasp', goal_condition_len, channels_out=channels_out)
             if place:
-                self.place_vector_block('place', goal_condition_len, channels_out=channels_out)
+                self.place_vector_block = vector_block('place', goal_condition_len, channels_out=channels_out)
             # TODO(ahundt) this variable overwrite is confusing, write the code better
             goal_condition_len = channels_out
 
