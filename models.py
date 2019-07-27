@@ -66,10 +66,10 @@ def trunk_net(name='', fc_channels=2048, goal_condition_len=0, channels_out=3):
 
 def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
     return nn.Sequential(OrderedDict([
-            (name + '-vectorblock-lin0', nn.Linear(channels_in, fc_channels)),
+            (name + '-vectorblock-lin0', nn.Linear(channels_in, fc_channels, bias=False)),
             (name + '-vectorblock-norm0', nn.BatchNorm2d(fc_channels)),
             (name + '-vectorblock-relu0', nn.ReLU(inplace=True)),
-            (name + '-vectorblock-lin1', nn.Linear(fc_channels, channels_out, kernel_size=1, stride=1, bias=False))
+            (name + '-vectorblock-lin1', nn.Linear(fc_channels, channels_out, bias=False))
             (name + '-vectorblock-norm1', nn.BatchNorm2d(channels_out)),
             (name + '-vectorblock-relu1', nn.ReLU(inplace=True)),
             # ('push-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
