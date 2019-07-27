@@ -69,10 +69,9 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             (name + '-vectorblock-lin0', nn.Linear(channels_in, fc_channels, bias=False)),
             (name + '-vectorblock-relu0', nn.ReLU(inplace=True)),
             (name + '-vectorblock-norm0', nn.BatchNorm1d(fc_channels)),
-            (name + '-vectorblock-lin1', nn.Linear(fc_channels, channels_out, bias=False))
+            (name + '-vectorblock-lin1', nn.Linear(fc_channels, channels_out, bias=False)),
             (name + '-vectorblock-relu1', nn.ReLU(inplace=True)),
-            (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out)),
-            # ('push-upsample2', nn.Upsample(scale_factor=4, mode='bilinear'))
+            (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
 
