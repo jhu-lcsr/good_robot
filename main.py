@@ -518,13 +518,8 @@ def main(args):
                         goal_condition = None
                         sample_color_success = None
 
-                    if place:
-                        sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
-                            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
-                    else:
-                        sample_push_predictions, sample_grasp_predictions, sample_state_feat = trainer.forward(
-                            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
-                        sample_place_predictions = None
+                    sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
+                        sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
                     # Load next sample RGB-D heightmap
                     next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
