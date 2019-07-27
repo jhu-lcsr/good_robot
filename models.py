@@ -162,7 +162,7 @@ class pixel_net(nn.Module):
                 rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
                 # Compute sample grid for rotation BEFORE neural network
-                interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
+                interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
                 if self.place:
                     interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
                 else:
@@ -200,7 +200,7 @@ class pixel_net(nn.Module):
             rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
             # Compute sample grid for rotation BEFORE branches
-            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
+            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
             if self.place:
                 self.interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
             else:
