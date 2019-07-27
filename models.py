@@ -76,82 +76,6 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
-
-def layers_forward(obj, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
-    """ Reduces the repetitive forward pass code across multiple model classes. See pixel_net forward() and responsive_net forward().
-    """
-    # Compute sample grid for rotation BEFORE neural network
-    affine_mat_before = np.asarray([[np.cos(-rotate_theta), np.sin(-rotate_theta), 0],[-np.sin(-rotate_theta), np.cos(-rotate_theta), 0]])
-    affine_mat_before.shape = (2,3,1)
-    affine_mat_before = torch.from_numpy(affine_mat_before).permute(2,0,1).float()
-    if obj.use_cuda:
-        flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size())
-    else:
-        flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad), input_color_data.size())
-
-    # Rotate images clockwise
-    if obj.use_cuda:
-        rotate_color = F.grid_sample(Variable(input_color_data).cuda(), flow_grid_before, mode='nearest')
-        rotate_depth = F.grid_sample(Variable(input_depth_data).cuda(), flow_grid_before, mode='nearest')
-    else:
-        rotate_color = F.grid_sample(Variable(input_color_data), flow_grid_before, mode='nearest')
-        rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
-
-    # Compute intermediate features
-    if efficientnet_pytorch is None:
-        # densenet
-        interm_push_color_feat = obj.push_color_trunk.features(rotate_color)
-        interm_push_depth_feat = obj.push_depth_trunk.features(rotate_depth)
-        interm_grasp_color_feat = obj.grasp_color_trunk.features(rotate_color)
-        interm_grasp_depth_feat = obj.grasp_depth_trunk.features(rotate_depth)
-
-        # TODO(hkwon214): added placenet to test block testing
-        if obj.place:
-            interm_place_color_feat = obj.place_color_trunk.features(rotate_color)
-            interm_place_depth_feat = obj.place_depth_trunk.features(rotate_depth)
-    else:
-        # efficientnet
-        interm_push_color_feat = obj.push_color_trunk.extract_features(rotate_color)
-        interm_push_depth_feat = obj.push_depth_trunk.extract_features(rotate_depth)
-        interm_grasp_color_feat = obj.grasp_color_trunk.extract_features(rotate_color)
-        interm_grasp_depth_feat = obj.grasp_depth_trunk.extract_features(rotate_depth)
-
-        # TODO(hkwon214): added placenet to test block testing
-        if obj.place:
-            interm_place_color_feat = obj.place_color_trunk.extract_features(rotate_color)
-            interm_place_depth_feat = obj.place_depth_trunk.extract_features(rotate_depth)
-
-    # Combine features, including the goal condition if appropriate
-    if goal_condition is None:
-        interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
-        interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
-        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
-        interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
-        interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-        if obj.place:
-            interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
-
-    else:
-        if obj.use_vector_block:
-            push_goal_vec = tile_vector_as_image_channels_torch(obj.push_vector_block(goal_condition), interm_push_color_feat.shape)
-            grasp_goal_vec = tile_vector_as_image_channels_torch(obj.grasp_vector_block(goal_condition), interm_push_color_feat.shape)
-            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, push_goal_vec), dim=1)
-            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, grasp_goal_vec), dim=1)
-            if obj.place:
-                place_goal_vec = tile_vector_as_image_channels_torch(obj.place_vector_block(goal_condition), interm_push_color_feat.shape)
-                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, place_goal_vec), dim=1)
-
-        else:
-            if tiled_goal_condition is None:
-                # This is part of a big for loop, but tiling only needs to be done once.
-                # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
-                tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
-            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
-            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
-            if obj.place:
-                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
-    return interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition
-
 class pixel_net(nn.Module):
 
     def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=True): # , snapshot=None
@@ -302,3 +226,79 @@ class pixel_net(nn.Module):
                                      nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
 
             return self.output_prob, self.interm_feat
+
+    def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
+        """ Reduces the repetitive forward pass code across multiple model classes. See pixel_net forward() and responsive_net forward().
+        """
+        interm_place_feat = None
+        # Compute sample grid for rotation BEFORE neural network
+        affine_mat_before = np.asarray([[np.cos(-rotate_theta), np.sin(-rotate_theta), 0],[-np.sin(-rotate_theta), np.cos(-rotate_theta), 0]])
+        affine_mat_before.shape = (2,3,1)
+        affine_mat_before = torch.from_numpy(affine_mat_before).permute(2,0,1).float()
+        if self.use_cuda:
+            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size())
+        else:
+            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad), input_color_data.size())
+
+        # Rotate images clockwise
+        if self.use_cuda:
+            rotate_color = F.grid_sample(Variable(input_color_data).cuda(), flow_grid_before, mode='nearest')
+            rotate_depth = F.grid_sample(Variable(input_depth_data).cuda(), flow_grid_before, mode='nearest')
+        else:
+            rotate_color = F.grid_sample(Variable(input_color_data), flow_grid_before, mode='nearest')
+            rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
+
+        # Compute intermediate features
+        if efficientnet_pytorch is None:
+            # densenet
+            interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+            interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+            interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+            interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+
+            # TODO(hkwon214): added placenet to test block testing
+            if self.place:
+                interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+        else:
+            # efficientnet
+            interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
+            interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
+            interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
+            interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+
+            # TODO(hkwon214): added placenet to test block testing
+            if self.place:
+                interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
+                interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
+
+        # Combine features, including the goal condition if appropriate
+        if goal_condition is None:
+            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
+            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
+            if self.place:
+                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
+                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+
+        else:
+            if self.use_vector_block:
+                push_goal_vec = tile_vector_as_image_channels_torch(self.push_vector_block(goal_condition), interm_push_color_feat.shape)
+                grasp_goal_vec = tile_vector_as_image_channels_torch(self.grasp_vector_block(goal_condition), interm_push_color_feat.shape)
+                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, push_goal_vec), dim=1)
+                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, grasp_goal_vec), dim=1)
+                if self.place:
+                    place_goal_vec = tile_vector_as_image_channels_torch(self.place_vector_block(goal_condition), interm_push_color_feat.shape)
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, place_goal_vec), dim=1)
+
+            else:
+                if tiled_goal_condition is None:
+                    # This is part of a big for loop, but tiling only needs to be done once.
+                    # Sorry that this code is a bit confusing, but we need the shape of the output of interm_*_color_feat
+                    tiled_goal_condition = tile_vector_as_image_channels_torch(goal_condition, interm_push_color_feat.shape)
+                interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat, tiled_goal_condition), dim=1)
+                interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat, tiled_goal_condition), dim=1)
+                if self.place:
+                    interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
+        return interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition
