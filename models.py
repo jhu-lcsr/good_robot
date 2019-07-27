@@ -289,7 +289,7 @@ class pixel_net(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
             else:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
-            print('goal_condition: ' + str(goal_condition))
+            # print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
             # TODO(hkwon214): added placenet to test block testing
             if self.place:
