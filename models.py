@@ -68,10 +68,12 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
     return nn.Sequential(OrderedDict([
             (name + '-vectorblock-lin0', nn.Linear(channels_in, fc_channels, bias=False)),
             (name + '-vectorblock-relu0', nn.ReLU(inplace=True)),
-            (name + '-vectorblock-norm0', nn.BatchNorm1d(fc_channels)),
+            # TODO(ahundt) re-enable batchnorm https://github.com/pytorch/pytorch/issues/4534
+            # (name + '-vectorblock-norm0', nn.BatchNorm1d(fc_channels)),
             (name + '-vectorblock-lin1', nn.Linear(fc_channels, channels_out, bias=False)),
             (name + '-vectorblock-relu1', nn.ReLU(inplace=True)),
-            (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
+            # TODO(ahundt) re-enable batchnorm https://github.com/pytorch/pytorch/issues/4534
+            # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
 
@@ -224,7 +226,7 @@ class pixel_net(nn.Module):
                 goal_condition = torch.tensor(goal_condition).float().cuda()
             else:
                 goal_condition = torch.tensor(goal_condition).float()
-            tiled_goal_condition = None
+        tiled_goal_condition = None
 
         if is_volatile:
             torch.set_grad_enabled(False)
@@ -236,7 +238,7 @@ class pixel_net(nn.Module):
                 rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
                 # Compute sample grid for rotation BEFORE neural network
-                interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition)
+                interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
                 if self.place:
                     interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
                 else:
