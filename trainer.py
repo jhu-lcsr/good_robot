@@ -286,7 +286,9 @@ class Trainer(object):
                 future_reward = 0
             else:
                 next_push_predictions, next_grasp_predictions, next_place_predictions, next_state_feat = self.forward(next_color_heightmap, next_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
-                future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions), np.max(next_place_predictions))
+                future_reward = max(np.max(next_push_predictions), np.max(next_grasp_predictions))
+                if self.place:
+                    future_reward = max(future_reward, np.max(next_place_predictions))
 
                 # # Experiment: use Q differences
                 # push_predictions_difference = next_push_predictions - prev_push_predictions
