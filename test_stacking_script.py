@@ -50,30 +50,50 @@ test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases e
 
 # Set random seed
 np.random.seed(random_seed)
+# Do we care about color? Switch to
+# True to run a color order stacking test,
+# False tests stacking order does not matter.
+grasp_color_task = False
+# are we doing a stack even if we don't care about colors
+place_task = True
 
 robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               is_testing, test_preset_cases, test_preset_file,
-              place=True, grasp_color_task=True)
-stacksequence = StackSequence(num_obj, is_goal_conditioned_task=True)
+              place=place_task, grasp_color_task=grasp_color_task)
+stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task or place_task)
 
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
+num_stacks = 10
 
-for i in range(blocks_to_move):
-    print('----------------------------------------------')
+for stack in range(num_stacks):
+    print('++++++++++++++++++++++++++++++++++++++++++++++++++')
+    print('+++++++ Making New Stack                  ++++++++')
+    print('++++++++++++++++++++++++++++++++++++++++++++++++++')
+    for i in range(blocks_to_move):
+        print('----------------------------------------------')
+        stacksequence.next()
+        stack_goal = stacksequence.current_sequence_progress()
+        block_to_move = stack_goal[-1]
+        print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
+        block_positions = robot.get_obj_positions_and_orientations()[0]
+        primitive_position = block_positions[block_to_move]
+        robot.grasp(primitive_position, best_rotation_angle, object_color=block_to_move)
+        block_positions = robot.get_obj_positions_and_orientations()[0]
+        base_block_to_place = stack_goal[-2]
+        primitive_position = block_positions[base_block_to_place]
+        place = robot.place(primitive_position, best_rotation_angle)
+        print('place ' + str(i) + ' : ' + str(place))
+        # check if we don't care about color
+        if not grasp_color_task:
+            # Deliberately change the goal stack order to test the non-ordered check
+            stack_goal = np.random.permutation(stack_goal)
+            print('fake stack goal to test any stack order: ' + str(stack_goal))
+        stack_success = robot.check_stack(stack_goal)
+        print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
+    # reset scene
+    robot.reposition_objects()
+    # determine first block to grasp
     stacksequence.next()
-    stack_goal = stacksequence.current_sequence_progress()
-    block_to_move = stack_goal[-1]
-    print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
-    block_positions = robot.get_obj_positions_and_orientations()[0]
-    primitive_position = block_positions[block_to_move]
-    robot.grasp(primitive_position, best_rotation_angle, object_color=block_to_move)
-    block_positions = robot.get_obj_positions_and_orientations()[0]
-    base_block_to_place = stack_goal[-2]
-    primitive_position = block_positions[base_block_to_place]
-    place = robot.place(primitive_position, best_rotation_angle)
-    print('place ' + str(i) + ' : ' + str(place))
-    stack_success = robot.check_stack(stack_goal)
-    print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))

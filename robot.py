@@ -1149,6 +1149,30 @@ class Robot(object):
         if checks <= 0:
             return True
         pos = np.asarray(self.get_obj_positions())
+        if not self.grasp_color_task:
+            # Automatically determine the color order.
+            # We don't worry about the colors, just the length of the sequence.
+            # This should even handle 2 stacks of 2 blocks after a single place success
+            # TODO(ahundt) See if there are any special failure cases common enough to warrant more code improvements
+            num_obj = len(object_color_sequence)
+            object_z_positions = np.array(pos[:,2])
+            # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
+            # object indices sorted highest to lowest
+            low2high_idx = object_z_positions.argsort()
+            high_idx = low2high_idx[-1]
+            low2high_pos = pos[low2high_idx,:]
+            # filter objects closest to the highest block in x, y based on the threshold
+            nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
+            # take num_obj that are close enough from bottom to top
+            # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
+            object_color_sequence = low2high_idx[nearby_obj]
+            if len(object_color_sequence) < num_obj:
+                # there aren't enough nearby objects for a successful stack!
+                return False
+            # cut out objects we don't need to check
+            object_color_sequence = object_color_sequence[:num_obj+1]
+            # print('auto object_color_sequence: ' + str(object_color_sequence))
+
         # print('bottom: ' + str(object_color_sequence[:-1]))
         # print('top: ' + str(object_color_sequence[1:]))
         for idx in range(checks):
