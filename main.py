@@ -499,7 +499,7 @@ def main(args):
                     elif method == 'reinforcement':
                         sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
                     sorted_surprise_ind = np.argsort(sample_surprise_values[:,0])
-                    sorted_sample_ind = sample_ind[sorted_surprise_ind,0]
+                    sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
                     pow_law_exp = 2
                     rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
                     sample_iteration = sorted_sample_ind[rand_sample_ind]
@@ -514,8 +514,10 @@ def main(args):
                     # Compute forward pass with sample
                     if nonlocal_variables['stack'].is_goal_conditioned_task:
                         goal_condition = [trainer.goal_condition_log[sample_iteration]]
+                        next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
                     else:
                         goal_condition = None
+                        next_goal_condition = None
                         sample_color_success = None
 
                     sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
@@ -526,14 +528,12 @@ def main(args):
                     next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
                     next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
                     next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
-
+                    # TODO(ahundt) TODO(hkwon14) Fix success checks to be performed correctly for all mode combinations of grasping, color grasping, and stacking, rewards must match get_label_value() in trainer.py, prefereably in an easy to use way.
+                    # TODO(ahundt) TODO(hkwon14) tune sample_reward_value?
                     sample_push_success = sample_reward_value == 0.5
-                    #TODO HK: tune sample_reward_value?
                     sample_grasp_success = sample_reward_value == 0.5
-                    #TODO HK
                     sample_change_detected = sample_push_success
                     if goal_condition is not None:
-                        goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
                         sample_color_success = sample_reward_value == 1
                     # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
                     new_sample_label_value, _ = trainer.get_label_value(
