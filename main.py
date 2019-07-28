@@ -177,7 +177,7 @@ def main(args):
                           'partial_stack_success': False}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task)
+    nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
 
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
