@@ -594,9 +594,19 @@ def main(args):
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
+                # TODO(ahundt) add color stacking step, make sure code works with "if place:" statement below
         else:
             prev_color_success = None
 
+        if place and nonlocal_variables['place_success']:
+            prev_stack_goal = prev_stack.current_sequence_progress()
+            nonlocal_variables['stack'].next()
+            stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+            # TODO(ahundt) add stack success check here or in the appropriate spot in the code
+            if len(prev_stack_goal) > len(stack_goal):
+                # full stack is complete. Reset.
+                # TODO(ahundt) handle failure cases like stack falling over and consider giving a big reward if the full height stacking check passes.
+                robot.reposition_objects()
 
         trainer.iteration += 1
         iteration_time_1 = time.time()
