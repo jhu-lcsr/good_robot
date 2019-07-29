@@ -131,9 +131,11 @@ class URcomm(object):
 
     def send_program(self, prog, is_sim=False):
         # mostly adding a printout for ease of debugging
-        self.logger.info("Sending program: " + prog)
         if not is_sim:
+            self.logger.info("Sending program: " + prog)
             self.secmon.send_program(prog)
+        else:
+            self.logger.info("SIM. Would have sent program: " + prog)
 
     # -- Utils
 
@@ -209,7 +211,7 @@ class URcomm(object):
                     {type: open}]
         """
         prog = "def combo_move():\n"
-        prog += self.socket_close_str
+        # prog += self.socket_close_str
         prog += self.socket_open_str
 
         for idx, a_move in enumerate(moves_list):
@@ -264,7 +266,7 @@ class URcomm(object):
         throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.1}
+                      'acc': acc, 'vel': vel, 'radius': 0.2}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])

@@ -8,7 +8,7 @@ from robot import Robot
 import logging
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 # User options (change me)
 # --------------- Setup options ---------------
@@ -55,6 +55,7 @@ while True:
 
     # robot.open_gripper()
     try:
+        robot.r.open_gripper()
         prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
         if str(prompt1) == 'y':
             time.sleep(0.01)
@@ -67,6 +68,7 @@ while True:
             print('!----Throw started')
             robot.r.throw(is_sim=False)
             print('!----Throw completed')
+            time.sleep(2)
 
         # # robot.push(push_position, 0, workspace_limits)
         # # robot.restart_real()
