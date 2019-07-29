@@ -419,7 +419,7 @@ def main(args):
         if not exit_called:
 
             # Run forward pass with network to get affordances
-            if nonlocal_variables['stack'].is_goal_conditioned_task:
+            if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
             else:
                 goal_condition = None
@@ -461,7 +461,7 @@ def main(args):
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
-            if nonlocal_variables['stack'].is_goal_conditioned_task:
+            if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
 
@@ -512,7 +512,7 @@ def main(args):
                     sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
                     # Compute forward pass with sample
-                    if nonlocal_variables['stack'].is_goal_conditioned_task:
+                    if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                         goal_condition = [trainer.goal_condition_log[sample_iteration]]
                         next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
                     else:
