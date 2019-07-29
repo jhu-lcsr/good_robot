@@ -129,10 +129,11 @@ class URcomm(object):
                            get_cartesian_info, 'tool_data': get_tool_data}
         return parse_functions[subpackage]()  # cute trick
 
-    def send_program(self, prog):
+    def send_program(self, prog, is_sim=False):
         # mostly adding a printout for ease of debugging
         self.logger.info("Sending program: " + prog)
-        self.secmon.send_program(prog)
+        if not is_sim:
+            self.secmon.send_program(prog)
 
     # -- Utils
 
@@ -201,7 +202,7 @@ class URcomm(object):
         self.logger.debug("Going home.")
         self.move_joints(self.home_joint_config)
 
-    def combo_move(self, moves_list, wait=True):
+    def combo_move(self, moves_list, wait=True, is_sim=False):
         """
         Example use:
         pose_list = [ {type:p, vel:0.1, acc:0.1, radius:0.2}, 
@@ -235,7 +236,7 @@ class URcomm(object):
                     prog += self._format_move(
                         'movej', a_move['pose'], acc, vel, radius, prefix="p") + "\n"
         prog += "end\n"
-        self.send_program(prog)
+        self.send_program(prog, is_sim=is_sim)
 
         if wait:
             self._wait_for_move(target=moves_list[-1]['pose'],
@@ -266,11 +267,11 @@ class URcomm(object):
                       'acc': acc, 'vel': vel, 'radius': 0.1}
 
         home_position = np.array(start_position) + \
-            np.array([0, 0, 0.100, 0, 0, 0])
+            np.array([0, 0, 0.070, 0, 0, 0])
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': acc/3., 'vel': vel/3., 'radius': 0.01}
+                     'acc': acc/2.5, 'vel': vel/2.5, 'radius': 0.05}
 
         gripper_open = {'type': 'open'}
         # middle_position = np.array(end_position) - \
@@ -284,7 +285,7 @@ class URcomm(object):
                            throw_move, gripper_open, home_move]
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
-        self.combo_move(throw_pose_list, wait=True)
+        self.combo_move(throw_pose_list, wait=True, is_sim=True)
 
         """ this stops between points
         print('throw acc will be', self.joint_acc * 1)  # 4)
