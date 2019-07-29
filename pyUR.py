@@ -286,6 +286,7 @@ class URcomm(object):
         # (position[0], position[1], bin_position[2],
         # tool_orientation[0], tool_orientation[1], 0.0,
         # self.joint_acc, self.joint_vel, blend_radius)
+
     def is_running(self):
         """
         Return True if robot is running (not
@@ -313,7 +314,6 @@ class URcomm(object):
                 self.logger.debug(
                         "We are threshold(%s) close to target, move has ended", threshold)
                 return
-
 
     '''
     def _wait_for_move(self, target, threshold=None, timeout=5, joints=False):
@@ -350,8 +350,6 @@ class URcomm(object):
             else:
                 count = 0
     '''
-
-
 
     def _get_dist(self, target, joints=False):
         if joints:
