@@ -201,30 +201,39 @@ class URcomm(object):
         self.logger.debug("Going home.")
         self.move_joints(self.home_joint_config)
 
-    def combo_move(self, pose_list, wait=True):
+    def combo_move(self, moves_list, wait=True):
         """
         Example use:
-        # end_position = ['p', 0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
-        # throw_pose_list = [start_pose, middle_pose, "open", end_pose]
+        pose_list = [ {type:p, vel:0.1, acc:0.1, radius:0.2}, 
+                    {type: open}]
         """
-        acc, vel, radius = 1, 1, 0.3
         prog = "def combo_move():\n"
         prog += self.socket_close_str
         prog += self.socket_open_str
-        for idx, pose in enumerate(pose_list):
+
+        for idx, a_move in enumerate(moves_list):
             if idx == (len(pose_list) - 1):
                 radius = 0.01
-            if str(pose) == 'open':
+
+            if  a_move["type"] == 'open':
                 msg = "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
-                                                                  self.socket_name)
-            else:
+                                                                  "gripper_socket")
+            else: 
+                acc, vel, radius = a_move["acc"], a_move["vel"], a_move["radius"]
+                if radius is None:
+                    radius = 0.01
+                if acc is None:
+                    acc = self.joint_acc
+                if vel is None:
+                    vel = self.joint_vel
+
                 # WARNING: this does not have safety checks!
-                if str(pose[0]) == 'j':
-                    prog += self._format_move(
-                        "movej", pose[1:], acc, vel, radius, prefix="") + "\n"
-                elif str(pose[0]) == 'p':
-                    prog += self._format_move(
-                        'movej', pose[1:], acc, vel, radius, prefix="p") + "\n"
+                if a_move["type"] == 'j':
+                        prog += self._format_move(
+                            "movej", a_move['pose'], acc, vel, radius, prefix="") + "\n"
+                elif a_move["type"] == 'p':
+                        prog += self._format_move(
+                            'movej', pose[1:], acc, vel, radius, prefix="p") + "\n"
         prog += "end\n"
         self.send_program(prog)
 
@@ -235,26 +244,37 @@ class URcomm(object):
     def throw(self):
         self.close_gripper()
         # currently hard coded positions
-        start_position = ['p', 0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
+        start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
+        start_move = {'type':'p', 
+                      'pose': start_position, 
+                      'acc': None, 'vel': None, 'radius': 0.2}
 
         curled_config_deg = [-196, -107, 126, -90, -90, -12]
         curled_config = [np.deg2rad(i) for i in curled_config_deg]
-        curled_config = ['j'] + curled_config
+        curled_move = {'type':'j', 
+                      'pose': curled_config,
+                      'acc': None, 'vel': None, 'radius': 0.2}
 
-        end_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        throw_move =  {'type':'p', 
+                      'pose': throw_position, 
+                      'acc': None, 'vel': None, 'radius': 0.2}
 
-        middle_position = np.array(end_position) - \
-            np.array([0.020, 0, -0.020, 0, 0, 0])
+        home_position = np.array(start_position) + np.array([0,0,0.070,0,0,0])
+        home_position = home_position.tolist()
+        home_move =  {'type':'p', 
+                      'pose': home_position, 
+                      'acc': self.acc/2., 'vel': self.vel/2., 'radius': 0.01}
 
-        end_position = ['p'] + end_position
-        middle_position = ['p'] + middle_position.tolist()
+        # middle_position = np.array(end_position) - \
+            # np.array([0.020, 0, -0.020, 0, 0, 0])
 
-        blend_radius = 0.100
-        K = 1.   # 28.
+        # blend_radius = 0.100
+        # K = 1.   # 28.
 
         # NOTE: important
-        throw_pose_list = [start_pose, middle_pose,
-                           "open", end_pose, start_pose]
+        throw_pose_list = [start_move, curled_move, 
+                           "open", throw_move, home_move]
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True)
