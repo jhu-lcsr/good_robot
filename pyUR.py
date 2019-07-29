@@ -213,15 +213,15 @@ class URcomm(object):
         prog += self.socket_open_str
 
         for idx, a_move in enumerate(moves_list):
-            if idx == (len(moves_list) - 1):
-                radius = 0.01
 
             if a_move["type"] == 'open':
                 prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
                                                                     self.socket_name)
             else:
                 acc, vel, radius = a_move["acc"], a_move["vel"], a_move["radius"]
-                if radius is None:
+                if idx == (len(moves_list) - 1):
+                    radius = 0.01
+                elif radius is None:
                     radius = 0.01
                 if acc is None:
                     acc = self.joint_acc
