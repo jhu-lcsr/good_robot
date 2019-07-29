@@ -314,7 +314,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    if nonlocal_variables['stack'].object_color_index is not None:
+                    if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
@@ -331,7 +331,10 @@ def main(args):
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
-                    print('Grasp Count: %r, grasp success rate: %r color success rate: %r' % (grasp_count, grasp_rate, color_grasp_rate))
+                    grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
+                    if grasp_color_task:
+                        grasp_str += ' color success rate: %r' % (color_grasp_rate)
+                    print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
