@@ -220,7 +220,7 @@ class URcomm(object):
             else:
                 acc, vel, radius = a_move["acc"], a_move["vel"], a_move["radius"]
                 if idx == (len(moves_list) - 1):
-                    radius = 0.01
+                    radius = 0.001
                 elif radius is None:
                     radius = 0.01
                 if acc is None:
@@ -241,9 +241,9 @@ class URcomm(object):
         if wait:
             self._wait_for_move(target=moves_list[-1]['pose'],
                                 threshold=self.pose_tolerance)
-            return self.getl()
+            return self.get_state('cartesian_info')
 
-    def throw(self):
+    def throw(self, is_sim=False):
         self.close_gripper()
         # currently hard coded positions
         # acc, vel = 1.4, 1.05 # Safe
@@ -285,7 +285,7 @@ class URcomm(object):
                            throw_move, gripper_open, home_move]
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
-        self.combo_move(throw_pose_list, wait=True, is_sim=True)
+        self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
         """ this stops between points
         print('throw acc will be', self.joint_acc * 1)  # 4)
