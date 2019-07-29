@@ -19,8 +19,8 @@ class URcomm(object):
         # self.host = host
         # self.csys = None
         self.logger = logging.getLogger("urx")
-
         self.logger.debug("Opening secondary monitor socket")
+
         self.secmon = ursecmon.SecondaryMonitor(host)
 
         # NOTE: this is for throw practice
@@ -36,12 +36,10 @@ class URcomm(object):
 
         self.socket_name = "gripper_socket"
 
-
         self.socket_open_str = '\tsocket_open("127.0.0.1", 63352, "gripper_socket")\n'
         self.socket_close_str = '\tsocket_close("gripper_socket")\n'
 
         self.max_float_length = 6  # according to python-urx lib, UR may have max float length
-
 
     # -- Gripper commands
 
@@ -104,7 +102,7 @@ class URcomm(object):
 
     def get_state(self, subpackage):
 
-        def get_joint_data(self, _log=True):
+        def get_joint_data(_log=True):
             jts = self.secmon.get_joint_data()
             joint_positions = [jts["q_actual0"], jts["q_actual1"],
                                jts["q_actual2"], jts["q_actual3"],
@@ -114,7 +112,7 @@ class URcomm(object):
                                   joint_positions)
             return joint_positions
 
-        def get_cartesian_info(self, _log=True):
+        def get_cartesian_info(_log=True):
             pose = self.secmon.get_cartesian_info()
             if pose:
                 pose = [pose["X"], pose["Y"], pose["Z"],
@@ -170,7 +168,7 @@ class URcomm(object):
             # t = 0, r = radius
             if orientation is None:
                 self.logger.debug(
-                    "Attempting to move position but not orientation")
+                    "Attempting to move position but keep orientation")
                 orientation = self.get_state('cartesian_info')[3:]
 
             prog += self._format_move("movel", np.concatenate((position, orientation)),
@@ -180,6 +178,9 @@ class URcomm(object):
         else:
             self.logger.debug("NOT Safe. NOT moving to: %s, due to LIMITS: %s",
                               position, self.moveto_limits)
+        if wait:
+            self._wait_for_move(np.concatenate((position, orientation)),
+                                joints=False)
 
     def move_joints(self, joint_configuration, vel=None, acc=None, wait=True):
         if vel is None:
@@ -193,9 +194,8 @@ class URcomm(object):
                                   vel=vel, acc=acc, prefix="")
         prog += "end\n"
         self.send_program(prog)
-        # if wait:
-        # self._wait_for_move(tpose[:6], threshold=threshold)
-        #     return self.getl()
+        if wait:
+            self._wait_for_move(joint_configuration, joints=True)
 
     def go_home(self):
         self.logger.debug("Going home.")
@@ -217,7 +217,7 @@ class URcomm(object):
 
             if  a_move["type"] == 'open':
                 msg = "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
-                                                                  "gripper_socket")
+                                                                  self.socket_name)
             else: 
                 acc, vel, radius = a_move["acc"], a_move["vel"], a_move["radius"]
                 if radius is None:
@@ -238,7 +238,8 @@ class URcomm(object):
         self.send_program(prog)
 
         if wait:
-            self._wait_for_move(target=pose_list[-1][1:], threshold=threshold)
+            self._wait_for_move(target=pose_list[-1][1:],
+                                threshold=self.pose_tolerance)
             return self.getl()
 
     def throw(self):
@@ -314,30 +315,41 @@ class URcomm(object):
         """
         return self.secmon.running
 
-    def _wait_for_move(self, target, threshold=None):
-        """ 
-        wait for a move to complete. Unfortunately there is no good way to know when a move has finished
-        so for every received data from robot we compute a dist equivalent and when it is lower than
-        'threshold' we return.
+    def _wait_for_move(self, target, threshold=None, joints=False):
+        """
+        Wait for a move to complete. Unfortunately there is no good way to know
+        when a move has finished so for every received data from robot we
+        compute a dist equivalent and when it is lower than 'threshold' we
+        return.
         if threshold is not reached within timeout, an exception is raised
         """
         self.logger.debug(
             "Waiting for move completion using threshold %s and target %s", threshold, target)
         if threshold is None:
-                threshold = [0.001] * 6
+            # threshold = [0.001] * 6
+            threshold = self.pose_tolerance
             self.logger.debug("No threshold set, setting it to %s", threshold)
         while True:
             if not self.is_running():
-                raise RobotException("Robot stopped")
-            actual_pose = self.get_state('cartesian_info')
-            if all([np.abs( actual_pose[j] - target[j]) < self.pose_tolerance[j] for j in range(6)]):
+                # raise RobotException("Robot stopped")
+                self.logger.exception("ROBOT STOPPED!")
+            if joints:
+                actual_pose = self.get_state('joint_data')
+            else:
+                actual_pose = self.get_state('cartesian_info')
+
+            dist = [np.abs(actual_pose[j] - target[j]) for j in range(6)]
+            self.logger.debug(
+                "distance to target is: %s, target dist is %s", dist, threshold)
+            if all([np.abs(actual_pose[j] - target[j]) < self.pose_tolerance[j] for j in range(6)]):
                 self.logger.debug(
-                        "We are threshold(%s) close to target, move has ended", threshold)
+                    "We are threshold(%s) close to target, move has ended", threshold)
                 return
 
     '''
+
     def _wait_for_move(self, target, threshold=None, timeout=5, joints=False):
-        """ 
+        """
         wait for a move to complete. Unfortunately there is no good way to know when a move has finished
         so for every received data from robot we compute a dist equivalent and when it is lower than
         'threshold' we return.
