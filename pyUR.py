@@ -250,7 +250,8 @@ class URcomm(object):
                 if radius is None:
                     radius = 0.01
                 if acc is None:
-                    acc = self.joint_acc
+                    # acc = self.joint_acc
+                    acc = 2.5
                 if vel is None:
                     vel = self.joint_vel
                 if idx == (len(moves_list) - 1):
@@ -300,16 +301,17 @@ class URcomm(object):
 
         # throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
         # throw_position = [0.597, 0.000, 0.640, 2.28, -2.35, 2.20]
-        throw_position = [0.590, 0.000, 0.580, 2.38, -2.37, 1.60]
+        # throw_position = [0.597, 0.000, 0.640, 2.38, -2.37, 1.60]
+        throw_position = [0.597, 0.000, 0.640, 2.26, -2.35, 2.24]
         # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.25}
+                      'acc': acc, 'vel': vel, 'radius': 0.250}
 
-        return_position = [0.557, 0.000, 0.550, 2.38, -2.37, 1.60]
+        return_position = [0.590, 0.000, 0.620, 2.38, -2.37, 1.60]
         return_move = {'type': 'p',
                        'pose': return_position,
-                       'acc': 1.5, 'vel': 1.0, 'radius': 0.15}
+                       'acc': 3.5, 'vel': 3.5, 'radius': 0.100}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])
@@ -326,9 +328,8 @@ class URcomm(object):
         # K = 1.   # 28.
 
         # NOTE: important
-        throw_pose_list = [start_move, curled_move,
-                           throw_move, gripper_open, return_move,  home_move, start_move]
-        throw_pose_list = [curled_move, throw_move,
+
+        throw_pose_list = [throw_move,  # throw_move,
                            gripper_open, home_move, start_move]
         # throw_pose_list = [start_move]
 
