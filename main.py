@@ -188,8 +188,10 @@ def main(args):
         place_count = 0
         # short stacks of blocks
         partial_stack_count = 0
+        partial_stack_rate = np.inf
         # all the blocks stacked
         stack_count = 0
+        stack_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -356,9 +358,11 @@ def main(args):
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
-                    partial_stack_rate = float(action_count)/float(partial_stack_count)
-                    stack_rate = float(action_count)/float(stack_count)
-                    print('PLACE: actions/partial, actions/full stack (lower is better): ' + str(partial_stack_rate) + ' ' + str(stack_rate))
+                    if partial_stack_count > 0:
+                        partial_stack_rate = float(action_count)/float(partial_stack_count)
+                    if stack_count > 0:
+                        stack_rate = float(action_count)/float(stack_count)
+                    print('PLACE: actions/partial: ' + str(partial_stack_rate) + ' actions/full stack: ' + str(stack_rate)) + ' (lower is better)  place_count: ' + str(place_count) + ' stack_count: ' + str(stack_count)
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
