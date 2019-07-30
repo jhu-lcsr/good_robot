@@ -278,30 +278,41 @@ class URcomm(object):
         # currently hard coded positions
         # acc, vel = 1.4, 1.05 # Safe
         # acc, vel = 8, 3 # Default
-        acc, vel = 18, 10
+        # acc, vel = 15, 10
+        # K = 8.5
+        K = 1
+        acc, vel = 1.4 * K, K
         start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
         start_move = {'type': 'p',
                       'pose': start_position,
                       # 'acc': None, 'vel': None, 'radius': 0.2}
                       'acc': acc, 'vel': vel, 'radius': 0.2}
 
-        curled_config_deg = [-196, -107, 126, -90, -90, -12]
-        curled_config = [np.deg2rad(i) for i in curled_config_deg]
-        curled_move = {'type': 'j',
-                       'pose': curled_config,
-                       'acc': acc, 'vel': vel, 'radius': 0.2}
+        # curled_config_deg = [-196, -107, 126, -90, -90, -12]
+        # curled_config = [np.deg2rad(i) for i in curled_config_deg]
+        # curled_move = {'type': 'j',
+        # 'pose': curled_config,
+        # 'acc': acc, 'vel': vel, 'radius': 0.2}
 
-        throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        # throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
+        # throw_position = [0.597, 0.000, 0.640, 2.28, -2.35, 2.20]
+        throw_position = [0.590, 0.000, 0.580, 2.38, -2.37, 1.60]
+        # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
                       'acc': acc, 'vel': vel, 'radius': 0.25}
+
+        return_position = [0.557, 0.000, 0.550, 2.38, -2.37, 1.60]
+        return_move = {'type': 'p',
+                       'pose': return_position,
+                       'acc': 1.5, 'vel': 1.0, 'radius': 0.150}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': acc/2.5, 'vel': vel/2.5, 'radius': 0.001}
+                     'acc': 0.5, 'vel': .5, 'radius': 0.001}
 
         gripper_open = {'type': 'open'}
         # middle_position = np.array(end_position) - \
@@ -312,7 +323,8 @@ class URcomm(object):
 
         # NOTE: important
         throw_pose_list = [start_move, curled_move,
-                           throw_move, gripper_open, home_move, start_move]
+                           throw_move, gripper_open, return_move,  home_move, start_move]
+        # throw_pose_list = [start_move]
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
