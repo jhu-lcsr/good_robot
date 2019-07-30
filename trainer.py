@@ -19,6 +19,11 @@ class Trainer(object):
 
         self.method = method
         self.place = place
+        self.push_reward = 0.0625
+        self.grasp_reward = 0.125
+        self.grasp_color_reward = 0.25
+        self.place_reward = 0.5
+        self.place_color_reward = 1.0
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
@@ -33,7 +38,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place = place)
+            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -63,7 +68,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place = place)
+            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -223,8 +228,8 @@ class Trainer(object):
 
 
     def get_label_value(
-        self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
-        next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None, prev_place_predictions=None):
+            self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
+            next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None, prev_place_predictions=None):
 
         if self.method == 'reactive':
 
@@ -240,7 +245,6 @@ class Trainer(object):
                 if not place_success:
                     label_value = 1
 
-
             print('Label value: %d' % (label_value))
             return label_value, label_value
 
@@ -249,35 +253,35 @@ class Trainer(object):
             current_reward = 0
             if primitive_action == 'push':
                 if change_detected:
-                    current_reward = 0.25
+                    current_reward = self.push_reward
             elif primitive_action == 'grasp':
                 if color_success is None:
                     if grasp_success:
-                        current_reward = 1.0
+                        current_reward = self.grasp_reward
                 elif color_success is not None:
                     # HK add if statement
                     if grasp_success and not color_success:
                         #current_reward = 1.0
                         # TODO(hkwon14): fine tune reward function
                         # current_reward = 0
-                        current_reward = 0.5
+                        current_reward = self.grasp_reward
                     # HK: Color: Compute current reward
                     elif grasp_success and color_success:
-                        current_reward = 1.0
+                        current_reward = self.grasp_color_reward
             #TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
             elif primitive_action == 'place':
                 if color_success is None:
                     if place_success:
-                        current_reward = 1.0
+                        current_reward = self.place_reward
                 elif color_success is not None:
                     # HK add if statement
                     if place_success and not color_success:
                         #current_reward = 1.0
                         # TODO: fine tune reward function
-                        current_reward = 0
+                        current_reward = self.place_reward
                     # HK: Color: Compute current reward
                     elif place_success and color_success:
-                        current_reward = 1.0
+                        current_reward = self.place_color_reward
 
             # Compute future reward
             if self.place and not change_detected and not grasp_success and not place_success:

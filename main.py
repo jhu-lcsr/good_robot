@@ -487,19 +487,34 @@ def main(args):
 
             # Do sampling for experience replay
             if experience_replay and not is_testing:
+                # Here we will try to sample a reward value from the same action as the current one
+                # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
+                # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
                 sample_primitive_action = prev_primitive_action
                 if sample_primitive_action == 'push':
                     sample_primitive_action_id = 0
                     if method == 'reactive':
                         sample_reward_value = 0 if prev_reward_value == 1 else 1 # random.randint(1, 2) # 2
                     elif method == 'reinforcement':
-                        sample_reward_value = 0 if prev_reward_value == 0.5 else 0.5
+                        sample_reward_value = 0 if prev_reward_value == trainer.push_reward else trainer.push_reward
                 elif sample_primitive_action == 'grasp':
                     sample_primitive_action_id = 1
                     if method == 'reactive':
                         sample_reward_value = 0 if prev_reward_value == 1 else 1
                     elif method == 'reinforcement':
+                        if grasp_color_task:
+                            sample_reward_value = 0 if prev_reward_value == trainer.grasp_color_reward else trainer.grasp_color_reward
+                        else:
+                            sample_reward_value = 0 if prev_reward_value == trainer.grasp_reward else trainer.grasp_reward
+                elif sample_primitive_action == 'place':
+                    sample_primitive_action_id = 2
+                    if method == 'reactive':
                         sample_reward_value = 0 if prev_reward_value == 1 else 1
+                    elif method == 'reinforcement':
+                        if grasp_color_task:
+                            sample_reward_value = 0 if prev_reward_value == trainer.place_color_reward else trainer.place_color_reward
+                        else:
+                            sample_reward_value = 0 if prev_reward_value == trainer.place_reward else trainer.place_reward
 
                 # Get samples of the same primitive but with different results
                 sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
