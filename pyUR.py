@@ -39,6 +39,24 @@ class URcomm(object):
         self.socket_open_str = '\tsocket_open("127.0.0.1", 63352, "gripper_socket")\n'
         self.socket_close_str = '\tsocket_close("gripper_socket")\n'
 
+        """
+        FOR is the variable
+        range is 0 - 255
+        0 is no force
+        255 is full force
+        """
+        """
+        SPE is the variable
+        range is 0 - 255
+        0 is no speed
+        255 is full speed
+        """
+        """
+        POS is the variable
+        range is 0 - 255
+        0 is open 
+        255 is closed 
+        """
         self.max_float_length = 6  # according to python-urx lib, UR may have max float length
 
     # -- Gripper commands
@@ -63,6 +81,8 @@ class URcomm(object):
         prog = "def openGrip():\n"
         prog += self.socket_close_str
         prog += self.socket_open_str
+        prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("SPE", 255,
+                                                              self.socket_name)
         prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
                                                               self.socket_name)
         prog += "end\n"
@@ -74,6 +94,10 @@ class URcomm(object):
         prog = "def closeGrip():\n"
         prog += self.socket_close_str
         prog += self.socket_open_str
+        prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("FOR", 20,
+                                                              self.socket_name)
+        prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("SPE", 255,
+                                                              self.socket_name)
         prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 255,
                                                               self.socket_name)
         prog += "end\n"
@@ -217,17 +241,21 @@ class URcomm(object):
         for idx, a_move in enumerate(moves_list):
 
             if a_move["type"] == 'open':
-                prog += "socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
-                                                                    self.socket_name)
+                prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("SPE", 255,
+                                                                      self.socket_name)
+                prog += "\tsocket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
+                                                                      self.socket_name)
             else:
                 acc, vel, radius = a_move["acc"], a_move["vel"], a_move["radius"]
-                if idx == (len(moves_list) - 1):
-                    radius = 0.001
-                elif radius is None:
+                if radius is None:
                     radius = 0.01
                 if acc is None:
                     acc = self.joint_acc
                 if vel is None:
+                    vel = self.joint_vel
+                if idx == (len(moves_list) - 1):
+                    radius = 0.001
+                    acc = self.joint_acc
                     vel = self.joint_vel
 
                 # WARNING: this does not have safety checks!
@@ -250,7 +278,7 @@ class URcomm(object):
         # currently hard coded positions
         # acc, vel = 1.4, 1.05 # Safe
         # acc, vel = 8, 3 # Default
-        acc, vel = 8, 3
+        acc, vel = 18, 10
         start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
         start_move = {'type': 'p',
                       'pose': start_position,
@@ -266,14 +294,14 @@ class URcomm(object):
         throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.2}
+                      'acc': acc, 'vel': vel, 'radius': 0.25}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': acc/2.5, 'vel': vel/2.5, 'radius': 0.05}
+                     'acc': acc/2.5, 'vel': vel/2.5, 'radius': 0.001}
 
         gripper_open = {'type': 'open'}
         # middle_position = np.array(end_position) - \
@@ -284,7 +312,7 @@ class URcomm(object):
 
         # NOTE: important
         throw_pose_list = [start_move, curled_move,
-                           throw_move, gripper_open, home_move]
+                           throw_move, gripper_open, home_move, start_move]
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
