@@ -116,7 +116,6 @@ def main(args):
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
 
-
     # -------------- Test grasp_onlying options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
@@ -203,13 +202,14 @@ def main(args):
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
+                explore_actions = False
                 # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
                 if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                     nonlocal_variables['primitive_action'] = 'place'
                 else:
                     nonlocal_variables['primitive_action'] = 'grasp'
-                explore_actions = False
-                if not grasp_only:
+
+                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
                     if is_testing and method == 'reactive':
                         if best_push_conf > 2 * best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
@@ -250,6 +250,9 @@ def main(args):
                     elif nonlocal_variables['primitive_action'] == 'grasp':
                         nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape)
                         predicted_value = np.max(grasp_predictions)
+                    elif nonlocal_variables['primitive_action'] == 'place':
+                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
+                        predicted_value = np.max(place_predictions)
                 trainer.use_heuristic_log.append([1 if use_heuristic else 0])
                 logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
 
@@ -343,18 +346,19 @@ def main(args):
                         nonlocal_variables['partial_stack_success'] = robot.check_stack(current_stack_goal)
                         if nonlocal_variables['partial_stack_success']:
                             partial_stack_count += 1
-                            partial_stack_rate = float(action_count)/float(partial_stack_count)
-                            print('actions per partial stack (lower is better): ' + str(partial_stack_rate))
                             nonlocal_variables['stack'].next()
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                             if len(next_stack_goal) < len(current_stack_goal):
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
-                                stack_rate = float(action_count)/float(stack_count)
-                                print('actions per full stack (lower is better): ' + str(stack_rate))
                                 # full stack complete! reset the scene
                                 robot.reposition_objects()
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
+
+                if place:
+                    partial_stack_rate = float(action_count)/float(partial_stack_count)
+                    stack_rate = float(action_count)/float(stack_count)
+                    print('PLACE: actions/partial, actions/full stack (lower is better): ' + str(partial_stack_rate) + ' ' + str(stack_rate))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -367,14 +371,14 @@ def main(args):
     # -------------------------------------------------------------
     # -------------------------------------------------------------
 
-
     # Start main training/testing loop
     while True:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
 
         # Make sure simulation is still stable (if not, reset simulation)
-        if is_sim: robot.check_sim()
+        if is_sim:
+            robot.check_sim()
 
         # Get latest RGB-D image
         color_img, depth_img = robot.get_camera_data()
