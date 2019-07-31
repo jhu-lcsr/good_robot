@@ -344,7 +344,7 @@ class URcomm(object):
         start_move = {'type': 'p',
                       'pose': start_position,
                       # 'acc': None, 'vel': None, 'radius': 0.2}
-                      'acc': acc, 'vel': vel, 'radius': 0.1}
+                      'acc': acc, 'vel': vel, 'radius': 0.01}
 
         # curled_config_deg = [-196, -107, 126, -90, -90, -12]
         # curled_config = [np.deg2rad(i) for i in curled_config_deg]
@@ -363,7 +363,7 @@ class URcomm(object):
         # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.300}
+                      'acc': acc, 'vel': vel, 'radius': 0.200}
 
         # return_position = [0.590, 0.000, 0.620, 2.38, -2.37, 1.60]
         # return_move = {'type': 'p',
