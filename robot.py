@@ -498,9 +498,9 @@ class Robot(object):
             vrep.simxSetJointForce(self.sim_client, RG2_gripper_handle, gripper_motor_force, vrep.simx_opmode_blocking)
             vrep.simxSetJointTargetVelocity(self.sim_client, RG2_gripper_handle, gripper_motor_velocity, vrep.simx_opmode_blocking)
             gripper_fully_closed = False
-            while gripper_joint_position > -0.047: # Block until gripper is fully closed
+            while gripper_joint_position > -0.045: # Block until gripper is fully closed, value previously -0.047
                 sim_ret, new_gripper_joint_position = vrep.simxGetJointPosition(self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
-                # print(gripper_joint_position)
+                print('gripper position: ' + str(gripper_joint_position))
                 if new_gripper_joint_position >= gripper_joint_position:
                     return gripper_fully_closed
                 gripper_joint_position = new_gripper_joint_position
@@ -1068,12 +1068,26 @@ class Robot(object):
         return push_success
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06):
+        """ Place an object, currently only tested for blocks.
+
+        When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
+        """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
         print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
 
         if self.is_sim:
+
+            # Ensure gripper is closed
+            gripper_fully_closed = self.close_gripper()
+            if gripper_fully_closed:
+                # There is no object present, so we cannot possibly place!
+                return False
+            # If the object has been grasped it should be the highest object and held by the gripper
+            grasped_object_ind, grasped_object_handle = self.get_highest_object_list_index_and_handle()
+            sim_ret, grasped_object_position = vrep.simxGetObjectPosition(self.sim_client, grasped_object_handle, -1, vrep.simx_opmode_blocking)
+            grasped_object_position = np.array(grasped_object_position)
 
             # Compute tool orientation from heightmap rotation angle
             tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
@@ -1107,24 +1121,27 @@ class Robot(object):
             # Move gripper to location above place target
             self.move_to(location_above_place_target, None)
 
-            #TODO(hkwon214): check successful place
-            #TODO(hkwon214): double check block height
-            block_height = 0.08599236369132997
+            sim_ret, placed_object_position = vrep.simxGetObjectPosition(self.sim_client, grasped_object_handle, -1, vrep.simx_opmode_blocking)
+            placed_object_position = np.array(placed_object_position)
 
-            object_positions = np.asarray(self.get_obj_positions())
-            object_positions = object_positions[:,2]
-            grasped_object_ind, grasped_object_handle = self.get_highest_object_list_index_and_handle()
-            print('current_position: ' + str(grasped_object_ind))
-            current_obj_z_location = object_positions[grasped_object_ind]
-            print('current_obj_z_location: ' + str(current_obj_z_location+block_height/2))
-            print('goal_position: ' + str(position[2]))
-            print('goal_position_margin: ' + str(position[2] + place_location_margin))
-            #if abs(current_obj_z_location - position[2]) < 0.009:
-            if ((current_obj_z_location+block_height/2) >= position[2]) and ((current_obj_z_location+block_height/2) < (position[2]+block_height)):
-                place_success = True
-            else:
-                place_success = False
+            has_moved = np.linalg.norm(placed_object_position - grasped_object_position, axis=0) > (distance_threshold/2)
+            if not has_moved:
+                # The highest object, which we had supposedly grasped, didn't move!
+                return False
+            print('current_position: ' + str(placed_object_position))
+            current_obj_z_location = placed_object_position[2]
+            print('current_obj_z_location: ' + str(current_obj_z_location+distance_threshold/2))
+            near_goal = np.linalg.norm(placed_object_position - position, axis=0) < (distance_threshold)
+            print('goal_position: ' + str(position[2]) + ' goal_position_margin: ' + str(position[2] + place_location_margin))
+            place_success = has_moved and near_goal
+            print('has_moved: ' + str(has_moved) + ' near_goal: ' + str(near_goal) + ' place_success: ' + str(place_success))
             return place_success
+            #if abs(current_obj_z_location - position[2]) < 0.009:
+            # if ((current_obj_z_location+distance_threshold/2) >= position[2]) and ((current_obj_z_location+distance_threshold/2) < (position[2]+distance_threshold)):
+            #     place_success = True
+            # else:
+            #     place_success = False
+            # return place_success
         else:
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
