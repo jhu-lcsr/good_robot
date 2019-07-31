@@ -49,8 +49,8 @@ class Robot(object):
             # Default joint speed configuration
             # self.joint_acc = 8 # Safe: 1.4
             # self.joint_vel = 3 # Safe: 1.05
-            self.joint_acc = 0.50  # Safe when set 30% spe71ed on pendant
-            self.joint_vel = 0.35
+            self.joint_acc = 1.0  # Safe when set 30% spe71ed on pendant
+            self.joint_vel = 0.7
 
             # Default tool speed configuration
             # self.tool_acc = 1.2 # Safe: 0.5

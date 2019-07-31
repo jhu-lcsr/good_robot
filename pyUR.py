@@ -25,7 +25,10 @@ class URcomm(object):
 
         # NOTE: this is for throw practice
         home_in_deg = np.array(
-            [-197, -105, 130, -110, -90, -30]) * 1.0
+            [-107, -105, 130, -92, -44, -30]) * 1.0  # sideways # bent wrist 1 2
+        # [-197, -105, 130, -110, -90, -30]) * 1.0
+        # [-107, -105, 130, -110, -90, -30]) * 1.0  # sideways
+        # [-107, -105, 130, -85, -90, -30]) * 1.0  # sideways bent wrist
         self.home_joint_config = np.deg2rad(home_in_deg)
 
         self.moveto_limits = (
@@ -54,8 +57,8 @@ class URcomm(object):
         """
         POS is the variable
         range is 0 - 255
-        0 is open 
-        255 is closed 
+        0 is open
+        255 is closed
         """
         self.max_float_length = 6  # according to python-urx lib, UR may have max float length
 
@@ -231,7 +234,7 @@ class URcomm(object):
     def combo_move(self, moves_list, wait=True, is_sim=False):
         """
         Example use:
-        pose_list = [ {type:p, vel:0.1, acc:0.1, radius:0.2}, 
+        pose_list = [ {type:p, vel:0.1, acc:0.1, radius:0.2},
                     {type: open}]
         """
         prog = "def combo_move():\n"
@@ -251,7 +254,7 @@ class URcomm(object):
                     radius = 0.01
                 if acc is None:
                     # acc = self.joint_acc
-                    acc = 2.5
+                    acc = self.joint_acc
                 if vel is None:
                     vel = self.joint_vel
                 if idx == (len(moves_list) - 1):
@@ -273,6 +276,55 @@ class URcomm(object):
             self._wait_for_move(target=moves_list[-1]['pose'],
                                 threshold=self.pose_tolerance)
             return self.get_state('cartesian_info')
+
+    def throw_sideways(self, is_sim=False):
+        K = 1.
+        acc, vel = 1.4 * K, K
+
+        sideways_position = np.deg2rad(np.array(
+            [-107, -105, 130, -92, -44, -30]) * 1.0)  # sideways # bent wrist 1 2
+        # [-107, -105, 130, -85, -90, -30]) * 1.0  # sideways bent wrist
+        # sideways_position = [-0.005, 0.351, 0.245, 3.0, 0.33, 0.00]
+        # sideways_position = [-0.017, 0.309,
+        # 0.218, 2.6, 0.30, -0.23]  # bent wrist
+        sideways_move = {'type': 'j',
+                         'pose': sideways_position,
+                         # 'acc': None, 'vel': None, 'radius': 0.2}
+                         'acc': acc, 'vel': vel, 'radius': 0.05}
+
+        start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
+        start_move = {'type': 'p',
+                      'pose': start_position,
+                      # 'acc': None, 'vel': None, 'radius': 0.2}
+                      'acc': acc/3., 'vel': vel/3., 'radius': 0.1}
+
+        curled_position = [0.350, 0.000, 0.250, 1.75, -1.80, -0.62]
+        curled_move = {'type': 'p',
+                       'pose': curled_position,
+                       'acc': acc, 'vel': vel, 'radius': 0.001}
+
+        throw_position = [0.597, 0.000, 0.640, 2.26, -2.35, 2.24]
+        # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
+        throw_move = {'type': 'p',
+                      'pose': throw_position,
+                      'acc': acc, 'vel': vel, 'radius': 0.250}
+
+        home_position = np.array(start_position) + \
+            np.array([0, 0, 0.070, 0, 0, 0])
+        home_position = home_position.tolist()
+        home_move = {'type': 'p',
+                     'pose': home_position,
+                     'acc': acc/3., 'vel': vel/3., 'radius': 0.02}
+
+        gripper_open = {'type': 'open'}
+
+        # NOTE: important
+        throw_pose_list = [sideways_move, throw_move,  # throw_move,
+                           gripper_open, home_move, start_move, sideways_move]
+        # throw_pose_list = [start_move]
+
+        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
+        self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
     def throw(self, is_sim=False):
         self.close_gripper()
@@ -306,19 +358,19 @@ class URcomm(object):
         # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.250}
+                      'acc': acc, 'vel': vel, 'radius': 0.300}
 
-        return_position = [0.590, 0.000, 0.620, 2.38, -2.37, 1.60]
-        return_move = {'type': 'p',
-                       'pose': return_position,
-                       'acc': 3.5, 'vel': 3.5, 'radius': 0.100}
+        # return_position = [0.590, 0.000, 0.620, 2.38, -2.37, 1.60]
+        # return_move = {'type': 'p',
+        # 'pose': return_position,
+        # 'acc': 3.5, 'vel': 3.5, 'radius': 0.100}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': 1.5, 'vel': 1.5, 'radius': 0.01}
+                     'acc': 1.0, 'vel': 1.0, 'radius': 0.01}
 
         gripper_open = {'type': 'open'}
         # middle_position = np.array(end_position) - \
@@ -335,27 +387,6 @@ class URcomm(object):
 
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
-
-        """ this stops between points
-        print('throw acc will be', self.joint_acc * 1)  # 4)
-        print('throw vel will be', self.joint_vel * 1)  # 0)
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        # , acc_scaling=K, vel_scaling=K, radius=0)  # last # is blend radius
-        self.move_joints(curled_config)
-        self.move_to(end_position, end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.5)  # last # is blend radius
-        # gripper.open_gripper()
-        self.move_to(np.array(end_position) - np.array((0.020, 0, -0.020)), end_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0.1)  # last # is blend radius
-        self.move_to(start_position, start_axisangle, acc_scaling=K,
-                     vel_scaling=K, radius=0)  # last # is blend radius
-        """
-
-        # hardcoded open gripper (close to 3/4 of unwind, b/f deccel phase)
-        # time.sleep(1.25)
-        # self.open_gripper()
-        # time.sleep(2)
 
         # Pre-compute blend radius
         # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)

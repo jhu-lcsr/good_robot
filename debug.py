@@ -58,16 +58,17 @@ while True:
     try:
         prompt1 = raw_input("Place object in grasp, then 'y' to close grasp: ")
         if str(prompt1) == 'y':
-            robot.r.open_gripper()
             # time.sleep(0.01)
             robot.r.close_gripper()
             # time.sleep(0.01)
-        prompt2 = raw_input("Stand clear, then 'yes' to throw: ")
+        prompt2 = raw_input("Stand clear, then 'yes' to throw, o to open: ")
         if str(prompt2) == 'yes':
             time.sleep(0.05)
             print('!----Throw started')
-            robot.r.throw(is_sim=False)
+            robot.r.throw_sideways(is_sim=False)
             print('!----Throw completed')
+        if str(prompt2) == 'o':
+            robot.r.open_gripper()
 
         # # robot.push(push_position, 0, workspace_limits)
         # # robot.restart_real()
