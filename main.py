@@ -558,8 +558,18 @@ def main(args):
                     next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
                     # TODO(ahundt) TODO(hkwon14) Fix success checks to be performed correctly for all mode combinations of grasping, color grasping, and stacking, rewards must match get_label_value() in trainer.py, prefereably in an easy to use way.
                     # TODO(ahundt) TODO(hkwon14) tune sample_reward_value?
-                    sample_push_success = sample_reward_value == 0.5
-                    sample_grasp_success = sample_reward_value == 0.5
+                    sample_place_success = None
+                    if grasp_color_task:
+                        # TODO(ahundt) non-color actions should also get partial credit, need to update DEFINITE BUG PRESENT
+                        sample_push_success = sample_reward_value == trainer.push_reward
+                        sample_grasp_success = sample_reward_value == trainer.grasp_color_reward
+                        if place:
+                            sample_place_success = sample_reward_value == trainer.place_color_reward
+                    else:
+                        sample_push_success = sample_reward_value == trainer.push_reward
+                        sample_grasp_success = sample_reward_value == trainer.grasp_reward
+                        if place:
+                            sample_place_success = sample_reward_value == trainer.place_reward
                     sample_change_detected = sample_push_success
                     if goal_condition is not None:
                         sample_color_success = sample_reward_value == 1
@@ -567,11 +577,13 @@ def main(args):
                     new_sample_label_value, _ = trainer.get_label_value(
                         sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
                         sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-                        sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions)
+                        sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions,
+                        place_success=sample_place_success)
 
                     # Get labels for sample and backpropagate
                     sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
-                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind, trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
+                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
+                                     trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
 
                     # Recompute prediction value and label for replay buffer
                     if sample_primitive_action == 'push':
