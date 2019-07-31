@@ -65,7 +65,8 @@ while True:
         if str(prompt2) == 'yes':
             time.sleep(0.05)
             print('!----Throw started')
-            robot.r.throw_sideways(is_sim=False)
+            # robot.r.throw_sideways(is_sim=False)
+            robot.r.throw(is_sim=False)
             print('!----Throw completed')
         if str(prompt2) == 'o':
             robot.r.open_gripper()

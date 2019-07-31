@@ -25,8 +25,8 @@ class URcomm(object):
 
         # NOTE: this is for throw practice
         home_in_deg = np.array(
-            [-107, -105, 130, -92, -44, -30]) * 1.0  # sideways # bent wrist 1 2
-        # [-197, -105, 130, -110, -90, -30]) * 1.0
+            # [-107, -105, 130, -92, -44, -30]) * 1.0  # sideways # bent wrist 1 2
+            [-197, -105, 130, -110, -90, -30]) * 1.0
         # [-107, -105, 130, -110, -90, -30]) * 1.0  # sideways
         # [-107, -105, 130, -85, -90, -30]) * 1.0  # sideways bent wrist
         self.home_joint_config = np.deg2rad(home_in_deg)
@@ -267,10 +267,10 @@ class URcomm(object):
                 # WARNING: this does not have safety checks!
                 if a_move["type"] == 'j':
                     prog += self._format_move(
-                        "movej", a_move['pose'], acc, vel, radius, prefix="") + "\n"
+                        "movel", a_move['pose'], acc, vel, radius, prefix="") + "\n"
                 elif a_move["type"] == 'p':
                     prog += self._format_move(
-                        'movej', a_move['pose'], acc, vel, radius, prefix="p") + "\n"
+                        'movel', a_move['pose'], acc, vel, radius, prefix="p") + "\n"
         prog += "end\n"
         self.send_program(prog, is_sim=is_sim)
 
@@ -283,7 +283,7 @@ class URcomm(object):
             return self.get_state('cartesian_info')
 
     def throw_sideways(self, is_sim=False):
-        K = 8.
+        K = 9.
         acc, vel = 1.4 * K, K
 
         sideways_position = np.deg2rad(np.array(
@@ -312,7 +312,7 @@ class URcomm(object):
         # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.250}
+                      'acc': acc, 'vel': vel, 'radius': 0.200}
 
         home_position = np.array(start_position) + \
             np.array([0, 0, 0.070, 0, 0, 0])
@@ -324,7 +324,7 @@ class URcomm(object):
         gripper_open = {'type': 'open'}
 
         # NOTE: important
-        throw_pose_list = [sideways_move, throw_move,  # throw_move,
+        throw_pose_list = [throw_move,  # throw_move,
                            gripper_open, home_move, start_move, sideways_move]
         # throw_pose_list = [start_move]
 
@@ -338,7 +338,7 @@ class URcomm(object):
         # acc, vel = 8, 3 # Default
         # acc, vel = 15, 10
         # K = 8.5
-        K = 6
+        K = 0.5
         acc, vel = 1.4 * K, K
         start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
         start_move = {'type': 'p',
@@ -386,7 +386,8 @@ class URcomm(object):
 
         # NOTE: important
 
-        throw_pose_list = [throw_move,  # throw_move,
+        # throw_pose_list = [curled_move, throw_move,  # throw_move,
+        throw_pose_list = [throw_move,
                            gripper_open, home_move, start_move]
         # throw_pose_list = [start_move]
 
