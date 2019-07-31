@@ -35,7 +35,9 @@ class URcomm(object):
             [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
 
         # Tool pose tolerance for blocking calls (meters)
-        self.pose_tolerance = [0.002, 0.002, 0.002, 0.010, 0.010, 0.010]
+        # HACK lower tolerance for now 31 July,bent wrist move not completing
+        # self.pose_tolerance = [0.002, 0.002, 0.002, 0.010, 0.010, 0.010]
+        self.pose_tolerance = [0.005, 0.005, 0.005, 0.020, 0.020, 0.020]
 
         self.socket_name = "gripper_socket"
 
@@ -273,12 +275,15 @@ class URcomm(object):
         self.send_program(prog, is_sim=is_sim)
 
         if wait:
+            joint_flag = False
+            if moves_list[-1]['type'] == 'j':
+                joint_flag = True
             self._wait_for_move(target=moves_list[-1]['pose'],
-                                threshold=self.pose_tolerance)
+                                threshold=self.pose_tolerance, joints=joint_flag)
             return self.get_state('cartesian_info')
 
     def throw_sideways(self, is_sim=False):
-        K = 1.
+        K = 8.
         acc, vel = 1.4 * K, K
 
         sideways_position = np.deg2rad(np.array(
@@ -314,7 +319,7 @@ class URcomm(object):
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': acc/3., 'vel': vel/3., 'radius': 0.02}
+                     'acc': acc/3., 'vel': vel/3., 'radius': 0.015}
 
         gripper_open = {'type': 'open'}
 
@@ -333,7 +338,7 @@ class URcomm(object):
         # acc, vel = 8, 3 # Default
         # acc, vel = 15, 10
         # K = 8.5
-        K = 8
+        K = 6
         acc, vel = 1.4 * K, K
         start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
         start_move = {'type': 'p',
