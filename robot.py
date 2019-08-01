@@ -1188,7 +1188,11 @@ class Robot(object):
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
             object_color_sequence = low2high_idx[nearby_obj]
             if len(object_color_sequence) < num_obj:
+                print('check_stack() False, not enough nearby objects for a successful stack! '
+                      'expected at least ' + str(num_obj) +
+                      ' nearby objects, but only counted: ' + str(len(object_color_sequence)))
                 # there aren't enough nearby objects for a successful stack!
+                # TODO(ahundt) BUG this may actually return 1 when there is a stack of size 2 present, but 3 objects are needed
                 return False, 1
             # cut out objects we don't need to check
             object_color_sequence = object_color_sequence[:num_obj+1]
