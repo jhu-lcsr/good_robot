@@ -91,7 +91,7 @@ for stack in range(num_stacks):
             # Deliberately change the goal stack order to test the non-ordered check
             stack_goal = np.random.permutation(stack_goal)
             print('fake stack goal to test any stack order: ' + str(stack_goal))
-        stack_success = robot.check_stack(stack_goal)
+        stack_success, height_count = robot.check_stack(stack_goal)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene
     robot.reposition_objects()

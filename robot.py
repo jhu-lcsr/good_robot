@@ -1159,12 +1159,14 @@ class Robot(object):
 
         # Returns
 
-        True if the stack matches the specified order from bottom to top, False otherwise.
-
+        List [success, height_count].
+        success: will be True if the stack matches the specified order from bottom to top, False otherwise.
+        height_count: will be the number of individual blocks which passed the check, with a minimum value of 1.
+        i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
         """
         checks = len(object_color_sequence) - 1
         if checks <= 0:
-            return True
+            return True, 1
         pos = np.asarray(self.get_obj_positions())
         if not self.grasp_color_task:
             # Automatically determine the color order.
@@ -1192,21 +1194,22 @@ class Robot(object):
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
         # print('top: ' + str(object_color_sequence[1:]))
+        idx = 0
         for idx in range(checks):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
             # Check that Z is higher by at least half the distance threshold
             if top_pos[2] < (bottom_pos[2] + distance_threshold/2.0):
                 # print('not high enough')
-                return False
+                return False, idx+1
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ' + str(dist))
             if dist > distance_threshold:
                 # print('too far apart')
-                return False
+                return False, idx+1
         # TODO(ahundt) add check_stack for real robot
-        return True
+        return True, idx+1
 
 
     def restart_real(self):

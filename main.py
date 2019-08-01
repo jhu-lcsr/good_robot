@@ -310,6 +310,8 @@ def main(args):
                 nonlocal_variables['grasp_color_success'] = False
                 nonlocal_variables['place_color_success'] = False
                 change_detected = False
+                if place:
+                    current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
@@ -342,19 +344,23 @@ def main(args):
                     print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
-                    current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    if nonlocal_variables['place_success']:
-                        nonlocal_variables['partial_stack_success'] = robot.check_stack(current_stack_goal)
-                        if nonlocal_variables['partial_stack_success']:
-                            partial_stack_count += 1
-                            nonlocal_variables['stack'].next()
-                            next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-                            if len(next_stack_goal) < len(current_stack_goal):
-                                nonlocal_variables['stack_success'] = True
-                                stack_count += 1
-                                # full stack complete! reset the scene
-                                robot.reposition_objects()
+                    nonlocal_variables['partial_stack_success'], height_count = robot.check_stack(current_stack_goal)
+                    if height_count < len(current_stack_goal) - 1:
+                        # we are two blocks off the goal, reset the scene.
+                        print('main.py check_stack() after robot place() detected a mismatch between the goal '
+                              'and current workspace state, resetting the objects and goals...')
+                        robot.reposition_objects()
+                        nonlocal_variables['stack'].reset_sequence()
+                    elif nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                        partial_stack_count += 1
+                        nonlocal_variables['stack'].next()
+                        next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+                        if len(next_stack_goal) < len(current_stack_goal):
+                            nonlocal_variables['stack_success'] = True
+                            stack_count += 1
+                            # full stack complete! reset the scene
+                            robot.reposition_objects()
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
@@ -364,7 +370,7 @@ def main(args):
                         stack_rate = float(action_count)/float(stack_count)
                     print('stats for place: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  place_attempts: ' + str(place_count) + '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count))
+                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
