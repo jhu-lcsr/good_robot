@@ -421,6 +421,8 @@ def main(args):
                 robot.add_objects()
                 if is_testing: # If at end of test run, re-load original weights (before test run)
                     trainer.model.load_state_dict(torch.load(snapshot_file))
+                if place:
+                    nonlocal_variables['stack'].reset_sequence()
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
