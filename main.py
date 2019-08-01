@@ -177,6 +177,9 @@ def main(args):
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
+    if place:
+        # If we are stacking we actually skip to the second block which needs to go on the first
+        nonlocal_variables['stack'].next()
 
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
@@ -335,6 +338,7 @@ def main(args):
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
+
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
@@ -352,6 +356,7 @@ def main(args):
                               'and current workspace state, resetting the objects and goals...')
                         robot.reposition_objects()
                         nonlocal_variables['stack'].reset_sequence()
+                        nonlocal_variables['stack'].next()
                     elif nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
@@ -361,6 +366,8 @@ def main(args):
                             stack_count += 1
                             # full stack complete! reset the scene
                             robot.reposition_objects()
+                            nonlocal_variables['stack'].reset_sequence()
+                            nonlocal_variables['stack'].next()
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
@@ -423,6 +430,7 @@ def main(args):
                     trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
+                    nonlocal_variables['stack'].next()
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
