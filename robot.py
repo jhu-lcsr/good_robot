@@ -1162,7 +1162,8 @@ class Robot(object):
         List [success, height_count].
         success: will be True if the stack matches the specified order from bottom to top, False otherwise.
         height_count: will be the number of individual blocks which passed the check, with a minimum value of 1.
-        i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
+            i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
+            If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """
         checks = len(object_color_sequence) - 1
         if checks <= 0:
