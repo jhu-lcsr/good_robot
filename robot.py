@@ -1187,7 +1187,7 @@ class Robot(object):
             object_color_sequence = low2high_idx[nearby_obj]
             if len(object_color_sequence) < num_obj:
                 # there aren't enough nearby objects for a successful stack!
-                return False
+                return False, 1
             # cut out objects we don't need to check
             object_color_sequence = object_color_sequence[:num_obj+1]
             # print('auto object_color_sequence: ' + str(object_color_sequence))
@@ -1201,15 +1201,15 @@ class Robot(object):
             # Check that Z is higher by at least half the distance threshold
             if top_pos[2] < (bottom_pos[2] + distance_threshold/2.0):
                 # print('not high enough')
-                return False, idx+1
+                return False, idx + 1
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ' + str(dist))
             if dist > distance_threshold:
                 # print('too far apart')
-                return False, idx+1
+                return False, idx + 1
         # TODO(ahundt) add check_stack for real robot
-        return True, idx+1
+        return True, idx + 1
 
 
     def restart_real(self):
