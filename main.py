@@ -423,7 +423,8 @@ def main(args):
         #if nonlocal_variables['grasp_color_success'] :
             no_change_count = [0, 0]
             if is_sim:
-                print('Not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
+                print('There haven not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
+                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing: # If at end of test run, re-load original weights (before test run)
@@ -485,7 +486,11 @@ def main(args):
                     no_change_count[1] += 1
 
             # Compute training labels
-            label_value, prev_reward_value = trainer.get_label_value(prev_primitive_action, prev_push_success, prev_grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap, prev_color_success, goal_condition=prev_goal_condition)
+            label_value, prev_reward_value = trainer.get_label_value(
+                prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
+                prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
+                prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
+                place_success=prev_partial_stack_success)
             trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
@@ -638,8 +643,11 @@ def main(args):
         prev_push_success = nonlocal_variables['push_success']
         prev_grasp_success = nonlocal_variables['grasp_success']
         prev_primitive_action = nonlocal_variables['primitive_action']
+        prev_place_success = nonlocal_variables['place_success']
+        prev_partial_stack_success = nonlocal_variables['partial_stack_success']
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
+        prev_place_predictions = place_predictions
         prev_best_pix_ind = nonlocal_variables['best_pix_ind']
         prev_stack = nonlocal_variables['stack']
         prev_goal_condition = goal_condition
