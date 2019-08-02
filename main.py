@@ -225,7 +225,8 @@ def main(args):
                     # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
                         print('Strategy: explore (exploration probability: %f)' % (explore_prob))
-                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, 2) == 0 else 'grasp'
+                        push_frequency_one_in_n = 4
+                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
