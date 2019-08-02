@@ -423,7 +423,7 @@ def main(args):
         #if nonlocal_variables['grasp_color_success'] :
             no_change_count = [0, 0]
             if is_sim:
-                print('There haven not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
+                print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
