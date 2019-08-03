@@ -36,6 +36,7 @@ class StackSequence(object):
         self.is_goal_conditioned_task = is_goal_conditioned_task
         self.reset_sequence()
         self.total_steps = 1
+        self.trial = 0
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -57,6 +58,7 @@ class StackSequence(object):
             self.object_color_index = None
             self.object_color_one_hot_encodings = None
             self.object_color_sequence = None
+        self.trial += 1
 
     def current_one_hot(self):
         """ Return the one hot encoding for the current specific object.
@@ -173,7 +175,8 @@ def main(args):
                           'grasp_success' : False,
                           'color_success' : False,
                           'place_success' : False,
-                          'partial_stack_success': False}
+                          'partial_stack_success': False,
+                          'stack_height': 1}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
@@ -350,8 +353,8 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    nonlocal_variables['partial_stack_success'], height_count = robot.check_stack(current_stack_goal)
-                    if height_count < len(current_stack_goal) - 1:
+                    nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
+                    if nonlocal_variables['stack_height'] < len(current_stack_goal) - 1:
                         # we are two blocks off the goal, reset the scene.
                         print('main.py check_stack() after robot place() detected a mismatch between the goal '
                               'and current workspace state, resetting the objects and goals...')
