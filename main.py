@@ -376,7 +376,7 @@ def main(args):
 
                 if place:
 
-                    trainer.stack_height_log.append([nonlocal_variables['stack_height']])
+                    trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                     if stack_count > 0:
@@ -578,8 +578,9 @@ def main(args):
                         sample_color_success = None
 
                     if place:
-                        sample_stack_height = int(trainer.stack_height_log[sample_iteration])
-                        next_stack_height = int(trainer.stack_height_log[sample_iteration+1])
+                        # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
+                        sample_stack_height = int(trainer.stack_height_log[sample_iteration][0])
+                        next_stack_height = int(trainer.stack_height_log[sample_iteration+1][0])
                     else:
                         # set to 1 because stack height is used as the reward multiplier
                         sample_stack_height = 1
