@@ -423,9 +423,6 @@ def main(args):
         if is_sim and is_testing:
             empty_threshold = 10
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
-        #print(nonlocal_variables['grasp_color_success'])
-        #if nonlocal_variables['grasp_color_success'] :
-            no_change_count = [0, 0]
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
@@ -442,6 +439,7 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
                 robot.restart_real()
 
+            no_change_count = [0, 0]
             trainer.clearance_log.append([trainer.iteration])
             logger.write_to_log('clearance', trainer.clearance_log)
             if is_testing and len(trainer.clearance_log) >= max_test_trials:
