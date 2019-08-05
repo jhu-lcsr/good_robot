@@ -578,8 +578,8 @@ def main(args):
                         sample_color_success = None
 
                     if place:
-                        sample_stack_height = trainer.stack_height_log[sample_iteration]
-                        next_stack_height = trainer.stack_height_log[sample_iteration+1]
+                        sample_stack_height = int(trainer.stack_height_log[sample_iteration])
+                        next_stack_height = int(trainer.stack_height_log[sample_iteration+1])
                     else:
                         # set to 1 because stack height is used as the reward multiplier
                         sample_stack_height = 1
