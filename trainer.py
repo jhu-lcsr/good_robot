@@ -112,6 +112,8 @@ class Trainer(object):
         self.is_exploit_log = []
         self.clearance_log = []
         self.goal_condition_log = []
+        if place:
+            self.stack_height_log = []
 
 
     # Pre-load execution info and RL variables
@@ -229,7 +231,8 @@ class Trainer(object):
 
     def get_label_value(
             self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
-            next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None, prev_place_predictions=None):
+            next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None,
+            prev_place_predictions=None, reward_multiplier=1):
 
         if self.method == 'reactive':
 
@@ -253,35 +256,35 @@ class Trainer(object):
             current_reward = 0
             if primitive_action == 'push':
                 if change_detected:
-                    current_reward = self.push_reward
+                    current_reward = self.push_reward * reward_multiplier
             elif primitive_action == 'grasp':
                 if color_success is None:
                     if grasp_success:
-                        current_reward = self.grasp_reward
+                        current_reward = self.grasp_reward * reward_multiplier
                 elif color_success is not None:
                     # HK add if statement
                     if grasp_success and not color_success:
                         #current_reward = 1.0
                         # TODO(hkwon14): fine tune reward function
                         # current_reward = 0
-                        current_reward = self.grasp_reward
+                        current_reward = self.grasp_reward * reward_multiplier
                     # HK: Color: Compute current reward
                     elif grasp_success and color_success:
-                        current_reward = self.grasp_color_reward
-            #TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
+                        current_reward = self.grasp_color_reward * reward_multiplier
+            # TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
             elif primitive_action == 'place':
                 if color_success is None:
                     if place_success:
-                        current_reward = self.place_reward
+                        current_reward = self.place_reward * reward_multiplier
                 elif color_success is not None:
                     # HK add if statement
                     if place_success and not color_success:
                         #current_reward = 1.0
                         # TODO: fine tune reward function
-                        current_reward = self.place_reward
+                        current_reward = self.place_reward * reward_multiplier
                     # HK: Color: Compute current reward
                     elif place_success and color_success:
-                        current_reward = self.place_color_reward
+                        current_reward = self.place_color_reward * reward_multiplier
 
             # Compute future reward
             if self.place and not change_detected and not grasp_success and not place_success:

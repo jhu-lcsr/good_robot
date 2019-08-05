@@ -34,9 +34,9 @@ class StackSequence(object):
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.trial = 0
         self.reset_sequence()
         self.total_steps = 1
-        self.trial = 0
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -375,6 +375,8 @@ def main(args):
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
+
+                    trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                     if stack_count > 0:
@@ -492,7 +494,7 @@ def main(args):
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
-                place_success=prev_partial_stack_success)
+                place_success=prev_partial_stack_success, reward_multiplier=prev_stack_height)
             trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
@@ -500,6 +502,8 @@ def main(args):
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
+            if place:
+                logger.write_to_log('stack-height', trainer.stack_height_log)
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -571,6 +575,15 @@ def main(args):
                         next_goal_condition = None
                         sample_color_success = None
 
+                    if place:
+                        # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
+                        sample_stack_height = int(trainer.stack_height_log[sample_iteration][0])
+                        next_stack_height = int(trainer.stack_height_log[sample_iteration+1][0])
+                    else:
+                        # set to 1 because stack height is used as the reward multiplier
+                        sample_stack_height = 1
+                        next_stack_height = 1
+
                     sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
                         sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
@@ -601,7 +614,7 @@ def main(args):
                         sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
                         sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
                         sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions,
-                        place_success=sample_place_success)
+                        place_success=sample_place_success, reward_multiplier=sample_stack_height)
 
                     # Get labels for sample and backpropagate
                     sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
@@ -647,10 +660,13 @@ def main(args):
         prev_primitive_action = nonlocal_variables['primitive_action']
         prev_place_success = nonlocal_variables['place_success']
         prev_partial_stack_success = nonlocal_variables['partial_stack_success']
+        # stack_height will just always be 1 if we are not actually stacking
+        prev_stack_height = nonlocal_variables['stack_height']
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_place_predictions = place_predictions
         prev_best_pix_ind = nonlocal_variables['best_pix_ind']
+        # TODO(ahundt) BUG We almost certainly need to copy nonlocal_variables['stack']
         prev_stack = nonlocal_variables['stack']
         prev_goal_condition = goal_condition
         # HK: check color_success arguments
