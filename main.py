@@ -34,9 +34,9 @@ class StackSequence(object):
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.trial = 0
         self.reset_sequence()
         self.total_steps = 1
-        self.trial = 0
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
