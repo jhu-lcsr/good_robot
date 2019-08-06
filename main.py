@@ -194,20 +194,25 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal(size_shift=-1):
+    def check_stack_update_goal(place_check=False):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
 
-            size_shift: How much to shift the expected stack size comparison taller (negative number for smaller).
+            place_check: If place check is True we should match the current stack goal,
+                all other actions should match the stack check excluding the top goal block,
+                which will not have been placed yet.
 
         # Returns
 
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+        if not place_check:
+            # only the place check expects the current goal to be met
+            current_stack_goal = current_stack_goal[:-1]
         nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
-        max_workspace_height = len(current_stack_goal) + size_shift
+        max_workspace_height = len(current_stack_goal) - 1
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
@@ -363,7 +368,7 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal(size_shift=0)
+                        needed_to_reset = check_stack_update_goal()
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -398,7 +403,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    needed_to_reset = check_stack_update_goal()
+                    needed_to_reset = check_stack_update_goal(place_check=True)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
