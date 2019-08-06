@@ -209,7 +209,7 @@ def main(args):
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
             print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
-                  'and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
+                  ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
                   ', RESETTING the objects, goals, and action success to FALSE...')
             robot.reposition_objects()
             nonlocal_variables['stack'].reset_sequence()
