@@ -1146,7 +1146,7 @@ class Robot(object):
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1181,7 +1181,7 @@ class Robot(object):
             # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
             # object indices sorted highest to lowest
             low2high_idx = object_z_positions.argsort()
-            high_idx = low2high_idx[-1]
+            high_idx = low2high_idx[top_idx]
             low2high_pos = pos[low2high_idx,:]
             # filter objects closest to the highest block in x, y based on the threshold
             nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
@@ -1217,7 +1217,7 @@ class Robot(object):
                 return False, idx + 1
         # TODO(ahundt) add check_stack for real robot
         print('check_stack(): the current stack looks OK!')
-        return True, idx + 1
+        return True, idx + 2
 
 
     def restart_real(self):

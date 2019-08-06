@@ -194,7 +194,7 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal(place_check=False):
+    def check_stack_update_goal(place_check=False, top_idx=-1):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -202,6 +202,8 @@ def main(args):
             place_check: If place check is True we should match the current stack goal,
                 all other actions should match the stack check excluding the top goal block,
                 which will not have been placed yet.
+            top_idx: The index of blocks sorted from high to low which is expected to contain the top stack block.
+                -1 will be the highest object in the scene, -2 will be the second highest in the scene, etc.
 
         # Returns
 
@@ -216,16 +218,16 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset.
-        nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
+        nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         max_workspace_height = len(current_stack_goal) - stack_shift
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
-        print('DEBUG check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' partial_stack_success: ' +
-              str(nonlocal_variables['partial_stack_success']) + ' Does the debug code think a reset is needed: ' + str(needed_to_reset))
+        print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' partial_stack_success: ' +
+              str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if needed_to_reset:
         # Line above commented for debugging, remove line below after debugging complete
-        if needed_to_reset and place_check:
+        if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
-            print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
+            print('main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
                   ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
                   ', RESETTING the objects, goals, and action success to FALSE...')
             robot.reposition_objects()
@@ -389,9 +391,14 @@ def main(args):
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     if place:
+                        # when we are stacking we must also check the stack in case we caused it to topple
+                        top_idx = -1
+                        if nonlocal_variables['grasp_success']:
+                            # we will need to check the second from top block for the stack
+                            top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal()
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
