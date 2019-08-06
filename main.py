@@ -184,6 +184,33 @@ def main(args):
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
 
+    def check_stack_update_goal():
+        """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
+
+        # Returns
+
+        needed_to_reset boolean which is True if a reset was needed and False otherwise.
+        """
+        current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+        nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
+        needed_to_reset = nonlocal_variables['stack_height'] < len(current_stack_goal) - 1
+        if needed_to_reset:
+            # we are two blocks off the goal, reset the scene.
+            print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal '
+                  'and current workspace state, RESETTING the objects, goals, and action success to FALSE...')
+            robot.reposition_objects()
+            nonlocal_variables['stack'].reset_sequence()
+            nonlocal_variables['stack'].next()
+            # We needed to reset, so the stack must have been knocked over!
+            # all rewards and success checks are False!
+            nonlocal_variables['push_success'] = False
+            nonlocal_variables['grasp_success'] = False
+            nonlocal_variables['place_success'] = False
+            # HK: Added color variable
+            nonlocal_variables['grasp_color_success'] = False
+            nonlocal_variables['place_color_success'] = False
+        return needed_to_reset
+
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
@@ -192,6 +219,7 @@ def main(args):
         successful_grasp_count = 0
         successful_color_grasp_count = 0
         place_count = 0
+        place_rate = 0
         # short stacks of blocks
         partial_stack_count = 0
         partial_stack_rate = np.inf
@@ -353,15 +381,8 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
-                    if nonlocal_variables['stack_height'] < len(current_stack_goal) - 1:
-                        # we are two blocks off the goal, reset the scene.
-                        print('main.py check_stack() after robot place() detected a mismatch between the goal '
-                              'and current workspace state, resetting the objects and goals...')
-                        robot.reposition_objects()
-                        nonlocal_variables['stack'].reset_sequence()
-                        nonlocal_variables['stack'].next()
-                    elif nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                    needed_to_reset = check_stack_update_goal()
+                    if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
@@ -375,14 +396,17 @@ def main(args):
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
-
+                    # TODO(ahundt) check_stack_update_goal is somewhat expensive... maybe there is a better way to do this? Also, move to a class?
+                    needed_to_reset = check_stack_update_goal()
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
+                        place_rate = float(partial_stack_count)/float(place_count)
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
-                    print('stats for place: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  place_attempts: ' + str(place_count) + '  partial_stack_successes: ' + str(partial_stack_count) +
+                    print('PLACE: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
+                          ' (lower is better)  ' + 'place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                          '  partial_stack_successes: ' + str(partial_stack_count) +
                           '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
