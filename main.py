@@ -194,8 +194,12 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal():
+    def check_stack_update_goal(size_shift=-1):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
+
+        # Params
+
+            size_shift: How much to shift the expected stack size comparison taller (negative number for smaller).
 
         # Returns
 
@@ -203,7 +207,7 @@ def main(args):
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
         nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
-        max_workspace_height = len(current_stack_goal) - 1
+        max_workspace_height = len(current_stack_goal) + size_shift
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
@@ -233,6 +237,8 @@ def main(args):
         # all the blocks stacked
         stack_count = 0
         stack_rate = np.inf
+        # will need to reset if something went wrong with stacking
+        needed_to_reset = False
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -353,10 +359,12 @@ def main(args):
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
-                    print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                     if place:
-                        # Check if the push caused a topple
-                        needed_to_reset = check_stack_update_goal()
+                        # Check if the push caused a topple, size shift is more negative (-2) because
+                        # normal stack operations expect increased height, which push does not.
+                        needed_to_reset = check_stack_update_goal(size_shift=-2)
+                    if not place or not needed_to_reset:
+                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
