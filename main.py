@@ -360,9 +360,10 @@ def main(args):
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     if place:
-                        # Check if the push caused a topple, size shift is more negative (-2) because
-                        # normal stack operations expect increased height, which push does not.
-                        needed_to_reset = check_stack_update_goal(size_shift=-2)
+                        # Check if the push caused a topple, size shift zero because
+                        # place operations expect increased height,
+                        # while push expects constant height.
+                        needed_to_reset = check_stack_update_goal(size_shift=0)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
