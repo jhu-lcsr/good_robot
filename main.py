@@ -186,6 +186,15 @@ def main(args):
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
 
+
+    def set_nonlocal_success_variables_false():
+        nonlocal_variables['push_success'] = False
+        nonlocal_variables['grasp_success'] = False
+        nonlocal_variables['place_success'] = False
+        # HK: Added color variable
+        nonlocal_variables['grasp_color_success'] = False
+        nonlocal_variables['place_color_success'] = False
+
     def check_stack_update_goal():
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
@@ -195,22 +204,19 @@ def main(args):
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
         nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
-        needed_to_reset = nonlocal_variables['stack_height'] < len(current_stack_goal) - 1
+        max_workspace_height = len(current_stack_goal) - 1
+        needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
-            print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal '
-                  'and current workspace state, RESETTING the objects, goals, and action success to FALSE...')
+            print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
+                  'and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
+                  ', RESETTING the objects, goals, and action success to FALSE...')
             robot.reposition_objects()
             nonlocal_variables['stack'].reset_sequence()
             nonlocal_variables['stack'].next()
             # We needed to reset, so the stack must have been knocked over!
             # all rewards and success checks are False!
-            nonlocal_variables['push_success'] = False
-            nonlocal_variables['grasp_success'] = False
-            nonlocal_variables['place_success'] = False
-            # HK: Added color variable
-            nonlocal_variables['grasp_color_success'] = False
-            nonlocal_variables['place_color_success'] = False
+            set_nonlocal_success_variables_false()
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -340,21 +346,18 @@ def main(args):
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
                 # Initialize variables that influence reward
-                nonlocal_variables['push_success'] = False
-                nonlocal_variables['grasp_success'] = False
-                nonlocal_variables['place_success'] = False
-                # HK: Added color variable
-                nonlocal_variables['grasp_color_success'] = False
-                nonlocal_variables['place_color_success'] = False
+                set_nonlocal_success_variables_false()
                 change_detected = False
                 if place:
                     current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
-                    # TODO(hkwon214): check if robot.push returns True correctly
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
+                    if place:
+                        # Make sure the push didn't knock the stack over
+                        needed_to_reset = check_stack_update_goal()
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
@@ -363,6 +366,9 @@ def main(args):
                         print('Attempt to grasp color: ' + grasp_color_name)
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+                    if place and nonlocal_variables['grasp_success']:
+                        # TODO(ahundt) update the grasp success check to see if the grasp knocked over the stack on a successful grasp too
+                        needed_to_reset = check_stack_update_goal()
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -399,7 +405,6 @@ def main(args):
 
                 if place:
                     # TODO(ahundt) check_stack_update_goal is somewhat expensive... maybe there is a better way to do this? Also, move to a class?
-                    needed_to_reset = check_stack_update_goal()
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)

@@ -1165,6 +1165,7 @@ class Robot(object):
             i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
             If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """
+        # TODO(ahundt) support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
         checks = len(object_color_sequence) - 1
         if checks <= 0:
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
