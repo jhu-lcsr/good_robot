@@ -91,7 +91,7 @@ class StackSequence(object):
 
 
 def main(args):
-
+    # TODO(ahundt) move main and process_actions() to a class?
 
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
@@ -185,7 +185,6 @@ def main(args):
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
-
 
     def set_nonlocal_success_variables_false():
         nonlocal_variables['push_success'] = False
@@ -356,7 +355,7 @@ def main(args):
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
                     print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                     if place:
-                        # Make sure the push didn't knock the stack over
+                        # Check if the push caused a topple
                         needed_to_reset = check_stack_update_goal()
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
@@ -405,7 +404,6 @@ def main(args):
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 if place:
-                    # TODO(ahundt) check_stack_update_goal is somewhat expensive... maybe there is a better way to do this? Also, move to a class?
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
@@ -466,6 +464,7 @@ def main(args):
                 if is_testing: # If at end of test run, re-load original weights (before test run)
                     trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
+                    set_nonlocal_success_variables_false()
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
             else:
