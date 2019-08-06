@@ -176,7 +176,9 @@ def main(args):
                           'color_success' : False,
                           'place_success' : False,
                           'partial_stack_success': False,
-                          'stack_height': 1}
+                          'stack_height': 1,
+                          'stack_rate': np.inf}
+    best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
@@ -404,6 +406,7 @@ def main(args):
                         place_rate = float(partial_stack_count)/float(place_count)
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
+                        nonlocal_variables['stack_rate'] = stack_rate
                     print('PLACE: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  ' + 'place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
@@ -663,6 +666,14 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.model, method)
+                    if trainer.use_cuda:
+                        trainer.model = trainer.model.cuda()
+                # Save model if we are at a new best stack rate
+                if place and best_stack_rate < nonlocal_variables['stack_rate']:
+                    best_stack_rate = nonlocal_variables['stack_rate']
+                    stack_rate_str = method + '-best-stack-rate'
+                    logger.save_backup_model(trainer.model, stack_rate_str)
+                    logger.save_model(trainer.model, stack_rate_str)
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
