@@ -219,7 +219,11 @@ def main(args):
         nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal)
         max_workspace_height = len(current_stack_goal) - stack_shift
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
-        if needed_to_reset:
+        print('DEBUG check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' partial_stack_success: ' +
+              str(nonlocal_variables['partial_stack_success']) + ' Does the debug code think a reset is needed: ' + str(needed_to_reset))
+        # if needed_to_reset:
+        # Line above commented for debugging, remove line below after debugging complete
+        if needed_to_reset and place_check:
             # we are two blocks off the goal, reset the scene.
             print('main.py check_stack() after robot place() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
                   ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
