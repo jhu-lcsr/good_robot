@@ -366,8 +366,9 @@ def main(args):
                         print('Attempt to grasp color: ' + grasp_color_name)
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    if place and nonlocal_variables['grasp_success']:
-                        # TODO(ahundt) update the grasp success check to see if the grasp knocked over the stack on a successful grasp too
+                    if place and not nonlocal_variables['grasp_success']:
+                        # check if a failed grasp led to a topple
+                        # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         needed_to_reset = check_stack_update_goal()
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
