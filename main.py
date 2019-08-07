@@ -218,13 +218,19 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset.
-        nonlocal_variables['partial_stack_success'], nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+        stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+        nonlocal_variables['partial_stack_success'] = stack_matches_goal
+        if nonlocal_variables['stack_height'] == 1:
+            # A stack of size 1 does not meet the criteria for a partial stack success
+            nonlocal_variables['partial_stack_success'] = False
+
         max_workspace_height = len(current_stack_goal) - stack_shift
+        # Has that stack gotten shorter than it was before? If so we need to reset
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
-        print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' partial_stack_success: ' +
+        print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
-        # if needed_to_reset:
-        # Line above commented for debugging, remove line below after debugging complete
+        # if place and needed_to_reset:
+        # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
             print('main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
