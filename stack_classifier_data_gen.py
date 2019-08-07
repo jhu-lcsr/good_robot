@@ -15,6 +15,7 @@ from trainer import Trainer
 from logger_for_classifier import Logger
 import utils
 from main import StackSequence
+import csv
 
 
 ############### Testing Block Stacking #######
@@ -71,8 +72,11 @@ stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
-num_stacks = 10
+num_stacks = 3400
 iteration = 0
+labels = []
+data_num = 1
+
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
     print('+++++++ Making New Stack                  ++++++++')
@@ -113,10 +117,15 @@ for stack in range(num_stacks):
         logger.save_images_stack(iteration, color_img, depth_img, stack_class)
         logger.save_heightmaps_stack(iteration, color_heightmap, valid_depth_heightmap, stack_class)
         ###########################################
+        filename = '%06d.%s.color.png' % (iteration, stack_class)
+        labels.append([filename,iteration,stack_class])
+        print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
+        iteration += 1
 
-        print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) )
-        iteration +=1
     # reset scene
     robot.reposition_objects()
     # determine first block to grasp
     stacksequence.next()
+
+# save labels
+logger.save_label_1('stack_label', labels)

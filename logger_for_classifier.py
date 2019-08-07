@@ -4,6 +4,7 @@ import os
 import numpy as np
 import cv2
 import torch
+import csv
 # import h5py
 
 class Logger():
@@ -85,6 +86,13 @@ class Logger():
 
     def write_to_log(self, log_name, log):
         np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
+    
+    def save_label(self, log_name, log):
+        np.savetxt(os.path.join(self.color_images_directory, '%s.log.txt' % log_name), log, delimiter=' ')
+    
+    def save_label_1(self, log_name, log):
+        with open(os.path.join(self.color_images_directory, '%s.txt' % log_name), 'w') as f:
+            csv.writer(f, delimiter=' ').writerows(log)
 
     def save_model(self, model, name):
         torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
