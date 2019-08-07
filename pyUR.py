@@ -347,10 +347,10 @@ class URcomm(object):
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
     def throw_andy(self, wait=True, is_sim=False):
-        default_jacc = 6  # 8.0
+        default_jacc = 8  # 8.0
         default_jvel = 3.0  # 3.0
-        toss_jacc = 10  # 25.0
-        toss_jvel = 2.0  # 3.2
+        toss_jacc = 25  # 25.0
+        toss_jvel = 3.2  # 3.2
         pretoss_jconf = np.asarray(
             [90., -45., 90., -098.9, -90., 0.])*np.pi/180.0
         posttoss_jconf = np.asarray(
