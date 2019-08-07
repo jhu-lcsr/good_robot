@@ -1224,7 +1224,7 @@ class Robot(object):
                 print('check_stack(): too far apart')
                 return False, idx + 1
         detected_height = min(idx + 2, len(object_color_sequence))
-        print('check_stack(): the current stack looks OK! detected height: ' + str(detected_height))
+        print('check_stack() current detected stack height: ' + str(detected_height))
         # TODO(ahundt) add check_stack for real robot
         return goal_success, detected_height
 
