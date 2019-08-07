@@ -347,9 +347,9 @@ class URcomm(object):
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
     def throw_andy(self, wait=True, is_sim=False):
-        default_jacc = 8  # 8.0
+        default_jacc = 8.  # 8.0
         default_jvel = 3.0  # 3.0
-        toss_jacc = 25  # 25.0
+        toss_jacc = 25.  # 25.0
         toss_jvel = 3.2  # 3.2
         pretoss_jconf = np.asarray(
             [90., -45., 90., -098.9, -90., 0.])*np.pi/180.0
@@ -362,8 +362,8 @@ class URcomm(object):
         # toss_blend_radius = 0.7 # BLEND FAIL
         # toss_blend_radius = 0.6 # CAUSES CRUNCH SOUND ON WAY UP
         # toss_blend_radius = 0.005 # FINE
-        toss_blend_radius = 0.01  # FINE
-        toss_blend_radius = 0.01
+        toss_blend_radius = 0.6  # FINE
+        # toss_blend_radius = 0.5
 
         tcp_msg = "def process():\n"
         tcp_msg += '    socket_open("127.0.0.1",63352,"gripper_socket")\n'
