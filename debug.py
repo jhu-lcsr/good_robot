@@ -30,9 +30,13 @@ workspace_limits = np.asarray(
 # ---------------------------------------------
 
 # Initialize robot and move to home pose
+# NOTE: IMPORTANT!!! ROBOT WILL GO HERE FIRST AT RAPID SPEED
+home = np.asarray([90., -45., 90., -098.9, -90., 0.]) * np.pi / 180.0
+print('home', home)
+
 robot = Robot(False, False, None, workspace_limits,
               tcp_host_ip, tcp_port, None, None,
-              False, None, None)
+              False, None, None, home_joint_config=home)
 
 # Repeatedly grasp at middle of workspace
 grasp_position = np.sum(workspace_limits, axis=1) / 2
@@ -66,7 +70,8 @@ while True:
             time.sleep(0.05)
             print('!----Throw started')
             # robot.r.throw_sideways(is_sim=False)
-            robot.r.throw(is_sim=False)
+            # robot.r.throw(is_sim=False)
+            robot.r.throw_andy(is_sim=False)
             print('!----Throw completed')
         if str(prompt2) == 'o':
             robot.r.open_gripper()

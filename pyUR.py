@@ -10,7 +10,7 @@ __license__ = "LGPLv3"
 
 
 class URcomm(object):
-    def __init__(self, host, joint_vel, joint_acc):
+    def __init__(self, host, joint_vel, joint_acc, home_joint_config=None):
 
         self.joint_vel = joint_vel
         self.joint_acc = joint_acc
@@ -24,12 +24,16 @@ class URcomm(object):
         self.secmon = ursecmon.SecondaryMonitor(host)
 
         # NOTE: this is for throw practice
-        home_in_deg = np.array(
-            # [-107, -105, 130, -92, -44, -30]) * 1.0  # sideways # bent wrist 1 2
-            [-197, -105, 130, -110, -90, -30]) * 1.0
-        # [-107, -105, 130, -110, -90, -30]) * 1.0  # sideways
-        # [-107, -105, 130, -85, -90, -30]) * 1.0  # sideways bent wrist
-        self.home_joint_config = np.deg2rad(home_in_deg)
+        if home_joint_config is None:
+            home_in_deg = np.array(
+                # [-107, -105, 130, -92, -44, -30]) * 1.0  # sideways # bent wrist 1 2
+                [-197, -105, 130, -110, -90, -30]) * 1.0
+            # [-107, -105, 130, -110, -90, -30]) * 1.0  # sideways
+            # [-107, -105, 130, -85, -90, -30]) * 1.0  # sideways bent wrist
+            self.home_joint_config = np.deg2rad(home_in_deg)
+        else:
+            self.home_joint_config = home_joint_config
+        self.logger.debug("Home config: ", self.home_joint_config)
 
         self.moveto_limits = (
             [[0.300, 0.600], [-0.250, 0.180], [0.195, 0.571]])
@@ -179,13 +183,24 @@ class URcomm(object):
             self.btw(position[2], limits[2][0], limits[2][1])
         return safe
 
-    def _format_move(self, command, tpose, acc, vel, radius=0, prefix=""):
+    def _format_move(self, command, tpose, acc, vel, radius=0, time=0, prefix=""):
         # prefix= p for position, none for joints
         tpose = [round(i, self.max_float_length) for i in tpose]
+        # can i specifiy time?
         tpose.append(acc)
         tpose.append(vel)
         tpose.append(radius)
-        return "\t{}({}[{},{},{},{},{},{}], a={}, v={}, r={})\n".format(command, prefix, *tpose)
+        tpose.append(time)
+        return "\t{}({}[{}, {}, {}, {}, {}, {}], a={}, v={}, r={}, t={})\n".format(command, prefix, *tpose)
+
+   # tcp_command += " set_digital_out(8,False)\n"
+   # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" \
+   # % (position[0], position[1], position[2] + 0.1, tool_orientation[0],
+   # tool_orientation[1], 0.0, self.joint_acc * 0.5, self.joint_vel * 0.5)
+   # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" \
+   # % (position[0], position[1], position[2], tool_orientation[0],
+   # tool_orientation[1], 0.0, self.joint_acc * 0.1, self.joint_vel * 0.1)
+   # tcp_command += " set_digital_out(8,True)\n"
 
     # -- Move commands
 
@@ -331,6 +346,59 @@ class URcomm(object):
         # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
+    def throw_andy(self, wait=True, is_sim=False):
+        default_jacc = 6  # 8.0
+        default_jvel = 3.0  # 3.0
+        toss_jacc = 10  # 25.0
+        toss_jvel = 2.0  # 3.2
+        pretoss_jconf = np.asarray(
+            [90., -45., 90., -098.9, -90., 0.])*np.pi/180.0
+        posttoss_jconf = np.asarray(
+            # [90., -057.8, 035.1, -142.1, -90., 0.])*np.pi/180.0
+            # JOINT 3 IS THE PROBLEM
+            [90., -057.8, 035.1, -142.1, -90., 0.])*np.pi/180.0
+        # [90., -057.8, 90, -142.1, -90., 0.])*np.pi/180.0
+        pretoss_blend_radius = 0.09
+        # toss_blend_radius = 0.7 # BLEND FAIL
+        # toss_blend_radius = 0.6 # CAUSES CRUNCH SOUND ON WAY UP
+        # toss_blend_radius = 0.005 # FINE
+        toss_blend_radius = 0.01  # FINE
+        toss_blend_radius = 0.01
+
+        tcp_msg = "def process():\n"
+        tcp_msg += '    socket_open("127.0.0.1",63352,"gripper_socket")\n'
+        tcp_msg += "    sync()\n"
+        # tcp_msg += self._format_move("movej", pretoss_jconf, default_jacc,
+        # default_jvel, pretoss_blend_radius, time=0, prefix="") + "\n"
+        # tcp_msg += self._format_move("movej", posttoss_jconf, toss_jacc,
+        # toss_jvel, toss_blend_radius, time=0, prefix="") + "\n"
+        tcp_msg += '    movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0.0,r=%f)\n' % (pretoss_jconf[0], pretoss_jconf[1], pretoss_jconf[2],
+                                                                              pretoss_jconf[3], pretoss_jconf[4], pretoss_jconf[5], default_jacc, default_jvel, pretoss_blend_radius)
+        tcp_msg += '    movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0.0,r=%f)\n' % (posttoss_jconf[0], posttoss_jconf[1],
+                                                                              posttoss_jconf[2], posttoss_jconf[3], posttoss_jconf[4], posttoss_jconf[5], toss_jacc, toss_jvel, toss_blend_radius)
+        # tcp_msg += '    set_digital_out(8,False)\n'  # for RG2 gripper
+        tcp_msg += "    socket_set_var(\"{}\",{},\"{}\")\n".format("SPE", 255,
+                                                                   self.socket_name)
+        tcp_msg += "    socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
+                                                                   self.socket_name)
+        tcp_msg += "    sync()\n"
+        # tcp_msg += self._format_move("movej", pretoss_jconf, default_jacc,
+        # default_jvel, radius=0, time=0, prefix="") + "\n"
+        tcp_msg += '    movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0.0,r=0.0)\n' % (pretoss_jconf[0], pretoss_jconf[1],
+                                                                               pretoss_jconf[2], pretoss_jconf[3], pretoss_jconf[4], pretoss_jconf[5], default_jacc, default_jvel)
+        tcp_msg += '    socket_close("gripper_socket")\n'
+        tcp_msg += 'end\n'
+        self.send_program(tcp_msg, is_sim=is_sim)
+
+        if wait:
+            joint_flag = True
+            self._wait_for_move(target=pretoss_jconf,
+                                threshold=self.pose_tolerance, joints=joint_flag)
+            return self.get_state('cartesian_info')
+
+        print('done with toss')
+        # self.send_program(prog, is_sim=is_sim)
+
     def throw(self, is_sim=False):
         self.close_gripper()
         # currently hard coded positions
@@ -338,68 +406,61 @@ class URcomm(object):
         # acc, vel = 8, 3 # Default
         # acc, vel = 15, 10
         # K = 8.5
-        K = 0.5
+        K = 2
         acc, vel = 1.4 * K, K
         start_position = [0.350, 0.000, 0.250, 2.12, -2.21, -0.009]
         start_move = {'type': 'p',
                       'pose': start_position,
                       # 'acc': None, 'vel': None, 'radius': 0.2}
-                      'acc': acc, 'vel': vel, 'radius': 0.01}
+                      'acc': acc, 'vel': vel, 'radius': 0.001}
 
-        # curled_config_deg = [-196, -107, 126, -90, -90, -12]
-        # curled_config = [np.deg2rad(i) for i in curled_config_deg]
-        # curled_move = {'type': 'j',
-        # 'pose': curled_config,
-        # 'acc': acc, 'vel': vel, 'radius': 0.2}
-        curled_position = [0.350, 0.000, 0.250, 1.75, -1.80, -0.62]
-        curled_move = {'type': 'p',
-                       'pose': curled_position,
-                       'acc': acc, 'vel': vel, 'radius': 0.001}
+        # curled_position = [0.350, 0.000, 0.250, 1.75, -1.80, -0.62]
+        # curled_move = {'type': 'p',
+        # 'pose': curled_position,
+        # 'acc': acc, 'vel': vel, 'radius': 0.000}
 
-        # throw_position = [0.597, 0.000, 0.550, 2.18, -2.35, 2.21]
-        # throw_position = [0.597, 0.000, 0.640, 2.28, -2.35, 2.20]
-        # throw_position = [0.597, 0.000, 0.640, 2.38, -2.37, 1.60]
-        throw_position = [0.597, 0.000, 0.640, 2.26, -2.35, 2.24]
+        # throw_position = [0.597, 0.000, 0.640, 2.26, -2.35, 2.24]
+        throw_position = [0.550, 0.000, 0.550, 2.26, -2.35, 2.24]
         # throw_position = [0.567, 0.000, 0.580, 2.38, -2.37, 1.60]
         throw_move = {'type': 'p',
                       'pose': throw_position,
-                      'acc': acc, 'vel': vel, 'radius': 0.200}
+                      'acc': acc, 'vel': vel, 'radius': 0.150}
 
+        throw2_position = np.array(throw_position) + \
+            np.array([0.050, 0.000, 0.105, 0, 0, 0])
+        throw2_position = throw2_position.tolist()
+        throw2_move = {'type': 'p',
+                       'pose': throw2_position,
+                       'acc': acc, 'vel': vel, 'radius': 0.01}  # max =0.05*1.4
         # return_position = [0.590, 0.000, 0.620, 2.38, -2.37, 1.60]
         # return_move = {'type': 'p',
         # 'pose': return_position,
         # 'acc': 3.5, 'vel': 3.5, 'radius': 0.100}
 
         home_position = np.array(start_position) + \
-            np.array([0, 0, 0.070, 0, 0, 0])
+            np.array([0.010, 0, 0.210, 0, 0, 0])
         home_position = home_position.tolist()
         home_move = {'type': 'p',
                      'pose': home_position,
-                     'acc': 1.0, 'vel': 1.0, 'radius': 0.01}
+                     'acc': 1.0, 'vel': 1.0, 'radius': 0.001}
 
         gripper_open = {'type': 'open'}
-        # middle_position = np.array(end_position) - \
-        # np.array([0.020, 0, -0.020, 0, 0, 0])
-
-        # blend_radius = 0.100
-        # K = 1.   # 28.
-
-        # NOTE: important
 
         # throw_pose_list = [curled_move, throw_move,  # throw_move,
-        throw_pose_list = [throw_move,
-                           gripper_open, home_move, start_move]
+        throw_pose_list = [throw_move, gripper_open, throw2_move,
+                           home_move, start_move]
         # throw_pose_list = [start_move]
 
-        # pose_list = [start_pose, middle_pose, end_pose, start_pose]
         self.combo_move(throw_pose_list, wait=True, is_sim=is_sim)
 
+        '''
         # Pre-compute blend radius
         # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
         # tcp_command += "movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=%f)\n" % \
         # (position[0], position[1], bin_position[2],
         # tool_orientation[0], tool_orientation[1], 0.0,
         # self.joint_acc, self.joint_vel, blend_radius)
+        '''
 
     def is_running(self):
         """

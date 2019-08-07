@@ -17,7 +17,8 @@ from real.camera import Camera
 class Robot(object):
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file):
+                 is_testing, test_preset_cases, test_preset_file,
+                 home_joint_config=None):
 
         self.is_sim = is_sim
 
@@ -64,7 +65,7 @@ class Robot(object):
 
             # port is assumed to be 30002
             self.r = URcomm(tcp_host_ip, self.joint_vel,
-                            self.joint_acc)
+                            self.joint_acc, home_joint_config)
 
             # Move robot to home pose
             self.r.go_home()
