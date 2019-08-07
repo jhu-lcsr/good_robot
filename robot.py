@@ -1223,9 +1223,10 @@ class Robot(object):
             if dist > distance_threshold:
                 print('check_stack(): too far apart')
                 return False, idx + 1
+        detected_height = min(idx + 2, len(object_color_sequence))
+        print('check_stack(): the current stack looks OK! detected height: ' + str(detected_height))
         # TODO(ahundt) add check_stack for real robot
-        print('check_stack(): the current stack looks OK!')
-        return goal_success, idx + 2
+        return goal_success, detected_height
 
 
     def restart_real(self):
