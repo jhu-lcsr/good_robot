@@ -1171,6 +1171,9 @@ class Robot(object):
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
         pos = np.asarray(self.get_obj_positions())
+        # Assume the stack will work out successfully
+        # in the end until proven otherwise
+        goal_success = True
         if not self.grasp_color_task:
             # Automatically determine the color order.
             # We don't worry about the colors, just the length of the sequence.
@@ -1193,10 +1196,15 @@ class Robot(object):
                       'expected at least ' + str(num_obj) +
                       ' nearby objects, but only counted: ' + str(len(object_color_sequence)))
                 # there aren't enough nearby objects for a successful stack!
+                checks = len(object_color_sequence) - 1
+                # We know the goal won't be met, so goal_success is False
+                # But we still need to count the actual stack height so set the variable for later
+                goal_success = False
                 # TODO(ahundt) BUG this may actually return 1 when there is a stack of size 2 present, but 3 objects are needed
-                return False, 1
-            # cut out objects we don't need to check
-            object_color_sequence = object_color_sequence[:num_obj+1]
+                # return False, 1
+            else:
+                # cut out objects we don't need to check
+                object_color_sequence = object_color_sequence[:num_obj+1]
             # print('auto object_color_sequence: ' + str(object_color_sequence))
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
@@ -1217,7 +1225,7 @@ class Robot(object):
                 return False, idx + 1
         # TODO(ahundt) add check_stack for real robot
         print('check_stack(): the current stack looks OK!')
-        return True, idx + 2
+        return goal_success, idx + 2
 
 
     def restart_real(self):
