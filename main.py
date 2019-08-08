@@ -297,6 +297,8 @@ def main(args):
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
+                trainer.trial_log.append([nonlocal_variables['stack'].trial])
+                logger.write_to_log('trial', trainer.trial_log)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.

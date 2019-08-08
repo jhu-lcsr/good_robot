@@ -112,6 +112,7 @@ class Trainer(object):
         self.is_exploit_log = []
         self.clearance_log = []
         self.goal_condition_log = []
+        self.trial_log = []
         if place:
             self.stack_height_log = []
 
@@ -149,6 +150,15 @@ class Trainer(object):
         self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
         self.clearance_log.shape = (self.clearance_log.shape[0],1)
         self.clearance_log = self.clearance_log.tolist()
+        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ')
+        self.trial_log = self.trial_log[0:self.iteration]
+        self.trial_log.shape = (self.iteration,1)
+        self.trial_log = self.trial_log.tolist()
+        if self.place:
+            self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), delimiter=' ')
+            self.stack_height_log = self.stack_height_log[0:self.iteration]
+            self.stack_height_log.shape = (self.iteration,1)
+            self.stack_height_log = self.trial_log.tolist()
 
 
     # Compute forward pass through model to compute affordances/Q
