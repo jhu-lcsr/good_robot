@@ -381,7 +381,7 @@ class URcomm(object):
                                                                    self.socket_name)
         tcp_msg += "    socket_set_var(\"{}\",{},\"{}\")\n".format("POS", 0,
                                                                    self.socket_name)
-        tcp_msg += "    sync()\n"
+        # tcp_msg += "    sync()\n"
         # tcp_msg += self._format_move("movej", pretoss_jconf, default_jacc,
         # default_jvel, radius=0, time=0, prefix="") + "\n"
         tcp_msg += '    movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0.0,r=0.0)\n' % (pretoss_jconf[0], pretoss_jconf[1],
