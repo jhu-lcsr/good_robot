@@ -107,13 +107,13 @@ class pixel_net(nn.Module):
         else:
             # Initialize network trunks with DenseNet pre-trained on ImageNet
             self.push_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.push_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.grasp_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.grasp_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.push_depth_trunk = self.push_color_trunk
+            self.grasp_color_trunk = self.push_color_trunk
+            self.grasp_depth_trunk = self.push_color_trunk
 
             # TODO(hkwon214): added placenet to test block testing
-            self.place_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.place_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            self.place_color_trunk = self.push_color_trunk
+            self.place_depth_trunk = self.push_color_trunk
             fc_channels = 1280 * 2
 
         self.num_rotations = 16
