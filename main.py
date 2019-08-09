@@ -712,7 +712,7 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
                 # Save model if we are at a new best stack rate
-                if place and best_stack_rate < nonlocal_variables['stack_rate']:
+                if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
                     best_stack_rate = nonlocal_variables['stack_rate']
                     stack_rate_str = method + '-best-stack-rate'
                     logger.save_backup_model(trainer.model, stack_rate_str)
