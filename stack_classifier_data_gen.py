@@ -45,7 +45,7 @@ test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases e
 # load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
 # snapshot_file = os.path.abspath(args.snapshot_file)  if load_snapshot else None
 continue_logging = False # Continue logging from previous session
-logging_directory = 'logs_for_classifier'
+logging_directory = './logs_for_classifier/training'
 logging_directory = os.path.abspath(logging_directory) if continue_logging else os.path.abspath('logs_for_classifier')
 # save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
@@ -72,10 +72,18 @@ stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
-num_stacks = 3400
-iteration = 0
+num_stacks = 500
 labels = []
 data_num = 1
+continue_gen = True
+if continue_gen == False:
+    iteration = 0
+else:
+    label_text = "./logs_for_classifier/training/data/color-images/stack_label.txt"
+    myfile = open(label_text, 'r')
+    myfiles = [line.split(' ') for line in myfile.readlines()]
+    iteration = 6033
+
 
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -118,7 +126,16 @@ for stack in range(num_stacks):
         logger.save_heightmaps_stack(iteration, color_heightmap, valid_depth_heightmap, stack_class)
         ###########################################
         filename = '%06d.%s.color.png' % (iteration, stack_class)
+        if continue_gen:
+
+            print(myfiles)
+            myfiles.append([filename,iteration,stack_class])
+            # with open(label_text, "a") as myfile:
+            #     title = [filename,iteration,stack_class]
+            #     myfile.write('%d' % number)
+            #logger.save_label_1('stack_label', myfiles)
         labels.append([filename,iteration,stack_class])
+        logger.save_label_1('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
         iteration += 1
 
@@ -127,5 +144,8 @@ for stack in range(num_stacks):
     # determine first block to grasp
     stacksequence.next()
 
-# save labels
-logger.save_label_1('stack_label', labels)
+## save labels
+#if continue_gen == False:
+#    logger.save_label_1('stack_label', labels)
+#else:
+#    logger.save_label_1('stack_label_cont', labels)
