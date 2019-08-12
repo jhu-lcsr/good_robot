@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import CrossEntropyLoss2d
-from models import pixel_net
+from models import PixelNet
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
@@ -38,7 +38,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -68,7 +68,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
