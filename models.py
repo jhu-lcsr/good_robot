@@ -76,10 +76,10 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
-class pixel_net(nn.Module):
+class PixelNet(nn.Module):
 
     def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False): # , snapshot=None
-        super(pixel_net, self).__init__()
+        super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
         self.use_vector_block = use_vector_block
@@ -221,7 +221,7 @@ class pixel_net(nn.Module):
             return self.output_prob, self.interm_feat
 
     def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
-        """ Reduces the repetitive forward pass code across multiple model classes. See pixel_net forward() and responsive_net forward().
+        """ Reduces the repetitive forward pass code across multiple model classes. See PixelNet forward() and responsive_net forward().
         """
         interm_place_feat = None
         # Compute sample grid for rotation BEFORE neural network
