@@ -811,7 +811,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=50,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
 
