@@ -261,6 +261,7 @@ def main(args):
         stack_rate = np.inf
         # will need to reset if something went wrong with stacking
         needed_to_reset = False
+        grasp_str = ''
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -423,7 +424,8 @@ def main(args):
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
                     if grasp_color_task:
                         grasp_str += ' color success rate: %r' % (color_grasp_rate)
-                    print(grasp_str)
+                    if not place:
+                        print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
@@ -449,10 +451,10 @@ def main(args):
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
-                    print('PLACE: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
+                    print('STACK: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  ' + 'place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
+                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal) + ' ' + grasp_str)
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -519,6 +521,9 @@ def main(args):
 
             # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
+
+        if place and nonlocal_variables['stack'].trial > max_test_trials:
+            exit_called = True
 
         if not exit_called:
 
@@ -806,7 +811,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=30,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
 
