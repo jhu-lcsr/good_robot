@@ -106,14 +106,7 @@ class pixel_net(nn.Module):
             fc_channels = 2048
         else:
             # Initialize network trunks with DenseNet pre-trained on ImageNet
-            self.push_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.push_depth_trunk = self.push_color_trunk
-            self.grasp_color_trunk = self.push_color_trunk
-            self.grasp_depth_trunk = self.push_color_trunk
-
-            # TODO(hkwon214): added placenet to test block testing
-            self.place_color_trunk = self.push_color_trunk
-            self.place_depth_trunk = self.push_color_trunk
+            self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
             fc_channels = 1280 * 2
 
         self.num_rotations = 16
@@ -262,15 +255,15 @@ class pixel_net(nn.Module):
                 interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
         else:
             # efficientnet
-            interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
-            interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
-            interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
-            interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+            interm_push_color_feat = self.image_trunk.extract_features(rotate_color)
+            interm_push_depth_feat = self.image_trunk.extract_features(rotate_depth)
+            interm_grasp_color_feat = interm_push_color_feat
+            interm_grasp_depth_feat = interm_push_depth_feat
 
             # TODO(hkwon214): added placenet to test block testing
             if self.place:
-                interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
-                interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
+                interm_place_color_feat = interm_push_depth_feat
+                interm_place_depth_feat = interm_push_color_feat
 
         # Combine features, including the goal condition if appropriate
         if goal_condition is None:
