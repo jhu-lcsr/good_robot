@@ -452,9 +452,9 @@ def main(args):
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
                     print('STACK: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + 'place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal) + ' ' + grasp_str)
+                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
