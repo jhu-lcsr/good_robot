@@ -451,7 +451,8 @@ def main(args):
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
-                    print('STACK: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
+                    print('STACK:  trial: ' + nonlocal_variables['stack'].trial + ' actions/partial: ' + str(partial_stack_rate) +
+                          '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
                           '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
@@ -522,7 +523,7 @@ def main(args):
             # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
 
-        if place and nonlocal_variables['stack'].trial > max_test_trials:
+        if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
             exit_called = True
 
         if not exit_called:
