@@ -83,6 +83,8 @@ class PixelNet(nn.Module):
         self.use_cuda = use_cuda
         self.place = place
         self.use_vector_block = use_vector_block
+        self.upsample_scale = 16
+        self.num_rotations = 16
 
         if self.use_vector_block:
             channels_out = 2048
@@ -105,11 +107,19 @@ class PixelNet(nn.Module):
             self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             fc_channels = 2048
         else:
+            # how many dilations to do at the end of the network
+            num_dilation = 1
             # Initialize network trunks with DenseNet pre-trained on ImageNet
-            self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            try:
+                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+            except:
+                print('Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                      'instead of the original efficientnet pytorch')
+                num_dilation = 0
+                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            # how much will the dilations affect the upsample step
+            self.upsample_scale =  self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
-
-        self.num_rotations = 16
 
         # Construct network branches for pushing and grasping
         self.pushnet = trunk_net('push', fc_channels, goal_condition_len, 1)
@@ -173,12 +183,12 @@ class PixelNet(nn.Module):
                 # Forward pass through branches, undo rotation on output predictions, upsample results
                 # TODO(hkwon214): added placenet to test block testing
                 if self.place:
-                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
                 else:
-                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                        nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
 
             torch.set_grad_enabled(True)
             return output_prob, interm_feat
@@ -211,13 +221,13 @@ class PixelNet(nn.Module):
             # Forward pass through branches, undo rotation on output predictions, upsample results
             # TODO(hkwon214): added placenet to test block testing
             if self.place:
-                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
             else:
-                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
-
+                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+            # print('output prob shapes: ' + str(self.output_prob[0][0].shape))
             return self.output_prob, self.interm_feat
 
     def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
