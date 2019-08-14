@@ -79,11 +79,10 @@ continue_gen = True
 if continue_gen == False:
     iteration = 0
 else:
-    label_text = "./logs_for_classifier/training/data/color-images/stack_label.txt"
+    label_text = "./logs_for_classifier/test/data/color-images/stack_label.txt"
     myfile = open(label_text, 'r')
     myfiles = [line.split(' ') for line in myfile.readlines()]
-    iteration = 6033
-
+    iteration = int(myfiles[-1][1]) +1
 
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -128,14 +127,22 @@ for stack in range(num_stacks):
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_gen:
 
-            print(myfiles)
-            myfiles.append([filename,iteration,stack_class])
+            with open(label_text,"a") as f:
+                f.writelines("\n")
+                filename = ['000005.0.color.png',' ', str(iteration),' ', str(stack_class)] 
+                f.writelines(filename)
+                #opened_file.write("%r\n" %new_string)
+                f.close()
+
+            # print(myfiles)
+            # myfiles.append([filename,iteration,stack_class])
             # with open(label_text, "a") as myfile:
             #     title = [filename,iteration,stack_class]
             #     myfile.write('%d' % number)
             #logger.save_label_1('stack_label', myfiles)
-        labels.append([filename,iteration,stack_class])
-        logger.save_label_1('stack_label', labels)
+        else:
+            labels.append([filename,iteration,stack_class])
+            logger.save_label_1('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
         iteration += 1
 
