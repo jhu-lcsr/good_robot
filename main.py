@@ -177,7 +177,8 @@ def main(args):
                           'place_success' : False,
                           'partial_stack_success': False,
                           'stack_height': 1,
-                          'stack_rate': np.inf}
+                          'stack_rate': np.inf,
+                          'trial_success_rate': np.inf}
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
@@ -262,6 +263,8 @@ def main(args):
         # will need to reset if something went wrong with stacking
         needed_to_reset = False
         grasp_str = ''
+        successful_trial_count = 0
+        trial_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -438,6 +441,7 @@ def main(args):
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
+                            successful_trial_count += 1
                             robot.reposition_objects()
                             nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -451,11 +455,13 @@ def main(args):
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
+                        trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
+                        nonlocal_variables['trial_success_rate'] = trial_rate
                     print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
                           '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
+                          '  stack_successes: ' + str(stack_count) + 'trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
