@@ -47,12 +47,15 @@ def tile_vector_as_image_channels_torch(vector_op, image_shape):
     return vector_op
 
 
-def trunk_net(name='', fc_channels=2048, goal_condition_len=0, channels_out=3):
+def trunk_net(name='', fc_channels=2048, second_fc_channels=None, goal_condition_len=0, channels_out=3):
     first_fc = fc_channels + goal_condition_len
     # original behavior of second conv layer
     # second_fc = 64
     # new behavior of second conv layer
-    second_fc = fc_channels + goal_condition_len
+    if second_fc_channels is None:
+        second_fc = fc_channels + goal_condition_len
+    else:
+        second_fc = second_fc_channels + goal_condition_len
     return nn.Sequential(OrderedDict([
             (name + '-norm0', nn.BatchNorm2d(first_fc)),
             (name + '-relu0', nn.ReLU(inplace=True)),
@@ -85,6 +88,7 @@ class PixelNet(nn.Module):
         self.use_vector_block = use_vector_block
         self.upsample_scale = 16
         self.num_rotations = 16
+        self.network = network
 
         if self.use_vector_block:
             channels_out = 2048
@@ -106,6 +110,7 @@ class PixelNet(nn.Module):
             self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             fc_channels = 2048
+            second_fc_channels = 64
         else:
             # how many dilations to do at the end of the network
             num_dilation = 1
@@ -120,13 +125,14 @@ class PixelNet(nn.Module):
             # how much will the dilations affect the upsample step
             self.upsample_scale =  self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
+            second_fc_channels = None
 
         # Construct network branches for pushing and grasping
-        self.pushnet = trunk_net('push', fc_channels, goal_condition_len, 1)
-        self.graspnet = trunk_net('grasp', fc_channels, goal_condition_len, 1)
+        self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
+        self.graspnet = trunk_net('grasp', fc_channels, second_fc_channels, goal_condition_len, 1)
         # TODO(hkwon214): added placenet to test block testing
         if place:
-            self.placenet = trunk_net('place', fc_channels, goal_condition_len, 1)
+            self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
 
         # Initialize network weights
         for m in self.named_modules():
