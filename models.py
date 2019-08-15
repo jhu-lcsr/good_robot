@@ -106,9 +106,10 @@ class PixelNet(nn.Module):
             self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
-            # TODO(hkwon214): added placenet to test block testing
-            self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            # placenet tests block stacking
+            if self.place:
+                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             fc_channels = 2048
             second_fc_channels = 64
         else:
@@ -130,7 +131,7 @@ class PixelNet(nn.Module):
         # Construct network branches for pushing and grasping
         self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
         self.graspnet = trunk_net('grasp', fc_channels, second_fc_channels, goal_condition_len, 1)
-        # TODO(hkwon214): added placenet to test block testing
+        # placenet tests block stacking
         if place:
             self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
 
@@ -187,7 +188,7 @@ class PixelNet(nn.Module):
                     flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
                 # Forward pass through branches, undo rotation on output predictions, upsample results
-                # TODO(hkwon214): added placenet to test block testing
+                # placenet tests block stacking
                 if self.place:
                     output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
@@ -225,7 +226,7 @@ class PixelNet(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
             # print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
                 self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
@@ -265,7 +266,7 @@ class PixelNet(nn.Module):
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
                 interm_place_color_feat = self.place_color_trunk.features(rotate_color)
                 interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
@@ -276,7 +277,7 @@ class PixelNet(nn.Module):
             interm_grasp_color_feat = interm_push_color_feat
             interm_grasp_depth_feat = interm_push_depth_feat
 
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
                 interm_place_color_feat = interm_push_depth_feat
                 interm_place_depth_feat = interm_push_color_feat
