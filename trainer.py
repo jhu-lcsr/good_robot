@@ -554,8 +554,8 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind):
-
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=2):
+        # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
         for canvas_row in range(int(num_rotations/4)):
@@ -565,6 +565,8 @@ class Trainer(object):
                 prediction_vis = predictions[rotate_idx,:,:].copy()
                 # prediction_vis[prediction_vis < 0] = 0 # assume probability
                 # prediction_vis[prediction_vis > 1] = 1 # assume probability
+                # Reduce the dynamic range so the visualization looks better
+                prediction_vis = prediction_vis/scale_factor
                 prediction_vis = np.clip(prediction_vis, 0, 1)
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
