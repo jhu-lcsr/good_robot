@@ -735,6 +735,12 @@ def main(args):
         # Sync both action thread and training thread
         while nonlocal_variables['executing_action']:
             time.sleep(0.01)
+            time_elapsed = time.time()-iteration_time_0
+            if int(time_elapsed) > 20:
+                # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                robot.reposition_objects()
+
 
         if exit_called:
             break
