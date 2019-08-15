@@ -252,7 +252,7 @@ class PixelNet(nn.Module):
             rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
 
         # Compute intermediate features
-        if efficientnet_pytorch is None:
+        if efficientnet_pytorch is None or self.network == 'densenet':
             # densenet
             interm_push_color_feat = self.push_color_trunk.features(rotate_color)
             interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
