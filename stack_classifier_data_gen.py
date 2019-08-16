@@ -41,11 +41,30 @@ max_test_trials = 1 # Maximum number of test runs per case/scenario
 test_preset_cases = False
 test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
 
+#####################################################################
+## Modify 
+#continue_gen = True
+split = 'test' #['train', 'val', 'test']
+##
+
+root = './logs_for_classifier'
+logging_directory = os.path.join(root, split)
+if split == 'train':
+    num_stacks = 33400 
+    max_iterations = 100000
+elif split == 'test' or split == 'val':
+    num_stacks = 3400
+    max_iterations = 10000
+
+labels = []
+data_num = 1
+#####################################################################
+
 # ------ Pre-loading and logging options ------
 # load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
 # snapshot_file = os.path.abspath(args.snapshot_file)  if load_snapshot else None
-continue_logging = False # Continue logging from previous session
-logging_directory = './logs_for_classifier/training'
+continue_logging = True # Continue logging from previous session
+#logging_directory = './logs_for_classifier/training'
 logging_directory = os.path.abspath(logging_directory) if continue_logging else os.path.abspath('logs_for_classifier')
 # save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
@@ -72,11 +91,8 @@ stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
-num_stacks = 500
-labels = []
-data_num = 1
-continue_gen = True
-if continue_gen == False:
+
+if continue_logging  == False:
     iteration = 0
 else:
     label_text = "./logs_for_classifier/test/data/color-images/stack_label.txt"
@@ -124,13 +140,14 @@ for stack in range(num_stacks):
         logger.save_images_stack(iteration, color_img, depth_img, stack_class)
         logger.save_heightmaps_stack(iteration, color_heightmap, valid_depth_heightmap, stack_class)
         ###########################################
+        print(stack)
         filename = '%06d.%s.color.png' % (iteration, stack_class)
-        if continue_gen:
+        if continue_logging:
 
             with open(label_text,"a") as f:
                 f.writelines("\n")
-                filename = ['000005.0.color.png',' ', str(iteration),' ', str(stack_class)] 
-                f.writelines(filename)
+                name = [filename,' ', str(iteration),' ', str(stack_class)] 
+                f.writelines(name)
                 #opened_file.write("%r\n" %new_string)
                 f.close()
 
@@ -146,10 +163,14 @@ for stack in range(num_stacks):
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
         iteration += 1
 
+
+
     # reset scene
     robot.reposition_objects()
     # determine first block to grasp
     stacksequence.next()
+    if iteration > max_iterations:
+        break
 
 ## save labels
 #if continue_gen == False:
