@@ -19,12 +19,15 @@ class Trainer(object):
 
         self.method = method
         self.place = place
-        reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.25
-        self.push_reward = reward_schedule[0]
-        self.grasp_reward = reward_schedule[1]
-        self.grasp_color_reward = reward_schedule[2]
-        self.place_reward = reward_schedule[3]
-        self.place_color_reward = reward_schedule[4]
+        if self.place:
+            self.push_reward = 0.0625
+            self.grasp_reward = 0.125
+            self.grasp_color_reward = 0.25
+            self.place_reward = 0.5
+            self.place_color_reward = 1.0
+        else:
+            self.push_reward = 0.5
+            self.grasp_reward = 1.0
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
@@ -555,7 +558,7 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=3):
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=2):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
