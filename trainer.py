@@ -19,11 +19,15 @@ class Trainer(object):
 
         self.method = method
         self.place = place
-        self.push_reward = 0.0625
-        self.grasp_reward = 0.125
-        self.grasp_color_reward = 0.25
-        self.place_reward = 0.5
-        self.place_color_reward = 1.0
+        if self.place:
+            self.push_reward = 0.0625
+            self.grasp_reward = 0.125
+            self.grasp_color_reward = 0.25
+            self.place_reward = 0.5
+            self.place_color_reward = 1.0
+        else:
+            self.push_reward = 0.5
+            self.grasp_reward = 1.0
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
