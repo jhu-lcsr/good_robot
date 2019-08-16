@@ -42,15 +42,15 @@ test_preset_cases = False
 test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
 
 #####################################################################
-## Modify 
+## Modify
 #continue_gen = True
-split = 'test' #['train', 'val', 'test']
+split = 'train' #['train', 'val', 'test']
 ##
 
 root = './logs_for_classifier'
 logging_directory = os.path.join(root, split)
 if split == 'train':
-    num_stacks = 33400 
+    num_stacks = 33400
     max_iterations = 100000
 elif split == 'test' or split == 'val':
     num_stacks = 3400
@@ -63,7 +63,7 @@ data_num = 1
 # ------ Pre-loading and logging options ------
 # load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
 # snapshot_file = os.path.abspath(args.snapshot_file)  if load_snapshot else None
-continue_logging = True # Continue logging from previous session
+continue_logging = False # Continue logging from previous session
 #logging_directory = './logs_for_classifier/training'
 logging_directory = os.path.abspath(logging_directory) if continue_logging else os.path.abspath('logs_for_classifier')
 # save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
@@ -95,7 +95,8 @@ blocks_to_move = num_obj - 1
 if continue_logging  == False:
     iteration = 0
 else:
-    label_text = "./logs_for_classifier/test/data/color-images/stack_label.txt"
+    #label_text = "./logs_for_classifier/test/data/color-images/stack_label.txt"
+    label_text = os.path.join(logging_directory, 'data','color-images', 'stack_label.txt')
     myfile = open(label_text, 'r')
     myfiles = [line.split(' ') for line in myfile.readlines()]
     iteration = int(myfiles[-1][1]) +1
@@ -146,7 +147,7 @@ for stack in range(num_stacks):
 
             with open(label_text,"a") as f:
                 f.writelines("\n")
-                name = [filename,' ', str(iteration),' ', str(stack_class)] 
+                name = [filename,' ', str(iteration),' ', str(stack_class)]
                 f.writelines(name)
                 #opened_file.write("%r\n" %new_string)
                 f.close()
