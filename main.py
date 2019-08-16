@@ -177,7 +177,8 @@ def main(args):
                           'place_success' : False,
                           'partial_stack_success': False,
                           'stack_height': 1,
-                          'stack_rate': np.inf}
+                          'stack_rate': np.inf,
+                          'trial_success_rate': np.inf}
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
@@ -217,7 +218,7 @@ def main(args):
             # only the place check expects the current goal to be met
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
-        # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset.
+        # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if nonlocal_variables['stack_height'] == 1:
@@ -261,6 +262,9 @@ def main(args):
         stack_rate = np.inf
         # will need to reset if something went wrong with stacking
         needed_to_reset = False
+        grasp_str = ''
+        successful_trial_count = 0
+        trial_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -297,6 +301,8 @@ def main(args):
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
+                trainer.trial_log.append([nonlocal_variables['stack'].trial])
+                logger.write_to_log('trial', trainer.trial_log)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
@@ -421,7 +427,8 @@ def main(args):
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
                     if grasp_color_task:
                         grasp_str += ' color success rate: %r' % (color_grasp_rate)
-                    print(grasp_str)
+                    if not place:
+                        print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
@@ -434,6 +441,7 @@ def main(args):
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
+                            successful_trial_count += 1
                             robot.reposition_objects()
                             nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -447,10 +455,13 @@ def main(args):
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
-                    print('PLACE: actions/partial: ' + str(partial_stack_rate) + '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + 'place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                        trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
+                        nonlocal_variables['trial_success_rate'] = trial_rate
+                    print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
+                          '  actions/full stack: ' + str(stack_rate) +
+                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' stack goal: ' + str(current_stack_goal))
+                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -517,6 +528,9 @@ def main(args):
 
             # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
+
+        if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
+            exit_called = True
 
         if not exit_called:
 
@@ -710,7 +724,7 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
                 # Save model if we are at a new best stack rate
-                if place and best_stack_rate < nonlocal_variables['stack_rate']:
+                if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
                     best_stack_rate = nonlocal_variables['stack_rate']
                     stack_rate_str = method + '-best-stack-rate'
                     logger.save_backup_model(trainer.model, stack_rate_str)
@@ -721,6 +735,12 @@ def main(args):
         # Sync both action thread and training thread
         while nonlocal_variables['executing_action']:
             time.sleep(0.01)
+            time_elapsed = time.time()-iteration_time_0
+            if int(time_elapsed) > 20:
+                # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                robot.reposition_objects()
+
 
         if exit_called:
             break
@@ -804,7 +824,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=30,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=50,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
 

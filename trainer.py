@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import CrossEntropyLoss2d
-from models import pixel_net
+from models import PixelNet
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
@@ -38,7 +38,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -68,7 +68,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = pixel_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -112,6 +112,7 @@ class Trainer(object):
         self.is_exploit_log = []
         self.clearance_log = []
         self.goal_condition_log = []
+        self.trial_log = []
         if place:
             self.stack_height_log = []
 
@@ -149,6 +150,15 @@ class Trainer(object):
         self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
         self.clearance_log.shape = (self.clearance_log.shape[0],1)
         self.clearance_log = self.clearance_log.tolist()
+        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ')
+        self.trial_log = self.trial_log[0:self.iteration]
+        self.trial_log.shape = (self.iteration,1)
+        self.trial_log = self.trial_log.tolist()
+        if self.place:
+            self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), delimiter=' ')
+            self.stack_height_log = self.stack_height_log[0:self.iteration]
+            self.stack_height_log.shape = (self.iteration,1)
+            self.stack_height_log = self.trial_log.tolist()
 
 
     # Compute forward pass through model to compute affordances/Q
@@ -223,7 +233,7 @@ class Trainer(object):
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     if self.place:
-                        place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         if not self.place:
             place_predictions = None
         return push_predictions, grasp_predictions, place_predictions, state_feat
@@ -544,8 +554,8 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind):
-
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=2):
+        # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
         for canvas_row in range(int(num_rotations/4)):
@@ -555,6 +565,8 @@ class Trainer(object):
                 prediction_vis = predictions[rotate_idx,:,:].copy()
                 # prediction_vis[prediction_vis < 0] = 0 # assume probability
                 # prediction_vis[prediction_vis > 1] = 1 # assume probability
+                # Reduce the dynamic range so the visualization looks better
+                prediction_vis = prediction_vis/scale_factor
                 prediction_vis = np.clip(prediction_vis, 0, 1)
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)

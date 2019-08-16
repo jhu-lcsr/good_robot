@@ -47,12 +47,15 @@ def tile_vector_as_image_channels_torch(vector_op, image_shape):
     return vector_op
 
 
-def trunk_net(name='', fc_channels=2048, goal_condition_len=0, channels_out=3):
+def trunk_net(name='', fc_channels=2048, second_fc_channels=None, goal_condition_len=0, channels_out=3):
     first_fc = fc_channels + goal_condition_len
     # original behavior of second conv layer
     # second_fc = 64
     # new behavior of second conv layer
-    second_fc = fc_channels + goal_condition_len
+    if second_fc_channels is None:
+        second_fc = fc_channels + goal_condition_len
+    else:
+        second_fc = second_fc_channels + goal_condition_len
     return nn.Sequential(OrderedDict([
             (name + '-norm0', nn.BatchNorm2d(first_fc)),
             (name + '-relu0', nn.ReLU(inplace=True)),
@@ -76,13 +79,16 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
-class pixel_net(nn.Module):
+class PixelNet(nn.Module):
 
     def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False): # , snapshot=None
-        super(pixel_net, self).__init__()
+        super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
         self.use_vector_block = use_vector_block
+        self.upsample_scale = 16
+        self.num_rotations = 16
+        self.network = network
 
         if self.use_vector_block:
             channels_out = 2048
@@ -100,30 +106,34 @@ class pixel_net(nn.Module):
             self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
 
-            # TODO(hkwon214): added placenet to test block testing
-            self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            # placenet tests block stacking
+            if self.place:
+                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
             fc_channels = 2048
+            second_fc_channels = 64
         else:
+            # how many dilations to do at the end of the network
+            num_dilation = 1
             # Initialize network trunks with DenseNet pre-trained on ImageNet
-            self.push_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.push_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.grasp_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.grasp_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-
-            # TODO(hkwon214): added placenet to test block testing
-            self.place_color_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-            self.place_depth_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            try:
+                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+            except:
+                print('Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                      'instead of the original efficientnet pytorch')
+                num_dilation = 0
+                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+            # how much will the dilations affect the upsample step
+            self.upsample_scale =  self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
-
-        self.num_rotations = 16
+            second_fc_channels = None
 
         # Construct network branches for pushing and grasping
-        self.pushnet = trunk_net('push', fc_channels, goal_condition_len, 1)
-        self.graspnet = trunk_net('grasp', fc_channels, goal_condition_len, 1)
-        # TODO(hkwon214): added placenet to test block testing
+        self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
+        self.graspnet = trunk_net('grasp', fc_channels, second_fc_channels, goal_condition_len, 1)
+        # placenet tests block stacking
         if place:
-            self.placenet = trunk_net('place', fc_channels, goal_condition_len, 1)
+            self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
 
         # Initialize network weights
         for m in self.named_modules():
@@ -178,14 +188,14 @@ class pixel_net(nn.Module):
                     flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
                 # Forward pass through branches, undo rotation on output predictions, upsample results
-                # TODO(hkwon214): added placenet to test block testing
+                # placenet tests block stacking
                 if self.place:
-                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
-                                    nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
                 else:
-                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                        nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
 
             torch.set_grad_enabled(True)
             return output_prob, interm_feat
@@ -216,19 +226,19 @@ class pixel_net(nn.Module):
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
             # print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
-                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
+                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
             else:
-                self.output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                     nn.Upsample(scale_factor=16, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
-
+                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+            # print('output prob shapes: ' + str(self.output_prob[0][0].shape))
             return self.output_prob, self.interm_feat
 
     def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
-        """ Reduces the repetitive forward pass code across multiple model classes. See pixel_net forward() and responsive_net forward().
+        """ Reduces the repetitive forward pass code across multiple model classes. See PixelNet forward() and responsive_net forward().
         """
         interm_place_feat = None
         # Compute sample grid for rotation BEFORE neural network
@@ -249,28 +259,28 @@ class pixel_net(nn.Module):
             rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest')
 
         # Compute intermediate features
-        if efficientnet_pytorch is None:
+        if efficientnet_pytorch is None or self.network == 'densenet':
             # densenet
             interm_push_color_feat = self.push_color_trunk.features(rotate_color)
             interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
 
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
                 interm_place_color_feat = self.place_color_trunk.features(rotate_color)
                 interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
         else:
             # efficientnet
-            interm_push_color_feat = self.push_color_trunk.extract_features(rotate_color)
-            interm_push_depth_feat = self.push_depth_trunk.extract_features(rotate_depth)
-            interm_grasp_color_feat = self.grasp_color_trunk.extract_features(rotate_color)
-            interm_grasp_depth_feat = self.grasp_depth_trunk.extract_features(rotate_depth)
+            interm_push_color_feat = self.image_trunk.extract_features(rotate_color)
+            interm_push_depth_feat = self.image_trunk.extract_features(rotate_depth)
+            interm_grasp_color_feat = interm_push_color_feat
+            interm_grasp_depth_feat = interm_push_depth_feat
 
-            # TODO(hkwon214): added placenet to test block testing
+            # placenet tests block stacking
             if self.place:
-                interm_place_color_feat = self.place_color_trunk.extract_features(rotate_color)
-                interm_place_depth_feat = self.place_depth_trunk.extract_features(rotate_depth)
+                interm_place_color_feat = interm_push_depth_feat
+                interm_place_depth_feat = interm_push_color_feat
 
         # Combine features, including the goal condition if appropriate
         if goal_condition is None:

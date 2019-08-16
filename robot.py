@@ -1108,7 +1108,7 @@ class Robot(object):
                 increment = -0.2
             while abs(tool_rotation_angle - gripper_orientation[1]) >= 0.2:
                 vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + increment, np.pi/2), vrep.simx_opmode_blocking)
-                time.sleep(0.01)
+                time.sleep(0.005)
                 sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
             vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
 
