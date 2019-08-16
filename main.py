@@ -526,7 +526,6 @@ def main(args):
             if is_testing and len(trainer.clearance_log) >= max_test_trials:
                 exit_called = True # Exit after training thread (backprop and saving labels)
 
-            # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
             continue
 
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
