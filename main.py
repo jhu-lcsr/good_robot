@@ -775,17 +775,6 @@ def main(args):
         else:
             prev_color_success = None
 
-        # TODO(ahundt) verify equivalent code in process_actions(), then delete this if block, especially if the code has been working for a while
-        # if place and nonlocal_variables['place_success']:
-        #     prev_stack_goal = prev_stack.current_sequence_progress()
-        #     nonlocal_variables['stack'].next()
-        #     stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        #     # TODO(ahundt) add stack success check here or in the appropriate spot in the code
-        #     if len(prev_stack_goal) > len(stack_goal):
-        #         # full stack is complete. Reset.
-        #         # TODO(ahundt) handle failure cases like stack falling over and consider giving a big reward if the full height stacking check passes.
-        #         robot.reposition_objects()
-
         trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
