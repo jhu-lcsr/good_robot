@@ -118,6 +118,7 @@ class PixelNet(nn.Module):
             # Initialize network trunks with DenseNet pre-trained on ImageNet
             try:
                 self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
             except:
                 print('Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
                       'instead of the original efficientnet pytorch')
@@ -272,15 +273,17 @@ class PixelNet(nn.Module):
                 interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
         else:
             # efficientnet
-            interm_push_color_feat = self.image_trunk.extract_features(rotate_color)
-            interm_push_depth_feat = self.image_trunk.extract_features(rotate_depth)
-            interm_grasp_color_feat = interm_push_color_feat
-            interm_grasp_depth_feat = interm_push_depth_feat
+            interm_push_color_feat = self.push_trunk.extract_features(rotate_color)
+            interm_push_depth_feat = self.push_trunk.extract_features(rotate_depth)
+            interm_grasp_color_feat = self.image_trunk.extract_features(rotate_color)
+            interm_grasp_depth_feat = self.image_trunk.extract_features(rotate_depth)
+            # interm_grasp_color_feat = interm_push_color_feat
+            # interm_grasp_depth_feat = interm_push_depth_feat
 
             # placenet tests block stacking
             if self.place:
-                interm_place_color_feat = interm_push_depth_feat
-                interm_place_depth_feat = interm_push_color_feat
+                interm_place_color_feat = interm_grasp_depth_feat
+                interm_place_depth_feat = interm_grasp_color_feat
 
         # Combine features, including the goal condition if appropriate
         if goal_condition is None:
