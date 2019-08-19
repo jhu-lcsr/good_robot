@@ -729,6 +729,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         sample_iteration = sorted_sample_ind[rand_sample_ind]
         sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
+        sample_reward_value = trainer.reward_value_log[sample_iteration]
         nonlocal_variables['replay_iteration'] += 1
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
 
