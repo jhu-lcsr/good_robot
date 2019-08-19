@@ -725,6 +725,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
         rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
+        # sample_iteration is the actual time step on which we will run experience replay
         sample_iteration = sorted_sample_ind[rand_sample_ind]
         sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
