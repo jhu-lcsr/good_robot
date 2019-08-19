@@ -600,7 +600,7 @@ def main(args):
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                goal_condition = experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
 
             # Save model snapshot
             if not is_testing:
@@ -622,7 +622,7 @@ def main(args):
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # do some experience replay while waiting, rather than sleeping
-                goal_condition = experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
             else:
                 time.sleep(0.01)
             time_elapsed = time.time()-iteration_time_0
@@ -706,8 +706,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     # Get samples of the same primitive but with different results
     sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
 
-    if sample_ind.size > 0:
+    if sample_ind.size == 0 and prev_reward_value is not None and trainer.iteration > 2:
+        print('Experience Replay: We do not have examples of the current situation, so sampling from the whole history.')
+        sample_ind = np.arange(1,trainer.iteration-1).reshape(trainer.iteration-2, 1)
 
+    if sample_ind.size > 0:
         # Find sample with highest surprise value
         if method == 'reactive':
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - (1 - sample_reward_value))
@@ -728,10 +731,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
 
         # Compute forward pass with sample
         if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
-            goal_condition = [trainer.goal_condition_log[sample_iteration]]
+            exp_goal_condition = [trainer.goal_condition_log[sample_iteration]]
             next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
         else:
-            goal_condition = None
+            exp_goal_condition = None
             next_goal_condition = None
             sample_color_success = None
 
@@ -745,7 +748,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             next_stack_height = 1
 
         sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
-            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
 
         # Load next sample RGB-D heightmap
         next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
@@ -767,19 +770,19 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             if place:
                 sample_place_success = sample_reward_value == trainer.place_reward
         sample_change_detected = sample_push_success
-        if goal_condition is not None:
+        if exp_goal_condition is not None:
             sample_color_success = sample_reward_value == 1
         # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         new_sample_label_value, _ = trainer.get_label_value(
             sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
             sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-            sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions,
+            sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
             place_success=sample_place_success, reward_multiplier=sample_stack_height)
 
         # Get labels for sample and backpropagate
         sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
         trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
-                         trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
+                         trainer.label_value_log[sample_iteration], goal_condition=exp_goal_condition)
 
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
@@ -792,8 +795,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
-        print('Not enough prior training samples. Skipping experience replay.')
-    return goal_condition
+        print('Experience Replay: 0 prior training samples. Skipping experience replay.')
 
 
 if __name__ == '__main__':
