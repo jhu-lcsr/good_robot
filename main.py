@@ -779,9 +779,9 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                 sample_place_success = sample_reward_value == trainer.place_reward
         sample_change_detected = sample_push_success
         if exp_goal_condition is not None:
-            sample_color_success = sample_reward_value == trainer.grasp_color_reward
+            sample_color_success = sample_reward_value == trainer.grasp_color_reward or sample_reward_value == trainer.place_color_reward
             # or sample_reward_value == trainer.place_color_reward
-            raise NotImplementedError('TODO(ahundt) Experience for color success is not yet correctly implemented, code changes are required')
+            # TODO(ahundt) Experience for color success is not yet correctly implemented, code changes may be required
 
         # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         new_sample_label_value, _ = trainer.get_label_value(
