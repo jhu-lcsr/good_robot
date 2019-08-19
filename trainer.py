@@ -322,15 +322,14 @@ class Trainer(object):
                 # push_predictions_difference = next_push_predictions - prev_push_predictions
                 # grasp_predictions_difference = next_grasp_predictions - prev_grasp_predictions
                 # future_reward = max(np.max(push_predictions_difference), np.max(grasp_predictions_difference))
-
-            print('Current reward: %f' % (current_reward))
-            print('Future reward: %f' % (future_reward))
+            reward_str = 'Trainer.get_label_value(): Current reward: %f Future reward: %f ' % (current_reward, future_reward)
             if primitive_action == 'push' and not self.push_rewards:
                 expected_reward = self.future_reward_discount * future_reward
-                print('Expected reward: %f + %f x %f = %f' % (0.0, self.future_reward_discount, future_reward, expected_reward))
+                reward_str += 'Expected reward: %f + %f x %f = %f' % (0.0, self.future_reward_discount, future_reward, expected_reward)
             else:
                 expected_reward = current_reward + self.future_reward_discount * future_reward
-                print('Expected reward: %f + %f x %f = %f' % (current_reward, self.future_reward_discount, future_reward, expected_reward))
+                reward_str += 'Expected reward: %f + %f x %f = %f' % (current_reward, self.future_reward_discount, future_reward, expected_reward)
+            print(reward_str)
             return expected_reward, current_reward
 
 
