@@ -178,8 +178,12 @@ def main(args):
                           'partial_stack_success': False,
                           'stack_height': 1,
                           'stack_rate': np.inf,
-                          'trial_success_rate': np.inf}
+                          'trial_success_rate': np.inf,
+                          'replay_iteration': 0,}
     best_stack_rate = np.inf
+    # to convert action names to the corresponding ID number and vice-versa
+    ACTION_TO_ID = {'push':0, 'grasp':1, 'place':2}
+    ID_TO_ACTION = {0:'push', 1:'grasp', 2:'place'}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
@@ -678,14 +682,15 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
     sample_primitive_action = prev_primitive_action
+    sample_primitive_action_id = ID_TO_ACTION[sample_primitive_action]
     if sample_primitive_action == 'push':
-        sample_primitive_action_id = 0
+        # sample_primitive_action_id = 0
         if method == 'reactive':
             sample_reward_value = 0 if prev_reward_value == 1 else 1 # random.randint(1, 2) # 2
         elif method == 'reinforcement':
             sample_reward_value = 0 if prev_reward_value == trainer.push_reward else trainer.push_reward
     elif sample_primitive_action == 'grasp':
-        sample_primitive_action_id = 1
+        # sample_primitive_action_id = 1
         if method == 'reactive':
             sample_reward_value = 0 if prev_reward_value == 1 else 1
         elif method == 'reinforcement':
@@ -694,7 +699,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             else:
                 sample_reward_value = 0 if prev_reward_value == trainer.grasp_reward else trainer.grasp_reward
     elif sample_primitive_action == 'place':
-        sample_primitive_action_id = 2
+        # sample_primitive_action_id = 2
         if method == 'reactive':
             sample_reward_value = 0 if prev_reward_value == 1 else 1
         elif method == 'reinforcement':
@@ -721,7 +726,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         pow_law_exp = 2
         rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
         sample_iteration = sorted_sample_ind[rand_sample_ind]
-        print('Experience replay: iteration %d (surprise value: %f)' % (sample_iteration, sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
+        sample_primitive_action_id = trainer.executed_action_log[sample_iteration,0]
+        sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
+        nonlocal_variables['replay_iteration'] += 1
+        print('Experience replay %d: history timstep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
 
         # Load sample RGB-D heightmap
         sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
@@ -771,7 +779,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                 sample_place_success = sample_reward_value == trainer.place_reward
         sample_change_detected = sample_push_success
         if exp_goal_condition is not None:
-            sample_color_success = sample_reward_value == 1
+            sample_color_success = sample_reward_value == trainer.grasp_color_reward
+            # or sample_reward_value == trainer.place_color_reward
+            raise NotImplementedError('TODO(ahundt) Experience for color success is not yet correctly implemented, code changes are required')
+
         # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         new_sample_label_value, _ = trainer.get_label_value(
             sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
