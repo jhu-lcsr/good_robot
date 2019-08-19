@@ -17,6 +17,9 @@ from trainer import Trainer
 from logger import Logger
 import utils
 
+# to convert action names to the corresponding ID number and vice-versa
+ACTION_TO_ID = {'push':0, 'grasp':1, 'place':2}
+ID_TO_ACTION = {0:'push', 1:'grasp', 2:'place'}
 
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True):
@@ -181,9 +184,6 @@ def main(args):
                           'trial_success_rate': np.inf,
                           'replay_iteration': 0,}
     best_stack_rate = np.inf
-    # to convert action names to the corresponding ID number and vice-versa
-    ACTION_TO_ID = {'push':0, 'grasp':1, 'place':2}
-    ID_TO_ACTION = {0:'push', 1:'grasp', 2:'place'}
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
@@ -682,7 +682,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
     sample_primitive_action = prev_primitive_action
-    sample_primitive_action_id = ID_TO_ACTION[sample_primitive_action]
+    sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
     if sample_primitive_action == 'push':
         # sample_primitive_action_id = 0
         if method == 'reactive':
@@ -726,7 +726,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         pow_law_exp = 2
         rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
         sample_iteration = sorted_sample_ind[rand_sample_ind]
-        sample_primitive_action_id = trainer.executed_action_log[sample_iteration,0]
+        sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
         nonlocal_variables['replay_iteration'] += 1
         print('Experience replay %d: history timstep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
