@@ -712,7 +712,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
 
     if sample_ind.size == 0 and prev_reward_value is not None and trainer.iteration > 2:
-        print('Experience Replay: We do not have examples of the current situation, so sampling from the whole history.')
+        print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a reward value of ' + str(sample_reward_value) + ', so sampling from the whole history.')
         sample_ind = np.arange(1,trainer.iteration-1).reshape(trainer.iteration-2, 1)
 
     if sample_ind.size > 0:
