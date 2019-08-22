@@ -1300,6 +1300,10 @@ class Robot(object):
                 break
             tool_analog_input2 = new_tool_analog_input2
 
+    def shutdown(self):
+        if self.is_sim:
+            vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            vrep.simxFinish(-1)
 
         # def place(self, position, orientation, workspace_limits):
         #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))

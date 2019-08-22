@@ -629,9 +629,9 @@ def main(args):
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
 
-
         if exit_called:
-            # TODO(ahundt) stop the simulation
+            # shut down the simulation or robot
+            robot.shutdown()
             break
 
         # Save information for next training step
