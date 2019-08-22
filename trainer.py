@@ -110,8 +110,15 @@ class Trainer(object):
         # Set model to training mode
         self.model.train()
 
+        lr = 1e-4
+        momentum = 0.9
+        weight_decay = 2e-5
+        if is_testing:
+            lr = 1e-6
+            momentum = 0
+            weight_decay = 0
         # Initialize optimizer
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=2e-5)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
         self.iteration = 0
 
         # Initialize lists to save execution info and RL variables
