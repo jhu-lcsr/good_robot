@@ -529,7 +529,7 @@ def main(args):
             no_change_count = [0, 0]
             trainer.clearance_log.append([trainer.iteration])
             logger.write_to_log('clearance', trainer.clearance_log)
-            if is_testing and len(trainer.clearance_log) >= max_test_trials:
+            if is_testing and not place and len(trainer.clearance_log) >= max_test_trials:
                 exit_called = True # Exit after training thread (backprop and saving labels)
 
             continue
@@ -840,7 +840,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=50,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
 
