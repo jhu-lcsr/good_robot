@@ -241,6 +241,7 @@ def main(args):
             print('main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
                   ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
                   ', RESETTING the objects, goals, and action success to FALSE...')
+            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
             robot.reposition_objects()
             nonlocal_variables['stack'].reset_sequence()
             nonlocal_variables['stack'].next()
@@ -446,6 +447,7 @@ def main(args):
                             stack_count += 1
                             # full stack complete! reset the scene
                             successful_trial_count += 1
+                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                             robot.reposition_objects()
                             nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -490,17 +492,8 @@ def main(args):
             robot.check_sim()
 
         # Get latest RGB-D image
-        color_img, depth_img = robot.get_camera_data()
-        depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
-        #print(color_img)
-        # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-        color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
-        valid_depth_heightmap = depth_heightmap.copy()
-        valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
-
-        # Save RGB-D images and RGB-D heightmaps
-        logger.save_images(trainer.iteration, color_img, depth_img, '0')
-        logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, '0')
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
+            robot, workspace_limits, heightmap_resolution, logger, trainer)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
@@ -633,10 +626,12 @@ def main(args):
             if int(time_elapsed) > 20:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
 
 
         if exit_called:
+            # TODO(ahundt) stop the simulation
             break
 
         # Save information for next training step
@@ -676,6 +671,21 @@ def main(args):
         # HK: TODO
 
         print('Trainer iteration: %f' % (trainer.iteration))
+
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0'):
+    # Get latest RGB-D image
+    color_img, depth_img = robot.get_camera_data()
+    depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
+    #print(color_img)
+    # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
+    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+    valid_depth_heightmap = depth_heightmap.copy()
+    valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
+
+    # Save RGB-D images and RGB-D heightmaps
+    logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
+    logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
+    return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
 def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition):
     # Here we will try to sample a reward value from the same action as the current one
