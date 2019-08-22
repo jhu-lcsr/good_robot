@@ -120,12 +120,13 @@ class PixelNet(nn.Module):
                 self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
                 self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
             except:
-                print('Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
                       'instead of the original efficientnet pytorch')
                 num_dilation = 0
                 self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
             # how much will the dilations affect the upsample step
-            self.upsample_scale =  self.upsample_scale / 2 ** num_dilation
+            self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
             second_fc_channels = None
 
