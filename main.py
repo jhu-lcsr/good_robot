@@ -71,7 +71,7 @@ class StackSequence(object):
     def sequence_one_hot(self):
         """ Return the one hot encoding for the entire stack sequence.
         """
-        return np.concatenate(object_color_one_hot_encodings)
+        return np.concatenate(self.object_color_one_hot_encodings)
 
     def current_sequence_progress(self):
         """ How much of the current stacking sequence we have completed.
