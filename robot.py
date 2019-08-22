@@ -393,6 +393,8 @@ class Robot(object):
             # Drop object at random x,y location and random orientation in robot workspace
             self.reposition_object_randomly(object_handle)
             time.sleep(0.5)
+        # an extra half second so things settle down
+        time.sleep(0.5)
 
 
     def get_camera_data(self):
