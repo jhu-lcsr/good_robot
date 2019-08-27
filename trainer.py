@@ -19,22 +19,19 @@ class Trainer(object):
 
         self.method = method
         self.place = place
-        # if self.place:
-        #     self.push_reward = 0.0625
-        #     self.grasp_reward = 0.125
-        #     self.grasp_color_reward = 0.25
-        #     self.place_reward = 0.5
-        #     self.place_color_reward = 1.0
-        # else:
-        #     self.push_reward = 0.5
-        #     self.grasp_reward = 1.0
+        if self.place:
+            # Stacking Reward Schedule
+            reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
+            self.push_reward = reward_schedule[0]
+            self.grasp_reward = reward_schedule[1]
+            self.grasp_color_reward = reward_schedule[2]
+            self.place_reward = reward_schedule[3]
+            self.place_color_reward = reward_schedule[4]
+        else:
+            # Push Grasp Reward Schedule
+            self.push_reward = 0.5
+            self.grasp_reward = 1.0
 
-        reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
-        self.push_reward = reward_schedule[0]
-        self.grasp_reward = reward_schedule[1]
-        self.grasp_color_reward = reward_schedule[2]
-        self.place_reward = reward_schedule[3]
-        self.place_color_reward = reward_schedule[4]
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
