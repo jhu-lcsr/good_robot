@@ -805,7 +805,8 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # or sample_reward_value == trainer.place_color_reward
             # TODO(ahundt) Experience for color success is not yet correctly implemented, code changes may be required
 
-        if no_height_reward:
+        # if no_height_reward:  # TODO(ahundt) why does the args.no_height_reward line below work and the regular no_height_reward here broken?
+        if args.no_height_reward:
             # used to assess the value of the reward multiplier
             reward_multiplier = 1
         else:
