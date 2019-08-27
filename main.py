@@ -123,6 +123,7 @@ def main(args):
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
+    no_height_reward = args.no_height_reward
 
     # -------------- Test grasp_onlying options --------------
     is_testing = args.is_testing
@@ -572,12 +573,18 @@ def main(args):
                 elif prev_primitive_action == 'grasp':
                     no_change_count[1] += 1
 
+            if no_height_reward:
+                # used to assess the value of the reward multiplier
+                reward_multiplier = 1
+            else:
+                reward_multiplier = prev_stack_height
+
             # Compute training labels
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
-                place_success=prev_partial_stack_success, reward_multiplier=prev_stack_height)
+                place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
             trainer.label_value_log.append([label_value])
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
@@ -798,12 +805,17 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # or sample_reward_value == trainer.place_color_reward
             # TODO(ahundt) Experience for color success is not yet correctly implemented, code changes may be required
 
+        if no_height_reward:
+            # used to assess the value of the reward multiplier
+            reward_multiplier = 1
+        else:
+            reward_multiplier = sample_stack_height
         # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         new_sample_label_value, _ = trainer.get_label_value(
             sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
             sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
             sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
-            place_success=sample_place_success, reward_multiplier=sample_stack_height)
+            place_success=sample_place_success, reward_multiplier=reward_multiplier)
 
         # Get labels for sample and backpropagate
         sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
@@ -865,6 +877,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
