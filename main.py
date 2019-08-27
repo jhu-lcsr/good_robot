@@ -100,6 +100,9 @@ def main(args):
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
     num_obj = args.num_obj if is_sim else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim else None
+    if num_obj is not None:
+        num_obj += num_extra_obj
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port if not is_sim else None
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -186,7 +189,7 @@ def main(args):
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
+    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, grasp_color_task or place)
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -830,6 +833,7 @@ if __name__ == '__main__':
     parser.add_argument('--is_sim', dest='is_sim', action='store_true', default=False,                                    help='run in simulation?')
     parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',                  help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
+    parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as TCP client (UR5)')
     parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as real-time client (UR5)')
