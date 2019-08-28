@@ -801,7 +801,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                 sample_place_success = sample_reward_value == trainer.place_reward
         sample_change_detected = sample_push_success
         if exp_goal_condition is not None:
-            sample_color_success = sample_reward_value == trainer.grasp_color_reward or sample_reward_value == trainer.place_color_reward
+            if place:
+                sample_color_success = sample_reward_value == trainer.grasp_color_reward or sample_reward_value == trainer.place_color_reward
+            else:
+                sample_color_success = sample_reward_value == trainer.grasp_color_reward
             # or sample_reward_value == trainer.place_color_reward
             # TODO(ahundt) Experience for color success is not yet correctly implemented, code changes may be required
 
