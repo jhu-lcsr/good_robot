@@ -31,6 +31,7 @@ class Trainer(object):
             # Push Grasp Reward Schedule
             self.push_reward = 0.5
             self.grasp_reward = 1.0
+            self.grasp_color_reward = 2.0
 
 
         # Check if CUDA can be used
@@ -94,7 +95,7 @@ class Trainer(object):
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            self.model.load_state_dict(loaded_snapshot_state_dict)
+            self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
 
             # self.model.load_state_dict(torch.load(snapshot_file)) # Old loading command pre v0.4
 
