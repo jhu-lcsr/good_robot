@@ -81,7 +81,7 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
@@ -101,15 +101,15 @@ class PixelNet(nn.Module):
 
         if network == 'densenet' or efficientnet_pytorch is None:
             # Initialize network trunks with DenseNet pre-trained on ImageNet
-            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
 
             # placenet tests block stacking
             if self.place:
-                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
             fc_channels = 2048
             second_fc_channels = 64
         else:

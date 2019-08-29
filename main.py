@@ -123,6 +123,8 @@ def main(args):
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
+    pretrained = args.pretrained
+    max_iter = args.max_iter
     no_height_reward = args.no_height_reward
 
     # -------------- Test grasp_onlying options --------------
@@ -159,7 +161,7 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place)
+                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -487,7 +489,7 @@ def main(args):
     prev_reward_value = None
 
     # Start main training/testing loop
-    while True:
+    while 0 < max_iter < trainer.iteration:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
 
@@ -866,6 +868,8 @@ if __name__ == '__main__':
     parser.add_argument('--heuristic_bootstrap', dest='heuristic_bootstrap', action='store_true', default=False,          help='use handcrafted grasping algorithm when grasping fails too many times in a row during training?')
     parser.add_argument('--explore_rate_decay', dest='explore_rate_decay', action='store_true', default=False)
     parser.add_argument('--grasp_only', dest='grasp_only', action='store_true', default=False)
+    parser.add_argument('--pretrained', dest='pretrained', action='store', type=bool, default=False,                   help='use randomly initialization rather than weights pretrained on ImageNet')
+    parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
 
 
     # -------------- Testing options --------------
