@@ -716,7 +716,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
-def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition):
+def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2):
     # Here we will try to sample a reward value from the same action as the current one
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
@@ -727,7 +727,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     prev_success = np.array(bool(prev_reward_value))
 
     # Get samples of the same primitive but with different success results
-    if sample_primitive_action == 'push':
+    if np.random.random(1) >= all_history_prob:
+        # Sample all of history every one out of n times.
+        sample_ind = np.arange(1,trainer.iteration-1).reshape(trainer.iteration-2, 1)
+    elif sample_primitive_action == 'push':
         # sample_primitive_action_id = 0
         sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:trainer.iteration,0] != prev_success, 
                                                 actions == sample_primitive_action_id))
