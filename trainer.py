@@ -120,6 +120,7 @@ class Trainer(object):
         self.iteration = 0
 
         # Initialize lists to save execution info and RL variables
+        # executed action log includes the action, push grasp or place, and the best pixel index
         self.executed_action_log = []
         self.label_value_log = []
         self.reward_value_log = []
@@ -129,8 +130,13 @@ class Trainer(object):
         self.clearance_log = []
         self.goal_condition_log = []
         self.trial_log = []
+        self.grasp_success_log = []
+        self.color_success_log = []
+        self.change_detected_log = []
         if place:
             self.stack_height_log = []
+            self.partial_stack_success_log = []
+            self.place_success_log = []
 
 
     # Pre-load execution info and RL variables
@@ -170,11 +176,31 @@ class Trainer(object):
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log.shape = (self.iteration,1)
         self.trial_log = self.trial_log.tolist()
+        self.grasp_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+        self.grasp_success_log = self.grasp_success_log[0:self.iteration]
+        self.grasp_success_log.shape = (self.iteration,1)
+        self.grasp_success_log = self.grasp_success_log.tolist()
+        self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+        self.color_success_log = self.color_success_log[0:self.iteration]
+        self.color_success_log.shape = (self.iteration,1)
+        self.color_success_log = self.color_success_log.tolist()
+        self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), delimiter=' ')
+        self.change_detected_log = self.change_detected_log[0:self.iteration]
+        self.change_detected_log.shape = (self.iteration,1)
+        self.change_detected_log = self.change_detected_log.tolist()
         if self.place:
             self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), delimiter=' ')
             self.stack_height_log = self.stack_height_log[0:self.iteration]
             self.stack_height_log.shape = (self.iteration,1)
-            self.stack_height_log = self.trial_log.tolist()
+            self.stack_height_log = self.stack_height_log.tolist()
+            self.partial_stack_success_log = np.loadtxt(os.path.join(transitions_directory, 'partial-stack-success.log.txt'), delimiter=' ')
+            self.partial_stack_success_log = self.partial_stack_success_log[0:self.iteration]
+            self.partial_stack_success_log.shape = (self.iteration,1)
+            self.partial_stack_success_log = self.partial_stack_success_log.tolist()
+            self.place_success_log = np.loadtxt(os.path.join(transitions_directory, 'place-success.log.txt'), delimiter=' ')
+            self.place_success_log = self.place_success_log[0:self.iteration]
+            self.place_success_log.shape = (self.iteration,1)
+            self.place_success_log = self.place_success_log.tolist()
 
 
     # Compute forward pass through model to compute affordances/Q
@@ -586,7 +612,7 @@ class Trainer(object):
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
                 if rotate_idx == best_pix_ind[0]:
-                    prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (0,0,255), 2)
+                    prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (221,211,238), 2)
                 prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations), reshape=False, order=0)
                 background_image = ndimage.rotate(color_heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0)
                 prediction_vis = (0.5*cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR) + 0.5*prediction_vis).astype(np.uint8)
