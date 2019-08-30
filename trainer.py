@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False):
+                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False):
 
         self.method = method
         self.place = place
@@ -47,7 +47,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -77,7 +77,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
