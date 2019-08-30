@@ -469,7 +469,7 @@ def main(args):
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
-                    
+
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                         place_rate = float(partial_stack_count)/float(place_count)
@@ -592,7 +592,7 @@ def main(args):
 
             # Compute training labels, returns are:
             # label_value == expected_reward (with future rewards)
-            # prev_reward_value == current_reward (without future rewards) 
+            # prev_reward_value == current_reward (without future rewards)
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
@@ -723,23 +723,23 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     sample_primitive_action = prev_primitive_action
     sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
     # executed_action_log includes the action, push grasp or place, and the best pixel index
-    actions = np.asarray(trainer.executed_action_log)[1:trainer.iteration,0]
+    actions = np.asarray(trainer.executed_action_log)[1:trainer.iteration, 0]
     prev_success = np.array(bool(prev_reward_value))
 
     # Get samples of the same primitive but with different success results
     if np.random.random(1) >= all_history_prob:
         # Sample all of history every one out of n times.
-        sample_ind = np.arange(1,trainer.iteration-1).reshape(trainer.iteration-2, 1)
+        sample_ind = np.arange(1, trainer.iteration-1).reshape(trainer.iteration-2, 1)
     elif sample_primitive_action == 'push':
         # sample_primitive_action_id = 0
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:trainer.iteration,0] != prev_success, 
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:trainer.iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     elif sample_primitive_action == 'grasp':
         # sample_primitive_action_id = 1
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:trainer.iteration,0] != prev_success, 
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:trainer.iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     elif sample_primitive_action == 'place':
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:trainer.iteration,0] != prev_success, 
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:trainer.iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     else:
         raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
