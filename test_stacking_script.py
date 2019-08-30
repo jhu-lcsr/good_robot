@@ -56,7 +56,7 @@ grasp_color_task = False
 # are we doing a stack even if we don't care about colors
 place_task = True
 # are we stacking in Z or some other dimension?
-stack_dim = 1
+stack_axis = 1
 # if placing in rows, how far apart to set the blocks?
 separation = 0.06
 
@@ -88,8 +88,8 @@ for stack in range(num_stacks):
         base_block_to_place = stack_goal[-2]
         primitive_position = block_positions[base_block_to_place]
         print('primitive_position', primitive_position)
-        if stack_dim != 2:
-            primitive_position[stack_dim] += separation
+        if stack_axis != 2:
+            primitive_position[stack_axis] += separation
         place = robot.place(primitive_position, best_rotation_angle)
         print('place ' + str(i) + ' : ' + str(place))
         # check if we don't care about color
@@ -97,7 +97,7 @@ for stack in range(num_stacks):
             # Deliberately change the goal stack order to test the non-ordered check
             stack_goal = np.random.permutation(stack_goal)
             print('fake stack goal to test any stack order: ' + str(stack_goal))
-        stack_success, height_count = robot.check_stack(stack_goal, stack_dim=stack_dim)
+        stack_success, height_count = robot.check_stack(stack_goal, stack_axis=stack_axis)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene
     robot.reposition_objects()

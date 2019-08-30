@@ -1148,7 +1148,7 @@ class Robot(object):
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, stack_dim=2):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, stack_axis=2):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1158,7 +1158,7 @@ class Robot(object):
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
-        stack_dim: dimension along which to check the stack, axis=2 (default) corresponds to z axis.
+        stack_axis: integer dimension along which to check the stack in [0,1,2]. axis=2 (default) corresponds to z axis.
         
 
         # Returns
@@ -1175,9 +1175,9 @@ class Robot(object):
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
 
-        assert stack_dim in [0, 1, 2], 'stack_dim must be 0, 1, or 2 (x, y, or z dimension)'
-        ortho_dims = [0, 1, 2]
-        ortho_dims.remove(stack_dim)
+        assert stack_axis in [0, 1, 2], 'stack_dim must be 0, 1, or 2 (x, y, or z dimension)'
+        ortho_axes = [0, 1, 2]
+        ortho_axes.remove(stack_axis)
         
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
@@ -1193,12 +1193,12 @@ class Robot(object):
             # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
             # object indices sorted highest to lowest
             # low2high_idx = object_z_positions.argsort()
-            low2high_idx = np.array(pos[:, stack_dim]).argsort()
+            low2high_idx = np.array(pos[:, stack_axis]).argsort()
             high_idx = low2high_idx[top_idx]
             low2high_pos = pos[low2high_idx,:]
             # filter objects closest to the highest block in x, y based on the threshold
             # nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
-            nearby_obj = np.linalg.norm(low2high_pos[:,ortho_dims] - pos[high_idx][ortho_dims], axis=1) < (distance_threshold/2)
+            nearby_obj = np.linalg.norm(low2high_pos[:,ortho_axes] - pos[high_idx][ortho_axes], axis=1) < (distance_threshold/2)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
             object_color_sequence = low2high_idx[nearby_obj]
@@ -1224,11 +1224,11 @@ class Robot(object):
         for idx in range(checks):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
-            # Check that Z (or stack_dim) is higher by at least half the distance threshold
-            if top_pos[stack_dim] < (bottom_pos[stack_dim] + distance_threshold/2.0):
+            # Check that Z (or stack_axis) is higher by at least half the distance threshold
+            if top_pos[stack_axis] < (bottom_pos[stack_axis] + distance_threshold/2.0):
                 print('check_stack(): not high (or long) enough')
                 return False, idx + 1
-            # Check that the blocks are near each other in ortho_dims
+            # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ' + str(dist))
             if dist > distance_threshold:
