@@ -18,7 +18,7 @@ class Robot(object):
     """
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file, place=False, grasp_color_task=False):
+                 is_testing, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -118,20 +118,7 @@ class Robot(object):
 
             # If testing, read object meshes and poses from test case file
             if self.is_testing and self.test_preset_cases:
-                file = open(self.test_preset_file, 'r')
-                file_content = file.readlines()
-                self.test_obj_mesh_files = []
-                self.test_obj_mesh_colors = []
-                self.test_obj_positions = []
-                self.test_obj_orientations = []
-                for object_idx in range(self.num_obj):
-                    file_content_curr_object = file_content[object_idx].split()
-                    self.test_obj_mesh_files.append(os.path.join(self.obj_mesh_dir,file_content_curr_object[0]))
-                    self.test_obj_mesh_colors.append([float(file_content_curr_object[1]),float(file_content_curr_object[2]),float(file_content_curr_object[3])])
-                    self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
-                    self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
-                file.close()
-                self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
+                self.load_preset_case()
 
             # Add objects to simulation environment
             self.add_objects()
@@ -180,6 +167,23 @@ class Robot(object):
             self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
             self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
 
+    def load_preset_case(self, test_preset_file=None):
+        if test_preset_file is None:
+            test_preset_file = self.test_preset_file
+        file = open(test_preset_file, 'r')
+        file_content = file.readlines()
+        self.test_obj_mesh_files = []
+        self.test_obj_mesh_colors = []
+        self.test_obj_positions = []
+        self.test_obj_orientations = []
+        for object_idx in range(self.num_obj):
+            file_content_curr_object = file_content[object_idx].split()
+            self.test_obj_mesh_files.append(os.path.join(self.obj_mesh_dir,file_content_curr_object[0]))
+            self.test_obj_mesh_colors.append([float(file_content_curr_object[1]),float(file_content_curr_object[2]),float(file_content_curr_object[3])])
+            self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
+            self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
+        file.close()
+        self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
 
     def setup_sim_camera(self):
 
@@ -1159,7 +1163,7 @@ class Robot(object):
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
         stack_axis: integer dimension along which to check the stack in [0,1,2]. axis=2 (default) corresponds to z axis.
-        
+
 
         # Returns
 
@@ -1178,7 +1182,7 @@ class Robot(object):
         assert stack_axis in [0, 1, 2], 'stack_dim must be 0, 1, or 2 (x, y, or z dimension)'
         ortho_axes = [0, 1, 2]
         ortho_axes.remove(stack_axis)
-        
+
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
         # in the end until proven otherwise

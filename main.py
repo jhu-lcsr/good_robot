@@ -128,11 +128,26 @@ def main(args):
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
 
-    # -------------- Test grasp_onlying options --------------
+    # -------------- Test grasping options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases
-    test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
+    trials_per_case = 1
+    if test_preset_cases:
+        if args.test_preset_file:
+            # load just one specific file
+            preset_files = [os.path.abspath(args.test_preset_file)]
+        else:
+            # load a directory of files
+            preset_files = os.listdir(args.test_preset_dir)
+            preset_files = [os.path.abspath(os.path.join(args.test_preset_dir, filename)) for filename in preset_files]
+        trials_per_case = max_test_trials
+        # run each preset file max_test_trials times.
+        max_test_trials *= len(preset_files)
+        test_preset_file = preset_files[0]
+    else:
+        preset_files = None
+    # test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
 
     # ------ Pre-loading and logging options ------
     load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
@@ -537,8 +552,13 @@ def main(args):
             no_change_count = [0, 0]
             trainer.clearance_log.append([trainer.iteration])
             logger.write_to_log('clearance', trainer.clearance_log)
-            if is_testing and not place and len(trainer.clearance_log) >= max_test_trials:
-                exit_called = True # Exit after training thread (backprop and saving labels)
+            num_trials = len(trainer.clearance_log)
+            print('Trials complete: ' + str(num_trials))
+            if is_testing and test_preset_cases:
+                # load the current preset case, incrementing as trials are cleared
+                robot.load_preset_case(preset_files[int(num_trials/trials_per_case)])
+            if is_testing and not place and num_trials >= max_test_trials:
+                exit_called = True  # Exit after training thread (backprop and saving labels)
 
             continue
 
@@ -878,7 +898,8 @@ if __name__ == '__main__':
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
-    parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
+    parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
+    parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/test-10-obj-*.txt')
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
