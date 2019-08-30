@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False):
+                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False):
 
         self.method = method
         self.place = place
@@ -31,6 +31,7 @@ class Trainer(object):
             # Push Grasp Reward Schedule
             self.push_reward = 0.5
             self.grasp_reward = 1.0
+            self.grasp_color_reward = 2.0
 
 
         # Check if CUDA can be used
@@ -46,7 +47,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -76,7 +77,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -94,7 +95,7 @@ class Trainer(object):
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            self.model.load_state_dict(loaded_snapshot_state_dict)
+            self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
 
             # self.model.load_state_dict(torch.load(snapshot_file)) # Old loading command pre v0.4
 
