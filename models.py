@@ -117,14 +117,22 @@ class PixelNet(nn.Module):
             num_dilation = 1
             # Initialize network trunks with DenseNet pre-trained on ImageNet
             try:
-                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
-                self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
             except:
                 print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
                       'instead of the original efficientnet pytorch')
                 num_dilation = 0
-                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
-                self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0')
             # how much will the dilations affect the upsample step
             self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
