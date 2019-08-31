@@ -1148,7 +1148,7 @@ class Robot(object):
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, stack_axis=2):
+    def check_stack(self, object_color_sequence, distance_threshold=0.07, top_idx=-1, stack_axis=2):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1195,10 +1195,10 @@ class Robot(object):
             # low2high_idx = object_z_positions.argsort()
             low2high_idx = np.array(pos[:, stack_axis]).argsort()
             high_idx = low2high_idx[top_idx]
-            low2high_pos = pos[low2high_idx,:]
+            low2high_pos = pos[low2high_idx, :]
             # filter objects closest to the highest block in x, y based on the threshold
-            # nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
-            nearby_obj = np.linalg.norm(low2high_pos[:,ortho_axes] - pos[high_idx][ortho_axes], axis=1) < (distance_threshold/2)
+            nearby_obj = np.linalg.norm(low2high_pos[:, ortho_axes] - pos[high_idx][ortho_axes], axis=1) < (distance_threshold/2)
+            # print('nearby:', nearby_obj)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
             object_color_sequence = low2high_idx[nearby_obj]
@@ -1225,12 +1225,15 @@ class Robot(object):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
             # Check that Z (or stack_axis) is higher by at least half the distance threshold
-            if top_pos[stack_axis] < (bottom_pos[stack_axis] + distance_threshold/2.0):
-                print('check_stack(): not high (or long) enough')
+            # print('bottom_pos:', bottom_pos)
+            # print('top_pos:', top_pos)
+            # print('distance_threshold: ', distance_threshold)
+            if top_pos[stack_axis] < (bottom_pos[stack_axis] + distance_threshold / 2.0):
+                print('check_stack(): not high (or long) enough for idx: ' + str(idx))
                 return False, idx + 1
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
-            # print('distance: ' + str(dist))
+            # print('distance: ', dist)
             if dist > distance_threshold:
                 print('check_stack(): too far apart')
                 return False, idx + 1
