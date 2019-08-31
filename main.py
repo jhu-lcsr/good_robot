@@ -150,7 +150,7 @@ def main(args):
         test_preset_file = preset_files[0]
     else:
         preset_files = None
-    # test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
+        test_preset_file = None
 
     # ------ Pre-loading and logging options ------
     load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
