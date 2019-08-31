@@ -133,6 +133,9 @@ def main(args):
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases
     trials_per_case = 1
+    show_preset_cases_then_exit = args.show_preset_cases_then_exit
+    if show_preset_cases_then_exit:
+        test_preset_cases = True
     if test_preset_cases:
         if args.test_preset_file:
             # load just one specific file
@@ -512,6 +515,19 @@ def main(args):
     prev_primitive_action = None
     prev_reward_value = None
 
+    if show_preset_cases_then_exit and test_preset_cases:
+        # Just a quick temporary mode for viewing the saved preset test cases
+        for case_file in preset_files:
+            # load the current preset case, incrementing as trials are cleared
+            print('loading case file: ' + str(case_file))
+            robot.load_preset_case(case_file)
+            robot.restart_sim()
+            robot.add_objects()
+            time.sleep(3)
+        exit_called = True
+        robot.shutdown()
+        return
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -767,11 +783,12 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
 
     if sample_ind.size == 0 and prev_reward_value is not None and trainer.iteration > 2:
         print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(not prev_success) + ', so sampling from the whole history.')
-        sample_ind = np.arange(1,trainer.iteration-1).reshape(trainer.iteration-2, 1)
+        sample_ind = np.arange(1, trainer.iteration-1).reshape(trainer.iteration-2, 1)
 
     if sample_ind.size > 0:
         # Find sample with highest surprise value
         if method == 'reactive':
+            # TODO(ahundt) BUG what to do with sample_reward_value here?
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - (1 - sample_reward_value))
         elif method == 'reinforcement':
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
@@ -901,6 +918,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/test-10-obj-*.txt')
+    parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
