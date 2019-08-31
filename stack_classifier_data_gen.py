@@ -12,7 +12,7 @@ import torch
 from torch.autograd import Variable
 from robot import Robot
 from trainer import Trainer
-from logger_for_classifier import Logger
+from logger import Logger
 import utils
 from main import StackSequence
 import csv
@@ -42,12 +42,11 @@ test_preset_cases = False
 test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
 
 #####################################################################
-## Modify
-#continue_gen = True
-split = 'train' #['train', 'val', 'test']
-##
-
+# Continue logging from previous session
+continue_logging = False # Set True if continue logging from previous session
+split = 'train' # Set ['train', 'val', 'test']
 root = './logs_for_classifier'
+
 logging_directory = os.path.join(root, split)
 if split == 'train':
     num_stacks = 33400
@@ -63,7 +62,7 @@ data_num = 1
 # ------ Pre-loading and logging options ------
 # load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
 # snapshot_file = os.path.abspath(args.snapshot_file)  if load_snapshot else None
-continue_logging = False # Continue logging from previous session
+# continue_logging = False # Continue logging from previous session
 #logging_directory = './logs_for_classifier/training'
 logging_directory = os.path.abspath(logging_directory) if continue_logging else os.path.abspath('logs_for_classifier')
 # save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
@@ -95,7 +94,6 @@ blocks_to_move = num_obj - 1
 if continue_logging  == False:
     iteration = 0
 else:
-    #label_text = "./logs_for_classifier/test/data/color-images/stack_label.txt"
     label_text = os.path.join(logging_directory, 'data','color-images', 'stack_label.txt')
     myfile = open(label_text, 'r')
     myfiles = [line.split(' ') for line in myfile.readlines()]
@@ -138,33 +136,21 @@ for stack in range(num_stacks):
         valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
         # Save RGB-D images and RGB-D heightmaps
-        logger.save_images_stack(iteration, color_img, depth_img, stack_class)
-        logger.save_heightmaps_stack(iteration, color_heightmap, valid_depth_heightmap, stack_class)
+        logger.save_images(iteration, color_img, depth_img, stack_class) # Used stack_class instead of mode
+        logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
         ###########################################
-        print(stack)
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:
-
             with open(label_text,"a") as f:
                 f.writelines("\n")
                 name = [filename,' ', str(iteration),' ', str(stack_class)]
                 f.writelines(name)
-                #opened_file.write("%r\n" %new_string)
                 f.close()
-
-            # print(myfiles)
-            # myfiles.append([filename,iteration,stack_class])
-            # with open(label_text, "a") as myfile:
-            #     title = [filename,iteration,stack_class]
-            #     myfile.write('%d' % number)
-            #logger.save_label_1('stack_label', myfiles)
         else:
             labels.append([filename,iteration,stack_class])
-            logger.save_label_1('stack_label', labels)
+            logger.save_label('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
         iteration += 1
-
-
 
     # reset scene
     robot.reposition_objects()
@@ -172,9 +158,3 @@ for stack in range(num_stacks):
     stacksequence.next()
     if iteration > max_iterations:
         break
-
-## save labels
-#if continue_gen == False:
-#    logger.save_label_1('stack_label', labels)
-#else:
-#    logger.save_label_1('stack_label_cont', labels)
