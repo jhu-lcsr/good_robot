@@ -56,7 +56,7 @@ grasp_color_task = False
 # are we doing a stack even if we don't care about colors
 place_task = True
 # are we stacking in Z or some other dimension?
-stack_axis = 1
+stack_axis = 2
 # if placing in rows, how far apart to set the blocks?
 separation = 0.06
 
@@ -75,21 +75,38 @@ for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
     print('+++++++ Making New Stack                  ++++++++')
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
+
+    # move the first block in order to have it in a standard position.
+    print('orienting first block')
+    stack_goal = stacksequence.current_sequence_progress()
+    block_to_move = stack_goal[0]
+    block_positions, block_orientations = robot.get_obj_positions_and_orientations()
+    primitive_position = block_positions[block_to_move]
+    rotation_angle = block_orientations[block_to_move][2]
+    robot.grasp(primitive_position, rotation_angle,
+                object_color=block_to_move)
+    block_positions = robot.get_obj_positions_and_orientations()[0]
+    original_position = np.array([-0.6, 0.25, 0])
+    place = robot.place(original_position, best_rotation_angle)
+    print('place initial: ' + str(place))
+    
     for i in range(blocks_to_move):
         print('----------------------------------------------')
         stacksequence.next()
         stack_goal = stacksequence.current_sequence_progress()
         block_to_move = stack_goal[-1]
         print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
-        block_positions = robot.get_obj_positions_and_orientations()[0]
+        block_positions, block_orientations = robot.get_obj_positions_and_orientations()
         primitive_position = block_positions[block_to_move]
-        robot.grasp(primitive_position, best_rotation_angle, object_color=block_to_move)
-        block_positions = robot.get_obj_positions_and_orientations()[0]
-        base_block_to_place = stack_goal[-2]
-        primitive_position = block_positions[base_block_to_place]
-        print('primitive_position', primitive_position)
+        rotation_angle = block_orientations[block_to_move][2]
+        robot.grasp(primitive_position, rotation_angle, object_color=block_to_move)
+        base_block_to_place = stack_goal[0]
         if stack_axis != 2:
-            primitive_position[stack_axis] += separation
+            primitive_position = original_position.copy()
+            primitive_position[stack_axis] += separation * (i + 1)
+        else:
+            block_positions = robot.get_obj_positions_and_orientations()[0]
+            primitive_position = block_positions[base_block_to_place]
         place = robot.place(primitive_position, best_rotation_angle)
         print('place ' + str(i) + ' : ' + str(place))
         # check if we don't care about color
@@ -97,7 +114,7 @@ for stack in range(num_stacks):
             # Deliberately change the goal stack order to test the non-ordered check
             stack_goal = np.random.permutation(stack_goal)
             print('fake stack goal to test any stack order: ' + str(stack_goal))
-        stack_success, height_count = robot.check_stack(stack_goal, stack_axis=stack_axis)
+        stack_success, height_count = robot.check_stack(stack_goal, stack_axis=stack_axis, distance_threshold=0.07)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene
     robot.reposition_objects()
