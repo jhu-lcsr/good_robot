@@ -599,10 +599,12 @@ def main(args):
             # TODO(ahundt) update experience replay trial rewards
 
         # check for possible bugs in the code
-        if len(trainer.reward_value_log) < trainer.iteration - 1 or (place and nonlocal_variables['stack'].trial != num_trials):
+        if len(trainer.reward_value_log) < trainer.iteration - 2:
             # check for progress counting inconsistencies
             print('WARNING POSSIBLE CRITICAL ERROR DETECTED: log data index and trainer.iteration out of sync!!! Experience Replay may break! '
                   'Check code for errors in indexes, continue statements etc.')
+        if place and nonlocal_variables['stack'].trial != num_trials:
+            print('WARNING variable mismatch num_trials: ' + str(num_trials) + ' nonlocal_variables[stack].trial: ' + str(nonlocal_variables['stack'].trial))
 
         # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
