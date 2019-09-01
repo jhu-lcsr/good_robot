@@ -764,7 +764,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     prev_success = np.array(bool(prev_reward_value))
 
     # Get samples of the same primitive but with different success results
-    if np.random.random(1) >= all_history_prob:
+    if np.random.random(1) < all_history_prob:
         # Sample all of history every one out of n times.
         sample_ind = np.arange(1, trainer.iteration-1).reshape(trainer.iteration-2, 1)
     elif sample_primitive_action == 'push':
