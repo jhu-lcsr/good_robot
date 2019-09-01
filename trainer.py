@@ -158,7 +158,7 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
-        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), delimiter=' ')
+        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
         self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
         self.trial_reward_value_log.shape = (self.iteration, 1)
         self.trial_reward_value_log = self.trial_reward_value_log.tolist()
@@ -207,6 +207,31 @@ class Trainer(object):
             self.place_success_log.shape = (self.iteration, 1)
             self.place_success_log = self.place_success_log.tolist()
 
+    def trial_reward_value_log_update(self):
+        # update the reward values for a whole trial, not just recent time steps
+        end = self.clearance_log[-1][0]
+        clearance_length = self.clearance_log.shape[0]
+
+        if end < clearance_length:
+            # First entry won't be zero...
+            if clearance_length == 1:
+                start = 0
+            else:
+                start = self.clearance_log[-2][0]
+
+            new_log_values = []
+            prev_r = None
+            for r in reversed(self.reward_value_log[start:end]):
+                if prev_r is None:
+                    # Give the final time step its own reward twice.
+                    prev_r = r
+                new_log_values.append([r + self.future_reward_discount * prev_r])
+            self.trial_reward_value_log += new_log_values
+            if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
+                print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
+            print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
+        else:
+            print('trial_reward_value_log_update() past end bug, check the code')
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):

@@ -533,6 +533,7 @@ def main(args):
         return
 
     num_trials = 0
+    do_continue = False
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -572,12 +573,11 @@ def main(args):
 
             nonlocal_variables['trial_complete'] = True
             # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
-            continue
+            do_continue = True
+            # continue
 
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
-            num_trials = trainer.end_trial()
-            logger.write_to_log('clearance', trainer.clearance_log)
             nonlocal_variables['trial_complete'] = False
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
@@ -589,6 +589,12 @@ def main(args):
                 robot.load_preset_case(case_file)
             if is_testing and not place and num_trials >= max_test_trials:
                 exit_called = True  # Exit after training thread (backprop and saving labels)
+            if experience_replay_enabled:
+                trainer.trial_reward_value_log_update()
+                logger.write_to_log('trial-reward-value', trainer.reward_value_log)
+            if do_continue:
+                do_continue = False
+                continue
 
             # TODO(ahundt) update experience replay trial rewards
 
