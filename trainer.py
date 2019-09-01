@@ -124,6 +124,7 @@ class Trainer(object):
         self.executed_action_log = []
         self.label_value_log = []
         self.reward_value_log = []
+        self.trial_reward_value_log = []
         self.predicted_value_log = []
         self.use_heuristic_log = []
         self.is_exploit_log = []
@@ -157,6 +158,10 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
+        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), delimiter=' ')
+        self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
+        self.trial_reward_value_log.shape = (self.iteration, 1)
+        self.trial_reward_value_log = self.trial_reward_value_log.tolist()
         self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
         self.goal_condition_log = self.goal_condition_log[0:self.iteration]
         self.goal_condition_log.shape = (self.iteration, 1)

@@ -592,6 +592,8 @@ def main(args):
             if is_testing and not place and num_trials >= max_test_trials:
                 exit_called = True  # Exit after training thread (backprop and saving labels)
 
+            # TODO(ahundt) update experience replay trial rewards
+
         # check for possible bugs in the code
         if len(trainer.reward_value_log) < trainer.iteration - 1 or (place and nonlocal_variables['stack'].trial != num_trials):
             # check for progress counting inconsistencies
