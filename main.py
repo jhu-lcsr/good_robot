@@ -899,6 +899,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
 
     else:
         print('Experience Replay: 0 prior training samples. Skipping experience replay.')
+        time.sleep(0.01)
 
 
 if __name__ == '__main__':
