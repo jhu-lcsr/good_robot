@@ -810,11 +810,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     if sample_ind.size > 0:
         # Find sample with highest surprise value
         if method == 'reactive':
-            # TODO(ahundt) BUG what to do with sample_reward_value here?
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - (1 - sample_reward_value))
+            # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
         elif method == 'reinforcement':
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
-        sorted_surprise_ind = np.argsort(sample_surprise_values[:,0])
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+        sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
         rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
