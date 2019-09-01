@@ -18,8 +18,8 @@ from logger import Logger
 import utils
 
 # to convert action names to the corresponding ID number and vice-versa
-ACTION_TO_ID = {'push':0, 'grasp':1, 'place':2}
-ID_TO_ACTION = {0:'push', 1:'grasp', 2:'place'}
+ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
+ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True):
