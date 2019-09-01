@@ -196,13 +196,13 @@ def main(args):
     explore_prob = 0.5 if not is_testing else 0.0
 
     # Quick hack for nonlocal memory between threads in Python 2
-    nonlocal_variables = {'executing_action' : False,
-                          'primitive_action' : None,
-                          'best_pix_ind' : None,
-                          'push_success' : False,
-                          'grasp_success' : False,
-                          'color_success' : False,
-                          'place_success' : False,
+    nonlocal_variables = {'executing_action': False,
+                          'primitive_action': None,
+                          'best_pix_ind': None,
+                          'push_success': False,
+                          'grasp_success': False,
+                          'color_success': False,
+                          'place_success': False,
                           'partial_stack_success': False,
                           'stack_height': 1,
                           'stack_rate': np.inf,
