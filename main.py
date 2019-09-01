@@ -159,7 +159,7 @@ def main(args):
     logging_directory = os.path.abspath(args.logging_directory) if continue_logging else os.path.abspath('logs')
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
-    # ------ HK: Added Options -----
+    # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
     place = args.place
     if grasp_color_task:
@@ -168,7 +168,6 @@ def main(args):
         goal_condition_len = num_obj
     else:
         goal_condition_len = 0
-    #grasp_count = args.grasp_count
 
     # Set random seed
     np.random.seed(random_seed)
@@ -758,7 +757,6 @@ def main(args):
         trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
-        # HK: TODO
 
         print('Trainer iteration: %f' % (trainer.iteration))
 
@@ -860,8 +858,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
         next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
         next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
-        # TODO(ahundt) TODO(hkwon14) Fix success checks to be performed correctly for all mode combinations of grasping, color grasping, and stacking, rewards must match get_label_value() in trainer.py, prefereably in an easy to use way.
-        # TODO(ahundt) TODO(hkwon14) tune sample_reward_value?
+        # TODO(ahundt) tune sample_reward_value and gamma discount rate?
         sample_place_success = None
         # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
         sample_push_success = True
@@ -879,7 +876,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             reward_multiplier = 1
         else:
             reward_multiplier = sample_stack_height
-        # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
+        # TODO(ahundt) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         # get_label_value does the forward pass for us to backprop, even if we don't use the return values.
         new_sample_label_value, _ = trainer.get_label_value(
             sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
