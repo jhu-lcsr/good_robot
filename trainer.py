@@ -210,7 +210,7 @@ class Trainer(object):
     def trial_reward_value_log_update(self):
         # update the reward values for a whole trial, not just recent time steps
         end = self.clearance_log[-1][0]
-        clearance_length = self.clearance_log.shape[0]
+        clearance_length = len(self.clearance_log)
 
         if end < clearance_length:
             # First entry won't be zero...
