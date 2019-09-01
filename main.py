@@ -741,8 +741,8 @@ def main(args):
 def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0'):
     # Get latest RGB-D image
     color_img, depth_img = robot.get_camera_data()
-    depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
-    #print(color_img)
+    depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
+    # print(color_img)
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
     color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
     valid_depth_heightmap = depth_heightmap.copy()
