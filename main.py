@@ -207,7 +207,8 @@ def main(args):
                           'stack_height': 1,
                           'stack_rate': np.inf,
                           'trial_success_rate': np.inf,
-                          'replay_iteration': 0,}
+                          'replay_iteration': 0,
+                          'trial_complete': False}
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
@@ -274,6 +275,7 @@ def main(args):
             # We needed to reset, so the stack must have been knocked over!
             # all rewards and success checks are False!
             set_nonlocal_success_variables_false()
+            nonlocal_variables['trial_complete'] = True
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -451,6 +453,7 @@ def main(args):
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
+                                nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
@@ -477,6 +480,7 @@ def main(args):
                             robot.reposition_objects()
                             nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
+                            nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
@@ -506,6 +510,8 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
+    # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -528,6 +534,7 @@ def main(args):
         robot.shutdown()
         return
 
+    num_trials = 0
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -553,7 +560,7 @@ def main(args):
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
-                if is_testing: # If at end of test run, re-load original weights (before test run)
+                if is_testing:  # If at end of test run, re-load original weights (before test run)
                     trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
                     set_nonlocal_success_variables_false()
@@ -565,10 +572,18 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
                 robot.restart_real()
 
-            no_change_count = [0, 0]
-            trainer.clearance_log.append([trainer.iteration])
+            nonlocal_variables['trial_complete'] = True
+            # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
+            continue
+
+        if nonlocal_variables['trial_complete']:
+            # Check if the other thread ended the trial and reset the important values
+            num_trials = trainer.end_trial()
             logger.write_to_log('clearance', trainer.clearance_log)
-            num_trials = len(trainer.clearance_log)
+            nonlocal_variables['trial_complete'] = False
+            no_change_count = [0, 0]
+            num_trials = trainer.end_trial()
+            logger.write_to_log('clearance', trainer.clearance_log)
             if is_testing and test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
                 # load the current preset case, incrementing as trials are cleared
@@ -577,9 +592,15 @@ def main(args):
             if is_testing and not place and num_trials >= max_test_trials:
                 exit_called = True  # Exit after training thread (backprop and saving labels)
 
-            continue
+        # check for possible bugs in the code
+        if len(trainer.reward_value_log) < trainer.iteration - 1 or (place and nonlocal_variables['stack'].trial != num_trials):
+            # check for progress counting inconsistencies
+            print('WARNING POSSIBLE CRITICAL ERROR DETECTED: log data index and trainer.iteration out of sync!!! Experience Replay may break! '
+                  'Check code for errors in indexes, continue statements etc.')
 
+        # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
+            # If we are doing a fixed number of test trials, end the run the next time around.
             exit_called = True
 
         if not exit_called:
@@ -695,6 +716,7 @@ def main(args):
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
+                nonlocal_variables['trial_complete'] = True
 
         if exit_called:
             # shut down the simulation or robot
