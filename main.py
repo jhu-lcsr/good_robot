@@ -220,7 +220,6 @@ def main(args):
         nonlocal_variables['push_success'] = False
         nonlocal_variables['grasp_success'] = False
         nonlocal_variables['place_success'] = False
-        # HK: Added color variable
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
@@ -744,7 +743,6 @@ def main(args):
         # TODO(ahundt) BUG We almost certainly need to copy nonlocal_variables['stack']
         prev_stack = nonlocal_variables['stack']
         prev_goal_condition = goal_condition
-        # HK: check color_success arguments
         if grasp_color_task:
             prev_color_success = nonlocal_variables['grasp_color_success']
             if nonlocal_variables['grasp_success'] and nonlocal_variables['grasp_color_success']:
