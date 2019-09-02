@@ -582,13 +582,14 @@ def main(args):
             nonlocal_variables['trial_complete'] = False
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
+            print('Trials complete: ' + str(num_trials) + ' -------------------------------')
             logger.write_to_log('clearance', trainer.clearance_log)
             trainer.trial_reward_value_log_update()
             logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
             if is_testing and test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
                 # load the current preset case, incrementing as trials are cleared
-                print('Trials complete: ' + str(num_trials) + ' loading case file: ' + str(case_file))
+                print('loading case file: ' + str(case_file))
                 robot.load_preset_case(case_file)
             if is_testing and not place and num_trials >= max_test_trials:
                 exit_called = True  # Exit after training thread (backprop and saving labels)
