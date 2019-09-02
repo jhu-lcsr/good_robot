@@ -226,8 +226,14 @@ class Trainer(object):
                 if future_r is None:
                     # Give the final time step its own reward twice.
                     future_r = r
-                future_r = r + self.future_reward_discount * future_r
-                new_log_values.append([future_r])
+                if r > 0:
+                    # If a nonzero score was received, the reward propagates
+                    future_r = r + self.future_reward_discount * future_r
+                    new_log_values.append([future_r])
+                else:
+                    # If the reward was zero, propagation is stopped
+                    new_log_values.append([r])
+                    future_r = r
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
             if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
