@@ -223,17 +223,18 @@ class Trainer(object):
             future_r = None
             # going backwards in time from most recent to oldest step
             for r in reversed(self.reward_value_log[start:end]):
+                # note, r is a list of size 1, future r is None or a float
                 if future_r is None:
                     # Give the final time step its own reward twice.
                     future_r = r
-                if r > 0:
+                if r[0] > 0:
                     # If a nonzero score was received, the reward propagates
-                    future_r = r + self.future_reward_discount * future_r
+                    future_r = r[0] + self.future_reward_discount * future_r
                     new_log_values.append([future_r])
                 else:
                     # If the reward was zero, propagation is stopped
-                    new_log_values.append([r])
-                    future_r = r
+                    new_log_values.append(r)
+                    future_r = r[0]
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
             if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
