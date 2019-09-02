@@ -579,13 +579,9 @@ def main(args):
 
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
-            nonlocal_variables['trial_complete'] = False
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
-            print('Trials complete: ' + str(num_trials) + ' -------------------------------')
             logger.write_to_log('clearance', trainer.clearance_log)
-            trainer.trial_reward_value_log_update()
-            logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
             if is_testing and test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
                 # load the current preset case, incrementing as trials are cleared
@@ -682,6 +678,12 @@ def main(args):
                 logger.write_to_log('stack-height', trainer.stack_height_log)
                 logger.write_to_log('partial-stack-success', trainer.partial_stack_success_log)
                 logger.write_to_log('place-success', trainer.place_success_log)
+            if nonlocal_variables['trial_complete']:
+                # Do final logging from the previous trial and previous complete iteration
+                nonlocal_variables['trial_complete'] = False
+                trainer.trial_reward_value_log_update()
+                logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
+                print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
