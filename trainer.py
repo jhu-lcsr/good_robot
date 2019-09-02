@@ -241,7 +241,8 @@ class Trainer(object):
             print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
         else:
             print('trial_reward_value_log_update() past end bug, check the code. end: ' +
-                  str(end) + ' clearance length: ' + str(clearance_length))
+                  str(end) + ' clearance length: ' + str(clearance_length) +
+                  ' reward value log length: ' + str(len(self.reward_value_log)))
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
