@@ -782,37 +782,42 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
-def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2):
+def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2, trial_reward=True):
     # Here we will try to sample a reward value from the same action as the current one
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
     sample_primitive_action = prev_primitive_action
     sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
+    if trial_reward and len(trainer.trial_reward_value_log) > 2:
+        max_iteration = len(trainer.trial_reward_value_log)
+    else:
+        trial_reward = False
+        max_iteration = trainer.iteration
     # executed_action_log includes the action, push grasp or place, and the best pixel index
-    actions = np.asarray(trainer.executed_action_log)[1:trainer.iteration, 0]
+    actions = np.asarray(trainer.executed_action_log)[1:max_iteration, 0]
     prev_success = np.array(bool(prev_reward_value))
 
     # Get samples of the same primitive but with different success results
     if np.random.random(1) < all_history_prob:
         # Sample all of history every one out of n times.
-        sample_ind = np.arange(1, trainer.iteration-1).reshape(trainer.iteration-2, 1)
+        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
     elif sample_primitive_action == 'push':
         # sample_primitive_action_id = 0
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:trainer.iteration, 0] != prev_success,
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:max_iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     elif sample_primitive_action == 'grasp':
         # sample_primitive_action_id = 1
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:trainer.iteration, 0] != prev_success,
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:max_iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     elif sample_primitive_action == 'place':
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:trainer.iteration, 0] != prev_success,
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:max_iteration, 0] != prev_success,
                                                 actions == sample_primitive_action_id))
     else:
         raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
 
-    if sample_ind.size == 0 and prev_reward_value is not None and trainer.iteration > 2:
+    if sample_ind.size == 0 and prev_reward_value is not None and max_iteration > 2:
         print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(not prev_success) + ', so sampling from the whole history.')
-        sample_ind = np.arange(1, trainer.iteration-1).reshape(trainer.iteration-2, 1)
+        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
 
     if sample_ind.size > 0:
         # Find sample with highest surprise value
@@ -829,7 +834,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         sample_iteration = sorted_sample_ind[rand_sample_ind]
         sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
-        sample_reward_value = trainer.reward_value_log[sample_iteration]
+        if trial_reward:
+            sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
+        else:
+            sample_reward_value = trainer.reward_value_log[sample_iteration]
         nonlocal_variables['replay_iteration'] += 1
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
 
