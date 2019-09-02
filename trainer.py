@@ -226,6 +226,7 @@ class Trainer(object):
                     # Give the final time step its own reward twice.
                     prev_r = r
                 new_log_values.append([r + self.future_reward_discount * prev_r])
+                prev_r = r
             self.trial_reward_value_log += new_log_values
             if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
                 print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
