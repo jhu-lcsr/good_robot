@@ -476,7 +476,8 @@ def main(args):
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                             robot.reposition_objects()
-                            nonlocal_variables['stack'].reset_sequence()
+                            # We don't need to reset here because the algorithm already reset itself
+                            # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
                             nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
