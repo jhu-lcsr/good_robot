@@ -237,9 +237,9 @@ class Trainer(object):
                     future_r = r[0]
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
-            if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
+            if len(self.trial_reward_value_log) != len(self.reward_value_log):
                 print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
-            print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
+            # print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
         else:
             print('trial_reward_value_log_update() past end bug, check the code. end: ' +
                   str(end) + ' clearance length: ' + str(clearance_length) +
