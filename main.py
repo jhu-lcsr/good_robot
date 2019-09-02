@@ -592,7 +592,7 @@ def main(args):
                 exit_called = True  # Exit after training thread (backprop and saving labels)
             if experience_replay_enabled:
                 trainer.trial_reward_value_log_update()
-                logger.write_to_log('trial-reward-value', trainer.reward_value_log)
+                logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
             if do_continue:
                 do_continue = False
                 continue
