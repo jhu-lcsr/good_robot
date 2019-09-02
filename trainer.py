@@ -226,7 +226,7 @@ class Trainer(object):
                 # note, r is a list of size 1, future r is None or a float
                 if future_r is None:
                     # Give the final time step its own reward twice.
-                    future_r = r
+                    future_r = r[0]
                 if r[0] > 0:
                     # If a nonzero score was received, the reward propagates
                     future_r = r[0] + self.future_reward_discount * future_r
