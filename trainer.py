@@ -220,14 +220,16 @@ class Trainer(object):
                 start = self.clearance_log[-2][0]
 
             new_log_values = []
-            prev_r = None
+            future_r = None
+            # going backwards in time from most recent to oldest step
             for r in reversed(self.reward_value_log[start:end]):
-                if prev_r is None:
+                if future_r is None:
                     # Give the final time step its own reward twice.
-                    prev_r = r
-                new_log_values.append([r + self.future_reward_discount * prev_r])
-                prev_r = r
-            self.trial_reward_value_log += new_log_values
+                    future_r = r
+                future_r = r + self.future_reward_discount * future_r
+                new_log_values.append([future_r])
+            # stick the reward_value_log on the end in the forward time order
+            self.trial_reward_value_log += reversed(new_log_values)
             if self.trial_reward_value_log.shape[0] != self.reward_value_log.shape[0]:
                 print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
             print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
