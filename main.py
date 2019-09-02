@@ -583,6 +583,8 @@ def main(args):
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
             logger.write_to_log('clearance', trainer.clearance_log)
+            trainer.trial_reward_value_log_update()
+            logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
             if is_testing and test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
                 # load the current preset case, incrementing as trials are cleared
@@ -590,9 +592,6 @@ def main(args):
                 robot.load_preset_case(case_file)
             if is_testing and not place and num_trials >= max_test_trials:
                 exit_called = True  # Exit after training thread (backprop and saving labels)
-            if experience_replay_enabled:
-                trainer.trial_reward_value_log_update()
-                logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
             if do_continue:
                 do_continue = False
                 continue
