@@ -212,7 +212,7 @@ class Trainer(object):
         end = self.clearance_log[-1][0]
         clearance_length = len(self.clearance_log)
 
-        if end < len(self.reward_value_log):
+        if end <= len(self.reward_value_log):
             # First entry won't be zero...
             if clearance_length == 1:
                 start = 0
