@@ -231,7 +231,8 @@ class Trainer(object):
                 print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
             print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
         else:
-            print('trial_reward_value_log_update() past end bug, check the code')
+            print('trial_reward_value_log_update() past end bug, check the code. end: ' +
+                  str(end) + ' clearance length: ' + str(clearance_length))
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
