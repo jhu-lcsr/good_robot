@@ -207,7 +207,8 @@ def main(args):
                           'stack_rate': np.inf,
                           'trial_success_rate': np.inf,
                           'replay_iteration': 0,
-                          'trial_complete': False}
+                          'trial_complete': False,
+                          'finalize_prev_trial_log': False}
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
@@ -582,8 +583,12 @@ def main(args):
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
             logger.write_to_log('clearance', trainer.clearance_log)
+            # we've recorded the data to mark this trial as complete
+            nonlocal_variables['trial_complete'] = False
+            # we're still not totally done, we still need to finilaize the log for the trial
+            nonlocal_variables['finalize_prev_trial_log'] = True
             if is_testing and test_preset_cases:
-                case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
+                case_file = preset_files[min(len(preset_files)-1, int(num_trials+1/trials_per_case))]
                 # load the current preset case, incrementing as trials are cleared
                 print('loading case file: ' + str(case_file))
                 robot.load_preset_case(case_file)
@@ -678,9 +683,9 @@ def main(args):
                 logger.write_to_log('stack-height', trainer.stack_height_log)
                 logger.write_to_log('partial-stack-success', trainer.partial_stack_success_log)
                 logger.write_to_log('place-success', trainer.place_success_log)
-            if nonlocal_variables['trial_complete']:
+            if nonlocal_variables['finalize_prev_trial_log']:
                 # Do final logging from the previous trial and previous complete iteration
-                nonlocal_variables['trial_complete'] = False
+                nonlocal_variables['finalize_prev_trial_log'] = False
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
