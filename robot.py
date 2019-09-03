@@ -4,7 +4,6 @@ import struct
 import time
 import os
 import numpy as np
-from scipy.spatial.transform import Rotation
 import itertools
 import utils
 from simulation import vrep
@@ -1155,7 +1154,7 @@ class Robot(object):
             # TODO(hkwon214): Add place function for real robot
         
             
-    def check_row(self, object_color_sequence, distance_threshold=0.07, num_directions=16):
+    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.07, num_directions=16):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1166,6 +1165,7 @@ class Robot(object):
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
         num_directions: number of rotations that 
+        num_obj: number of blocks in the workspace (needed to get all subsets)
         
         # Returns
 
@@ -1175,18 +1175,25 @@ class Robot(object):
             i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
             If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """
-        assert len(object_color_sequence) > 1, 'check_row() object_color_sequence too short'
+        if len(object_color_sequence) < 1:
+            print('check_row() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
+            return True, 1
 
-        # todo killeen: add compatibility with self.grasp_color_task
         pos = np.asarray(self.get_obj_positions())
         success = False
-        row_size = 0
+        row_size = 1
         row_length = len(object_color_sequence)
         # Color order of blocks doesn't matter, just the length of the sequence.
         # Therefore, check every row_length-size subset of blocks to see if
         # they are in a row and, if so, whether they are close enough
         # together.
-        for block_indices in itertools.combinations(pos, row_length):
+
+        if self.grasp_color_task:
+            all_block_indices = map(list, [object_color_sequence, reversed(object_color_sequence)])
+        else:
+            all_block_indices = map(list, itertools.combinations(np.arange(num_obj), row_length))
+            
+        for block_indices in all_block_indices:
             # check each rotation angle for a possible row
             for i in range(num_directions // 2):
                 # rotate block positions about Z axis
@@ -1195,20 +1202,27 @@ class Robot(object):
                 s = np.sin(theta)
                 R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
                 rotated_pos = np.array([np.matmul(R, p) for p in pos])
-                print('rotated_pos:', rotated_pos)
-                if (np.linalg.norm(rotated_pos[block_indices, [1, 2]] - rotated_pos[block_indices, [1, 2]].mean(axis=0), axis=1) < distance_threshold / 2):
+                # print('rotated_pos:', rotated_pos)
+                # print('block_indices:', block_indices)
+                along_axis = rotated_pos[block_indices][:, [1, 2]]
+                center = rotated_pos[block_indices][:, [1, 2]].mean(axis=0)
+                # print('along_axis:', along_axis)
+                # print('center:', center)
+                if (np.linalg.norm(along_axis - center, axis=1) < distance_threshold / 2).all():
                     # blocks are near enough to axis to be aligned along this rotation angle
                     block_order = np.array(rotated_pos[:, 0]).argsort()
-                    print('check_row() along angle', theta, 'with blocks', block_indices)
+                    # print('check_row() along angle', theta, 'with blocks', block_indices)
                     if utils.check_separation(rotated_pos[block_order, 0], distance_threshold):
                         # blocks are also close enough along the axis to be considered a row
                         print('valid row along', theta, 'with indices', block_indices)
                         success = True
                         row_size = max(len(block_indices), row_size)
                     else:
-                        print('invalid row: bad separation')
-                    
-        return [success, row_size]
+                        # print('invalid row: bad separation')
+                        pass
+
+        print('check_row:', success, row_size)
+        return success, row_size
                     
                         
     def check_stack(self, object_color_sequence, distance_threshold=0.07, top_idx=-1):

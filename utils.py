@@ -313,10 +313,10 @@ def check_separation(values, distance_threshold):
         y = values[i + 1]
         assert x < y, '`values` assumed to be sorted'
         if y < x + distance_threshold / 2.:
-            print('check_separation(): not long enough for idx: {}'.format(i))
+            # print('check_separation(): not long enough for idx: {}'.format(i))
             return False
         if y - x > distance_threshold:
-            print('check_separation(): too far apart')
+            # print('check_separation(): too far apart')
             return False
     return True
     
