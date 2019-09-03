@@ -123,7 +123,7 @@ def main(args):
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
-    stack_axis = {'x' : 0, 'y': 1, 'z': 2}[args.stack_axis]
+    check_row = args.check_row
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
@@ -248,7 +248,10 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, stack_axis=stack_axis)
+        if check_row:
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, top_idx=top_idx)
+        else:
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if nonlocal_variables['stack_height'] == 1:
             # A stack of size 1 does not meet the criteria for a partial stack success
@@ -908,7 +911,7 @@ if __name__ == '__main__':
     parser.add_argument('--heuristic_bootstrap', dest='heuristic_bootstrap', action='store_true', default=False,          help='use handcrafted grasping algorithm when grasping fails too many times in a row during training?')
     parser.add_argument('--explore_rate_decay', dest='explore_rate_decay', action='store_true', default=False)
     parser.add_argument('--grasp_only', dest='grasp_only', action='store_true', default=False)
-    parser.add_argument('--stack_axis', dest='stack_axis', action='store', default='z', choices=['x', 'y', 'z'],          help='dimension along which to stack blocks')
+    parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
 
