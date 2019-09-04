@@ -1163,15 +1163,16 @@ class Robot(object):
         # Arguments
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
-        num_directions: number of rotations that 
         num_obj: number of blocks in the workspace (needed to get all subsets)
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        num_directions: number of rotations that are checked for rows. TODO: make larger than robot's granularity.
+        
         
         # Returns
 
         List [success, height_count].
         success: will be True if the stack matches the specified order from bottom to top, False otherwise.
-        height_count: will be the number of individual blocks which passed the check, with a minimum value of 1.
+        row_size: will be the number of individual blocks which passed the check, with a minimum value of 1.
             i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
             If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """

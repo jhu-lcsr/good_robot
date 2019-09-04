@@ -302,7 +302,7 @@ def rotm2angle(R):
 def check_separation(values, distance_threshold):
     """Checks that the separation among the values is close enough about distance_threshold.
 
-    :param values: array of values to check, assumed to be sorted
+    :param values: array of values to check, assumed to be sorted from low to high
     :param distance_threshold: threshold
     :returns: success
     :rtype: bool
