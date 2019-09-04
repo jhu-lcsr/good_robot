@@ -120,6 +120,7 @@ def main(args):
     push_rewards = args.push_rewards if method == 'reinforcement' else None  # Use immediate rewards (from change detection) for pushing?
     future_reward_discount = args.future_reward_discount
     experience_replay_enabled = args.experience_replay # Use prioritized experience replay?
+    trial_reward = args.trial_reward
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
@@ -710,7 +711,7 @@ def main(args):
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
 
             # Save model snapshot
             if not is_testing:
@@ -732,7 +733,7 @@ def main(args):
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
             else:
                 time.sleep(0.01)
             time_elapsed = time.time()-iteration_time_0
@@ -982,6 +983,9 @@ if __name__ == '__main__':
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
+    # TODO(ahundt) determine a way to deal with the side effect
+    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,              help='Experience replay delivers rewards for the whole trial, not just next step. '
+                                                                                                                     'Side effect: live training conflicts with experience training.')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
     # Run main program with specified arguments
