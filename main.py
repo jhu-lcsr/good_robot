@@ -21,6 +21,7 @@ import utils
 ACTION_TO_ID = {'push':0, 'grasp':1, 'place':2}
 ID_TO_ACTION = {0:'push', 1:'grasp', 2:'place'}
 
+# killeen: this is defining the goal
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True):
         """ Oracle to choose a sequence of specific color objects to interact with.
