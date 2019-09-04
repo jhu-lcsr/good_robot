@@ -144,6 +144,7 @@ def main(args):
             # load a directory of files
             preset_files = os.listdir(args.test_preset_dir)
             preset_files = [os.path.abspath(os.path.join(args.test_preset_dir, filename)) for filename in preset_files]
+            preset_files = sorted(preset_files)
         trials_per_case = max_test_trials
         # run each preset file max_test_trials times.
         max_test_trials *= len(preset_files)
@@ -520,7 +521,10 @@ def main(args):
     # -------------------------------------------------------------
     prev_primitive_action = None
     prev_reward_value = None
-
+    if test_preset_cases:
+        # save out the order we will visit the preset files for a sanity check
+        print('preset files order: ' + str(preset_files))
+        np.savetxt(os.path.join(logger.transitions_directory, 'preset-case-files.log.txt'), preset_files, delimiter=' ', fmt='%s')
     if show_preset_cases_then_exit and test_preset_cases:
         # Just a quick temporary mode for viewing the saved preset test cases
         for case_file in preset_files:
@@ -588,7 +592,11 @@ def main(args):
             # we're still not totally done, we still need to finilaize the log for the trial
             nonlocal_variables['finalize_prev_trial_log'] = True
             if is_testing and test_preset_cases:
-                case_file = preset_files[min(len(preset_files)-1, int(num_trials+1/trials_per_case))]
+                # min(num_preset_files-1, int(float(trial_idx-1)/float(preset_trials_per_case)))
+                # TODO(ahundt) we shouldn't really be setting nonlocal_variables['trial'] here, but it is a workaround so the trials log file lines up
+                nonlocal_variables['trial'] = num_trials
+                case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
+                # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
                 # load the current preset case, incrementing as trials are cleared
                 print('loading case file: ' + str(case_file))
                 robot.load_preset_case(case_file)
