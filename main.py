@@ -17,6 +17,9 @@ from trainer import Trainer
 from logger import Logger
 import utils
 
+# to convert action names to the corresponding ID number and vice-versa
+ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
+ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True):
@@ -68,7 +71,7 @@ class StackSequence(object):
     def sequence_one_hot(self):
         """ Return the one hot encoding for the entire stack sequence.
         """
-        return np.concatenate(object_color_one_hot_encodings)
+        return np.concatenate(self.object_color_one_hot_encodings)
 
     def current_sequence_progress(self):
         """ How much of the current stacking sequence we have completed.
@@ -97,6 +100,9 @@ def main(args):
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
     num_obj = args.num_obj if is_sim else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim else None
+    if num_obj is not None:
+        num_obj += num_extra_obj
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port if not is_sim else None
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -113,16 +119,38 @@ def main(args):
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
     push_rewards = args.push_rewards if method == 'reinforcement' else None  # Use immediate rewards (from change detection) for pushing?
     future_reward_discount = args.future_reward_discount
-    experience_replay = args.experience_replay # Use prioritized experience replay?
+    experience_replay_enabled = args.experience_replay # Use prioritized experience replay?
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
+    stack_axis = {'x' : 0, 'y': 1, 'z': 2}[args.stack_axis]
+    pretrained = not args.random_weights
+    max_iter = args.max_iter
+    no_height_reward = args.no_height_reward
 
-    # -------------- Test grasp_onlying options --------------
+    # -------------- Test grasping options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases
-    test_preset_file = os.path.abspath(args.test_preset_file) if test_preset_cases else None
+    trials_per_case = 1
+    show_preset_cases_then_exit = args.show_preset_cases_then_exit
+    if show_preset_cases_then_exit:
+        test_preset_cases = True
+    if test_preset_cases:
+        if args.test_preset_file:
+            # load just one specific file
+            preset_files = [os.path.abspath(args.test_preset_file)]
+        else:
+            # load a directory of files
+            preset_files = os.listdir(args.test_preset_dir)
+            preset_files = [os.path.abspath(os.path.join(args.test_preset_dir, filename)) for filename in preset_files]
+        trials_per_case = max_test_trials
+        # run each preset file max_test_trials times.
+        max_test_trials *= len(preset_files)
+        test_preset_file = preset_files[0]
+    else:
+        preset_files = None
+        test_preset_file = None
 
     # ------ Pre-loading and logging options ------
     load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
@@ -131,7 +159,7 @@ def main(args):
     logging_directory = os.path.abspath(args.logging_directory) if continue_logging else os.path.abspath('logs')
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
-    # ------ HK: Added Options -----
+    # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
     place = args.place
     if grasp_color_task:
@@ -140,7 +168,6 @@ def main(args):
         goal_condition_len = num_obj
     else:
         goal_condition_len = 0
-    #grasp_count = args.grasp_count
 
     # Set random seed
     np.random.seed(random_seed)
@@ -152,7 +179,7 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place)
+                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -168,21 +195,23 @@ def main(args):
     explore_prob = 0.5 if not is_testing else 0.0
 
     # Quick hack for nonlocal memory between threads in Python 2
-    nonlocal_variables = {'executing_action' : False,
-                          'primitive_action' : None,
-                          'best_pix_ind' : None,
-                          'push_success' : False,
-                          'grasp_success' : False,
-                          'color_success' : False,
-                          'place_success' : False,
+    nonlocal_variables = {'executing_action': False,
+                          'primitive_action': None,
+                          'best_pix_ind': None,
+                          'push_success': False,
+                          'grasp_success': False,
+                          'color_success': False,
+                          'place_success': False,
                           'partial_stack_success': False,
                           'stack_height': 1,
                           'stack_rate': np.inf,
-                          'trial_success_rate': np.inf}
+                          'trial_success_rate': np.inf,
+                          'replay_iteration': 0,
+                          'trial_complete': False}
     best_stack_rate = np.inf
 
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj, grasp_color_task or place)
+    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, grasp_color_task or place)
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -191,7 +220,6 @@ def main(args):
         nonlocal_variables['push_success'] = False
         nonlocal_variables['grasp_success'] = False
         nonlocal_variables['place_success'] = False
-        # HK: Added color variable
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
@@ -219,11 +247,12 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+        stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, stack_axis=stack_axis)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if nonlocal_variables['stack_height'] == 1:
             # A stack of size 1 does not meet the criteria for a partial stack success
             nonlocal_variables['partial_stack_success'] = False
+            nonlocal_variables['stack_success'] = False
 
         max_workspace_height = len(current_stack_goal) - stack_shift
         # Has that stack gotten shorter than it was before? If so we need to reset
@@ -237,12 +266,14 @@ def main(args):
             print('main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
                   ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
                   ', RESETTING the objects, goals, and action success to FALSE...')
+            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
             robot.reposition_objects()
             nonlocal_variables['stack'].reset_sequence()
             nonlocal_variables['stack'].next()
             # We needed to reset, so the stack must have been knocked over!
             # all rewards and success checks are False!
             set_nonlocal_success_variables_false()
+            nonlocal_variables['trial_complete'] = True
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -420,6 +451,7 @@ def main(args):
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
+                                nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
@@ -442,13 +474,23 @@ def main(args):
                             stack_count += 1
                             # full stack complete! reset the scene
                             successful_trial_count += 1
+                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                             robot.reposition_objects()
-                            nonlocal_variables['stack'].reset_sequence()
+                            # We don't need to reset here because the algorithm already reset itself
+                            # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
+                            nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
+                trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
+                if grasp_color_task:
+                    trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
                 if place:
+                    # place trainer logs are updated in process_actions()
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
+                    trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
+                    trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
+
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                         place_rate = float(partial_stack_count)/float(place_count)
@@ -467,15 +509,34 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
+    # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
     exit_called = False
     # -------------------------------------------------------------
     # -------------------------------------------------------------
+    prev_primitive_action = None
+    prev_reward_value = None
 
-    # Start main training/testing loop
-    while True:
+    if show_preset_cases_then_exit and test_preset_cases:
+        # Just a quick temporary mode for viewing the saved preset test cases
+        for case_file in preset_files:
+            # load the current preset case, incrementing as trials are cleared
+            print('loading case file: ' + str(case_file))
+            robot.load_preset_case(case_file)
+            robot.restart_sim()
+            robot.add_objects()
+            time.sleep(3)
+        exit_called = True
+        robot.shutdown()
+        return
+
+    num_trials = 0
+    do_continue = False
+    # Start main training/testing loop, max_iter == 0 or -1 goes forever.
+    while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
 
@@ -484,17 +545,8 @@ def main(args):
             robot.check_sim()
 
         # Get latest RGB-D image
-        color_img, depth_img = robot.get_camera_data()
-        depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
-        #print(color_img)
-        # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-        color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
-        valid_depth_heightmap = depth_heightmap.copy()
-        valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
-
-        # Save RGB-D images and RGB-D heightmaps
-        logger.save_images(trainer.iteration, color_img, depth_img, '0')
-        logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, '0')
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
+            robot, workspace_limits, heightmap_resolution, logger, trainer)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
@@ -508,7 +560,7 @@ def main(args):
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
                 robot.restart_sim()
                 robot.add_objects()
-                if is_testing: # If at end of test run, re-load original weights (before test run)
+                if is_testing:  # If at end of test run, re-load original weights (before test run)
                     trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
                     set_nonlocal_success_variables_false()
@@ -520,16 +572,41 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
                 robot.restart_real()
 
+            nonlocal_variables['trial_complete'] = True
+            # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
+            do_continue = True
+            # continue
+
+        if nonlocal_variables['trial_complete']:
+            # Check if the other thread ended the trial and reset the important values
             no_change_count = [0, 0]
-            trainer.clearance_log.append([trainer.iteration])
+            num_trials = trainer.end_trial()
             logger.write_to_log('clearance', trainer.clearance_log)
-            if is_testing and len(trainer.clearance_log) >= max_test_trials:
-                exit_called = True # Exit after training thread (backprop and saving labels)
+            if is_testing and test_preset_cases:
+                case_file = preset_files[min(len(preset_files)-1, int(num_trials/trials_per_case))]
+                # load the current preset case, incrementing as trials are cleared
+                print('loading case file: ' + str(case_file))
+                robot.load_preset_case(case_file)
+            if is_testing and not place and num_trials >= max_test_trials:
+                exit_called = True  # Exit after training thread (backprop and saving labels)
+            if do_continue:
+                do_continue = False
+                continue
 
-            # TODO: HK -> max_test_trials = 100 -> print accuracy of grasping red block
-            continue
+            # TODO(ahundt) update experience replay trial rewards
 
+        # check for possible bugs in the code
+        if len(trainer.reward_value_log) < trainer.iteration - 2:
+            # check for progress counting inconsistencies
+            print('WARNING POSSIBLE CRITICAL ERROR DETECTED: log data index and trainer.iteration out of sync!!! Experience Replay may break! '
+                  'Check code for errors in indexes, continue statements etc.')
+        if place and nonlocal_variables['stack'].trial != num_trials + 1:
+            # check that num trials is always 1 less than the current trial number
+            print('WARNING variable mismatch num_trials + 1: ' + str(num_trials + 1) + ' nonlocal_variables[stack].trial: ' + str(nonlocal_variables['stack'].trial))
+
+        # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
+            # If we are doing a fixed number of test trials, end the run the next time around.
             exit_called = True
 
         if not exit_called:
@@ -571,21 +648,42 @@ def main(args):
                 elif prev_primitive_action == 'grasp':
                     no_change_count[1] += 1
 
-            # Compute training labels
+            if no_height_reward:
+                # used to assess the value of the reward multiplier
+                reward_multiplier = 1
+            else:
+                reward_multiplier = prev_stack_height
+
+            # Compute training labels, returns are:
+            # label_value == expected_reward (with future rewards)
+            # prev_reward_value == current_reward (without future rewards)
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
-                place_success=prev_partial_stack_success, reward_multiplier=prev_stack_height)
+                place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
             trainer.label_value_log.append([label_value])
+            # label-value is also known as expected_reward in trainer.get_label_value()
             logger.write_to_log('label-value', trainer.label_value_log)
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
+            trainer.change_detected_log.append([change_detected])
+            logger.write_to_log('change-detected', trainer.change_detected_log)
+            logger.write_to_log('grasp-success', trainer.grasp_success_log)
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
+                logger.write_to_log('color-success', trainer.color_success_log)
             if place:
                 logger.write_to_log('stack-height', trainer.stack_height_log)
+                logger.write_to_log('partial-stack-success', trainer.partial_stack_success_log)
+                logger.write_to_log('place-success', trainer.place_success_log)
+            if nonlocal_variables['trial_complete']:
+                # Do final logging from the previous trial and previous complete iteration
+                nonlocal_variables['trial_complete'] = False
+                trainer.trial_reward_value_log_update()
+                logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
+                print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -595,126 +693,11 @@ def main(args):
                 explore_prob = max(0.5 * np.power(0.9998, trainer.iteration), 0.1) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
-            if experience_replay and not is_testing:
+            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                sample_primitive_action = prev_primitive_action
-                if sample_primitive_action == 'push':
-                    sample_primitive_action_id = 0
-                    if method == 'reactive':
-                        sample_reward_value = 0 if prev_reward_value == 1 else 1 # random.randint(1, 2) # 2
-                    elif method == 'reinforcement':
-                        sample_reward_value = 0 if prev_reward_value == trainer.push_reward else trainer.push_reward
-                elif sample_primitive_action == 'grasp':
-                    sample_primitive_action_id = 1
-                    if method == 'reactive':
-                        sample_reward_value = 0 if prev_reward_value == 1 else 1
-                    elif method == 'reinforcement':
-                        if grasp_color_task:
-                            sample_reward_value = 0 if prev_reward_value == trainer.grasp_color_reward else trainer.grasp_color_reward
-                        else:
-                            sample_reward_value = 0 if prev_reward_value == trainer.grasp_reward else trainer.grasp_reward
-                elif sample_primitive_action == 'place':
-                    sample_primitive_action_id = 2
-                    if method == 'reactive':
-                        sample_reward_value = 0 if prev_reward_value == 1 else 1
-                    elif method == 'reinforcement':
-                        if grasp_color_task:
-                            sample_reward_value = 0 if prev_reward_value == trainer.place_color_reward else trainer.place_color_reward
-                        else:
-                            sample_reward_value = 0 if prev_reward_value == trainer.place_reward else trainer.place_reward
-
-                # Get samples of the same primitive but with different results
-                sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.reward_value_log)[1:trainer.iteration,0] == sample_reward_value, np.asarray(trainer.executed_action_log)[1:trainer.iteration,0] == sample_primitive_action_id))
-
-                if sample_ind.size > 0:
-
-                    # Find sample with highest surprise value
-                    if method == 'reactive':
-                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - (1 - sample_reward_value))
-                    elif method == 'reinforcement':
-                        sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:,0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
-                    sorted_surprise_ind = np.argsort(sample_surprise_values[:,0])
-                    sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
-                    pow_law_exp = 2
-                    rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
-                    sample_iteration = sorted_sample_ind[rand_sample_ind]
-                    print('Experience replay: iteration %d (surprise value: %f)' % (sample_iteration, sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
-
-                    # Load sample RGB-D heightmap
-                    sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
-                    sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
-                    sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
-                    sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
-
-                    # Compute forward pass with sample
-                    if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
-                        goal_condition = [trainer.goal_condition_log[sample_iteration]]
-                        next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
-                    else:
-                        goal_condition = None
-                        next_goal_condition = None
-                        sample_color_success = None
-
-                    if place:
-                        # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
-                        sample_stack_height = int(trainer.stack_height_log[sample_iteration][0])
-                        next_stack_height = int(trainer.stack_height_log[sample_iteration+1][0])
-                    else:
-                        # set to 1 because stack height is used as the reward multiplier
-                        sample_stack_height = 1
-                        next_stack_height = 1
-
-                    sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
-                        sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
-
-                    # Load next sample RGB-D heightmap
-                    next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
-                    next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-                    next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
-                    next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
-                    # TODO(ahundt) TODO(hkwon14) Fix success checks to be performed correctly for all mode combinations of grasping, color grasping, and stacking, rewards must match get_label_value() in trainer.py, prefereably in an easy to use way.
-                    # TODO(ahundt) TODO(hkwon14) tune sample_reward_value?
-                    sample_place_success = None
-                    if grasp_color_task:
-                        # TODO(ahundt) non-color actions should also get partial credit, need to update DEFINITE BUG PRESENT
-                        sample_push_success = sample_reward_value == trainer.push_reward
-                        sample_grasp_success = sample_reward_value == trainer.grasp_color_reward
-                        if place:
-                            sample_place_success = sample_reward_value == trainer.place_color_reward
-                    else:
-                        sample_push_success = sample_reward_value == trainer.push_reward
-                        sample_grasp_success = sample_reward_value == trainer.grasp_reward
-                        if place:
-                            sample_place_success = sample_reward_value == trainer.place_reward
-                    sample_change_detected = sample_push_success
-                    if goal_condition is not None:
-                        sample_color_success = sample_reward_value == 1
-                    # TODO(hkwon14) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
-                    new_sample_label_value, _ = trainer.get_label_value(
-                        sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
-                        sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-                        sample_color_success, goal_condition=goal_condition, prev_place_predictions=sample_place_predictions,
-                        place_success=sample_place_success, reward_multiplier=sample_stack_height)
-
-                    # Get labels for sample and backpropagate
-                    sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
-                    trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
-                                     trainer.label_value_log[sample_iteration], goal_condition=goal_condition)
-
-                    # Recompute prediction value and label for replay buffer
-                    if sample_primitive_action == 'push':
-                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
-                        # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
-                    elif sample_primitive_action == 'grasp':
-                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
-                    elif sample_primitive_action == 'place':
-                        trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
-                        # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
-
-                else:
-                    print('Not enough prior training samples. Skipping experience replay.')
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
 
             # Save model snapshot
             if not is_testing:
@@ -734,15 +717,22 @@ def main(args):
 
         # Sync both action thread and training thread
         while nonlocal_variables['executing_action']:
-            time.sleep(0.01)
+            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+                # do some experience replay while waiting, rather than sleeping
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition)
+            else:
+                time.sleep(0.01)
             time_elapsed = time.time()-iteration_time_0
             if int(time_elapsed) > 20:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
-
+                nonlocal_variables['trial_complete'] = True
 
         if exit_called:
+            # shut down the simulation or robot
+            robot.shutdown()
             break
 
         # Save information for next training step
@@ -765,34 +755,171 @@ def main(args):
         # TODO(ahundt) BUG We almost certainly need to copy nonlocal_variables['stack']
         prev_stack = nonlocal_variables['stack']
         prev_goal_condition = goal_condition
-        # HK: check color_success arguments
         if grasp_color_task:
             prev_color_success = nonlocal_variables['grasp_color_success']
             if nonlocal_variables['grasp_success'] and nonlocal_variables['grasp_color_success']:
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
-                # TODO(ahundt) add color stacking step, make sure code works with "if place:" statement below
         else:
             prev_color_success = None
-
-        # TODO(ahundt) verify equivalent code in process_actions(), then delete this if block, especially if the code has been working for a while
-        # if place and nonlocal_variables['place_success']:
-        #     prev_stack_goal = prev_stack.current_sequence_progress()
-        #     nonlocal_variables['stack'].next()
-        #     stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        #     # TODO(ahundt) add stack success check here or in the appropriate spot in the code
-        #     if len(prev_stack_goal) > len(stack_goal):
-        #         # full stack is complete. Reset.
-        #         # TODO(ahundt) handle failure cases like stack falling over and consider giving a big reward if the full height stacking check passes.
-        #         robot.reposition_objects()
 
         trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
-        # HK: TODO
 
         print('Trainer iteration: %f' % (trainer.iteration))
+
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0'):
+    # Get latest RGB-D image
+    color_img, depth_img = robot.get_camera_data()
+    depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
+    # print(color_img)
+    # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
+    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+    valid_depth_heightmap = depth_heightmap.copy()
+    valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
+
+    # Save RGB-D images and RGB-D heightmaps
+    logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
+    logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
+    return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
+
+def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2, trial_reward=False):
+    # Here we will try to sample a reward value from the same action as the current one
+    # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
+    # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
+    sample_primitive_action = prev_primitive_action
+    sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
+    if trial_reward and len(trainer.trial_reward_value_log) > 2:
+        max_iteration = len(trainer.trial_reward_value_log)
+    else:
+        trial_reward = False
+        max_iteration = trainer.iteration
+    # executed_action_log includes the action, push grasp or place, and the best pixel index
+    actions = np.asarray(trainer.executed_action_log)[1:max_iteration, 0]
+    prev_success = np.array(bool(prev_reward_value))
+
+    # Get samples of the same primitive but with different success results
+    if np.random.random(1) < all_history_prob:
+        # Sample all of history every one out of n times.
+        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+    elif sample_primitive_action == 'push':
+        # sample_primitive_action_id = 0
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:max_iteration, 0] != prev_success,
+                                                actions == sample_primitive_action_id))
+    elif sample_primitive_action == 'grasp':
+        # sample_primitive_action_id = 1
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:max_iteration, 0] != prev_success,
+                                                actions == sample_primitive_action_id))
+    elif sample_primitive_action == 'place':
+        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:max_iteration, 0] != prev_success,
+                                                actions == sample_primitive_action_id))
+    else:
+        raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
+
+    if sample_ind.size == 0 and prev_reward_value is not None and max_iteration > 2:
+        print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(not prev_success) + ', so sampling from the whole history.')
+        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+
+    if sample_ind.size > 0:
+        # Find sample with highest surprise value
+        if method == 'reactive':
+            # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
+        elif method == 'reinforcement':
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+        sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
+        sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
+        pow_law_exp = 2
+        rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
+        # sample_iteration is the actual time step on which we will run experience replay
+        sample_iteration = sorted_sample_ind[rand_sample_ind]
+        sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
+        sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
+        if trial_reward:
+            sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
+        else:
+            sample_reward_value = trainer.reward_value_log[sample_iteration]
+        nonlocal_variables['replay_iteration'] += 1
+        print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
+
+        # Load sample RGB-D heightmap
+        sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
+        sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
+        sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
+        sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
+
+        # Compute forward pass with sample
+        if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
+            exp_goal_condition = [trainer.goal_condition_log[sample_iteration]]
+            next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
+        else:
+            exp_goal_condition = None
+            next_goal_condition = None
+            sample_color_success = None
+
+        if place:
+            # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
+            sample_stack_height = int(trainer.stack_height_log[sample_iteration][0])
+            next_stack_height = int(trainer.stack_height_log[sample_iteration+1][0])
+        else:
+            # set to 1 because stack height is used as the reward multiplier
+            sample_stack_height = 1
+            next_stack_height = 1
+
+        sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
+            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
+
+        # Load next sample RGB-D heightmap
+        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
+        next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
+        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
+        next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
+        # TODO(ahundt) tune sample_reward_value and gamma discount rate?
+        sample_place_success = None
+        # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
+        sample_push_success = True
+        sample_change_detected = trainer.change_detected_log[sample_iteration]
+        sample_grasp_success = trainer.grasp_success_log[sample_iteration]
+        if place:
+            sample_place_success = trainer.partial_stack_success_log[sample_iteration]
+        # in this case grasp_color_task is True
+        if exp_goal_condition is not None:
+            sample_color_success = trainer.color_success_log[sample_iteration]
+
+        # if no_height_reward:  # TODO(ahundt) why does the args.no_height_reward line below work and the regular no_height_reward here broken?
+        if args.no_height_reward:
+            # used to assess the value of the reward multiplier
+            reward_multiplier = 1
+        else:
+            reward_multiplier = sample_stack_height
+        # TODO(ahundt) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
+        # get_label_value does the forward pass for us to backprop, even if we don't use the return values.
+        new_sample_label_value, _ = trainer.get_label_value(
+            sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+            sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
+            sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
+            place_success=sample_place_success, reward_multiplier=reward_multiplier)
+
+        # Get labels for sample and backpropagate
+        sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
+        trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
+                         trainer.label_value_log[sample_iteration], goal_condition=exp_goal_condition)
+
+        # Recompute prediction value and label for replay buffer
+        if sample_primitive_action == 'push':
+            trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
+            # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+        elif sample_primitive_action == 'grasp':
+            trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+        elif sample_primitive_action == 'place':
+            trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
+            # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+
+    else:
+        print('Experience Replay: 0 prior training samples. Skipping experience replay.')
+        time.sleep(0.01)
 
 
 if __name__ == '__main__':
@@ -804,6 +931,7 @@ if __name__ == '__main__':
     parser.add_argument('--is_sim', dest='is_sim', action='store_true', default=False,                                    help='run in simulation?')
     parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',                  help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
+    parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as TCP client (UR5)')
     parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as real-time client (UR5)')
@@ -820,13 +948,17 @@ if __name__ == '__main__':
     parser.add_argument('--heuristic_bootstrap', dest='heuristic_bootstrap', action='store_true', default=False,          help='use handcrafted grasping algorithm when grasping fails too many times in a row during training?')
     parser.add_argument('--explore_rate_decay', dest='explore_rate_decay', action='store_true', default=False)
     parser.add_argument('--grasp_only', dest='grasp_only', action='store_true', default=False)
-
+    parser.add_argument('--stack_axis', dest='stack_axis', action='store', default='z', choices=['x', 'y', 'z'],          help='dimension along which to stack blocks')
+    parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
+    parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
-    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=50,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
-    parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='test-10-obj-01.txt')
+    parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
+    parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
+    parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
@@ -835,6 +967,7 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 

@@ -15,7 +15,8 @@ try:
     from efficientnet_pytorch import EfficientNet
 except ImportError:
     print('efficientnet_pytorch is not available, using densenet. '
-          'EfficientNets can be installed with the command:'
+          'Try installing https://github.com/ahundt/EfficientNet-PyTorch for all features.'
+          'A version of EfficientNets without dilation can be installed with the command:'
           '    pip3 install efficientnet-pytorch --user --upgrade'
           'See https://github.com/lukemelas/EfficientNet-PyTorch for details')
     efficientnet_pytorch = None
@@ -81,7 +82,7 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
@@ -101,15 +102,15 @@ class PixelNet(nn.Module):
 
         if network == 'densenet' or efficientnet_pytorch is None:
             # Initialize network trunks with DenseNet pre-trained on ImageNet
-            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
 
             # placenet tests block stacking
             if self.place:
-                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=True)
-                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=True)
+                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
             fc_channels = 2048
             second_fc_channels = 64
         else:
@@ -117,14 +118,24 @@ class PixelNet(nn.Module):
             num_dilation = 1
             # Initialize network trunks with DenseNet pre-trained on ImageNet
             try:
-                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
             except:
-                print('Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
                       'instead of the original efficientnet pytorch')
                 num_dilation = 0
-                self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0')
             # how much will the dilations affect the upsample step
-            self.upsample_scale =  self.upsample_scale / 2 ** num_dilation
+            self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
             second_fc_channels = None
 
@@ -272,15 +283,17 @@ class PixelNet(nn.Module):
                 interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
         else:
             # efficientnet
-            interm_push_color_feat = self.image_trunk.extract_features(rotate_color)
-            interm_push_depth_feat = self.image_trunk.extract_features(rotate_depth)
-            interm_grasp_color_feat = interm_push_color_feat
-            interm_grasp_depth_feat = interm_push_depth_feat
+            interm_push_color_feat = self.push_trunk.extract_features(rotate_color)
+            interm_push_depth_feat = self.push_trunk.extract_features(rotate_depth)
+            interm_grasp_color_feat = self.image_trunk.extract_features(rotate_color)
+            interm_grasp_depth_feat = self.image_trunk.extract_features(rotate_depth)
+            # interm_grasp_color_feat = interm_push_color_feat
+            # interm_grasp_depth_feat = interm_push_depth_feat
 
             # placenet tests block stacking
             if self.place:
-                interm_place_color_feat = interm_push_depth_feat
-                interm_place_depth_feat = interm_push_color_feat
+                interm_place_color_feat = interm_grasp_depth_feat
+                interm_place_depth_feat = interm_grasp_color_feat
 
         # Combine features, including the goal condition if appropriate
         if goal_condition is None:

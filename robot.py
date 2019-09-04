@@ -18,7 +18,7 @@ class Robot(object):
     """
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases, test_preset_file, place=False, grasp_color_task=False):
+                 is_testing, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -118,20 +118,7 @@ class Robot(object):
 
             # If testing, read object meshes and poses from test case file
             if self.is_testing and self.test_preset_cases:
-                file = open(self.test_preset_file, 'r')
-                file_content = file.readlines()
-                self.test_obj_mesh_files = []
-                self.test_obj_mesh_colors = []
-                self.test_obj_positions = []
-                self.test_obj_orientations = []
-                for object_idx in range(self.num_obj):
-                    file_content_curr_object = file_content[object_idx].split()
-                    self.test_obj_mesh_files.append(os.path.join(self.obj_mesh_dir,file_content_curr_object[0]))
-                    self.test_obj_mesh_colors.append([float(file_content_curr_object[1]),float(file_content_curr_object[2]),float(file_content_curr_object[3])])
-                    self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
-                    self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
-                file.close()
-                self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
+                self.load_preset_case()
 
             # Add objects to simulation environment
             self.add_objects()
@@ -180,6 +167,23 @@ class Robot(object):
             self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
             self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
 
+    def load_preset_case(self, test_preset_file=None):
+        if test_preset_file is None:
+            test_preset_file = self.test_preset_file
+        file = open(test_preset_file, 'r')
+        file_content = file.readlines()
+        self.test_obj_mesh_files = []
+        self.test_obj_mesh_colors = []
+        self.test_obj_positions = []
+        self.test_obj_orientations = []
+        for object_idx in range(self.num_obj):
+            file_content_curr_object = file_content[object_idx].split()
+            self.test_obj_mesh_files.append(os.path.join(self.obj_mesh_dir,file_content_curr_object[0]))
+            self.test_obj_mesh_colors.append([float(file_content_curr_object[1]),float(file_content_curr_object[2]),float(file_content_curr_object[3])])
+            self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
+            self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
+        file.close()
+        self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
 
     def setup_sim_camera(self):
 
@@ -393,6 +397,8 @@ class Robot(object):
             # Drop object at random x,y location and random orientation in robot workspace
             self.reposition_object_randomly(object_handle)
             time.sleep(0.5)
+        # an extra half second so things settle down
+        time.sleep(0.5)
 
 
     def get_camera_data(self):
@@ -1146,7 +1152,7 @@ class Robot(object):
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, stack_axis=2):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1156,6 +1162,8 @@ class Robot(object):
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        stack_axis: integer dimension along which to check the stack in [0,1,2]. axis=2 (default) corresponds to z axis.
+
 
         # Returns
 
@@ -1170,6 +1178,11 @@ class Robot(object):
         if checks <= 0:
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
+
+        assert stack_axis in [0, 1, 2], 'stack_dim must be 0, 1, or 2 (x, y, or z dimension)'
+        ortho_axes = [0, 1, 2]
+        ortho_axes.remove(stack_axis)
+
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
         # in the end until proven otherwise
@@ -1180,14 +1193,16 @@ class Robot(object):
             # This should even handle 2 stacks of 2 blocks after a single place success
             # TODO(ahundt) See if there are any special failure cases common enough to warrant more code improvements
             num_obj = len(object_color_sequence)
-            object_z_positions = np.array(pos[:,2])
+            # object_z_positions = np.array(pos[:,2])
             # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
             # object indices sorted highest to lowest
-            low2high_idx = object_z_positions.argsort()
+            # low2high_idx = object_z_positions.argsort()
+            low2high_idx = np.array(pos[:, stack_axis]).argsort()
             high_idx = low2high_idx[top_idx]
             low2high_pos = pos[low2high_idx,:]
             # filter objects closest to the highest block in x, y based on the threshold
-            nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
+            # nearby_obj = np.linalg.norm(low2high_pos[:,:2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
+            nearby_obj = np.linalg.norm(low2high_pos[:,ortho_axes] - pos[high_idx][ortho_axes], axis=1) < (distance_threshold/2)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
             object_color_sequence = low2high_idx[nearby_obj]
@@ -1213,9 +1228,9 @@ class Robot(object):
         for idx in range(checks):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
-            # Check that Z is higher by at least half the distance threshold
-            if top_pos[2] < (bottom_pos[2] + distance_threshold/2.0):
-                print('check_stack(): not high enough')
+            # Check that Z (or stack_axis) is higher by at least half the distance threshold
+            if top_pos[stack_axis] < (bottom_pos[stack_axis] + distance_threshold/2.0):
+                print('check_stack(): not high (or long) enough')
                 return False, idx + 1
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
@@ -1298,6 +1313,10 @@ class Robot(object):
                 break
             tool_analog_input2 = new_tool_analog_input2
 
+    def shutdown(self):
+        if self.is_sim:
+            vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            vrep.simxFinish(-1)
 
         # def place(self, position, orientation, workspace_limits):
         #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))

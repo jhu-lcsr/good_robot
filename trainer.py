@@ -15,15 +15,24 @@ import matplotlib.pyplot as plt
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False):
+                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False):
 
         self.method = method
         self.place = place
-        self.push_reward = 0.0625
-        self.grasp_reward = 0.125
-        self.grasp_color_reward = 0.25
-        self.place_reward = 0.5
-        self.place_color_reward = 1.0
+        if self.place:
+            # Stacking Reward Schedule
+            reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
+            self.push_reward = reward_schedule[0]
+            self.grasp_reward = reward_schedule[1]
+            self.grasp_color_reward = reward_schedule[2]
+            self.place_reward = reward_schedule[3]
+            self.place_color_reward = reward_schedule[4]
+        else:
+            # Push Grasp Reward Schedule
+            self.push_reward = 0.5
+            self.grasp_reward = 1.0
+            self.grasp_color_reward = 2.0
+
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
@@ -38,7 +47,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -68,7 +77,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -86,7 +95,7 @@ class Trainer(object):
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            self.model.load_state_dict(loaded_snapshot_state_dict)
+            self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
 
             # self.model.load_state_dict(torch.load(snapshot_file)) # Old loading command pre v0.4
 
@@ -99,67 +108,142 @@ class Trainer(object):
         # Set model to training mode
         self.model.train()
 
+        lr = 1e-4
+        momentum = 0.9
+        weight_decay = 2e-5
+        if is_testing:
+            lr = 1e-6
+            momentum = 0
+            weight_decay = 0
         # Initialize optimizer
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=1e-4, momentum=0.9, weight_decay=2e-5)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
         self.iteration = 0
 
         # Initialize lists to save execution info and RL variables
+        # executed action log includes the action, push grasp or place, and the best pixel index
         self.executed_action_log = []
         self.label_value_log = []
         self.reward_value_log = []
+        self.trial_reward_value_log = []
         self.predicted_value_log = []
         self.use_heuristic_log = []
         self.is_exploit_log = []
         self.clearance_log = []
         self.goal_condition_log = []
         self.trial_log = []
+        self.grasp_success_log = []
+        self.color_success_log = []
+        self.change_detected_log = []
         if place:
             self.stack_height_log = []
+            self.partial_stack_success_log = []
+            self.place_success_log = []
 
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
         self.executed_action_log = np.loadtxt(os.path.join(transitions_directory, 'executed-action.log.txt'), delimiter=' ')
         self.iteration = self.executed_action_log.shape[0] - 2
-        self.executed_action_log = self.executed_action_log[0:self.iteration,:]
+        self.executed_action_log = self.executed_action_log[0:self.iteration, :]
         self.executed_action_log = self.executed_action_log.tolist()
         self.label_value_log = np.loadtxt(os.path.join(transitions_directory, 'label-value.log.txt'), delimiter=' ')
         self.label_value_log = self.label_value_log[0:self.iteration]
-        self.label_value_log.shape = (self.iteration,1)
+        self.label_value_log.shape = (self.iteration, 1)
         self.label_value_log = self.label_value_log.tolist()
         self.predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'predicted-value.log.txt'), delimiter=' ')
         self.predicted_value_log = self.predicted_value_log[0:self.iteration]
-        self.predicted_value_log.shape = (self.iteration,1)
+        self.predicted_value_log.shape = (self.iteration, 1)
         self.predicted_value_log = self.predicted_value_log.tolist()
         self.reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), delimiter=' ')
         self.reward_value_log = self.reward_value_log[0:self.iteration]
-        self.reward_value_log.shape = (self.iteration,1)
+        self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
+        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
+        self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
+        self.trial_reward_value_log.shape = (self.iteration, 1)
+        self.trial_reward_value_log = self.trial_reward_value_log.tolist()
         self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
         self.goal_condition_log = self.goal_condition_log[0:self.iteration]
-        self.goal_condition_log.shape = (self.iteration,1)
+        self.goal_condition_log.shape = (self.iteration, 1)
         self.goal_condition_log = self.goal_condition_log.tolist()
         self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), delimiter=' ')
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
-        self.use_heuristic_log.shape = (self.iteration,1)
+        self.use_heuristic_log.shape = (self.iteration, 1)
         self.use_heuristic_log = self.use_heuristic_log.tolist()
         self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), delimiter=' ')
         self.is_exploit_log = self.is_exploit_log[0:self.iteration]
-        self.is_exploit_log.shape = (self.iteration,1)
+        self.is_exploit_log.shape = (self.iteration, 1)
         self.is_exploit_log = self.is_exploit_log.tolist()
         self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
         self.clearance_log.shape = (self.clearance_log.shape[0],1)
         self.clearance_log = self.clearance_log.tolist()
         self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ')
         self.trial_log = self.trial_log[0:self.iteration]
-        self.trial_log.shape = (self.iteration,1)
+        self.trial_log.shape = (self.iteration, 1)
         self.trial_log = self.trial_log.tolist()
+        self.grasp_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+        self.grasp_success_log = self.grasp_success_log[0:self.iteration]
+        self.grasp_success_log.shape = (self.iteration, 1)
+        self.grasp_success_log = self.grasp_success_log.tolist()
+        self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+        self.color_success_log = self.color_success_log[0:self.iteration]
+        self.color_success_log.shape = (self.iteration, 1)
+        self.color_success_log = self.color_success_log.tolist()
+        self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), delimiter=' ')
+        self.change_detected_log = self.change_detected_log[0:self.iteration]
+        self.change_detected_log.shape = (self.iteration, 1)
+        self.change_detected_log = self.change_detected_log.tolist()
         if self.place:
             self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), delimiter=' ')
             self.stack_height_log = self.stack_height_log[0:self.iteration]
-            self.stack_height_log.shape = (self.iteration,1)
-            self.stack_height_log = self.trial_log.tolist()
+            self.stack_height_log.shape = (self.iteration, 1)
+            self.stack_height_log = self.stack_height_log.tolist()
+            self.partial_stack_success_log = np.loadtxt(os.path.join(transitions_directory, 'partial-stack-success.log.txt'), delimiter=' ')
+            self.partial_stack_success_log = self.partial_stack_success_log[0:self.iteration]
+            self.partial_stack_success_log.shape = (self.iteration, 1)
+            self.partial_stack_success_log = self.partial_stack_success_log.tolist()
+            self.place_success_log = np.loadtxt(os.path.join(transitions_directory, 'place-success.log.txt'), delimiter=' ')
+            self.place_success_log = self.place_success_log[0:self.iteration]
+            self.place_success_log.shape = (self.iteration, 1)
+            self.place_success_log = self.place_success_log.tolist()
 
+    def trial_reward_value_log_update(self):
+        # update the reward values for a whole trial, not just recent time steps
+        end = self.clearance_log[-1][0]
+        clearance_length = len(self.clearance_log)
+
+        if end <= len(self.reward_value_log):
+            # First entry won't be zero...
+            if clearance_length == 1:
+                start = 0
+            else:
+                start = self.clearance_log[-2][0]
+
+            new_log_values = []
+            future_r = None
+            # going backwards in time from most recent to oldest step
+            for r in reversed(self.reward_value_log[start:end]):
+                # note, r is a list of size 1, future r is None or a float
+                if future_r is None:
+                    # Give the final time step its own reward twice.
+                    future_r = r[0]
+                if r[0] > 0:
+                    # If a nonzero score was received, the reward propagates
+                    future_r = r[0] + self.future_reward_discount * future_r
+                    new_log_values.append([future_r])
+                else:
+                    # If the reward was zero, propagation is stopped
+                    new_log_values.append(r)
+                    future_r = r[0]
+            # stick the reward_value_log on the end in the forward time order
+            self.trial_reward_value_log += reversed(new_log_values)
+            if len(self.trial_reward_value_log) != len(self.reward_value_log):
+                print('trial_reward_value_log_update() past end bug, check the code of trainer.py reward_value_log and trial_reward_value_log')
+            # print('self.trial_reward_value_log(): ' + str(self.trial_reward_value_log))
+        else:
+            print('trial_reward_value_log_update() past end bug, check the code. end: ' +
+                  str(end) + ' clearance length: ' + str(clearance_length) +
+                  ' reward value log length: ' + str(len(self.reward_value_log)))
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
@@ -239,6 +323,11 @@ class Trainer(object):
         return push_predictions, grasp_predictions, place_predictions, state_feat
 
 
+    def end_trial(self):
+            self.clearance_log.append([self.iteration])
+            return len(self.clearance_log)
+
+
     def get_label_value(
             self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
             next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None,
@@ -311,15 +400,14 @@ class Trainer(object):
                 # push_predictions_difference = next_push_predictions - prev_push_predictions
                 # grasp_predictions_difference = next_grasp_predictions - prev_grasp_predictions
                 # future_reward = max(np.max(push_predictions_difference), np.max(grasp_predictions_difference))
-
-            print('Current reward: %f' % (current_reward))
-            print('Future reward: %f' % (future_reward))
+            reward_str = 'Trainer.get_label_value(): Current reward: %f Future reward: %f ' % (current_reward, future_reward)
             if primitive_action == 'push' and not self.push_rewards:
                 expected_reward = self.future_reward_discount * future_reward
-                print('Expected reward: %f + %f x %f = %f' % (0.0, self.future_reward_discount, future_reward, expected_reward))
+                reward_str += 'Expected reward: %f + %f x %f = %f' % (0.0, self.future_reward_discount, future_reward, expected_reward)
             else:
                 expected_reward = current_reward + self.future_reward_discount * future_reward
-                print('Expected reward: %f + %f x %f = %f' % (current_reward, self.future_reward_discount, future_reward, expected_reward))
+                reward_str += 'Expected reward: %f + %f x %f = %f' % (current_reward, self.future_reward_discount, future_reward, expected_reward)
+            print(reward_str)
             return expected_reward, current_reward
 
 
@@ -554,7 +642,7 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=2):
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=4):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
@@ -571,7 +659,7 @@ class Trainer(object):
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
                 if rotate_idx == best_pix_ind[0]:
-                    prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (0,0,255), 2)
+                    prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (221,211,238), 2)
                 prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations), reshape=False, order=0)
                 background_image = ndimage.rotate(color_heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0)
                 prediction_vis = (0.5*cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR) + 0.5*prediction_vis).astype(np.uint8)
