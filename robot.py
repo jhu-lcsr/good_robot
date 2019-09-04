@@ -1154,7 +1154,7 @@ class Robot(object):
             # TODO(hkwon214): Add place function for real robot
         
             
-    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.07, num_directions=16):
+    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.08, num_directions=64):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1163,15 +1163,16 @@ class Robot(object):
         # Arguments
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
-        num_directions: number of rotations that 
         num_obj: number of blocks in the workspace (needed to get all subsets)
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        num_directions: number of rotations that are checked for rows.
+        
         
         # Returns
 
         List [success, height_count].
         success: will be True if the stack matches the specified order from bottom to top, False otherwise.
-        height_count: will be the number of individual blocks which passed the check, with a minimum value of 1.
+        row_size: will be the number of individual blocks which passed the check, with a minimum value of 1.
             i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
             If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """
