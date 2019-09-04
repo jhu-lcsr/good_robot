@@ -299,6 +299,29 @@ def rotm2angle(R):
     return [angle,x,y,z]
 
 
+def check_separation(values, distance_threshold):
+    """Checks that the separation among the values is close enough about distance_threshold.
+
+    :param values: array of values to check, assumed to be sorted from low to high
+    :param distance_threshold: threshold
+    :returns: success
+    :rtype: bool
+
+    """
+    for i in range(len(values) - 1):
+        x = values[i]
+        y = values[i + 1]
+        assert x < y, '`values` assumed to be sorted'
+        if y < x + distance_threshold / 2.:
+            # print('check_separation(): not long enough for idx: {}'.format(i))
+            return False
+        if y - x > distance_threshold:
+            # print('check_separation(): too far apart')
+            return False
+    return True
+    
+     
+
 # Cross entropy loss for 2D outputs
 class CrossEntropyLoss2d(nn.Module):
 
