@@ -1191,8 +1191,8 @@ class Robot(object):
         if self.grasp_color_task:
             all_block_indices = map(list, [object_color_sequence, reversed(object_color_sequence)])
         else:
-            all_block_indices = map(list, itertools.combinations(np.arange(num_obj), row_length))
-            
+            all_block_indices = map(list, itertools.permutations(np.arange(num_obj), row_length))
+        
         for block_indices in all_block_indices:
             # check each rotation angle for a possible row
             for i in range(num_directions // 2):
@@ -1217,9 +1217,12 @@ class Robot(object):
                         print('valid row along', theta, 'with indices', block_indices)
                         success = True
                         row_size = max(len(block_indices), row_size)
+                        break
                     else:
                         # print('invalid row: bad separation')
                         pass
+            if success:
+                break
 
         print('check_row:', success, row_size)
         return success, row_size

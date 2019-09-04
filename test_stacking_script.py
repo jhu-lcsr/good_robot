@@ -71,7 +71,7 @@ print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
 num_stacks = 16
-original_position = np.array([-0.6, 0.25, 0])
+original_position = np.array([-0.6, 0.0, 0])
 
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
