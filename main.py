@@ -269,17 +269,20 @@ def main(args):
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
-            print('main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) +
-                  ' and current workspace stack height: ' + str(nonlocal_variables['stack_height']) +
-                  ', RESETTING the objects, goals, and action success to FALSE...')
-            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-            robot.reposition_objects()
-            nonlocal_variables['stack'].reset_sequence()
-            nonlocal_variables['stack'].next()
-            # We needed to reset, so the stack must have been knocked over!
-            # all rewards and success checks are False!
-            set_nonlocal_success_variables_false()
-            nonlocal_variables['trial_complete'] = True
+            mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            if not check_row:
+                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
+            print(mismatch_str)
+            if not check_row:
+                # this reset is appropriate for stacking, but not checking rows
+                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                robot.reposition_objects()
+                nonlocal_variables['stack'].reset_sequence()
+                nonlocal_variables['stack'].next()
+                # We needed to reset, so the stack must have been knocked over!
+                # all rewards and success checks are False!
+                set_nonlocal_success_variables_false()
+                nonlocal_variables['trial_complete'] = True
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
