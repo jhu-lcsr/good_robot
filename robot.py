@@ -1194,43 +1194,52 @@ class Robot(object):
         # Therefore, check every row_length-size subset of blocks to see if
         # they are in a row and, if so, whether they are close enough
         # together.
-        all_block_indices = map(list, itertools.combinations(np.arange(num_obj), row_length))
-        
-        for block_indices in all_block_indices:
-            # check each rotation angle for a possible row
-            # print('checking {}'.format(block_indices))
-            xs = pos[block_indices][:, 0]
-            ys = pos[block_indices][:, 1]
-            # print('xs: {}'.format(xs))
-            # print('ys: {}'.format(ys))
-            m, b = np.polyfit(xs, ys, 1)
-            # print('m, b: {}, {}'.format(m, b))
-            theta = np.arctan(m)
-            c = np.cos(theta)
-            s = np.sin(theta)
-            R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-            T = np.array([0, -b, 0])
-            # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
-            aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
-            aligned = True
-            for p in aligned_pos:
-                # print('distance from line: {:.03f}'.format(p[1]))
-                if abs(p[1]) > distance_threshold:
-                    aligned = False
-                    break
 
-            indices = aligned_pos[:, 0].argsort()
-            xs = aligned_pos[indices, 0]
-            if aligned and utils.check_separation(xs, separation_threshold):
-                # print('valid row along', theta, 'with indices', block_indices)
-                if self.grasp_color_task: 
-                    success = np.equal(indices, object_color_sequence).all()
-                else:
-                    success = True
-                row_size = max(len(block_indices), row_size)
-                break
+        # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
+        # So for 3 objects, this would be:
+        # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
+        all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
+                                 for length in range(1, num_obj+1)]
 
-        print('check_row: {} | row_size: {}'.format(success, row_size))
+        successful_block_indices = []
+        for block_indices_of_length in all_block_indices:
+            for block_indices in block_indices_of_length:
+                # check each rotation angle for a possible row
+                # print('checking {}'.format(block_indices))
+                xs = pos[block_indices][:, 0]
+                ys = pos[block_indices][:, 1]
+                # print('xs: {}'.format(xs))
+                # print('ys: {}'.format(ys))
+                m, b = np.polyfit(xs, ys, 1)
+                # print('m, b: {}, {}'.format(m, b))
+                theta = np.arctan(m)  # TODO(bendkill): use arctan2?
+                c = np.cos(theta)
+                s = np.sin(theta)
+                R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+                T = np.array([0, -b, 0])
+                # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
+                aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
+                aligned = True
+                for p in aligned_pos:
+                    # print('distance from line: {:.03f}'.format(p[1]))
+                    if abs(p[1]) > distance_threshold:
+                        aligned = False
+                        break
+
+                indices = aligned_pos[:, 0].argsort()
+                xs = aligned_pos[indices, 0]
+                if aligned and utils.check_separation(xs, separation_threshold):
+                    # print('valid row along', theta, 'with indices', block_indices)
+                    if self.grasp_color_task: 
+                        success = np.equal(indices, object_color_sequence).all()
+                    else:
+                        success = True
+                    successful_block_indices = block_indices
+                    row_size = max(len(block_indices), row_size)
+                    continue
+
+        print('check_row: {} | row_size: {} | blocks: {}'.format(
+            success, row_size, np.array(self.color_names)[successful_block_indices]))
         return success, row_size
 
     
