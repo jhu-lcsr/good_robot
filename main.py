@@ -17,6 +17,15 @@ from trainer import Trainer
 from logger import Logger
 import utils
 
+try:
+    import ptflops
+    from ptflops import get_model_complexity_info
+except ImportError:
+    print('ptflops is not available, cannot count floating point operations. Try: '
+          'pip install --user --upgrade git+https://github.com/sovrasov/flops-counter.pytorch.git')
+    get_model_complexity_info = None
+    ptflops = None
+
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
@@ -115,6 +124,7 @@ def main(args):
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
+    flops = args.flops
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -634,6 +644,17 @@ def main(args):
             else:
                 goal_condition = None
 
+            # sorry for the super random code here, but this is where we will check the flops
+            # floating point operations counts and parameters counts for now...
+            if flops and ptflops is not None:
+                def input_constructor(shape):
+                    custom_params = {'input_color_data': color_heightmap, 'input_depth_data':valid_depth_heightmap, 'goal_condition': goal_condition}
+                    return custom_params
+                flops, params = get_model_complexity_info(trainer, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
+                print('flops: ' + flops + ' params: ' + params)
+                robot.shutdown()
+                exit(0)
+
             push_predictions, grasp_predictions, place_predictions, state_feat = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
@@ -956,6 +977,7 @@ if __name__ == '__main__':
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
+    parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')
