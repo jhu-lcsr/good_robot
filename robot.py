@@ -5,8 +5,10 @@ import time
 import os
 import numpy as np
 import itertools
+from sklearn.linear_model import LinearRegression
 import utils
 from simulation import vrep
+
 
 class Robot(object):
     """
@@ -1154,7 +1156,7 @@ class Robot(object):
             # TODO(hkwon214): Add place function for real robot
         
             
-    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.08, num_directions=64):
+    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.06, num_directions=64):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1226,7 +1228,7 @@ class Robot(object):
         return success, row_size
                     
                         
-    def check_stack(self, object_color_sequence, distance_threshold=0.07, top_idx=-1):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
