@@ -191,7 +191,8 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
+                      is_testing, load_snapshot, snapshot_file, force_cpu,
+                      goal_condition_len, place, pretrained, flops)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -646,14 +647,14 @@ def main(args):
 
             # sorry for the super random code here, but this is where we will check the flops
             # floating point operations counts and parameters counts for now...
-            if flops and ptflops is not None:
-                def input_constructor(shape):
-                    custom_params = {'input_color_data': color_heightmap, 'input_depth_data':valid_depth_heightmap, 'goal_condition': goal_condition}
-                    return custom_params
-                flops, params = get_model_complexity_info(trainer, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
-                print('flops: ' + flops + ' params: ' + params)
-                robot.shutdown()
-                exit(0)
+            # if flops and ptflops is not None:
+            #     def input_constructor(shape):
+            #         custom_params = {'input_color_data': color_heightmap, 'input_depth_data':valid_depth_heightmap, 'goal_condition': goal_condition}
+            #         return custom_params
+            #     flops, params = get_model_complexity_info(trainer.model, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
+            #     print('flops: ' + flops + ' params: ' + params)
+            #     robot.shutdown()
+            #     exit(0)
 
             push_predictions, grasp_predictions, place_predictions, state_feat = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
