@@ -17,15 +17,6 @@ from trainer import Trainer
 from logger import Logger
 import utils
 
-try:
-    import ptflops
-    from ptflops import get_model_complexity_info
-except ImportError:
-    print('ptflops is not available, cannot count floating point operations. Try: '
-          'pip install --user --upgrade git+https://github.com/sovrasov/flops-counter.pytorch.git')
-    get_model_complexity_info = None
-    ptflops = None
-
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
@@ -644,17 +635,6 @@ def main(args):
                 goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
             else:
                 goal_condition = None
-
-            # sorry for the super random code here, but this is where we will check the flops
-            # floating point operations counts and parameters counts for now...
-            # if flops and ptflops is not None:
-            #     def input_constructor(shape):
-            #         custom_params = {'input_color_data': color_heightmap, 'input_depth_data':valid_depth_heightmap, 'goal_condition': goal_condition}
-            #         return custom_params
-            #     flops, params = get_model_complexity_info(trainer.model, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
-            #     print('flops: ' + flops + ' params: ' + params)
-            #     robot.shutdown()
-            #     exit(0)
 
             push_predictions, grasp_predictions, place_predictions, state_feat = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
