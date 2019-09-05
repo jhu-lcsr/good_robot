@@ -1248,6 +1248,7 @@ class Robot(object):
         input_img = torch.from_numpy(input_img)
         goal_success = False
         stack_class = model(input_img)
+        stack_class = stack_class.item()
         detected_height = stack_class + 1
         if current_stack_goal == detected_height:
             goal_success = True

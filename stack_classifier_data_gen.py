@@ -172,7 +172,6 @@ for stack in range(num_stacks):
         ###########################################
 
         stack_success_classifier, height_count_classifier= robot.stack_reward(model_stack, depth_heightmap, stack_goal)
-
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:
             with open(label_text,"a") as f:
