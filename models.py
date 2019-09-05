@@ -83,7 +83,7 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='densenet', use_vector_block=False, pretrained=True): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
