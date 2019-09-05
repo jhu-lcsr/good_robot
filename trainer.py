@@ -138,6 +138,7 @@ class Trainer(object):
             self.stack_height_log = []
             self.partial_stack_success_log = []
             self.place_success_log = []
+            self.color_order_success_log = []
 
 
     # Pre-load execution info and RL variables
@@ -331,7 +332,7 @@ class Trainer(object):
     def get_label_value(
             self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
             next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None,
-            prev_place_predictions=None, reward_multiplier=1):
+            color_order_success=False, prev_place_predictions=None, reward_multiplier=1):
 
         if self.method == 'reactive':
 
@@ -371,20 +372,13 @@ class Trainer(object):
                     elif grasp_success and color_success:
                         current_reward = self.grasp_color_reward * reward_multiplier
             # TODO(hkwon214): resume here. think of how to check correct color for place. change 'color success' function so it works with place too
-            elif primitive_action == 'place':
-                if color_success is None:
-                    if place_success:
-                        current_reward = self.place_reward * reward_multiplier
-                elif color_success is not None:
-                    # HK add if statement
-                    if place_success and not color_success:
-                        #current_reward = 1.0
-                        # TODO: fine tune reward function
-                        current_reward = self.place_reward * reward_multiplier
-                    # HK: Color: Compute current reward
-                    elif place_success and color_success:
-                        current_reward = self.place_color_reward * reward_multiplier
-
+            # TODO(killeen): above TODO possibly resolved with 'color_order_success' nonlocal variable. Remove if so.
+            elif primitive_action == 'place' and place_success:
+                if color_order_success:
+                    current_reward = self.place_color_reward * reward_multiplier
+                else:
+                    current_reward = self.place_reward * reward_multiplier
+                        
             # Compute future reward
             if self.place and not change_detected and not grasp_success and not place_success:
                 future_reward = 0

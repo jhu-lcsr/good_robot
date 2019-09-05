@@ -205,6 +205,7 @@ def main(args):
                           'color_success': False,
                           'place_success': False,
                           'partial_stack_success': False,
+                          'color_order_success': False,
                           'stack_height': 1,
                           'stack_rate': np.inf,
                           'trial_success_rate': np.inf,
@@ -224,7 +225,7 @@ def main(args):
         nonlocal_variables['grasp_success'] = False
         nonlocal_variables['place_success'] = False
         nonlocal_variables['grasp_color_success'] = False
-        nonlocal_variables['place_color_success'] = False
+        nonlocal_variables['color_order_success'] = False
 
     def check_stack_update_goal(place_check=False, top_idx=-1):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
@@ -254,17 +255,25 @@ def main(args):
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
-        nonlocal_variables['partial_stack_success'] = stack_matches_goal
+
+        # killeen: partial stack success shouldn't include block color ordering, so just check height
+        nonlocal_variables['partial_stack_success'] = nonlocal_variables['stack_height'] == len(current_stack_goal)
+        # color order matched as well as desired height
+        nonlocal_variables['color_order_success'] = stack_matches_goal
         if nonlocal_variables['stack_height'] == 1:
             # A stack of size 1 does not meet the criteria for a partial stack success
             nonlocal_variables['partial_stack_success'] = False
+            nonlocal_variables['color_order_success'] = False
             nonlocal_variables['stack_success'] = False
 
         max_workspace_height = len(current_stack_goal) - stack_shift
         # Has that stack gotten shorter than it was before? If so we need to reset
         needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
-        print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
-              str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
+        print('check_stack() stack_height: {} '.format(nonlocal_variables['stack_height'])
+              + 'stack matches current goal: {} '.format(stack_matches_goal)
+              + 'partial_stack_success: {} '.format(nonlocal_variables['partial_stack_success'])
+              + 'color_order_success: {} '.format(nonlocal_variables['color_order_success'])
+              + 'Does the code think a reset is needed: {}'.format(needed_to_reset))
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset:
@@ -297,6 +306,9 @@ def main(args):
         # all the blocks stacked
         stack_count = 0
         stack_rate = np.inf
+        # blocks stacked in the right order (for grasp_color_task)
+        color_order_success_count = 0
+        color_order_success_rate = np.inf
         # will need to reset if something went wrong with stacking
         needed_to_reset = False
         grasp_str = ''
@@ -480,6 +492,8 @@ def main(args):
                             stack_count += 1
                             # full stack complete! reset the scene
                             successful_trial_count += 1
+                            if grasp_color_task and nonlocal_variables['color_order_success']:
+                                color_order_success_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                             robot.reposition_objects()
                             # We don't need to reset here because the algorithm already reset itself
@@ -496,20 +510,29 @@ def main(args):
                     trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
+                    trainer.color_order_success_log.append([int(nonlocal_variables['color_order_success'])])
 
                     if partial_stack_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                         place_rate = float(partial_stack_count)/float(place_count)
+                        color_order_success_rate = float(color_order_success_count) / float(partial_stack_count)
                     if stack_count > 0:
                         stack_rate = float(action_count)/float(stack_count)
                         nonlocal_variables['stack_rate'] = stack_rate
                         trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
                         nonlocal_variables['trial_success_rate'] = trial_rate
-                    print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
-                          '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
-                          '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
+                    print('STACK:  trial: {}'.format(nonlocal_variables['stack'].trial),
+                          'actions/partial: {}'.format(partial_stack_rate),
+                          'actions/full stack: {}'.format(stack_rate),
+                          '(lower is better)  ' + grasp_str,
+                          'place_on_stack_rate: {}'.format(place_rate),
+                          'place_attempts: {}'.format(place_count),
+                          'partial_stack_successes: {}'.format(partial_stack_count),
+                          'stack_successes: {}'.format(stack_count),
+                          'trial_success_rate: {}'.format(trial_rate),
+                          'color_order_successes: {}'.format(color_order_success_count) if grasp_color_task else '',
+                          'color_order_success_rate: {}'.format(color_order_success_rate) if grasp_color_task else '',
+                          'stack goal: {}'.format(current_stack_goal))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -678,7 +701,8 @@ def main(args):
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
-                place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
+                place_success=prev_partial_stack_success, color_order_success=prev_color_order_success,
+                reward_multiplier=reward_multiplier)
             trainer.label_value_log.append([label_value])
             # label-value is also known as expected_reward in trainer.get_label_value()
             logger.write_to_log('label-value', trainer.label_value_log)
@@ -695,6 +719,8 @@ def main(args):
                 logger.write_to_log('stack-height', trainer.stack_height_log)
                 logger.write_to_log('partial-stack-success', trainer.partial_stack_success_log)
                 logger.write_to_log('place-success', trainer.place_success_log)
+            if grasp_color_task:
+                logger.write_to_log('color-order-success', trainer.color_order_success_log)
             if nonlocal_variables['finalize_prev_trial_log']:
                 # Do final logging from the previous trial and previous complete iteration
                 nonlocal_variables['finalize_prev_trial_log'] = False
@@ -763,6 +789,7 @@ def main(args):
         prev_primitive_action = nonlocal_variables['primitive_action']
         prev_place_success = nonlocal_variables['place_success']
         prev_partial_stack_success = nonlocal_variables['partial_stack_success']
+        prev_color_order_success = nonlocal_variables['color_order_success']
         # stack_height will just always be 1 if we are not actually stacking
         prev_stack_height = nonlocal_variables['stack_height']
         prev_push_predictions = push_predictions.copy()
