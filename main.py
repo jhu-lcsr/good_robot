@@ -474,9 +474,12 @@ def main(args):
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
                     needed_to_reset = check_stack_update_goal(place_check=True)
-                    if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                    if(not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']):
                         partial_stack_count += 1
-                        nonlocal_variables['stack'].next()
+                        # Only increment our progress checks if we've surpassed the current goal
+                        # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
+                        if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                            nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                         if len(next_stack_goal) < len(current_stack_goal):
                             nonlocal_variables['stack_success'] = True
@@ -512,7 +515,8 @@ def main(args):
                           '  actions/full stack: ' + str(stack_rate) +
                           ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
+                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
+                          ' current_height: ' + str(nonlocal_variables['stack_height']))
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
