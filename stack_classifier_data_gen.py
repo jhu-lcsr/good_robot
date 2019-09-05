@@ -16,7 +16,26 @@ from logger import Logger
 import utils
 from main import StackSequence
 import csv
-
+import torch._utils
+try:
+    torch._utils._rebuild_tensor_v2
+except AttributeError:
+    def _rebuild_tensor_v2(storage, storage_offset, size, stride, requires_grad, backward_hooks):
+        tensor = torch._utils._rebuild_tensor(storage, storage_offset, size, stride)
+        tensor.requires_grad = requires_grad
+        tensor._backward_hooks = backward_hooks
+        return tensor
+    torch._utils._rebuild_tensor_v2 = _rebuild_tensor_v2
+try:
+    import efficientnet_pytorch
+    from efficientnet_pytorch import EfficientNet
+except ImportError:
+    print('efficientnet_pytorch is not available, using densenet. '
+          'Try installing https://github.com/ahundt/EfficientNet-PyTorch for all features.'
+          'A version of EfficientNets without dilation can be installed with the command:'
+          '    pip3 install efficientnet-pytorch --user --upgrade'
+          'See https://github.com/lukemelas/EfficientNet-PyTorch for details')
+    efficientnet_pytorch = None
 
 ############### Testing Block Stacking #######
 is_sim = True# Run in simulation?
@@ -91,6 +110,19 @@ print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
 
+############## Load Image Classifier Weights ###############
+num_class = 4
+checkpoint_path = "./eval-20190818-154803-6ebd1fa-stack_height-efficientnet-0/model_best.pth.tar"
+height_count_sum = 0
+stack_success_sum = 0
+
+model_stack = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_class)
+#model = nn.DataParallel(model)
+model_stack = model_stack.cuda()
+checkpoint = torch.load(checkpoint_path)
+model_stack.load_state_dict(checkpoint['state_dict'])
+model_stack.eval()
+
 if continue_logging  == False:
     iteration = 0
 else:
@@ -123,7 +155,6 @@ for stack in range(num_stacks):
             stack_goal = np.random.permutation(stack_goal)
             print('fake stack goal to test any stack order: ' + str(stack_goal))
         stack_success, height_count = robot.check_stack(stack_goal)
-
         #######################################
         stack_class = height_count - 1
         # Get latest RGB-D image
@@ -136,9 +167,12 @@ for stack in range(num_stacks):
         valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
         # Save RGB-D images and RGB-D heightmaps
-        logger.save_images(iteration, color_img, depth_img, stack_class) # Used stack_class instead of mode
-        logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
+        #logger.save_images(iteration, color_img, depth_img, stack_class) # Used stack_class instead of mode
+        #logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
         ###########################################
+
+        stack_success_classifier, height_count_classifier= robot.stack_reward(model_stack, depth_heightmap, stack_goal)
+
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:
             with open(label_text,"a") as f:
@@ -150,7 +184,14 @@ for stack in range(num_stacks):
             labels.append([filename,iteration,stack_class])
             logger.save_label('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
+        print('stack success classifier part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success_classifier) +  ':' + str(height_count) +':' + str(stack_class_classifier))
         iteration += 1
+        if height_count_classifier == height_count:
+            height_count_sum += 1
+        if stack_success_classifier== stack_success:
+            stack_success_sum += 1
+        print('stack height classifier accuracy ' + str(i+1) + ' height_count ' + str(height_count_sum/iteration))
+        print('stack success classifier accuracy ' + str(i+1) + ' stack_success ' + str(stack_success_sum/iteration))
 
     # reset scene
     robot.reposition_objects()

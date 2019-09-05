@@ -6,7 +6,7 @@ import os
 import numpy as np
 import utils
 from simulation import vrep
-
+import torch
 class Robot(object):
     """
     Key member variables:
@@ -1243,6 +1243,15 @@ class Robot(object):
         # TODO(ahundt) add check_stack for real robot
         return goal_success, detected_height
 
+    # TODO(hkwon214): From image classifier 
+    def stack_reward(self, model, input_img, current_stack_goal):
+        input_img = torch.from_numpy(input_img)
+        goal_success = False
+        stack_class = model(input_img)
+        detected_height = stack_class + 1
+        if current_stack_goal == detected_height:
+            goal_success = True
+        return goal_success, detected_height
 
     def restart_real(self):
 

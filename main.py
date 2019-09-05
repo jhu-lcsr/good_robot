@@ -16,6 +16,16 @@ from robot import Robot
 from trainer import Trainer
 from logger import Logger
 import utils
+try:
+    import efficientnet_pytorch
+    from efficientnet_pytorch import EfficientNet
+except ImportError:
+    print('efficientnet_pytorch is not available, using densenet. '
+          'Try installing https://github.com/ahundt/EfficientNet-PyTorch for all features.'
+          'A version of EfficientNets without dilation can be installed with the command:'
+          '    pip3 install efficientnet-pytorch --user --upgrade'
+          'See https://github.com/lukemelas/EfficientNet-PyTorch for details')
+    efficientnet_pytorch = None
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -169,6 +179,24 @@ def main(args):
     else:
         goal_condition_len = 0
 
+    #TODO(hkwon214) temporary
+    # ------ Image Classifier options ----- 
+    use_classifier = args.use_classifier
+    checkpoint_path = args.checkpoint_path
+    num_class = args.num_class
+    #TODO(hkwon214) hard coded to use efficientnet for now. modify for future?
+    if use_classifier:
+        if checkpoint_path is None:
+            raise NotImplementedError('No checkpoints')
+        model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_class)
+        #model = nn.DataParallel(model)
+        model_stack = model_stack.cuda()
+        checkpoint = torch.load(checkpoint_path)
+        model_stack.load_state_dict(checkpoint['state_dict'])
+        model_stack.eval()
+        
+
+
     # Set random seed
     np.random.seed(random_seed)
 
@@ -223,7 +251,7 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1):
+    def check_stack_update_goal(place_check=False, top_idx=-1, use_classifier = False, input_img = None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -246,8 +274,13 @@ def main(args):
             # only the place check expects the current goal to be met
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
-        # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, stack_axis=stack_axis)
+        if use_classifier:
+            # TODO(hkwon214) Add image classifier
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.stack_reward(model_stack, input_img, current_stack_goal)
+        else:
+            # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, stack_axis=stack_axis)
+
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if nonlocal_variables['stack_height'] == 1:
             # A stack of size 1 does not meet the criteria for a partial stack success
@@ -422,7 +455,9 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal()
+                        #TODO(hkwon214) temp
+                        #needed_to_reset = check_stack_update_goal()
+                        needed_to_reset = check_stack_update_goal(use_classifier = use_classifier, input_img = color_heightmap)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -441,7 +476,9 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx)
+                        #needed_to_reset = check_stack_update_goal(top_idx=top_idx)
+                        #TODO(hkwon214) temp
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, use_classifier = use_classifier, input_img = color_heightmap)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -464,7 +501,9 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    needed_to_reset = check_stack_update_goal(place_check=True)
+                    #TODO(hkwon214) temp
+                    # needed_to_reset = check_stack_update_goal(place_check=True)
+                    needed_to_reset = check_stack_update_goal(place_check=True, use_classifier = use_classifier, input_img = color_heightmap)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
@@ -970,6 +1009,12 @@ if __name__ == '__main__':
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
+
+    # TODO(hkwon214)
+    # ------ Image Classifier Options (Temporary) ------
+    parser.add_argument('--use_classifier', dest='use_classifier', action='store_true', default=False,                                    help='use image classifier weights')
+    parser.add_argument('--checkpoint_path', dest='checkpoint_path', action='store', default='objects/blocks',                  help='directory of image classifier weights')
+    parser.add_argument('--num_class', dest='num_class', type=int, action='store', default=4,                                help='number of class for classifier')
 
     # Run main program with specified arguments
     args = parser.parse_args()
