@@ -129,6 +129,7 @@ def main(args):
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
+    neural_network_name = args.nn
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -183,7 +184,7 @@ def main(args):
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, load_snapshot, snapshot_file, force_cpu,
-                      goal_condition_len, place, pretrained, flops)
+                      goal_condition_len, place, pretrained, flops, network=neural_network_name)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -983,6 +984,7 @@ if __name__ == '__main__':
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
+    parser.add_argument('--nn', dest='nn', action='store', default='efficientnet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
