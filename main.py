@@ -115,6 +115,7 @@ def main(args):
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
+    flops = args.flops
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -128,6 +129,7 @@ def main(args):
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
+    neural_network_name = args.nn
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -181,7 +183,8 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
+                      is_testing, load_snapshot, snapshot_file, force_cpu,
+                      goal_condition_len, place, pretrained, flops, network=neural_network_name)
 
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
@@ -956,6 +959,7 @@ if __name__ == '__main__':
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
+    parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')
@@ -980,6 +984,7 @@ if __name__ == '__main__':
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
+    parser.add_argument('--nn', dest='nn', action='store', default='efficientnet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
