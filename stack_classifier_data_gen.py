@@ -116,9 +116,9 @@ checkpoint_path = "./eval-20190818-154803-6ebd1fa-stack_height-efficientnet-0/mo
 height_count_sum = 0
 stack_success_sum = 0
 
-model_stack = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_class)
+model_stack = EfficientNet.from_name('efficientnet-b0')
 #model = nn.DataParallel(model)
-model_stack = model_stack.cuda()
+#model_stack = model_stack.cuda()
 checkpoint = torch.load(checkpoint_path)
 model_stack.load_state_dict(checkpoint['state_dict'])
 model_stack.eval()
