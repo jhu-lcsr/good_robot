@@ -1,6 +1,7 @@
 import struct
 import math
 import numpy as np
+import warnings
 import cv2
 import torch
 import torch.nn as nn
@@ -319,7 +320,14 @@ def check_separation(values, distance_threshold):
             # print('check_separation(): too far apart')
             return False
     return True
-    
+
+
+def polyfit(*args, silent=True, **kwargs):
+    with warnings.catch_warnings():
+        # suppress the RankWarning, which just means the best fit line was bad.
+        warnings.simplefilter('ignore', np.RankWarning)
+        out = np.polyfit(*args, **kwargs)
+    return out
      
 
 # Cross entropy loss for 2D outputs

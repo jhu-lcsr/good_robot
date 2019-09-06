@@ -1210,7 +1210,8 @@ class Robot(object):
                 ys = pos[block_indices][:, 1]
                 # print('xs: {}'.format(xs))
                 # print('ys: {}'.format(ys))
-                m, b = np.polyfit(xs, ys, 1)
+                m, b = utils.polyfit(xs, ys, 1)
+                    
                 # print('m, b: {}, {}'.format(m, b))
                 theta = np.arctan(m)  # TODO(bendkill): use arctan2?
                 c = np.cos(theta)
@@ -1219,10 +1220,13 @@ class Robot(object):
                 T = np.array([0, -b, 0])
                 # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
                 aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
+                
                 aligned = True
+                median_z = aligned_pos[:, 2].median()
                 for p in aligned_pos:
                     # print('distance from line: {:.03f}'.format(p[1]))
-                    if abs(p[1]) > distance_threshold:
+                    if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
+                        # too far from line on table, or blocks are not on the same Z plane
                         aligned = False
                         break
 
