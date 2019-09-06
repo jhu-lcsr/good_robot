@@ -1222,7 +1222,7 @@ class Robot(object):
                 aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
                 
                 aligned = True
-                median_z = aligned_pos[:, 2].median()
+                median_z = np.median(aligned_pos[:, 2])
                 for p in aligned_pos:
                     # print('distance from line: {:.03f}'.format(p[1]))
                     if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
