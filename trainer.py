@@ -12,13 +12,24 @@ from models import PixelNet
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
+try:
+    import ptflops
+    from ptflops import get_model_complexity_info
+except ImportError:
+    print('ptflops is not available, cannot count floating point operations. Try: '
+          'pip install --user --upgrade git+https://github.com/sovrasov/flops-counter.pytorch.git')
+    get_model_complexity_info = None
+    ptflops = None
+
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False):
+                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
+                 flops=False, network='efficientnet'):
 
         self.method = method
         self.place = place
+        self.flops = flops
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
@@ -47,7 +58,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -77,7 +88,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -286,7 +297,17 @@ class Trainer(object):
         input_depth_image.shape = (input_depth_image.shape[0], input_depth_image.shape[1], input_depth_image.shape[2], 1)
         input_color_data = torch.from_numpy(input_color_image.astype(np.float32)).permute(3,2,0,1)
         input_depth_data = torch.from_numpy(input_depth_image.astype(np.float32)).permute(3,2,0,1)
-
+        if self.flops:
+            # sorry for the super random code here, but this is where we will check the
+            # floating point operations (flops) counts and parameters counts for now...
+            print('input_color_data trainer: ' + str(input_color_data.size()))
+            class Wrapper(object):
+                custom_params = {'input_color_data': input_color_data, 'input_depth_data': input_depth_data, 'goal_condition': goal_condition}
+            def input_constructor(shape):
+                return Wrapper.custom_params
+            flops, params = get_model_complexity_info(self.model, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
+            print('flops: ' + flops + ' params: ' + params)
+            exit(0)
         # Pass input data through model
         output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, goal_condition=goal_condition)
 
