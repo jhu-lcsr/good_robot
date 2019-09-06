@@ -1246,6 +1246,7 @@ class Robot(object):
     # TODO(hkwon214): From image classifier 
     def stack_reward(self, model, input_img, current_stack_goal):
         input_img = torch.from_numpy(input_img)
+        print('IMAGE SHAPE: ' + str(input_img.shape))
         goal_success = False
         stack_class = model(input_img)
         stack_class = stack_class.item()

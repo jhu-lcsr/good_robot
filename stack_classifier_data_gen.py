@@ -116,7 +116,7 @@ checkpoint_path = "./eval-20190818-154803-6ebd1fa-stack_height-efficientnet-0/mo
 height_count_sum = 0
 stack_success_sum = 0
 
-model_stack = EfficientNet.from_name('efficientnet-b0')
+model_stack = EfficientNet.from_name('efficientnet-b0',override_params={'num_classes': 4})
 #model = nn.DataParallel(model)
 #model_stack = model_stack.cuda()
 checkpoint = torch.load(checkpoint_path)
@@ -171,6 +171,19 @@ for stack in range(num_stacks):
         #logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
         ###########################################
 
+        #print('SHAPE: ' + str(color_heightmap.shape))
+        depth_heightmap = depth_heightmap[np.newaxis, np.newaxis,:,:]
+        print('SHAPE: ' + str(depth_heightmap.shape))
+        #normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                               #      std=[0.229, 0.224, 0.225])
+
+    #     image_size = EfficientNet.get_image_size(args.arch)
+    #     val_transforms = transforms.Compose([
+    #         transforms.Resize(image_size, interpolation=PIL.Image.BICUBIC),
+    #         transforms.CenterCrop(image_size),
+    #         transforms.ToTensor(),
+    #         normalize,
+    #     ])
         stack_success_classifier, height_count_classifier= robot.stack_reward(model_stack, depth_heightmap, stack_goal)
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:

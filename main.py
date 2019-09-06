@@ -183,12 +183,11 @@ def main(args):
     # ------ Image Classifier options ----- 
     use_classifier = args.use_classifier
     checkpoint_path = args.checkpoint_path
-    num_class = args.num_class
     #TODO(hkwon214) hard coded to use efficientnet for now. modify for future?
     if use_classifier:
         if checkpoint_path is None:
             raise NotImplementedError('No checkpoints')
-        model = EfficientNet.from_pretrained('efficientnet-b0', num_classes=num_class)
+        model = EfficientNet.from_name('efficientnet-b0')
         #model = nn.DataParallel(model)
         model_stack = model_stack.cuda()
         checkpoint = torch.load(checkpoint_path)
@@ -501,7 +500,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    #TODO(hkwon214) temp
+                    #TODO(hkwon214) robot executed task -> capture image for image classifier
                     # needed_to_reset = check_stack_update_goal(place_check=True)
                     needed_to_reset = check_stack_update_goal(place_check=True, use_classifier = use_classifier, input_img = color_heightmap)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
@@ -1014,7 +1013,6 @@ if __name__ == '__main__':
     # ------ Image Classifier Options (Temporary) ------
     parser.add_argument('--use_classifier', dest='use_classifier', action='store_true', default=False,                                    help='use image classifier weights')
     parser.add_argument('--checkpoint_path', dest='checkpoint_path', action='store', default='objects/blocks',                  help='directory of image classifier weights')
-    parser.add_argument('--num_class', dest='num_class', type=int, action='store', default=4,                                help='number of class for classifier')
 
     # Run main program with specified arguments
     args = parser.parse_args()
