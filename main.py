@@ -432,6 +432,26 @@ def main(args):
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+                    if place and check_row:
+                        needed_to_reset = check_stack_update_goal(place_check=True)
+                        if (not needed_to_reset and nonlocal_variables['place_succes'] and nonlocal_variables['partial_stack_success']):
+                            partial_stack_count += 1
+                            if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                                nonlocal_variables['stack'].next()
+                            next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+                            if len(next_stack_goal) < len(current_stack_goal):
+                                nonlocal_variables['stack_success'] = True
+                                stack_count += 1
+                                # full selftack complete! reset the scene
+                                successful_trial_count += 1
+                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                robot.reposition_objects()
+                                # We don't need to reset here because the algorithm already reset itself
+                                # nonlocal_variables['stack'].return eset_sequence()
+                                nonlocal_variables['stack'].next()
+                                nonlocal_variables['trial_complete'] = True
+                        
+                        
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
