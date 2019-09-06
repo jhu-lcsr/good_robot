@@ -666,7 +666,8 @@ def main(args):
             depth_diff[depth_diff > 0.3] = 0
             depth_diff[depth_diff < 0.01] = 0
             depth_diff[depth_diff > 0] = 1
-            change_threshold = 300
+            # NOTE: original VPG change_threshold was 300
+            change_threshold = 100
             change_value = np.sum(depth_diff)
             change_detected = change_value > change_threshold or prev_grasp_success
             print('Change detected: %r (value: %d)' % (change_detected, change_value))
