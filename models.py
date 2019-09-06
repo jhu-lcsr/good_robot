@@ -326,7 +326,7 @@ class PixelNet(nn.Module):
         return interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition
 
     def transfer_grasp_to_place(self):
-        if network == 'densenet' or efficientnet_pytorch is None:
+        if self.network == 'densenet' or efficientnet_pytorch is None:
             # placenet tests block stacking
             if self.place:
                 self.place_color_trunk.load_state_dict(grasp_color_trunk.state_dict())
