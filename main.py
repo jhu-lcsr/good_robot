@@ -128,6 +128,7 @@ def main(args):
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
+    transfer_grasp_to_place = args.transfer_grasp_to_place
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -183,6 +184,9 @@ def main(args):
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
 
+    if transfer_grasp_to_place:
+        # Transfer pretrained grasp weights to the place action.
+        trainer.model.transfer_grasp_to_place()
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
@@ -968,6 +972,11 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
+    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
+    parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
+    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
+    parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
@@ -983,10 +992,6 @@ if __name__ == '__main__':
     parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
-    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
-    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
-    parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
-    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
     # Run main program with specified arguments
     args = parser.parse_args()

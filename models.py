@@ -150,7 +150,6 @@ class PixelNet(nn.Module):
         # Initialize network weights
         for m in self.named_modules():
             #if 'push-' in m[0] or 'grasp-' in m[0]:
-            #TODO(hkwon214): add condition 'if place:'
             if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
                 if isinstance(m[1], nn.Conv2d):
                     nn.init.kaiming_normal_(m[1].weight.data)
@@ -325,3 +324,15 @@ class PixelNet(nn.Module):
                 if self.place:
                     interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat, tiled_goal_condition), dim=1)
         return interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition
+
+    def transfer_grasp_to_place(self):
+        if network == 'densenet' or efficientnet_pytorch is None:
+            # placenet tests block stacking
+            if self.place:
+                self.place_color_trunk.load_state_dict(grasp_color_trunk.state_dict())
+                self.place_depth_trunk.load_state_dict(grasp_depth_trunk.state_dict())
+            fc_channels = 2048
+            second_fc_channels = 64
+        # The push and place efficientnet model is shared, so we don't need to load that.
+        if place:
+            self.placenet.load_state_dict(self.graspnet.state_dict())
