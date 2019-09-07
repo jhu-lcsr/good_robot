@@ -7,6 +7,8 @@ import numpy as np
 import utils
 from simulation import vrep
 import torch
+import cv2
+from scipy import ndimage, misc
 class Robot(object):
     """
     Key member variables:
@@ -1245,7 +1247,7 @@ class Robot(object):
 
     # TODO(hkwon214): From image classifier 
     def stack_reward(self, model, input_img, current_stack_goal):
-        input_img = torch.from_numpy(input_img)
+        #input_img = torch.from_numpy(input_img)
         print('IMAGE SHAPE: ' + str(input_img.shape))
         goal_success = False
         stack_class = model(input_img)
@@ -1254,6 +1256,30 @@ class Robot(object):
         if current_stack_goal == detected_height:
             goal_success = True
         return goal_success, detected_height
+
+    def check_incremental_height(self,input_img, current_stack_goal):
+        goal_success = False
+        img_median = ndimage.median_filter(input_img, size=5)
+        max_z = np.max(img_median)
+        print('MAXZ ' + str(max_z))
+        if (max_z > 0.051) and (max_z < 0.052):
+            detected_height = 1
+        elif (max_z > 0.10) and (max_z < 0.11): 
+            detected_height = 2
+        elif (max_z > 0.155) and (max_z < 0.156): 
+            detected_height = 3
+        elif (max_z > 0.20) and (max_z < 0.21):  
+            detected_height = 4
+        if current_stack_goal == detected_height:
+            goal_success = True
+        return goal_success, detected_height
+
+    def check_z_height(self,input_img):
+        # CV or 
+        img_median = ndimage.median_filter(input_img, size=5)
+        max_z = np.max(img_median)
+        return max_z
+
 
     def restart_real(self):
 

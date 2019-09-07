@@ -17,6 +17,7 @@ import utils
 from main import StackSequence
 import csv
 import torch._utils
+import torchvision.transforms as transforms
 try:
     torch._utils._rebuild_tensor_v2
 except AttributeError:
@@ -116,12 +117,15 @@ checkpoint_path = "./eval-20190818-154803-6ebd1fa-stack_height-efficientnet-0/mo
 height_count_sum = 0
 stack_success_sum = 0
 
-model_stack = EfficientNet.from_name('efficientnet-b0',override_params={'num_classes': 4})
-#model = nn.DataParallel(model)
-#model_stack = model_stack.cuda()
-checkpoint = torch.load(checkpoint_path)
-model_stack.load_state_dict(checkpoint['state_dict'])
-model_stack.eval()
+# model_stack = EfficientNet.from_name('efficientnet-b0',override_params={'num_classes': 4})
+# #model = nn.DataParallel(model)
+# model_stack = model_stack.cuda()
+# checkpoint = torch.load(checkpoint_path)
+# model_stack.load_state_dict(checkpoint['state_dict'])
+# model_stack.eval()
+
+model_name = 'efficientnet-b0'
+image_size = EfficientNet.get_image_size(model_name)
 
 if continue_logging  == False:
     iteration = 0
@@ -139,6 +143,7 @@ for stack in range(num_stacks):
         print('----------------------------------------------')
         stacksequence.next()
         stack_goal = stacksequence.current_sequence_progress()
+        print('STACK GOAL ' + str(len(stack_goal)))
         block_to_move = stack_goal[-1]
         print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
         block_positions = robot.get_obj_positions_and_orientations()[0]
@@ -170,21 +175,21 @@ for stack in range(num_stacks):
         #logger.save_images(iteration, color_img, depth_img, stack_class) # Used stack_class instead of mode
         #logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
         ###########################################
+        #depth_heightmap = depth_heightmap[np.newaxis, np.newaxis,:,:]
 
-        #print('SHAPE: ' + str(color_heightmap.shape))
-        depth_heightmap = depth_heightmap[np.newaxis, np.newaxis,:,:]
-        print('SHAPE: ' + str(depth_heightmap.shape))
-        #normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                               #      std=[0.229, 0.224, 0.225])
 
-    #     image_size = EfficientNet.get_image_size(args.arch)
-    #     val_transforms = transforms.Compose([
-    #         transforms.Resize(image_size, interpolation=PIL.Image.BICUBIC),
-    #         transforms.CenterCrop(image_size),
-    #         transforms.ToTensor(),
-    #         normalize,
-    #     ])
-        stack_success_classifier, height_count_classifier= robot.stack_reward(model_stack, depth_heightmap, stack_goal)
+        # tfms = transforms.Compose([transforms.Resize(image_size), transforms.CenterCrop(image_size), 
+        #                         transforms.ToTensor(),
+        #                         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),])
+        # depth_heightmap = tfms(depth_heightmap).unsqueeze(0)
+
+        # stack_success_classifier, height_count_classifier= robot.stack_reward(model_stack, depth_heightmap, stack_goal)
+        stack_success_z, height_count_z = robot.check_incremental_height(valid_depth_heightmap, len(stack_goal))
+        stack_class_z = height_count_z - 1
+        z_height = robot.check_z_height
+        print('HEIGHT Z,: ' + str(height_count_z))
+        print('HEIGHT Z,: ' + str(np.max(valid_depth_heightmap)))
+        print('check z,: ' + str(z_height))
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:
             with open(label_text,"a") as f:
@@ -196,11 +201,11 @@ for stack in range(num_stacks):
             labels.append([filename,iteration,stack_class])
             logger.save_label('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
-        print('stack success classifier part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success_classifier) +  ':' + str(height_count) +':' + str(stack_class_classifier))
+        print('stack success classifier part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success_z) +  ':' + str(height_count) +':' + str(stack_class_z))
         iteration += 1
-        if height_count_classifier == height_count:
+        if height_count_z == height_count:
             height_count_sum += 1
-        if stack_success_classifier== stack_success:
+        if stack_success_z== stack_success:
             stack_success_sum += 1
         print('stack height classifier accuracy ' + str(i+1) + ' height_count ' + str(height_count_sum/iteration))
         print('stack success classifier accuracy ' + str(i+1) + ' stack_success ' + str(stack_success_sum/iteration))

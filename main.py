@@ -456,7 +456,12 @@ def main(args):
                         # while push expects constant height.
                         #TODO(hkwon214) temp
                         #needed_to_reset = check_stack_update_goal()
-                        needed_to_reset = check_stack_update_goal(use_classifier = use_classifier, input_img = color_heightmap)
+                        color_img, depth_img = robot.get_camera_data()
+                        depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
+                        # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
+                        color_heightmap_after_action, depth_heightmap_after_action = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+                        
+                        needed_to_reset = check_stack_update_goal(use_classifier = use_classifier, input_img = depth_heightmap_after_action)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -477,7 +482,13 @@ def main(args):
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         #needed_to_reset = check_stack_update_goal(top_idx=top_idx)
                         #TODO(hkwon214) temp
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, use_classifier = use_classifier, input_img = color_heightmap)
+
+                        color_img, depth_img = robot.get_camera_data()
+                        depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
+                        # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
+                        color_heightmap_after_action, depth_heightmap_after_action = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+                        
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, use_classifier = use_classifier, input_img = depth_heightmap_after_action)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -500,9 +511,15 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+                    
                     #TODO(hkwon214) robot executed task -> capture image for image classifier
+                    color_img, depth_img = robot.get_camera_data()
+                    depth_img = depth_img * robot.cam_depth_scale # Apply depth scale from calibration
+                    # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
+                    color_heightmap_after_action, depth_heightmap_after_action = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+                    
                     # needed_to_reset = check_stack_update_goal(place_check=True)
-                    needed_to_reset = check_stack_update_goal(place_check=True, use_classifier = use_classifier, input_img = color_heightmap)
+                    needed_to_reset = check_stack_update_goal(place_check=True, use_classifier = use_classifier, input_img = depth_heightmap_after_action)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
