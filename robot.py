@@ -6,6 +6,7 @@ import os
 import numpy as np
 import utils
 from simulation import vrep
+from scipy import ndimage, misc
 
 class Robot(object):
     """
@@ -1228,6 +1229,29 @@ class Robot(object):
         # TODO(ahundt) add check_stack for real robot
         return goal_success, detected_height
 
+    def check_incremental_height(self,input_img, current_stack_goal):
+        goal_success = False
+        img_median = ndimage.median_filter(input_img, size=5)
+        max_z = np.max(img_median)
+        # Check current_stack_goal input
+        current_stack_goal = len(current_stack_goal)
+        #print('MAXZ ' + str(max_z))
+        if (max_z <= 0.053):
+            detected_height = 1
+        elif (max_z > 0.053) and (max_z <= 0.11): 
+            detected_height = 2
+        elif (max_z > 0.11) and (max_z <= 0.156): 
+            detected_height = 3
+        elif (max_z > 0.156) and (max_z <= 0.21):  
+            detected_height = 4
+        if current_stack_goal == detected_height:
+            goal_success = True
+        return goal_success, detected_height
+
+    def check_z_height(self,input_img):
+        img_median = ndimage.median_filter(input_img, size=5)
+        max_z = np.max(img_median)
+        return max_z
 
     def restart_real(self):
 

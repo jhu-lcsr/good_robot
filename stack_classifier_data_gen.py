@@ -90,7 +90,10 @@ stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task
 print('full stack sequence: ' + str(stacksequence.object_color_sequence))
 best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
-
+##### Z HEIGHT ####
+z_height_correct = 0
+z_stack_success_correct= 0
+###################
 if continue_logging  == False:
     iteration = 0
 else:
@@ -139,6 +142,13 @@ for stack in range(num_stacks):
         logger.save_images(iteration, color_img, depth_img, stack_class) # Used stack_class instead of mode
         logger.save_heightmaps(iteration, color_heightmap, valid_depth_heightmap, stack_class) # Used stack_class instead of mode
         ###########################################
+        ######## Z HEIGHT #########
+        stack_success_z, height_count_z = robot.check_incremental_height(valid_depth_heightmap, stack_goal)
+        stack_class_z = height_count_z - 1
+        max_z = robot.check_z_height(valid_depth_heightmap)
+        print('Z_HEIGHT: ' + str(max_z))
+        #################
+
         filename = '%06d.%s.color.png' % (iteration, stack_class)
         if continue_logging:
             with open(label_text,"a") as f:
@@ -150,7 +160,15 @@ for stack in range(num_stacks):
             labels.append([filename,iteration,stack_class])
             logger.save_label('stack_label', labels)
         print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success) +  ':' + str(height_count) +':' + str(stack_class))
+        print('stack success z part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success_z) +  ':' + str(height_count) +':' + str(stack_class_z))
         iteration += 1
+
+        if height_count_z == height_count:
+            z_height_correct += 1
+        if stack_success_z  == stack_success:
+            z_stack_success_correct+= 1
+        print('stack z height accuracy ' + str(i+1) + ' height_count ' + str(z_height_correct/iteration))
+        print('stack z success accuracy ' + str(i+1) + ' stack_success ' + str(z_stack_success_correct/iteration))
 
     # reset scene
     robot.reposition_objects()
