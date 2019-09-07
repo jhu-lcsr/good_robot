@@ -7,6 +7,7 @@ import numpy as np
 import itertools
 import utils
 from simulation import vrep
+from scipy import ndimage, misc
 
 class Robot(object):
     """
@@ -1320,9 +1321,9 @@ class Robot(object):
         max_z = self.check_z_height(input_img)
         #TODO(hkwon214) Double check this
         current_stack_goal = len(current_stack_goal)
-        if (max_z <= 0.053):
+        if (max_z <= 0.069):
             detected_height = 1
-        elif (max_z > 0.053) and (max_z <= 0.11): 
+        elif (max_z > 0.069) and (max_z <= 0.11): 
             detected_height = 2
         elif (max_z > 0.11) and (max_z <= 0.156): 
             detected_height = 3

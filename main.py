@@ -126,6 +126,7 @@ def main(args):
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
     check_row = args.check_row
+    check_z_height = args.check_z_height
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
@@ -233,7 +234,7 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1):
+    def check_stack_update_goal(place_check=False, top_idx=-1, input_img = None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -259,6 +260,8 @@ def main(args):
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+        elif check_z_height:
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
@@ -431,11 +434,13 @@ def main(args):
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+                    #TODO(hkwon214) Get image after executing push action. save also? better place to put?
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal()
+                        needed_to_reset = check_stack_update_goal(input_img=valid_depth_heightmap)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -446,6 +451,8 @@ def main(args):
                         print('Attempt to grasp color: ' + grasp_color_name)
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+                    #TODO(hkwon214) Get image after executing grasp action. save also? better place to put?
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -454,7 +461,7 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx)
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, input_img=valid_depth_heightmap)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -477,7 +484,9 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    needed_to_reset = check_stack_update_goal(place_check=True)
+                    #TODO(hkwon214) Get image after executing place action. save also? better place to put?
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    needed_to_reset = check_stack_update_goal(place_check=True, input_img=valid_depth_heightmap)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
@@ -794,7 +803,7 @@ def main(args):
 
         print('Trainer iteration: %f' % (trainer.iteration))
 
-def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0'):
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
@@ -805,8 +814,9 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
     # Save RGB-D images and RGB-D heightmaps
-    logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
-    logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
+    if save_image:
+        logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
+        logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
 def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2, trial_reward=False):
@@ -981,6 +991,7 @@ if __name__ == '__main__':
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
+    parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
