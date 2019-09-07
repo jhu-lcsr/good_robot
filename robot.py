@@ -1231,8 +1231,7 @@ class Robot(object):
 
     def check_incremental_height(self,input_img, current_stack_goal):
         goal_success = False
-        img_median = ndimage.median_filter(input_img, size=5)
-        max_z = np.max(img_median)
+        max_z = self.check_z_height(input_img)
         # Check current_stack_goal input
         current_stack_goal = len(current_stack_goal)
         #print('MAXZ ' + str(max_z))
