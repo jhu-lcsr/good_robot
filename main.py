@@ -777,8 +777,14 @@ def main(args):
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                robot.check_sim()
                 robot.reposition_objects()
                 nonlocal_variables['trial_complete'] = True
+                if place:
+                    nonlocal_variables['stack'].reset_sequence()
+                    nonlocal_variables['stack'].next()
+                # don't reset again for 20 more seconds
+                iteration_time_0 = time.time()
 
         if exit_called:
             # shut down the simulation or robot
