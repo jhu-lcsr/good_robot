@@ -109,7 +109,7 @@ def main(args):
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
-        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     else:
         workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
@@ -239,6 +239,9 @@ def main(args):
         nonlocal_variables['place_success'] = False
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
+        if check_z_height:
+            nonlocal_variables['stack_height'] = 0.0
+            nonlocal_variables['prev_stack_height'] = 0.0
 
     def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
@@ -505,6 +508,7 @@ def main(args):
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
                            (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
+                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
@@ -1006,7 +1010,7 @@ if __name__ == '__main__':
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
-    parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=0.25,          help='check_z_height goal height in meters')
+    parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=2.0,          help='check_z_height goal height in meters')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
