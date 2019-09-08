@@ -84,7 +84,10 @@ class StackSequence(object):
         After three next() calls it will return [0, 1, 3, 2].
         After four next() calls a new sequence will be generated and it will return one element again.
         """
-        return self.object_color_sequence[:self.object_color_index+1]
+        if self.is_goal_conditioned_task:
+            return self.object_color_sequence[:self.object_color_index+1]
+        else:
+            return None
 
     def next(self):
         self.total_steps += 1
