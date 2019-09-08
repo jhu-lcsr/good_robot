@@ -1336,10 +1336,11 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self,input_img):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01):
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median)
-        return max_z
+        goal_success = max_z > prev_height + increase_threshold
+        return goal_success, max_z
 
     def restart_real(self):
 
