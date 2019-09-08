@@ -239,9 +239,6 @@ def main(args):
         nonlocal_variables['place_success'] = False
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
-        if check_z_height:
-            nonlocal_variables['stack_height'] = 0.0
-            nonlocal_variables['prev_stack_height'] = 0.0
 
     def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
@@ -544,6 +541,12 @@ def main(args):
                           '  partial_stack_successes: ' + str(partial_stack_count) +
                           '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
 
+                if check_z_height and nonlocal_variables['trial_complete']:
+                    # Zero out the height because the trial is done. 
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 0.0
+                    nonlocal_variables['prev_stack_height'] = 0.0
+
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -783,6 +786,13 @@ def main(args):
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
+                if check_z_height:
+                    # Zero out the height because the trial is done. 
+                    # Note these lines must normally be after the 
+                    # logging of these variables is complete,
+                    # but this is a special (hopefully rare) recovery scenario.
+                    nonlocal_variables['stack_height'] = 0.0
+                    nonlocal_variables['prev_stack_height'] = 0.0
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
 
