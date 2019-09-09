@@ -275,7 +275,7 @@ def main(args):
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
         elif check_z_height:
             # TODO(ahundt) make decrease threshold more accessible, perhaps a command line parameter
-            decrease_threshold = 0.01
+            decrease_threshold = 0.1
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
             # if it falls we will just keep going, and allow nonaction or objects out of scene checks to handle resets
