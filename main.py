@@ -266,7 +266,7 @@ def main(args):
         if place_check:
             # Only reset while placing if the stack decreases in height!
             stack_shift = 1
-        else:
+        elif current_stack_goal is not None:
             # only the place check expects the current goal to be met
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
