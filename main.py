@@ -260,14 +260,10 @@ def main(args):
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
-<<<<<<< HEAD
             row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
             stack_matches_goal = nonlocal_variables['stack_height'] == len(current_stack_goal)
-=======
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
         elif check_z_height:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
->>>>>>> grasp_pytorch0.4+
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
@@ -278,7 +274,9 @@ def main(args):
 
         max_workspace_height = len(current_stack_goal) - stack_shift
         # Has that stack gotten shorter than it was before? If so we need to reset
-        needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
+        needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < prev_stack_height
+        print('DEBUG check_stack() stack_height: {}, prev_stack_height: {}, needed_to_reset: {}'.format(
+            nonlocal_variables['stack_height'], prev_stack_height, needed_to_reset))
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if place and needed_to_reset:
