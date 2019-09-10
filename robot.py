@@ -27,6 +27,7 @@ class Robot(object):
         self.workspace_limits = workspace_limits
         self.place_task = place
         self.grasp_color_task = grasp_color_task
+        self.sim_home_position = [-0.3, 0.0, 0.45]
 
         # HK: If grasping specific block color...
         #
@@ -311,10 +312,11 @@ class Robot(object):
 
 
     def check_sim(self):
-
+        # buffer_meters = 0.1  # original buffer value
+        buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
         sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
-        sim_ok = gripper_position[0] > self.workspace_limits[0][0] - 0.1 and gripper_position[0] < self.workspace_limits[0][1] + 0.1 and gripper_position[1] > self.workspace_limits[1][0] - 0.1 and gripper_position[1] < self.workspace_limits[1][1] + 0.1 and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
+        sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
         if not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim()
@@ -744,8 +746,9 @@ class Robot(object):
             position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.04, workspace_limits[2][0] + 0.02)
 
-            # Move gripper to location above grasp target
-            grasp_location_margin = 0.15
+            # Move gripper to location above grasp target, this is the pre-grasp and post-grasp height
+            # grasp_location_margin = 0.15
+            grasp_location_margin = 0.2
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             location_above_grasp_target = (position[0], position[1], position[2] + grasp_location_margin)
 
@@ -788,6 +791,8 @@ class Robot(object):
 
             # Move gripper to location above grasp target
             self.move_to(location_above_grasp_target, None)
+            # move to the simulator home position
+            self.move_to(self.sim_home_position, None)
 
             # Check if grasp is successful
             gripper_full_closed = self.close_gripper()
@@ -1349,16 +1354,22 @@ class Robot(object):
             detected_height = 2
         elif (max_z > 0.11) and (max_z <= 0.156): 
             detected_height = 3
-        elif (max_z > 0.156) and (max_z <= 0.21):  
+        # elif (max_z > 0.156) and (max_z <= 0.21):  
+        #     detected_height = 4
+        else:
             detected_height = 4
+        #TODO(hkwon214) What happens if the height is above the limit?
         if current_stack_goal == detected_height:
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self,input_img):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=10.0):
+        # TODO(ahundt) make reward multiplier a command line parameter which can be modified, probably take it out of this function too.
         img_median = ndimage.median_filter(input_img, size=5)
-        max_z = np.max(img_median)
-        return max_z
+        max_z = np.max(img_median) * reward_multiplier
+        goal_success = max_z >= (prev_height + increase_threshold)
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + ' goal_success: ' + str(goal_success) + ' <<<<<<<<<<<')
+        return goal_success, max_z
 
     def restart_real(self):
 
