@@ -1279,7 +1279,6 @@ class Robot(object):
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
         
-        # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
         # in the end until proven otherwise
