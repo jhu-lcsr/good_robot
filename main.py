@@ -259,6 +259,7 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
+        prev_stack_height = nonlocal_variables['stack_height']
         if check_row:
             row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
             stack_matches_goal = nonlocal_variables['stack_height'] == len(current_stack_goal)
