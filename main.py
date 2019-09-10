@@ -445,7 +445,7 @@ def main(args):
 
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal(place_check=True)
-                        if (not needed_to_reset and nonlocal_variables['place_succes'] and nonlocal_variables['partial_stack_success']):
+                        if (not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']):
                             partial_stack_count += 1
                             if nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
