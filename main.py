@@ -1030,7 +1030,9 @@ if __name__ == '__main__':
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
-
+    # TODO(ahundt) determine a way to deal with the side effect
+    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,              help='Experience replay delivers rewards for the whole trial, not just next step. '
+                                                                                                                     'Side effect: live training conflicts with experience training.')
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
@@ -1038,6 +1040,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
+    
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
@@ -1047,13 +1050,6 @@ if __name__ == '__main__':
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
 
-    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
-    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
-    parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
-    # TODO(ahundt) determine a way to deal with the side effect
-    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,              help='Experience replay delivers rewards for the whole trial, not just next step. '
-                                                                                                                     'Side effect: live training conflicts with experience training.')
-    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
     # Run main program with specified arguments
     args = parser.parse_args()
