@@ -84,7 +84,10 @@ class StackSequence(object):
         After three next() calls it will return [0, 1, 3, 2].
         After four next() calls a new sequence will be generated and it will return one element again.
         """
-        return self.object_color_sequence[:self.object_color_index+1]
+        if self.is_goal_conditioned_task:
+            return self.object_color_sequence[:self.object_color_index+1]
+        else:
+            return None
 
     def next(self):
         self.total_steps += 1
@@ -109,12 +112,13 @@ def main(args):
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
-        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     else:
         workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
+    flops = args.flops
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -125,9 +129,13 @@ def main(args):
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
     check_row = args.check_row
+    check_z_height = args.check_z_height
+    check_z_height_goal = args.check_z_height_goal
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
+    transfer_grasp_to_place = args.transfer_grasp_to_place
+    neural_network_name = args.nn
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -181,8 +189,12 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len, place, pretrained)
+                      is_testing, load_snapshot, snapshot_file, force_cpu,
+                      goal_condition_len, place, pretrained, flops, network=neural_network_name)
 
+    if transfer_grasp_to_place:
+        # Transfer pretrained grasp weights to the place action.
+        trainer.model.transfer_grasp_to_place()
     # Initialize data logger
     logger = Logger(continue_logging, logging_directory)
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
@@ -210,11 +222,20 @@ def main(args):
                           'trial_success_rate': np.inf,
                           'replay_iteration': 0,
                           'trial_complete': False,
-                          'finalize_prev_trial_log': False}
+                          'finalize_prev_trial_log': False,
+                          'prev_stack_height': 1}
+
+    if check_z_height:
+        nonlocal_variables['stack_height'] = 0.0
+        nonlocal_variables['prev_stack_height'] = 0.0
     best_stack_rate = np.inf
 
+    if check_z_height:
+        is_goal_conditioned = False
+    else:
+        is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, grasp_color_task or place)
+    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -226,7 +247,7 @@ def main(args):
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1):
+    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -245,24 +266,38 @@ def main(args):
         if place_check:
             # Only reset while placing if the stack decreases in height!
             stack_shift = 1
-        else:
+        elif current_stack_goal is not None:
             # only the place check expects the current goal to be met
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+        elif check_z_height:
+            # TODO(ahundt) make decrease threshold more accessible, perhaps a command line parameter
+            decrease_threshold = 0.1
+            # decrease_threshold = None  # None means decrease_threshold will be disabled
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
+            # if it falls we will just keep going, and allow nonaction or objects out of scene checks to handle resets
+            needed_to_reset = False
+            max_workspace_height = nonlocal_variables['prev_stack_height'] - decrease_threshold
+            if decrease_threshold is not None and nonlocal_variables['stack_height'] < max_workspace_height:
+                needed_to_reset = True
+            # TODO(hkwon214) add a separate case for incremental height
+            # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
-        if nonlocal_variables['stack_height'] == 1:
-            # A stack of size 1 does not meet the criteria for a partial stack success
-            nonlocal_variables['partial_stack_success'] = False
-            nonlocal_variables['stack_success'] = False
+        if not check_z_height:
+            if nonlocal_variables['stack_height'] == 1: 
+                # A stack of size 1 does not meet the criteria for a partial stack success
+                nonlocal_variables['partial_stack_success'] = False
+                nonlocal_variables['stack_success'] = False
+            max_workspace_height = len(current_stack_goal) - stack_shift
+            # Has that stack gotten shorter than it was before? If so we need to reset
+            needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
 
-        max_workspace_height = len(current_stack_goal) - stack_shift
-        # Has that stack gotten shorter than it was before? If so we need to reset
-        needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if place and needed_to_reset:
@@ -424,11 +459,13 @@ def main(args):
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+                    #TODO(hkwon214) Get image after executing push action. save also? better place to put?
+                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal()
+                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -439,6 +476,8 @@ def main(args):
                         print('Attempt to grasp color: ' + grasp_color_name)
                     nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+                    #TODO(hkwon214) Get image after executing grasp action. save also? better place to put?
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -447,7 +486,7 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx)
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -470,12 +509,16 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
-                    needed_to_reset = check_stack_update_goal(place_check=True)
+                    #TODO(hkwon214) Get image after executing place action. save also? better place to put?
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
                         nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-                        if len(next_stack_goal) < len(current_stack_goal):
+                        if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
+                           (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
+                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
@@ -493,7 +536,7 @@ def main(args):
                     trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
                 if place:
                     # place trainer logs are updated in process_actions()
-                    trainer.stack_height_log.append([int(nonlocal_variables['stack_height'])])
+                    trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
 
@@ -510,6 +553,12 @@ def main(args):
                           ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
                           '  partial_stack_successes: ' + str(partial_stack_count) +
                           '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
+
+                if check_z_height and nonlocal_variables['trial_complete']:
+                    # Zero out the height because the trial is done. 
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 0.0
+                    nonlocal_variables['prev_stack_height'] = 0.0
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -744,8 +793,21 @@ def main(args):
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                robot.check_sim()
                 robot.reposition_objects()
                 nonlocal_variables['trial_complete'] = True
+                if place:
+                    nonlocal_variables['stack'].reset_sequence()
+                    nonlocal_variables['stack'].next()
+                if check_z_height:
+                    # Zero out the height because the trial is done. 
+                    # Note these lines must normally be after the 
+                    # logging of these variables is complete,
+                    # but this is a special (hopefully rare) recovery scenario.
+                    nonlocal_variables['stack_height'] = 0.0
+                    nonlocal_variables['prev_stack_height'] = 0.0
+                # don't reset again for 20 more seconds
+                iteration_time_0 = time.time()
 
         if exit_called:
             # shut down the simulation or robot
@@ -765,6 +827,7 @@ def main(args):
         prev_partial_stack_success = nonlocal_variables['partial_stack_success']
         # stack_height will just always be 1 if we are not actually stacking
         prev_stack_height = nonlocal_variables['stack_height']
+        nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_place_predictions = place_predictions
@@ -787,7 +850,7 @@ def main(args):
 
         print('Trainer iteration: %f' % (trainer.iteration))
 
-def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0'):
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
@@ -798,8 +861,9 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
     # Save RGB-D images and RGB-D heightmaps
-    logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
-    logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
+    if save_image:
+        logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
+        logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
 def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2, trial_reward=False):
@@ -956,6 +1020,7 @@ if __name__ == '__main__':
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
+    parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')
@@ -968,6 +1033,13 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
+    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
+    parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
+    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
+    parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
+    parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
+    parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=2.0,          help='check_z_height goal height in meters')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
@@ -980,13 +1052,10 @@ if __name__ == '__main__':
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
+    parser.add_argument('--nn', dest='nn', action='store', default='efficientnet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
     parser.add_argument('--logging_directory', dest='logging_directory', action='store')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
-    parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
-    parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                                      help='disable stack height reward multiplier')
-    parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,              help='enable grasping specific colored objects')
-    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                                help='number of successful task based grasps')
 
     # Run main program with specified arguments
     args = parser.parse_args()
