@@ -1,0 +1,16 @@
+
+Description of adversarial cases in `simulation/test-cases`:
+```
+Test case - viability for stacking - description of case
+00 - yes - two arches with cylinder (maybe no enough for 0.2m?)
+01 - yes - four arches in a row
+02 - no - two triangles and a square
+03 - yes - house shape
+04 - yes - split pairs of rectangles
+05 - yes - triangle, arch, cylinder packed together
+06 - no - two triangles side by side
+07 - yes - big square made of rectangles with central cube
+08 - yes - arches and triangles in a row
+09 - yes - house shape with cylinder on top
+10 - yes - two triangles with central rect (maybe not enough for 0.2m?)
+```
