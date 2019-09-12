@@ -763,9 +763,10 @@ def main(args):
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
                 place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
+            # label_value is also known as expected_reward in trainer.get_label_value(), this is what the nn predicts.
             trainer.label_value_log.append([label_value])
-            # label-value is also known as expected_reward in trainer.get_label_value()
             logger.write_to_log('label-value', trainer.label_value_log)
+            # prev_reward_value is the regular old reward value actually based on the multiplier and action success
             trainer.reward_value_log.append([prev_reward_value])
             logger.write_to_log('reward-value', trainer.reward_value_log)
             trainer.change_detected_log.append([change_detected])
