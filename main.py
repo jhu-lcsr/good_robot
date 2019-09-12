@@ -683,7 +683,7 @@ def main(args):
             else:
                 goal_condition = None
 
-            push_predictions, grasp_predictions, place_predictions, state_feat = trainer.forward(
+            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
             # Execute best primitive action on robot in another thread
@@ -946,7 +946,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
             sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
             place_success=sample_place_success, reward_multiplier=reward_multiplier)
-        
+
         if trial_reward:
             reward_to_backprop = trainer.trial_reward_value_log[sample_iteration]
         else:

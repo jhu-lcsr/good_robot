@@ -159,8 +159,8 @@ class PixelNet(nn.Module):
 
 
         # Initialize output variable (for backprop)
-        self.interm_feat = []
-        self.output_prob = []
+        # self.interm_feat = []
+        # self.output_prob = []
 
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
@@ -212,8 +212,8 @@ class PixelNet(nn.Module):
             return output_prob, interm_feat
 
         else:
-            self.output_prob = []
-            self.interm_feat = []
+            output_prob = []
+            interm_feat = []
 
             # Apply rotations to intermediate features
             # for rotate_idx in range(self.num_rotations):
@@ -239,14 +239,14 @@ class PixelNet(nn.Module):
             # Forward pass through branches, undo rotation on output predictions, upsample results
             # placenet tests block stacking
             if self.place:
-                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest'))])
             else:
-                self.output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
                                      nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
             # print('output prob shapes: ' + str(self.output_prob[0][0].shape))
-            return self.output_prob, self.interm_feat
+            return output_prob, interm_feat
 
     def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
         """ Reduces the repetitive forward pass code across multiple model classes. See PixelNet forward() and responsive_net forward().
