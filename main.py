@@ -955,7 +955,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         sample_iteration = sorted_sample_ind[rand_sample_ind]
 
         nonlocal_variables['replay_iteration'] += 1
-        [sample_stack_height, sample_primitive_action, sample_grasp_success,
+        [sample_stack_height, sample_primitive_action_id, sample_grasp_success,
          sample_change_detected, sample_push_predictions, sample_grasp_predictions,
          next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
          exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
