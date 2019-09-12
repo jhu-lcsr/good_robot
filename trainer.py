@@ -266,7 +266,7 @@ class Trainer(object):
                 # current timestep rewards were stored in the previous timestep in main.py
                 # this is confusing, but we are not modifying the previously written code's behavior to reduce
                 # the risks of other bugs cropping up with such a change.
-                current_reward = self.reward_value_log[i-1]
+                current_reward = self.reward_value_log[i-1][0]
                 if future_r is None:
                     # Give the final time step its own reward twice.
                     future_r = current_reward
@@ -276,7 +276,7 @@ class Trainer(object):
                     new_log_values.append([future_r])
                 else:
                     # If the reward was zero, propagation is stopped
-                    new_log_values.append(current_reward)
+                    new_log_values.append([current_reward])
                     future_r = current_reward
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
