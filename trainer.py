@@ -389,7 +389,7 @@ class Trainer(object):
             print('flops: ' + flops + ' params: ' + params)
             exit(0)
         # Pass input data through model
-        output_prob, state_feat, output_prob = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, goal_condition=goal_condition)
+        output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, goal_condition=goal_condition)
 
         if self.method == 'reactive':
 
