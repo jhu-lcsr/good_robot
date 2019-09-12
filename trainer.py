@@ -288,53 +288,53 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
-def load_sample(self, sample_iteration, logger):
-    sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
+    def load_sample(self, sample_iteration, logger):
+        sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
-    # Load sample RGB-D heightmap
-    sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
-    sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
-    sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
-    sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
+        # Load sample RGB-D heightmap
+        sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
+        sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
+        sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
+        sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
-    # Compute forward pass with sample
-    if self.goal_condition_len > 0:
-        exp_goal_condition = [self.goal_condition_log[sample_iteration]]
-        next_goal_condition = [self.goal_condition_log[sample_iteration+1]]
-    else:
-        exp_goal_condition = None
-        next_goal_condition = None
-        sample_color_success = None
+        # Compute forward pass with sample
+        if self.goal_condition_len > 0:
+            exp_goal_condition = [self.goal_condition_log[sample_iteration]]
+            next_goal_condition = [self.goal_condition_log[sample_iteration+1]]
+        else:
+            exp_goal_condition = None
+            next_goal_condition = None
+            sample_color_success = None
 
-    if self.place:
-        # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
-        sample_stack_height = int(self.stack_height_log[sample_iteration][0])
-        next_stack_height = int(self.stack_height_log[sample_iteration+1][0])
-    else:
-        # set to 1 because stack height is used as the reward multiplier
-        sample_stack_height = 1
-        next_stack_height = 1
+        if self.place:
+            # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
+            sample_stack_height = int(self.stack_height_log[sample_iteration][0])
+            next_stack_height = int(self.stack_height_log[sample_iteration+1][0])
+        else:
+            # set to 1 because stack height is used as the reward multiplier
+            sample_stack_height = 1
+            next_stack_height = 1
 
-    sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat, output_prob = self.forward(
-        sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
+        sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat, output_prob = self.forward(
+            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
 
-    # Load next sample RGB-D heightmap
-    next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
-    next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-    next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
-    next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
-    # TODO(ahundt) tune sample_reward_value and gamma discount rate?
-    sample_place_success = None
-    # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
-    sample_push_success = True
-    sample_change_detected = self.change_detected_log[sample_iteration]
-    sample_grasp_success = self.grasp_success_log[sample_iteration]
-    if self.place:
-        sample_place_success = self.partial_stack_success_log[sample_iteration]
-    # in this case grasp_color_task is True
-    if exp_goal_condition is not None:
-        sample_color_success = self.color_success_log[sample_iteration]
-    return sample_stack_height, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
+        # Load next sample RGB-D heightmap
+        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
+        next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
+        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
+        next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
+        # TODO(ahundt) tune sample_reward_value and gamma discount rate?
+        sample_place_success = None
+        # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
+        sample_push_success = True
+        sample_change_detected = self.change_detected_log[sample_iteration]
+        sample_grasp_success = self.grasp_success_log[sample_iteration]
+        if self.place:
+            sample_place_success = self.partial_stack_success_log[sample_iteration]
+        # in this case grasp_color_task is True
+        if exp_goal_condition is not None:
+            sample_color_success = self.color_success_log[sample_iteration]
+        return sample_stack_height, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
