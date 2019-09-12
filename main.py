@@ -272,7 +272,6 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        prev_stack_height = nonlocal_variables['stack_height']
         if check_row:
             row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
             stack_matches_goal = nonlocal_variables['stack_height'] == len(current_stack_goal)
@@ -298,7 +297,7 @@ def main(args):
                 nonlocal_variables['stack_success'] = False
             max_workspace_height = len(current_stack_goal) - stack_shift
             # Has that stack gotten shorter than it was before? If so we need to reset
-            needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < prev_stack_height
+            needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
         
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
@@ -542,7 +541,7 @@ def main(args):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
-                        if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                        if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
