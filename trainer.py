@@ -242,7 +242,6 @@ class Trainer(object):
                 start = self.clearance_log[-2][0]
 
             new_log_values = []
-            new_predicted_log_values = []
             future_r = None
             # going backwards in time from most recent to oldest step
             for i in reversed(range(start, end)):
@@ -501,7 +500,7 @@ class Trainer(object):
                 # push_predictions_difference = next_push_predictions - prev_push_predictions
                 # grasp_predictions_difference = next_grasp_predictions - prev_grasp_predictions
                 # future_reward = max(np.max(push_predictions_difference), np.max(grasp_predictions_difference))
-            reward_str = 'Trainer.get_label_value(): Current reward: %f Future reward: %f ' % (current_reward, future_reward)
+            reward_str = 'Trainer.get_label_value(): Current reward: %f Current reward multiplier: %f Predicted Future reward: %f ' % (current_reward, reward_multiplier, future_reward)
             if primitive_action == 'push' and not self.push_rewards:
                 expected_reward = self.future_reward_discount * future_reward
                 reward_str += 'Expected reward: %f + %f x %f = %f' % (0.0, self.future_reward_discount, future_reward, expected_reward)
