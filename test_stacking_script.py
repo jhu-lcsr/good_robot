@@ -72,6 +72,7 @@ best_rotation_angle = 3.14
 blocks_to_move = num_obj - 1
 num_stacks = 16
 original_position = np.array([-0.6, 0.25, 0])
+test_failure = False
 
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -90,7 +91,8 @@ for stack in range(num_stacks):
     robot.grasp(primitive_position, rotation_angle,
                 object_color=block_to_move)
     block_positions = robot.get_obj_positions_and_orientations()[0]
-    place = robot.place(original_position.copy(), theta)
+    # creates the ideal stack by fixing rotation angle
+    place = robot.place(original_position.copy(), theta + np.pi / 2)
     print('place initial: ' + str(place))
     
     for i in range(blocks_to_move):
