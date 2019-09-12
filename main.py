@@ -289,7 +289,7 @@ def main(args):
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if not check_z_height:
-            if nonlocal_variables['stack_height'] == 1: 
+            if nonlocal_variables['stack_height'] == 1:
                 # A stack of size 1 does not meet the criteria for a partial stack success
                 nonlocal_variables['partial_stack_success'] = False
                 nonlocal_variables['stack_success'] = False
@@ -555,7 +555,7 @@ def main(args):
                           '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal))
 
                 if check_z_height and nonlocal_variables['trial_complete']:
-                    # Zero out the height because the trial is done. 
+                    # Zero out the height because the trial is done.
                     # Note these lines must be after the logging of these variables is complete.
                     nonlocal_variables['stack_height'] = 0.0
                     nonlocal_variables['prev_stack_height'] = 0.0
@@ -800,8 +800,8 @@ def main(args):
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
                 if check_z_height:
-                    # Zero out the height because the trial is done. 
-                    # Note these lines must normally be after the 
+                    # Zero out the height because the trial is done.
+                    # Note these lines must normally be after the
                     # logging of these variables is complete,
                     # but this is a special (hopefully rare) recovery scenario.
                     nonlocal_variables['stack_height'] = 0.0
@@ -916,58 +916,22 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         rand_sample_ind = int(np.round(np.random.power(pow_law_exp, 1)*(sample_ind.size-1)))
         # sample_iteration is the actual time step on which we will run experience replay
         sample_iteration = sorted_sample_ind[rand_sample_ind]
-        sample_primitive_action_id = trainer.executed_action_log[sample_iteration][0]
+
+        nonlocal_variables['replay_iteration'] += 1
+        [sample_stack_height, sample_primitive_action, sample_grasp_success,
+         sample_change_detected, sample_push_predictions, sample_grasp_predictions,
+         next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
+         exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
+         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger)
+
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
+        print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
+        # sample_push_success is always true in the current version, because it only checks if the push action run, not if something was actually pushed, that is handled by change_detected.
+        sample_push_success = True
         if trial_reward:
             sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
         else:
             sample_reward_value = trainer.reward_value_log[sample_iteration]
-        nonlocal_variables['replay_iteration'] += 1
-        print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
-
-        # Load sample RGB-D heightmap
-        sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
-        sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
-        sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
-        sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
-
-        # Compute forward pass with sample
-        if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
-            exp_goal_condition = [trainer.goal_condition_log[sample_iteration]]
-            next_goal_condition = [trainer.goal_condition_log[sample_iteration+1]]
-        else:
-            exp_goal_condition = None
-            next_goal_condition = None
-            sample_color_success = None
-
-        if place:
-            # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
-            sample_stack_height = int(trainer.stack_height_log[sample_iteration][0])
-            next_stack_height = int(trainer.stack_height_log[sample_iteration+1][0])
-        else:
-            # set to 1 because stack height is used as the reward multiplier
-            sample_stack_height = 1
-            next_stack_height = 1
-
-        sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = trainer.forward(
-            sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
-
-        # Load next sample RGB-D heightmap
-        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
-        next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
-        next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
-        # TODO(ahundt) tune sample_reward_value and gamma discount rate?
-        sample_place_success = None
-        # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
-        sample_push_success = True
-        sample_change_detected = trainer.change_detected_log[sample_iteration]
-        sample_grasp_success = trainer.grasp_success_log[sample_iteration]
-        if place:
-            sample_place_success = trainer.partial_stack_success_log[sample_iteration]
-        # in this case grasp_color_task is True
-        if exp_goal_condition is not None:
-            sample_color_success = trainer.color_success_log[sample_iteration]
 
         # if no_height_reward:  # TODO(ahundt) why does the args.no_height_reward line below work and the regular no_height_reward here broken?
         if args.no_height_reward:
@@ -1001,6 +965,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     else:
         print('Experience Replay: 0 prior training samples. Skipping experience replay.')
         time.sleep(0.01)
+
 
 
 if __name__ == '__main__':

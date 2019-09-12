@@ -30,6 +30,7 @@ class Trainer(object):
         self.method = method
         self.place = place
         self.flops = flops
+        self.goal_condition_len = goal_condition_len
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
@@ -134,9 +135,11 @@ class Trainer(object):
         # executed action log includes the action, push grasp or place, and the best pixel index
         self.executed_action_log = []
         self.label_value_log = []
+        self.trial_label_value_log = []
         self.reward_value_log = []
         self.trial_reward_value_log = []
         self.predicted_value_log = []
+        self.trial_predicted_value_log = []
         self.use_heuristic_log = []
         self.is_exploit_log = []
         self.clearance_log = []
@@ -161,6 +164,10 @@ class Trainer(object):
         self.label_value_log = self.label_value_log[0:self.iteration]
         self.label_value_log.shape = (self.iteration, 1)
         self.label_value_log = self.label_value_log.tolist()
+        self.trial_label_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-label-value.log.txt'), delimiter=' ')
+        self.trial_label_value_log = self.trial_label_value_log[0:self.iteration]
+        self.trial_label_value_log.shape = (self.iteration, 1)
+        self.trial_label_value_log = self.trial_label_value_log.tolist()
         self.predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'predicted-value.log.txt'), delimiter=' ')
         self.predicted_value_log = self.predicted_value_log[0:self.iteration]
         self.predicted_value_log.shape = (self.iteration, 1)
@@ -169,10 +176,14 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
-        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
+        self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), delimiter=' ')
         self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
         self.trial_reward_value_log.shape = (self.iteration, 1)
         self.trial_reward_value_log = self.trial_reward_value_log.tolist()
+        self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
+        self.trial_predicted_value_log = self.trial_predicted_value_log[0:self.iteration]
+        self.trial_predicted_value_log.shape = (self.iteration, 1)
+        self.trial_predicted_value_log = self.trial_predicted_value_log.tolist()
         self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
         self.goal_condition_log = self.goal_condition_log[0:self.iteration]
         self.goal_condition_log.shape = (self.iteration, 1)
@@ -218,7 +229,7 @@ class Trainer(object):
             self.place_success_log.shape = (self.iteration, 1)
             self.place_success_log = self.place_success_log.tolist()
 
-    def trial_reward_value_log_update(self):
+    def trial_reward_value_log_update(self, logger):
         # update the reward values for a whole trial, not just recent time steps
         end = self.clearance_log[-1][0]
         clearance_length = len(self.clearance_log)
@@ -231,21 +242,37 @@ class Trainer(object):
                 start = self.clearance_log[-2][0]
 
             new_log_values = []
+            new_predicted_log_values = []
             future_r = None
             # going backwards in time from most recent to oldest step
-            for r in reversed(self.reward_value_log[start:end]):
+            for i in reversed(range(start, end)):
+
+                # load the sample i from the trainer so we can then get the label value
+                [sample_stack_height, sample_primitive_action, sample_grasp_success,
+                 sample_change_detected, sample_push_predictions, sample_grasp_predictions,
+                 next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
+                 exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
+                 sample_depth_heightmap] = self.load_sample(i, logger)
+
+                # load the current reward value
+                sample_push_success = True
+                ignore_me_incorrect_future_reward, current_reward = self.get_label_value(
+                    sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+                    sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
+                    sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
+                    place_success=sample_place_success, reward_multiplier=reward_multiplier)
                 # note, r is a list of size 1, future r is None or a float
                 if future_r is None:
                     # Give the final time step its own reward twice.
-                    future_r = r[0]
-                if r[0] > 0:
+                    future_r = current_reward
+                if current_reward > 0:
                     # If a nonzero score was received, the reward propagates
-                    future_r = r[0] + self.future_reward_discount * future_r
+                    future_r = current_reward + self.future_reward_discount * future_r
                     new_log_values.append([future_r])
                 else:
                     # If the reward was zero, propagation is stopped
-                    new_log_values.append(r)
-                    future_r = r[0]
+                    new_log_values.append(current_reward)
+                    future_r = current_reward
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
             if len(self.trial_reward_value_log) != len(self.reward_value_log):
@@ -255,6 +282,54 @@ class Trainer(object):
             print('trial_reward_value_log_update() past end bug, check the code. end: ' +
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
+
+def load_sample(self, sample_iteration, logger):
+    sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
+
+    # Load sample RGB-D heightmap
+    sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration)))
+    sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
+    sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
+    sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
+
+    # Compute forward pass with sample
+    if self.goal_condition_len > 0:
+        exp_goal_condition = [self.goal_condition_log[sample_iteration]]
+        next_goal_condition = [self.goal_condition_log[sample_iteration+1]]
+    else:
+        exp_goal_condition = None
+        next_goal_condition = None
+        sample_color_success = None
+
+    if self.place:
+        # print('place loading stack_height_log sample_iteration: ' + str(sample_iteration) + ' log len: ' + str(len(trainer.stack_height_log)))
+        sample_stack_height = int(self.stack_height_log[sample_iteration][0])
+        next_stack_height = int(self.stack_height_log[sample_iteration+1][0])
+    else:
+        # set to 1 because stack height is used as the reward multiplier
+        sample_stack_height = 1
+        next_stack_height = 1
+
+    sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat = self.forward(
+        sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
+
+    # Load next sample RGB-D heightmap
+    next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
+    next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
+    next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
+    next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
+    # TODO(ahundt) tune sample_reward_value and gamma discount rate?
+    sample_place_success = None
+    # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
+    sample_push_success = True
+    sample_change_detected = self.change_detected_log[sample_iteration]
+    sample_grasp_success = self.grasp_success_log[sample_iteration]
+    if self.place:
+        sample_place_success = self.partial_stack_success_log[sample_iteration]
+    # in this case grasp_color_task is True
+    if exp_goal_condition is not None:
+        sample_color_success = self.color_success_log[sample_iteration]
+    return sample_stack_height, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
 
     # Compute forward pass through model to compute affordances/Q
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
