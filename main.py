@@ -941,11 +941,13 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             reward_multiplier = sample_stack_height
         # TODO(ahundt) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         # get_label_value does the forward pass for us to backprop, even if we don't use the return values.
-        new_sample_label_value, _ = trainer.get_label_value(
-            sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
-            sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-            sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
-            place_success=sample_place_success, reward_multiplier=reward_multiplier)
+        update_label_value_log = False
+        if update_label_value_log:
+            new_sample_label_value, _ = trainer.get_label_value(
+                sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+                sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
+                sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
+                place_success=sample_place_success, reward_multiplier=reward_multiplier)
 
         if trial_reward:
             reward_to_backprop = trainer.trial_reward_value_log[sample_iteration]
@@ -960,12 +962,14 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
             trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
-            # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            if update_label_value_log:
+                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
         elif sample_primitive_action == 'grasp':
             trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
         elif sample_primitive_action == 'place':
             trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
-            # trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            if update_label_value_log:
+                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
         print('Experience Replay: 0 prior training samples. Skipping experience replay.')
