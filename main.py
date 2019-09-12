@@ -1052,7 +1052,7 @@ if __name__ == '__main__':
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
     # TODO(ahundt) determine a way to deal with the side effect
-    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,              help='Experience replay delivers rewards for the whole trial, not just next step. '
+    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=2.0,          help='check_z_height goal height in meters')
 
     # -------------- Testing options --------------
