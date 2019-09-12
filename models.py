@@ -157,12 +157,6 @@ class PixelNet(nn.Module):
                     m[1].weight.data.fill_(1)
                     m[1].bias.data.zero_()
 
-
-        # Initialize output variable (for backprop)
-        # self.interm_feat = []
-        # self.output_prob = []
-
-
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
         if goal_condition is not None:
@@ -223,9 +217,9 @@ class PixelNet(nn.Module):
             # Compute sample grid for rotation BEFORE branches
             interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
             if self.place:
-                self.interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
+                interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
             else:
-                self.interm_feat.append([interm_push_feat, interm_grasp_feat])
+                interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
             affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
