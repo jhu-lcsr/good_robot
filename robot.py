@@ -21,7 +21,7 @@ class Robot(object):
     """
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -103,9 +103,13 @@ class Robot(object):
 
             # MODIFY remoteApiConnections.txt
 
+            if tcp_port == 30002:
+                print("WARNING: default tcp port changed to 19997 for is_sim")
+                tcp_port = 19997
+
             # Connect to simulator
             vrep.simxFinish(-1) # Just in case, close all opened connections
-            self.sim_client = vrep.simxStart('127.0.0.1', 19997, True, True, 5000, 5) # Connect to V-REP on port 19997
+            self.sim_client = vrep.simxStart('127.0.0.1', tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
             if self.sim_client == -1:
                 print('Failed to connect to simulation (V-REP remote API server). Exiting.')
                 exit()
@@ -1159,8 +1163,8 @@ class Robot(object):
         else:
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
-        
-            
+
+
     def check_row(self, object_color_sequence,
                   num_obj=4,
                   distance_threshold=0.02,
@@ -1178,8 +1182,8 @@ class Robot(object):
         separation_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
         distance_threshold: maximum distance for blocks to be off-row
         num_directions: number of rotations that are checked for rows.
-        
-        
+
+
         # Returns
 
         List [success, height_count].
@@ -1217,7 +1221,7 @@ class Robot(object):
                 # print('xs: {}'.format(xs))
                 # print('ys: {}'.format(ys))
                 m, b = utils.polyfit(xs, ys, 1)
-                    
+
                 # print('m, b: {}, {}'.format(m, b))
                 theta = np.arctan(m)  # TODO(bendkill): use arctan2?
                 c = np.cos(theta)
@@ -1226,7 +1230,7 @@ class Robot(object):
                 T = np.array([0, -b, 0])
                 # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
                 aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
-                
+
                 aligned = True
                 median_z = np.median(aligned_pos[:, 2])
                 for p in aligned_pos:
@@ -1240,7 +1244,7 @@ class Robot(object):
                 xs = aligned_pos[indices, 0]
                 if aligned and utils.check_separation(xs, separation_threshold):
                     # print('valid row along', theta, 'with indices', block_indices)
-                    if self.grasp_color_task: 
+                    if self.grasp_color_task:
                         success = np.equal(indices, object_color_sequence).all()
                     else:
                         success = True
@@ -1252,7 +1256,7 @@ class Robot(object):
             success, row_size, np.array(self.color_names)[successful_block_indices]))
         return success, row_size
 
-    
+
     def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
 
@@ -1278,7 +1282,9 @@ class Robot(object):
         if checks <= 0:
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
-        
+
+        # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
+
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
         # in the end until proven otherwise
@@ -1349,10 +1355,11 @@ class Robot(object):
         current_stack_goal = len(current_stack_goal)
         if (max_z <= 0.069):
             detected_height = 1
-        elif (max_z > 0.069) and (max_z <= 0.11): 
+        elif (max_z > 0.069) and (max_z <= 0.11):
             detected_height = 2
-        elif (max_z > 0.11) and (max_z <= 0.156): 
+        elif (max_z > 0.11) and (max_z <= 0.156):
             detected_height = 3
+        elif (max_z > 0.156) and (max_z <= 0.21):  
         # elif (max_z > 0.156) and (max_z <= 0.21):  
         #     detected_height = 4
         else:

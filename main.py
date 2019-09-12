@@ -108,7 +108,7 @@ def main(args):
     if num_obj is not None:
         num_obj += num_extra_obj
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
-    tcp_port = args.tcp_port if not is_sim else None
+    tcp_port = args.tcp_port  # TODO(killeen) change the rest of these?
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
@@ -482,7 +482,7 @@ def main(args):
                                 # nonlocal_variables['stack'].return eset_sequence()
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
-                        
+
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
@@ -643,9 +643,9 @@ def main(args):
             empty_threshold = 10
         if check_row:
             # here we are assuming blocks for check_row, if any block leaves the scene then we can't succeed.
-            # TODO(ahundt) is adding num_extra_obj appropriate? 
+            # TODO(ahundt) is adding num_extra_obj appropriate?
             # TODO(ahundt) is applying this threshold to place appropriate? probably not unless volume is also accounted for, a perfect stack is about the area of 1 block.
-            empty_threshold = 300 * (num_obj + num_extra_obj) 
+            empty_threshold = 300 * (num_obj + num_extra_obj)
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
@@ -1026,7 +1026,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as TCP client (UR5)')
-    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
+    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                          help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as real-time client (UR5)')
     parser.add_argument('--rtc_port', dest='rtc_port', type=int, action='store', default=30003,                           help='port to robot arm as real-time client (UR5)')
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
@@ -1062,7 +1062,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
-    
+
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
