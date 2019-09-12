@@ -928,10 +928,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
         # sample_push_success is always true in the current version, because it only checks if the push action run, not if something was actually pushed, that is handled by change_detected.
         sample_push_success = True
-        if trial_reward:
-            sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
-        else:
-            sample_reward_value = trainer.reward_value_log[sample_iteration]
+        # TODO(ahundt) deletme if this has been working for a while, sample reward value isn't actually used for anything...
+        # if trial_reward:
+        #     sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
+        # else:
+        #     sample_reward_value = trainer.reward_value_log[sample_iteration]
 
         # if no_height_reward:  # TODO(ahundt) why does the args.no_height_reward line below work and the regular no_height_reward here broken?
         if args.no_height_reward:
