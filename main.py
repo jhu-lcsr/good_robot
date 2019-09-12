@@ -808,6 +808,7 @@ def main(args):
                     nonlocal_variables['prev_stack_height'] = 0.0
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
+                # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
 
         if exit_called:
             # shut down the simulation or robot
