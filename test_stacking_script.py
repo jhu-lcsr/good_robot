@@ -91,6 +91,7 @@ for stack in range(num_stacks):
     robot.grasp(primitive_position, rotation_angle,
                 object_color=block_to_move)
     block_positions = robot.get_obj_positions_and_orientations()[0]
+    # creates the ideal stack by fixing rotation angle
     place = robot.place(original_position.copy(), theta + np.pi / 2)
     print('place initial: ' + str(place))
     
