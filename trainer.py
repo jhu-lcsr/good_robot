@@ -229,7 +229,7 @@ class Trainer(object):
             self.place_success_log.shape = (self.iteration, 1)
             self.place_success_log = self.place_success_log.tolist()
 
-    def trial_reward_value_log_update(self, logger):
+    def trial_reward_value_log_update(self):
         # update the reward values for a whole trial, not just recent time steps
         end = self.clearance_log[-1][0]
         clearance_length = len(self.clearance_log)
@@ -248,20 +248,25 @@ class Trainer(object):
             for i in reversed(range(start, end)):
 
                 # load the sample i from the trainer so we can then get the label value
-                [sample_stack_height, sample_primitive_action, sample_grasp_success,
-                 sample_change_detected, sample_push_predictions, sample_grasp_predictions,
-                 next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
-                 exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
-                 sample_depth_heightmap] = self.load_sample(i, logger)
+                # [sample_stack_height, sample_primitive_action, sample_grasp_success,
+                #  sample_change_detected, sample_push_predictions, sample_grasp_predictions,
+                #  next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
+                #  exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
+                #  sample_depth_heightmap] = self.load_sample(i, logger)
 
                 # load the current reward value
-                sample_push_success = True
-                ignore_me_incorrect_future_reward, current_reward = self.get_label_value(
-                    sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
-                    sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
-                    sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
-                    place_success=sample_place_success, reward_multiplier=reward_multiplier)
+                # sample_push_success = True
+                # ignore_me_incorrect_future_reward, current_reward = self.get_label_value(
+                #     sample_primitive_action, sample_push_success, sample_grasp_success, sample_change_detected,
+                #     sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
+                #     sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
+                #     place_success=sample_place_success, reward_multiplier=reward_multiplier)
                 # note, r is a list of size 1, future r is None or a float
+
+                # current timestep rewards were stored in the previous timestep in main.py
+                # this is confusing, but we are not modifying the previously written code's behavior to reduce
+                # the risks of other bugs cropping up with such a change.
+                current_reward = self.reward_value_log[i-1]
                 if future_r is None:
                     # Give the final time step its own reward twice.
                     future_r = current_reward

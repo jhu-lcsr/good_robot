@@ -946,11 +946,16 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap,
             sample_color_success, goal_condition=exp_goal_condition, prev_place_predictions=sample_place_predictions,
             place_success=sample_place_success, reward_multiplier=reward_multiplier)
+        
+        if trial_reward:
+            reward_to_backprop = trainer.trial_reward_value_log[sample_iteration]
+        else:
+            reward_to_backprop = trainer.label_value_log[sample_iteration]
 
         # Get labels for sample and backpropagate
         sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
         trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
-                         trainer.label_value_log[sample_iteration], goal_condition=exp_goal_condition)
+                         reward_to_backprop, goal_condition=exp_goal_condition)
 
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
