@@ -940,7 +940,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         else:
             reward_multiplier = sample_stack_height
         # TODO(ahundt) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
-        # get_label_value does the forward pass for us to backprop, even if we don't use the return values.
+        # get_label_value does the forward pass for updating the label value log.
         update_label_value_log = False
         if update_label_value_log:
             new_sample_label_value, _ = trainer.get_label_value(
@@ -954,7 +954,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         else:
             reward_to_backprop = trainer.label_value_log[sample_iteration]
 
-        # Get labels for sample and backpropagate
+        # Get labels for sample and backpropagate, trainer.backprop also does a forward pass internally.
         sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
         trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
                          reward_to_backprop, goal_condition=exp_goal_condition)
