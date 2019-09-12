@@ -299,3 +299,33 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 * Use `touch.py` to test calibrated camera extrinsics -- provides a UI where the user can click a point on the RGB-D image, and the robot moves its end-effector to the 3D location of that point
 * Use `debug.py` to test robot communication and primitive actions
+
+## Costar Visual Stacking Execution Details
+
+### Running Multiple Simulations in Parallel
+
+It is possible to do multiple runs on different GPUs on the same machine. First, start an instance of V-Rep as below,
+```
+~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
+```
+being careful to use V-Rep 3.6.2 wherever it is installed locally. The port number, here 19997 which is the usual default, is the important point, as we will cahnge it in subsequent runs.
+
+Start the simulation as usual, but now specify `--tcp_port 19997`.
+
+Start another V-Rep session.
+```
+~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19996_FALSE_TRUE -s simulation/simulation.ttt
+```
+For some reason, the port number is important here, and should be selected to be lower than already running sessions.
+
+When you start training, be sure to specify a different GPU. For example, if previously you set
+```
+export CUDA_VISIBLE_DEVICES="0"
+```
+then you should likely set
+```
+export CUDA_VISIBLE_DEVICES="1"
+```
+and specify the corresponding tcp port `--tcp_port 19996`.
+
+Additional runs in parallel should use ports 19995, 19994, etc.
