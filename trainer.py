@@ -265,7 +265,7 @@ class Trainer(object):
                 # current timestep rewards were stored in the previous timestep in main.py
                 # this is confusing, but we are not modifying the previously written code's behavior to reduce
                 # the risks of other bugs cropping up with such a change.
-                current_reward = self.reward_value_log[i-1][0]
+                current_reward = self.reward_value_log[i][0]
                 if future_r is None:
                     # Give the final time step its own reward twice.
                     future_r = current_reward
