@@ -137,6 +137,7 @@ def main(args):
     no_height_reward = args.no_height_reward
     transfer_grasp_to_place = args.transfer_grasp_to_place
     neural_network_name = args.nn
+    disable_situation_removal = args.disable_situation_removal
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -298,7 +299,7 @@ def main(args):
             max_workspace_height = len(current_stack_goal) - stack_shift
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
-        
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if place and needed_to_reset:
@@ -306,10 +307,10 @@ def main(args):
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
-            if not check_row:
+            if not check_row not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
             print(mismatch_str)
-            if not check_row:
+            if not check_row and not disable_situation_removal:
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
@@ -1054,6 +1055,7 @@ if __name__ == '__main__':
     # TODO(ahundt) determine a way to deal with the side effect
     parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=2.0,          help='check_z_height goal height in meters')
+    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. ')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
