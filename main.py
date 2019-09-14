@@ -275,7 +275,8 @@ def main(args):
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
             row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
-            stack_matches_goal = nonlocal_variables['stack_height'] == len(current_stack_goal)
+            # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
+            stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
             # TODO(ahundt) make decrease threshold more accessible, perhaps a command line parameter
             decrease_threshold = 0.1
@@ -468,7 +469,7 @@ def main(args):
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal(place_check=True)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
-                           
+
                             if nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 partial_stack_count += 1
