@@ -125,6 +125,7 @@ class PixelNet(nn.Module):
                 else:
                     self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
                     self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
             except:
                 print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
                       'instead of the original efficientnet pytorch')

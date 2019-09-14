@@ -1168,7 +1168,7 @@ class Robot(object):
     def check_row(self, object_color_sequence,
                   num_obj=4,
                   distance_threshold=0.02,
-                  separation_threshold=0.06,
+                  separation_threshold=0.08,
                   num_directions=64):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
