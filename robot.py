@@ -1359,7 +1359,7 @@ class Robot(object):
             detected_height = 2
         elif (max_z > 0.11) and (max_z <= 0.156):
             detected_height = 3
-        # elif (max_z > 0.156) and (max_z <= 0.21):  
+        # elif (max_z > 0.156) and (max_z <= 0.21):
         #     detected_height = 4
         else:
             detected_height = 4
