@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from utils import CrossEntropyLoss2d
 from models import PixelNet
+import models
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
@@ -763,4 +764,55 @@ class Trainer(object):
 
         best_pix_ind = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
         return best_pix_ind
+
+    #TODO(hkwon214) use image classifier instead stack height
+    def image_classifier_reward(self, input_image, current_stack_goal,checkpoint):
+        # Input
+        num_channels = np.shape(input_image)[-1]
+        goal_success = False
+
+        # Similar to the forward function 
+        # Pre-process color image (scale and normalize)
+        if num_channels == 3:
+            image_mean = [0.485, 0.456, 0.406]
+            image_std = [0.229, 0.224, 0.225]
+            input_image_ = input_image.astype(float)/255
+            for c in range(3):
+                input_image_[:,:,c] = (input_image_[:,:,c] - image_mean[c])/image_std[c]
+        # Pre-process depth image (normalize)
+        elif num_channels == 1:
+            image_mean = [0.01, 0.01, 0.01]
+            image_std = [0.03, 0.03, 0.03]
+            input_image.shape = (input_image.shape[0], input_image.shape[1], 1)
+            input_image_ = np.concatenate((input_image, input_image, input_image), axis=2)
+            for c in range(3):
+                input_image_[:,:,c] = (input_image_[:,:,c] - image_mean[c])/image_std[c]
+        else:
+            raise Exception('check input image shape')
+
+        # Construct minibatch of size 1 (b,c,h,w)
+        input_image_.shape = (input_image_.shape[0], input_image_.shape[1], input_image_.shape[2], 1)
+        input_data = torch.from_numpy(input_image_.astype(np.float32)).permute(3,2,0,1)
+
+        model = models.image_classifier_output(checkpoint)
+        # Convert model from CPU to GPU
+        if self.use_cuda:
+            model = model.cuda()
+
+        # Set model to evaluation mode
+        model.eval()
+        stack_class = model(input_data)
+        stack_class = stack_class.item()
+        detected_height = stack_class + 1
+        print('STACK_CLASS: ' + str(stack_class))
+        if current_stack_goal == detected_height:
+            goal_success = True
+        return goal_success, detected_height
+
+
+
+
+
+
+
 

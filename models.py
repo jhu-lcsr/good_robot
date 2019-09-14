@@ -81,6 +81,12 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
+    #TODO(hkwon214) temp
+def image_classifier_output(checkpoint, num_classes=4):
+    model = EfficientNet.from_name('efficientnet-b0', override_params={'num_classes': num_classes})
+    model.load_state_dict(checkpoint['state_dict'])
+    return model
+
 class PixelNet(nn.Module):
 
     def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True): # , snapshot=None
@@ -337,3 +343,4 @@ class PixelNet(nn.Module):
         if self.place:
             # we rename the dictionary names of the grasp weights to place, then load them into the placenet
             self.placenet.load_state_dict(dict(map(lambda t: (t[0].replace('grasp', 'place'), t[1]), self.graspnet.state_dict().items())))
+    

@@ -131,6 +131,8 @@ def main(args):
     check_row = args.check_row
     check_z_height = args.check_z_height
     check_z_height_goal = args.check_z_height_goal
+    check_classifier = args.check_classifier
+    classifier_checkpoint = args.classifier_checkpoint
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
@@ -285,6 +287,8 @@ def main(args):
                 needed_to_reset = True
             # TODO(hkwon214) add a separate case for incremental height
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
+        elif check_classifier:
+            stack_matches_goal, nonlocal_variables['stack_height'] = trainer.image_classifier_reward(depth_img, current_stack_goal, classifier_checkpoint)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
@@ -1040,6 +1044,8 @@ if __name__ == '__main__':
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=2.0,          help='check_z_height goal height in meters')
+    parser.add_argument('--check_classifier', dest='check_classifier', action='store_true', default=False,          help='check stacks using the image classifier')
+    parser.add_argument('--classifier_checkpoint', dest='classifier_checkpoint', action='store', default='./eval/model_best_pth.tar',          help='image classifier checkpoint location')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
