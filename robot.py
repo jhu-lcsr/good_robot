@@ -1368,7 +1368,7 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=10.0):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=20.0):
         # TODO(ahundt) make reward multiplier a command line parameter which can be modified, probably take it out of this function too.
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median) * reward_multiplier
