@@ -306,19 +306,17 @@ def main(args):
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
-            if not check_row:
-                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
+            mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
             print(mismatch_str)
-            if not check_row:
-                # this reset is appropriate for stacking, but not checking rows
-                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.reposition_objects()
-                nonlocal_variables['stack'].reset_sequence()
-                nonlocal_variables['stack'].next()
-                # We needed to reset, so the stack must have been knocked over!
-                # all rewards and success checks are False!
-                set_nonlocal_success_variables_false()
-                nonlocal_variables['trial_complete'] = True
+            # this reset is appropriate for stacking, but not checking rows
+            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+            robot.reposition_objects()
+            nonlocal_variables['stack'].reset_sequence()
+            nonlocal_variables['stack'].next()
+            # We needed to reset, so the stack must have been knocked over!
+            # all rewards and success checks are False!
+            set_nonlocal_success_variables_false()
+            nonlocal_variables['trial_complete'] = True
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -371,7 +369,7 @@ def main(args):
                     # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
                         print('Strategy: explore (exploration probability: %f)' % (explore_prob))
-                        push_frequency_one_in_n = 4
+                        push_frequency_one_in_n = 3
                         nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
@@ -466,10 +464,11 @@ def main(args):
 
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal(place_check=True)
-                        if (not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']):
-                            partial_stack_count += 1
+                        if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
+                           
                             if nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
+                                partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                             if len(next_stack_goal) < len(current_stack_goal):
                                 nonlocal_variables['stack_success'] = True
@@ -568,7 +567,7 @@ def main(args):
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
 
-                    if partial_stack_count > 0:
+                    if partial_stack_count > 0 and place_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
                         place_rate = float(partial_stack_count)/float(place_count)
                     if stack_count > 0:
