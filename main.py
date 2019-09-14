@@ -307,7 +307,7 @@ def main(args):
         if needed_to_reset:
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
-            if not check_row not disable_situation_removal:
+            if not check_row and not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
             print(mismatch_str)
             if not check_row and not disable_situation_removal:
