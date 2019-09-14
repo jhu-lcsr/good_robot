@@ -33,7 +33,7 @@ class Trainer(object):
         self.goal_condition_len = goal_condition_len
         if self.place:
             # Stacking Reward Schedule
-            reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.5
+            reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
             self.push_reward = reward_schedule[0]
             self.grasp_reward = reward_schedule[1]
             self.grasp_color_reward = reward_schedule[2]
