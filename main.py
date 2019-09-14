@@ -265,6 +265,8 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+        # no need to reset by default
+        needed_to_reset = False
         if place_check:
             # Only reset while placing if the stack decreases in height!
             stack_shift = 1
@@ -467,22 +469,25 @@ def main(args):
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
                     if place and check_row:
-                        needed_to_reset = check_stack_update_goal(place_check=True)
+                        needed_to_reset = check_stack_update_goal()
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
 
                             if nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-                            if len(next_stack_goal) < len(current_stack_goal):
+                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
+                                print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
-                                # full selftack complete! reset the scene
+                                # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                                 robot.reposition_objects()
-                                # We don't need to reset here because the algorithm already reset itself
-                                # nonlocal_variables['stack'].return eset_sequence()
+                                if len(next_stack_goal) > 1:
+                                    # if multiple parts of a row are completed in one action, we need to reset the trial counter.
+                                    nonlocal_variables['stack'].reset_sequence()
+                                # goal is 2 blocks in a row
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
 
@@ -591,6 +596,11 @@ def main(args):
                     # Note these lines must be after the logging of these variables is complete.
                     nonlocal_variables['stack_height'] = 0.0
                     nonlocal_variables['prev_stack_height'] = 0.0
+                elif nonlocal_variables['trial_complete']:
+                    # Set back to the minimum stack height because the trial is done.
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 1
+                    nonlocal_variables['prev_stack_height'] = 1
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -845,6 +855,9 @@ def main(args):
                     # but this is a special (hopefully rare) recovery scenario.
                     nonlocal_variables['stack_height'] = 0.0
                     nonlocal_variables['prev_stack_height'] = 0.0
+                else:
+                    nonlocal_variables['stack_height'] = 1.0
+                    nonlocal_variables['prev_stack_height'] = 1.0
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
