@@ -9,6 +9,7 @@ import utils
 from simulation import vrep
 from scipy import ndimage, misc
 
+
 class Robot(object):
     """
     Key member variables:
@@ -20,7 +21,7 @@ class Robot(object):
     """
     def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
                  tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
 
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
@@ -102,9 +103,13 @@ class Robot(object):
 
             # MODIFY remoteApiConnections.txt
 
+            if tcp_port == 30002:
+                print("WARNING: default tcp port changed to 19997 for is_sim")
+                tcp_port = 19997
+
             # Connect to simulator
             vrep.simxFinish(-1) # Just in case, close all opened connections
-            self.sim_client = vrep.simxStart('127.0.0.1', 19997, True, True, 5000, 5) # Connect to V-REP on port 19997
+            self.sim_client = vrep.simxStart('127.0.0.1', tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
             if self.sim_client == -1:
                 print('Failed to connect to simulation (V-REP remote API server). Exiting.')
                 exit()
@@ -1158,9 +1163,13 @@ class Robot(object):
         else:
             raise NotImplementedError('place not yet implemented for the real robot')
             # TODO(hkwon214): Add place function for real robot
-        
-            
-    def check_row(self, object_color_sequence, num_obj=4, distance_threshold=0.08, num_directions=64):
+
+
+    def check_row(self, object_color_sequence,
+                  num_obj=4,
+                  distance_threshold=0.02,
+                  separation_threshold=0.08,
+                  num_directions=64):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1170,10 +1179,11 @@ class Robot(object):
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
         num_obj: number of blocks in the workspace (needed to get all subsets)
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        separation_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        distance_threshold: maximum distance for blocks to be off-row
         num_directions: number of rotations that are checked for rows.
-        
-        
+
+
         # Returns
 
         List [success, height_count].
@@ -1195,44 +1205,59 @@ class Robot(object):
         # they are in a row and, if so, whether they are close enough
         # together.
 
-        if self.grasp_color_task:
-            all_block_indices = map(list, [object_color_sequence, reversed(object_color_sequence)])
-        else:
-            all_block_indices = map(list, itertools.combinations(np.arange(num_obj), row_length))
-            
-        for block_indices in all_block_indices:
-            # check each rotation angle for a possible row
-            for i in range(num_directions // 2):
-                # rotate block positions about Z axis
-                theta = 2 * np.pi * i / num_directions
+        # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
+        # So for 3 objects, this would be:
+        # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
+        all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
+                                 for length in range(1, num_obj+1)]
+
+        successful_block_indices = []
+        for block_indices_of_length in all_block_indices:
+            for block_indices in block_indices_of_length:
+                # check each rotation angle for a possible row
+                # print('checking {}'.format(block_indices))
+                xs = pos[block_indices][:, 0]
+                ys = pos[block_indices][:, 1]
+                # print('xs: {}'.format(xs))
+                # print('ys: {}'.format(ys))
+                m, b = utils.polyfit(xs, ys, 1)
+
+                # print('m, b: {}, {}'.format(m, b))
+                theta = np.arctan(m)  # TODO(bendkill): use arctan2?
                 c = np.cos(theta)
                 s = np.sin(theta)
                 R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-                rotated_pos = np.array([np.matmul(R, p) for p in pos])
-                # print('rotated_pos:', rotated_pos)
-                # print('block_indices:', block_indices)
-                along_axis = rotated_pos[block_indices][:, [1, 2]]
-                center = rotated_pos[block_indices][:, [1, 2]].mean(axis=0)
-                # print('along_axis:', along_axis)
-                # print('center:', center)
-                if (np.linalg.norm(along_axis - center, axis=1) < distance_threshold / 2).all():
-                    # blocks are near enough to axis to be aligned along this rotation angle
-                    block_order = np.array(rotated_pos[:, 0]).argsort()
-                    # print('check_row() along angle', theta, 'with blocks', block_indices)
-                    if utils.check_separation(rotated_pos[block_order, 0], distance_threshold):
-                        # blocks are also close enough along the axis to be considered a row
-                        print('valid row along', theta, 'with indices', block_indices)
-                        success = True
-                        row_size = max(len(block_indices), row_size)
-                    else:
-                        # print('invalid row: bad separation')
-                        pass
+                T = np.array([0, -b, 0])
+                # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
+                aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
 
-        print('check_row:', success, row_size)
+                aligned = True
+                median_z = np.median(aligned_pos[:, 2])
+                for p in aligned_pos:
+                    # print('distance from line: {:.03f}'.format(p[1]))
+                    if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
+                        # too far from line on table, or blocks are not on the same Z plane
+                        aligned = False
+                        break
+
+                indices = aligned_pos[:, 0].argsort()
+                xs = aligned_pos[indices, 0]
+                if aligned and utils.check_separation(xs, separation_threshold):
+                    # print('valid row along', theta, 'with indices', block_indices)
+                    if self.grasp_color_task:
+                        success = np.equal(indices, object_color_sequence).all()
+                    else:
+                        success = True
+                    successful_block_indices = block_indices
+                    row_size = max(len(block_indices), row_size)
+                    continue
+
+        print('check_row: {} | row_size: {} | blocks: {}'.format(
+            success, row_size, np.array(self.color_names)[successful_block_indices]))
         return success, row_size
-                    
-                        
-    def check_stack(self, object_color_sequence, distance_threshold=0.07, top_idx=-1):
+
+
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1257,6 +1282,8 @@ class Robot(object):
         if checks <= 0:
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
             return True, checks+1
+
+        # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
 
         pos = np.asarray(self.get_obj_positions())
         # Assume the stack will work out successfully
@@ -1328,11 +1355,11 @@ class Robot(object):
         current_stack_goal = len(current_stack_goal)
         if (max_z <= 0.069):
             detected_height = 1
-        elif (max_z > 0.069) and (max_z <= 0.11): 
+        elif (max_z > 0.069) and (max_z <= 0.11):
             detected_height = 2
-        elif (max_z > 0.11) and (max_z <= 0.156): 
+        elif (max_z > 0.11) and (max_z <= 0.156):
             detected_height = 3
-        # elif (max_z > 0.156) and (max_z <= 0.21):  
+        # elif (max_z > 0.156) and (max_z <= 0.21):
         #     detected_height = 4
         else:
             detected_height = 4
@@ -1341,7 +1368,7 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=10.0):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=20.0):
         # TODO(ahundt) make reward multiplier a command line parameter which can be modified, probably take it out of this function too.
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median) * reward_multiplier
