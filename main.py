@@ -656,9 +656,11 @@ def main(args):
             empty_threshold = 10
         if check_row:
             # here we are assuming blocks for check_row, if any block leaves the scene then we can't succeed.
-            # TODO(ahundt) is adding num_extra_obj appropriate?
-            # TODO(ahundt) is applying this threshold to place appropriate? probably not unless volume is also accounted for, a perfect stack is about the area of 1 block.
-            empty_threshold = 300 * (num_obj + num_extra_obj)
+            # TODO(ahundt) Ideally volume should also be accounted for, a perfect stack is about the area of 1 block, and the scene might start with a stack.
+            num_empty_obj = num_obj
+            if is_testing:
+                num_empty_obj -= 1
+            empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
