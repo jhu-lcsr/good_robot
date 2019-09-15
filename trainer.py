@@ -433,6 +433,7 @@ class Trainer(object):
             next_color_heightmap, next_depth_heightmap, color_success=None, goal_condition=None, place_success=None,
             prev_place_predictions=None, reward_multiplier=1):
 
+        reward_multiplier *= reward_multiplier
         if self.method == 'reactive':
 
             # Compute label value
