@@ -18,7 +18,7 @@ class Logger():
             self.base_directory = logging_directory
             print('Pre-loading data logging session: %s' % (self.base_directory))
         else:
-            self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d.%H:%M:%S'))
+            self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d-%H-%M-%S'))
             print('Creating data logging session: %s' % (self.base_directory))
         self.info_directory = os.path.join(self.base_directory, 'info')
         self.color_images_directory = os.path.join(self.base_directory, 'data', 'color-images')
