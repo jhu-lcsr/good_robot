@@ -22,10 +22,6 @@ class Logger():
         else:
             self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d-%H-%M-%S'))
             print('Creating data logging session: %s' % (self.base_directory))
-        if args is not None:
-            params_path = os.path.join(self.base_directory, 'commandline_args.json')
-            with open(params_path, 'w') as f:
-                json.dump(vars(args), f)
         self.info_directory = os.path.join(self.base_directory, 'info')
         self.color_images_directory = os.path.join(self.base_directory, 'data', 'color-images')
         self.depth_images_directory = os.path.join(self.base_directory, 'data', 'depth-images')
@@ -54,6 +50,11 @@ class Logger():
             os.makedirs(self.recordings_directory)
         if not os.path.exists(self.transitions_directory):
             os.makedirs(os.path.join(self.transitions_directory, 'data'))
+
+        if args is not None:
+            params_path = os.path.join(self.base_directory, 'commandline_args.json')
+            with open(params_path, 'w') as f:
+                json.dump(vars(args), f)
 
     def save_camera_info(self, intrinsics, pose, depth_scale):
         np.savetxt(os.path.join(self.info_directory, 'camera-intrinsics.txt'), intrinsics, delimiter=' ')
