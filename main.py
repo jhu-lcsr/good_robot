@@ -138,6 +138,7 @@ def main(args):
     transfer_grasp_to_place = args.transfer_grasp_to_place
     neural_network_name = args.nn
     disable_situation_removal = args.disable_situation_removal
+    evaluate_random_objects = args.evaluate_random_objects
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -307,7 +308,7 @@ def main(args):
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
-        if needed_to_reset:
+        if needed_to_reset or evaluate_random_objects:
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
             if not disable_situation_removal:
@@ -838,7 +839,7 @@ def main(args):
                 # do some experience replay while waiting, rather than sleeping
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
             else:
-                time.sleep(0.01)
+                time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
             if int(time_elapsed) > 20:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
@@ -1076,6 +1077,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
+    parser.add_argument('--evaluate_random_objects', dest='is_testing', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
