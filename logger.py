@@ -4,11 +4,13 @@ import os
 import numpy as np
 import cv2
 import torch
+import glob
+import json
 # import h5py
 
 class Logger():
 
-    def __init__(self, continue_logging, logging_directory):
+    def __init__(self, continue_logging, logging_directory, args=None):
 
         # Create directory to save data
         timestamp = time.time()
@@ -20,6 +22,10 @@ class Logger():
         else:
             self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d-%H-%M-%S'))
             print('Creating data logging session: %s' % (self.base_directory))
+        if args is not None:
+            params_path = os.path.join(self.base_directory, 'commandline_args.json')
+            with open(params_path, 'w') as f:
+                json.dump(vars(args), f)
         self.info_directory = os.path.join(self.base_directory, 'info')
         self.color_images_directory = os.path.join(self.base_directory, 'data', 'color-images')
         self.depth_images_directory = os.path.join(self.base_directory, 'data', 'depth-images')

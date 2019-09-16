@@ -199,7 +199,7 @@ def main(args):
         # Transfer pretrained grasp weights to the place action.
         trainer.model.transfer_grasp_to_place()
     # Initialize data logger
-    logger = Logger(continue_logging, logging_directory)
+    logger = Logger(continue_logging, logging_directory, args=args)
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
