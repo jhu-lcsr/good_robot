@@ -324,6 +324,10 @@ def main(args):
                 # all rewards and success checks are False!
                 set_nonlocal_success_variables_false()
                 nonlocal_variables['trial_complete'] = True
+                if check_row:
+                    # on reset get the current row state
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+                    nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -475,6 +479,7 @@ def main(args):
 
                             if nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
+                                # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
@@ -834,6 +839,7 @@ def main(args):
                         trainer.model = trainer.model.cuda()
 
         # Sync both action thread and training thread
+        num_problems_detected = 0
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # do some experience replay while waiting, rather than sleeping
@@ -861,6 +867,11 @@ def main(args):
                 else:
                     nonlocal_variables['stack_height'] = 1.0
                     nonlocal_variables['prev_stack_height'] = 1.0
+                num_problems_detected += 1
+                if num_problems_detected > 2 and is_sim:
+                    # Try more drastic recovery methods the second time around
+                    robot.restart_sim()
+                    robot.add_objects()
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
