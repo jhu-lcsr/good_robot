@@ -413,9 +413,10 @@ class Robot(object):
     def get_camera_data(self):
 
         if self.is_sim:
-
-            # Get color image from simulation
-            sim_ret, resolution, raw_image = vrep.simxGetVisionSensorImage(self.sim_client, self.cam_handle, 0, vrep.simx_opmode_blocking)
+            sim_ret = None
+            while sim_ret != vrep.simx_return_ok:
+                # Get color image from simulation
+                sim_ret, resolution, raw_image = vrep.simxGetVisionSensorImage(self.sim_client, self.cam_handle, 0, vrep.simx_opmode_blocking)
             color_img = np.asarray(raw_image)
             color_img.shape = (resolution[1], resolution[0], 3)
             color_img = color_img.astype(np.float)/255
@@ -424,8 +425,10 @@ class Robot(object):
             color_img = np.fliplr(color_img)
             color_img = color_img.astype(np.uint8)
 
-            # Get depth image from simulation
-            sim_ret, resolution, depth_buffer = vrep.simxGetVisionSensorDepthBuffer(self.sim_client, self.cam_handle, vrep.simx_opmode_blocking)
+            sim_ret = None
+            while sim_ret != vrep.simx_return_ok:
+                # Get depth image from simulation
+                sim_ret, resolution, depth_buffer = vrep.simxGetVisionSensorDepthBuffer(self.sim_client, self.cam_handle, vrep.simx_opmode_blocking)
             depth_img = np.asarray(depth_buffer)
             depth_img.shape = (resolution[1], resolution[0])
             depth_img = np.fliplr(depth_img)
