@@ -17,7 +17,7 @@ Abstract— In order to learn effectively, robots must be able to extract the in
 
 ## Training CoSTAR Visual Stacking
 
-Details of our specific training and test runs as well as commands are found on the [costar visual stacking github releases page](https://github.com/jhu-lcsr/costar_visual_stacking/releases).
+Details of our specific training and test runs, command line commands, pre-trained models, and logged data with images are on the [costar visual stacking github releases page](https://github.com/jhu-lcsr/costar_visual_stacking/releases).
 
 ### Starting the V-REP Simulation
 
@@ -28,6 +28,8 @@ Details of our specific training and test runs as well as commands are found on 
 ```
 
 ### Cube Stacking
+
+![A stack of 4 cubes](https://user-images.githubusercontent.com/55744/64198714-cb032100-ce56-11e9-9f6d-acb3101ff786.png)
 
 #### Cube Stack Training
 
@@ -47,7 +49,13 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 
 ### Row of 4 Cubes
 
+![001057 1 color row](https://user-images.githubusercontent.com/55744/65455899-31f07600-de16-11e9-9808-bb75226fa58d.png)
+
+Row Testing Video:
+
 [![CoSTAR Visual Stacking v0.12 rows test run video](https://img.youtube.com/vi/Ti3mSGvbc7w/0.jpg)](https://youtu.be/Ti3mSGvbc7w)
+
+[Row v0.12 release page and pretrained models](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0).
 
 #### Row Training
 
@@ -56,7 +64,6 @@ export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir 'obje
 ```
 
 #### Row Testing
-
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --place --check_row --is_testing  --tcp_port 19996 --load_snapshot --snapshot_file '/home/costar/Downloads/snapshot-backup.reinforcement-best-stack-rate.pth' --random_seed 1238 --disable_situation_removal --save_visualizations
