@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 
 To use trial SPOT also add `--trial_reward` to this command.
 
-### Cube Stack Testing
+#### Cube Stack Testing
 
 Remember to first train the model or download the snapshot file from the release page (ex: [v0.12 release](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0)) and update the command line `--snapshot_file FILEPATH`:
 
@@ -81,7 +81,7 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 
 You can also run without `--trial_reward` and with the default `--future_reward_discount 0.5`.
 
-#### Push + Grasp Random Placement Testing
+#### Push + Grasp Random Object Location Testing
 
 ![000040 0 color heightmap](https://user-images.githubusercontent.com/55744/63808939-16fe1500-c8ef-11e9-9dfa-8dc5ed53cd00.png)
 
@@ -89,7 +89,7 @@ You can also run without `--trial_reward` and with the default `--future_reward_
  export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --load_snapshot --snapshot_file '/home/costar/src/costar_visual_stacking/logs/2019-08-17.20:54:32-train-grasp-place-split-efficientnet-21k-acc-0.80/models/snapshot.reinforcement.pth' --random_seed 1238 --is_testing --save_visualizations
 ```
 
-#### Push + Grasp Adversarial Placement Testing
+#### Push + Grasp Adversarial Object Location Testing
 
 ![Push grasp adversarial viz](https://user-images.githubusercontent.com/55744/64275313-4aeec100-cf13-11e9-9a04-3f56e2de79d5.png)
 video:
