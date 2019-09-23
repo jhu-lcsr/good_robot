@@ -1,4 +1,4 @@
-# CoSTAR Visual Stacking
+# Good Robot! CoSTAR Visual Stacking
 
 [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
@@ -71,7 +71,7 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 
 ### Push + Grasp
 
-We provide the [Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping) pushing and grasping task as a baseline for our algorithms.
+We provide backwards compatibility with the [Visual Pushing Grasping (VPG) GitHub Repository](https://github.com/andyzeng/visual-pushing-grasping), and evaluate on their pushing and grasping task as a baseline from which to compare our algorithms.
 
 #### Push + Grasp Training
 
