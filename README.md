@@ -92,9 +92,10 @@ You can also run without `--trial_reward` and with the default `--future_reward_
 #### Push + Grasp Adversarial Object Location Testing
 
 ![Push grasp adversarial viz](https://user-images.githubusercontent.com/55744/64275313-4aeec100-cf13-11e9-9a04-3f56e2de79d5.png)
-video:
 
-[![CoSTAR Visual Stacking v0.2 test run video](https://img.youtube.com/vi/F85d9xGCDnY/0.jpg)](https://youtu.be/F85d9xGCDnY)
+[Adversarial pushing and grasping release v0.3.2](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/push_grasp_v0.3.2) video:
+
+[![CoSTAR Visual Stacking v0.3.2 test run video](https://img.youtube.com/vi/F85d9xGCDnY/0.jpg)](https://youtu.be/F85d9xGCDnY)
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --tcp_port 19996 --is_testing --random_seed 1238 --load_snapshot --snapshot_file '/home/ahundt/src/costar_visual_stacking/logs/2019-09-12.18:21:37-push-grasp-16k-trial-reward/models/snapshot.reinforcement.pth' --max_test_trials 10 --test_preset_cases
