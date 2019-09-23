@@ -1,4 +1,4 @@
-# Costar Visual Stacking
+# CoSTAR Visual Stacking
 
 [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
