@@ -194,10 +194,13 @@ If you find this code useful in your work, please consider citing:
 ```
 
 #### Demo Videos
+
 Demo videos of a real robot in action can be found [here](http://vpg.cs.princeton.edu/).
 
 #### Contact
-If you have any questions or find any bugs, please let me know: [Andy Zeng](http://www.cs.princeton.edu/~andyz/) andyz[at]princeton[dot]edu
+
+The contact for CoSTAR Visual Stacking is [Andrew Hundt](http://ahundt.github.io/).
+The contact for the original [Visual Pushing Grasping repository](https://github.com/andyzeng/visual-pushing-grasping) is [Andy Zeng](http://www.cs.princeton.edu/~andyz/) andyz[at]princeton[dot]edu
 
 ## Installation
 
@@ -205,14 +208,16 @@ This implementation requires the following dependencies (tested on Ubuntu 16.04.
 
 * Python 2.7 or Python 3
 * [NumPy](http://www.numpy.org/), [SciPy](https://www.scipy.org/scipylib/index.html), [OpenCV-Python](https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_tutorials.html), [Matplotlib](https://matplotlib.org/). You can quickly install/update these dependencies by running the following (replace `pip` with `pip3` for Python 3):
-  ```shell
-  pip install numpy scipy opencv-python matplotlib
+
+  ```bash
+  pip3 install numpy scipy opencv-python matplotlib
   ```
-* [PyTorch](http://pytorch.org/) version 0.3. Since 0.3 is no longer the latest version, see installation instructions [here](http://pytorch.org/previous-versions/) or run the following:
-  ```shell
-  pip install torch==0.3.1 torchvision==0.2.0
+
+* [PyTorch](http://pytorch.org/) version 1.2:
+
+  ```bash
+  pip3 install torch==1.2 torchvision==0.4.0
   ```
-  Support for PyTorch version 0.4+ is work-in-progress and lives in [this branch](https://github.com/andyzeng/visual-pushing-grasping/tree/support-pytorch-v0.4), but currently remains unstable.
 
 * [V-REP](http://www.coppeliarobotics.com/) (simulation environment)
 
@@ -231,7 +236,7 @@ This demo runs our pre-trained model with a UR5 robot arm in simulation on chall
 1. Checkout this repository and download our pre-trained models.
 
     ```shell
-    git clone https://github.com/andyzeng/visual-pushing-grasping.git visual-pushing-grasping
+    git clone https://github.com/jhu-lcsr/costar_visual_stacking.git visual-pushing-grasping
     cd visual-pushing-grasping/downloads
     ./download-weights.sh
     cd ..
@@ -271,18 +276,109 @@ Various training options can be modified or toggled on/off with different flags 
 
 ```shell
 usage: main.py [-h] [--is_sim] [--obj_mesh_dir OBJ_MESH_DIR]
-               [--num_obj NUM_OBJ] [--tcp_host_ip TCP_HOST_IP]
-               [--tcp_port TCP_PORT] [--rtc_host_ip RTC_HOST_IP]
-               [--rtc_port RTC_PORT]
+               [--num_obj NUM_OBJ] [--num_extra_obj NUM_EXTRA_OBJ]
+               [--tcp_host_ip TCP_HOST_IP] [--tcp_port TCP_PORT]
+               [--rtc_host_ip RTC_HOST_IP] [--rtc_port RTC_PORT]
                [--heightmap_resolution HEIGHTMAP_RESOLUTION]
-               [--random_seed RANDOM_SEED] [--method METHOD] [--push_rewards]
+               [--random_seed RANDOM_SEED] [--cpu] [--flops] [--method METHOD]
+               [--push_rewards]
                [--future_reward_discount FUTURE_REWARD_DISCOUNT]
                [--experience_replay] [--heuristic_bootstrap]
-               [--explore_rate_decay] [--grasp_only] [--is_testing]
-               [--max_test_trials MAX_TEST_TRIALS] [--test_preset_cases]
-               [--test_preset_file TEST_PRESET_FILE] [--load_snapshot]
-               [--snapshot_file SNAPSHOT_FILE] [--continue_logging]
+               [--explore_rate_decay] [--grasp_only] [--check_row]
+               [--random_weights] [--max_iter MAX_ITER] [--place]
+               [--no_height_reward] [--grasp_color_task]
+               [--grasp_count GRASP_COUT] [--transfer_grasp_to_place]
+               [--check_z_height] [--trial_reward]
+               [--check_z_height_goal CHECK_Z_HEIGHT_GOAL]
+               [--disable_situation_removal] [--is_testing]
+               [--evaluate_random_objects] [--max_test_trials MAX_TEST_TRIALS]
+               [--test_preset_cases] [--test_preset_file TEST_PRESET_FILE]
+               [--test_preset_dir TEST_PRESET_DIR]
+               [--show_preset_cases_then_exit] [--load_snapshot]
+               [--snapshot_file SNAPSHOT_FILE] [--nn NN] [--continue_logging]
                [--logging_directory LOGGING_DIRECTORY] [--save_visualizations]
+
+Train robotic agents to learn how to plan complementary pushing and grasping
+actions for manipulation with deep reinforcement learning in PyTorch.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --is_sim              run in simulation?
+  --obj_mesh_dir OBJ_MESH_DIR
+                        directory containing 3D mesh files (.obj) of objects
+                        to be added to simulation
+  --num_obj NUM_OBJ     number of objects to add to simulation
+  --num_extra_obj NUM_EXTRA_OBJ
+                        number of secondary objects, like distractors, to add
+                        to simulation
+  --tcp_host_ip TCP_HOST_IP
+                        IP address to robot arm as TCP client (UR5)
+  --tcp_port TCP_PORT   port to robot arm as TCP client (UR5)
+  --rtc_host_ip RTC_HOST_IP
+                        IP address to robot arm as real-time client (UR5)
+  --rtc_port RTC_PORT   port to robot arm as real-time client (UR5)
+  --heightmap_resolution HEIGHTMAP_RESOLUTION
+                        meters per pixel of heightmap
+  --random_seed RANDOM_SEED
+                        random seed for simulation and neural net
+                        initialization
+  --cpu                 force code to run in CPU mode
+  --flops               calculate floating point operations of a forward pass
+                        then exit
+  --method METHOD       set to 'reactive' (supervised learning) or
+                        'reinforcement' (reinforcement learning ie Q-learning)
+  --push_rewards        use immediate rewards (from change detection) for
+                        pushing?
+  --future_reward_discount FUTURE_REWARD_DISCOUNT
+  --experience_replay   use prioritized experience replay?
+  --heuristic_bootstrap
+                        use handcrafted grasping algorithm when grasping fails
+                        too many times in a row during training?
+  --explore_rate_decay
+  --grasp_only
+  --check_row           check for placed rows instead of stacks
+  --random_weights      use random weights rather than weights pretrained on
+                        ImageNet
+  --max_iter MAX_ITER   max iter for training. -1 (default) trains
+                        indefinitely.
+  --place               enable placing of objects
+  --no_height_reward    disable stack height reward multiplier
+  --grasp_color_task    enable grasping specific colored objects
+  --grasp_count GRASP_COUT
+                        number of successful task based grasps
+  --transfer_grasp_to_place
+                        Load the grasping weights as placing weights.
+  --check_z_height      use check_z_height instead of check_stacks for any
+                        stacks
+  --trial_reward        Experience replay delivers rewards for the whole
+                        trial, not just next step.
+  --check_z_height_goal CHECK_Z_HEIGHT_GOAL
+                        check_z_height goal height, a value of 2.0 is 0.1
+                        meters, and a value of 4.0 is 0.2 meters
+  --disable_situation_removal
+                        Disables situation removal, where rewards are set to 0
+                        and a reset is triggerd upon reveral of task progress.
+  --is_testing
+  --evaluate_random_objects
+                        Evaluate trials with random block positions, for
+                        example testing frequency of random rows.
+  --max_test_trials MAX_TEST_TRIALS
+                        maximum number of test runs per case/scenario
+  --test_preset_cases
+  --test_preset_file TEST_PRESET_FILE
+  --test_preset_dir TEST_PRESET_DIR
+  --show_preset_cases_then_exit
+                        just show all the preset cases so you can have a look,
+                        then exit
+  --load_snapshot       load pre-trained snapshot of model?
+  --snapshot_file SNAPSHOT_FILE
+  --nn NN               Neural network architecture choice, options are
+                        efficientnet, densenet
+  --continue_logging    continue logging from previous session?
+  --logging_directory LOGGING_DIRECTORY
+  --save_visualizations
+                        save visualizations of FCN predictions?
+
 ```
 
 Results from our baseline comparisons and ablation studies in our [paper](https://arxiv.org/pdf/1803.09956.pdf) can be reproduced using these flags. For example:
