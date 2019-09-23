@@ -1,19 +1,153 @@
 # Costar Visual Stacking
 
-Andrew Hundt, Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+
+Click the image to watch the video:
+
+[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/p2iTSEJ-f_A/0.jpg)](https://youtu.be/p2iTSEJ-f_A)
+
+## Paper, Abstract, and Citations
 
 ```
 TODO BIBTEX
 "Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping
 ```
 
-Click to watch the video:
-[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/p2iTSEJ-f_A/0.jpg)](https://youtu.be/p2iTSEJ-f_A)
+Abstract— In order to learn effectively, robots must be able to extract the intangible context by which task progress and mistakes are defined. In the domain of reinforcement learning, much of this information is provided by the reward function. Hence, reward shaping is a necessary part of how we can achieve state-of-the-art results on complex, multi-step tasks. However, comparatively little work has examined how reward shaping should be done so that it captures task context, particularly in scenarios where the task is long-horizon and failure is highly consequential. Our Schedule for Positive Task (SPOT) reward trains our Efficient Visual Task (EVT) model to solve problems that require an understanding of both task context and workspace constraints of multi-step block arrangement tasks. In simulation EVT can completely clear adversarial arrangements of objects by pushing and grasping in 99% of cases vs an 82% baseline in prior work. For random arrangements EVT clears 100% of test cases at 86% action efficiency vs 61% efficiency in prior work. EVT + SPOT is also able to demonstrate context understanding and complete stacks in 74% of trials compared to a base- line of 5% with EVT alone. To our knowledge, this is the first instance of a Reinforcement Learning based algorithm successfully completing such a challenge. Code is available at https://github.com/jhu-lcsr/costar visual stacking.
 
-CoSTAR Visual Stacking
+## Training CoSTAR Visual Stacking
+
+Details of our specific training and test runs as well as commands are found on the [costar visual stacking github releases page](https://github.com/jhu-lcsr/costar_visual_stacking/releases).
+
+[Download V-REP](http://www.coppeliarobotics.com/index.html) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
+
+```bash
+~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
+```
+
+### Cube Stacking
+
+#### Cube Stack Training
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place
+```
+
+To use trial SPOT also add `--trial_reward` to this command.
+
+### Cube Stack Testing
+
+Remember to first train the model or download the snapshot file from the release page (ex: [v0.12 release](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0)) and update the command line `--snapshot_file FILEPATH`:
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --place --load_snapshot --snapshot_file ~/Downloads/snapshot.reinforcement-best-stack-rate.pth --random_seed 1238 --is_testing --save_visualizations --disable_situation_removal
+```
+
+### Row of 4 Cubes
+
+[![CoSTAR Visual Stacking v0.12 rows test run video](https://img.youtube.com/vi/Ti3mSGvbc7w/0.jpg)](https://youtu.be/Ti3mSGvbc7w)
+
+#### Row Training
+
+```bash
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place --check_row
+```
+
+#### Row Testing
 
 
-## This repository originated with the Visual Pushing and Grasping Toolbox
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --place --check_row --is_testing  --tcp_port 19996 --load_snapshot --snapshot_file '/home/costar/Downloads/snapshot-backup.reinforcement-best-stack-rate.pth' --random_seed 1238 --disable_situation_removal --save_visualizations
+```
+
+### Push + Grasp
+
+We provide the [Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping) pushing and grasping task as a baseline for our algorithms.
+
+#### Push + Grasp Training
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay
+```
+
+You can also run without `--trial_reward` and with the default `--future_reward_discount 0.5`.
+
+#### Push + Grasp Random Placement Testing
+
+![000040 0 color heightmap](https://user-images.githubusercontent.com/55744/63808939-16fe1500-c8ef-11e9-9dfa-8dc5ed53cd00.png)
+
+```bash
+ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --load_snapshot --snapshot_file '/home/costar/src/costar_visual_stacking/logs/2019-08-17.20:54:32-train-grasp-place-split-efficientnet-21k-acc-0.80/models/snapshot.reinforcement.pth' --random_seed 1238 --is_testing --save_visualizations
+```
+
+#### Push + Grasp Adversarial Placement Testing
+
+![Push grasp adversarial viz](https://user-images.githubusercontent.com/55744/64275313-4aeec100-cf13-11e9-9a04-3f56e2de79d5.png)
+video:
+
+[![CoSTAR Visual Stacking v0.2 test run video](https://img.youtube.com/vi/F85d9xGCDnY/0.jpg)](https://youtu.be/F85d9xGCDnY)
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --tcp_port 19996 --is_testing --random_seed 1238 --load_snapshot --snapshot_file '/home/ahundt/src/costar_visual_stacking/logs/2019-09-12.18:21:37-push-grasp-16k-trial-reward/models/snapshot.reinforcement.pth' --max_test_trials 10 --test_preset_cases
+```
+
+After Running the test you need to summarize the results:
+
+```bash
+python3 evaluate.py --session_directory /home/ahundt/src/costar_visual_stacking/logs/2019-09-16.02:11:25  --method reinforcement --num_obj_complete 6 --preset
+```
+
+## Costar Visual Stacking Execution Details
+
+### Running Multiple Simulations in Parallel
+
+It is possible to do multiple runs on different GPUs on the same machine. First, start an instance of V-Rep as below,
+
+```bash
+~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
+```
+
+being careful to use V-Rep 3.6.2 wherever it is installed locally. The port number, here 19997 which is the usual default, is the important point, as we will cahnge it in subsequent runs.
+
+Start the simulation as usual, but now specify `--tcp_port 19997`.
+
+Start another V-Rep session.
+
+```bash
+~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19996_FALSE_TRUE -s simulation/simulation.ttt
+```
+
+For some reason, the port number is important here, and should be selected to be lower than already running sessions.
+
+When you start training, be sure to specify a different GPU. For example, if previously you set
+
+```bash
+export CUDA_VISIBLE_DEVICES="0"
+```
+
+then you should likely set
+
+```bash
+export CUDA_VISIBLE_DEVICES="1"
+```
+
+and specify the corresponding tcp port `--tcp_port 19996`.
+
+Additional runs in parallel should use ports 19995, 19994, etc.
+
+## Generating plots
+
+To run jupyter lab or a jupyter notebook in the `costar_visual_stacking/plot_success_rate` folder use the following command:
+
+```bash
+jupyter lab ~/src/costar_visual_stacking/plot_success_rate
+```
+
+Open jupyter in your favorite browser and there you will also find instructions for generating the plots.
+
+## CoSTAR Visual Stacking is forked from the Visual Pushing and Grasping Toolbox
+
+[Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping). Edits have been made to the text below to reflect some configuration and code updates needed to reproduce this previous paper's original behavior:
 
 Visual Pushing and Grasping (VPG) is a method for training robotic agents to learn how to plan complementary pushing and grasping actions for manipulation (*e.g.* for unstructured pick-and-place applications). VPG operates directly on visual observations (RGB-D images), learns from trial and error, trains quickly, and generalizes to new objects and scenarios.
 
@@ -103,7 +237,7 @@ This demo runs our pre-trained model with a UR5 robot arm in simulation on chall
         --push_rewards --experience_replay --explore_rate_decay \
         --is_testing --test_preset_cases --test_preset_file 'simulation/test-cases/test-10-obj-07.txt' \
         --load_snapshot --snapshot_file 'downloads/vpg-original-sim-pretrained-10-obj.pth' \
-        --save_visualizations
+        --save_visualizations --nn densenet
     ```
 
 Note: you may get a popup window titled "Dynamics content" in your V-REP window. Select the checkbox and press OK. You will have to do this a total of 3 times before it stops annoying you.
@@ -306,33 +440,3 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 * Use `touch.py` to test calibrated camera extrinsics -- provides a UI where the user can click a point on the RGB-D image, and the robot moves its end-effector to the 3D location of that point
 * Use `debug.py` to test robot communication and primitive actions
-
-## Costar Visual Stacking Execution Details
-
-### Running Multiple Simulations in Parallel
-
-It is possible to do multiple runs on different GPUs on the same machine. First, start an instance of V-Rep as below,
-```
-~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
-```
-being careful to use V-Rep 3.6.2 wherever it is installed locally. The port number, here 19997 which is the usual default, is the important point, as we will cahnge it in subsequent runs.
-
-Start the simulation as usual, but now specify `--tcp_port 19997`.
-
-Start another V-Rep session.
-```
-~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19996_FALSE_TRUE -s simulation/simulation.ttt
-```
-For some reason, the port number is important here, and should be selected to be lower than already running sessions.
-
-When you start training, be sure to specify a different GPU. For example, if previously you set
-```
-export CUDA_VISIBLE_DEVICES="0"
-```
-then you should likely set
-```
-export CUDA_VISIBLE_DEVICES="1"
-```
-and specify the corresponding tcp port `--tcp_port 19996`.
-
-Additional runs in parallel should use ports 19995, 19994, etc.
