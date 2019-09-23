@@ -2,11 +2,18 @@
 
 Andrew Hundt, Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
+```
+TODO BIBTEX
+"Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping
+```
 
-TODO add description
+Click to watch the video:
+[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/p2iTSEJ-f_A/0.jpg)](https://youtu.be/p2iTSEJ-f_A)
+
+CoSTAR Visual Stacking
 
 
-# This repository originated with the Visual Pushing and Grasping Toolbox
+## This repository originated with the Visual Pushing and Grasping Toolbox
 
 Visual Pushing and Grasping (VPG) is a method for training robotic agents to learn how to plan complementary pushing and grasping actions for manipulation (*e.g.* for unstructured pick-and-place applications). VPG operates directly on visual observations (RGB-D images), learns from trial and error, trains quickly, and generalizes to new objects and scenarios.
 
