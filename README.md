@@ -156,7 +156,7 @@ Open jupyter in your favorite browser and there you will also find instructions 
 
 ## CoSTAR Visual Stacking is forked from the Visual Pushing and Grasping Toolbox
 
-[Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping). Edits have been made to the text below to reflect some configuration and code updates needed to reproduce this previous paper's original behavior:
+[Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping). Edits have been made to the text below to reflect some configuration and code updates needed to reproduce the previous VPG paper's original behavior:
 
 Visual Pushing and Grasping (VPG) is a method for training robotic agents to learn how to plan complementary pushing and grasping actions for manipulation (*e.g.* for unstructured pick-and-place applications). VPG operates directly on visual observations (RGB-D images), learns from trial and error, trains quickly, and generalizes to new objects and scenarios.
 
@@ -298,8 +298,8 @@ usage: main.py [-h] [--is_sim] [--obj_mesh_dir OBJ_MESH_DIR]
                [--snapshot_file SNAPSHOT_FILE] [--nn NN] [--continue_logging]
                [--logging_directory LOGGING_DIRECTORY] [--save_visualizations]
 
-Train robotic agents to learn how to plan complementary pushing and grasping
-actions for manipulation with deep reinforcement learning in PyTorch.
+Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks
+for manipulation with deep reinforcement learning in PyTorch.
 
 optional arguments:
   -h, --help            show this help message and exit
