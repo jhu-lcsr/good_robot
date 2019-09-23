@@ -19,6 +19,8 @@ Abstract— In order to learn effectively, robots must be able to extract the in
 
 Details of our specific training and test runs as well as commands are found on the [costar visual stacking github releases page](https://github.com/jhu-lcsr/costar_visual_stacking/releases).
 
+### Starting the V-REP Simulation
+
 [Download V-REP](http://www.coppeliarobotics.com/index.html) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
 
 ```bash
