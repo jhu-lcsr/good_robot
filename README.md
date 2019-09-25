@@ -1,4 +1,4 @@
-# Good Robot! CoSTAR Visual Stacking
+# "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping
 
 [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
