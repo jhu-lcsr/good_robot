@@ -819,7 +819,7 @@ def main(args):
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
-                # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
+
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
 
             # Save model snapshot
@@ -1007,7 +1007,6 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             reward_multiplier = 1
         else:
             reward_multiplier = sample_stack_height
-        # TODO(ahundt) This mix of current and next parameters (like next_sample_color_heightmap and sample_push_success) seems a likely spot for a bug, we must make sure we haven't broken the behavior. ahundt has already fixed one bug here.
         # get_label_value does the forward pass for updating the label value log.
         update_label_value_log = False
         if update_label_value_log:
