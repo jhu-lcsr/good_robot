@@ -155,7 +155,7 @@ jupyter lab ~/src/costar_visual_stacking/plot_success_rate
 
 Open jupyter in your favorite browser and there you will also find instructions for generating the plots.
 
-## CoSTAR Visual Stacking is forked from the Visual Pushing and Grasping Toolbox
+## "Good Robot!" is forked from the Visual Pushing and Grasping Toolbox
 
 [Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping). Edits have been made to the text below to reflect some configuration and code updates needed to reproduce the previous VPG paper's original behavior:
 
