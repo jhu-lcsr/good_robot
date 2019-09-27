@@ -9,8 +9,15 @@ Click the image to watch the video:
 ## Paper, Abstract, and Citations
 
 ```
-TODO BIBTEX
-"Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping
+@misc{hundt2019good,
+    title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping},
+    author={Andrew Hundt and Benjamin Killeen and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
+    year={2019},
+    eprint={1909.11730},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO},
+    url={https://arxiv.org/abs/1909.11730}
+}
 ```
 
 Abstract— In order to learn effectively, robots must be able to extract the intangible context by which task progress and mistakes are defined. In the domain of reinforcement learning, much of this information is provided by the reward function. Hence, reward shaping is a necessary part of how we can achieve state-of-the-art results on complex, multi-step tasks. However, comparatively little work has examined how reward shaping should be done so that it captures task context, particularly in scenarios where the task is long-horizon and failure is highly consequential. Our Schedule for Positive Task (SPOT) reward trains our Efficient Visual Task (EVT) model to solve problems that require an understanding of both task context and workspace constraints of multi-step block arrangement tasks. In simulation EVT can completely clear adversarial arrangements of objects by pushing and grasping in 99% of cases vs an 82% baseline in prior work. For random arrangements EVT clears 100% of test cases at 86% action efficiency vs 61% efficiency in prior work. EVT + SPOT is also able to demonstrate context understanding and complete stacks in 74% of trials compared to a base- line of 5% with EVT alone. To our knowledge, this is the first instance of a Reinforcement Learning based algorithm successfully completing such a challenge. Code is available at https://github.com/jhu-lcsr/costar visual stacking.
