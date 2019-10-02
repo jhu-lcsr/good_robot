@@ -1,4 +1,4 @@
-#! /src/env/bin python3
+#! /usr/env/bin python3
 
 '''
 
