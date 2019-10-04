@@ -18,21 +18,28 @@ def main(portname):
     RG = RobotiqGripper(portname)
 
     # Reset and Activate the gripper
-    RG.resetActivate()
     time.sleep(1)
+    print('Resetting...')
+    RG.reset()
+#    RG.printInfo()
+    print('Activating...')
+    RG.activate()
+    RG.printInfo()
 
-    RG.readAll()
-    print('##################')
-    print([RG.registerDic[key][RG.paramDic[key]] for key in RG.paramDic.keys()])
-    print('##################')
-
-    pos, curr = RG.getPositionCurrent()
-    
-    print('##################')
-    print(f'position: {pos}, current: {curr}')
-    print('##################')
+#    RG.readAll()
+#    print('##################')
+#    print([RG.registerDic[key][RG.paramDic[key]] for key in RG.paramDic.keys()])
+#    print('##################')
+#
+#    pos, curr = RG.getPositionCurrent()
+#    
+#    print('##################')
+#    print(f'position: {pos}, current: {curr}')
+#    print('##################')
     # Go to a test position
-    RG.goTo(10, 10, 255)
+    RG.goTo(20)
+    RG.printInfo()
+    RG.goTo(230)
     time.sleep(1)
 
     # # Open the gripper

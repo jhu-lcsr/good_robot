@@ -548,23 +548,23 @@ class RobotiqGripper( mm.Instrument ):
             print(self.registerDic[key][value])
             
 #Test
-if True:
-    grip = RobotiqGripper("/dev/ttyUSB0")
-    grip.resetActivate()
-    time.sleep(1)
-    # grip.reset()
-    grip.printInfo()
-    # grip.activate()
-    grip.printInfo()
-    
-    
-    grip.closeGripper()
-    grip.openGripper()
-    # grip.goTo(20)
-    # grip.goTo(230)
-    # grip.goTo(40)
-    # grip.goTo(80)
-    
-    # grip.calibrate(0,40)
-    # grip.goTomm(20,255,255)
-    # grip.goTomm(40,1,255)
+#if True:
+#    grip = RobotiqGripper("/dev/ttyUSB0")
+#    grip.resetActivate()
+#    time.sleep(1)
+#    # grip.reset()
+#    grip.printInfo()
+#    # grip.activate()
+#    grip.printInfo()
+#    
+#    
+#    grip.closeGripper()
+#    grip.openGripper()
+#    # grip.goTo(20)
+#    # grip.goTo(230)
+#    # grip.goTo(40)
+#    # grip.goTo(80)
+#    
+#    # grip.calibrate(0,40)
+#    # grip.goTomm(20,255,255)
+#    # grip.goTomm(40,1,255)
