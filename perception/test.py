@@ -6,6 +6,8 @@ Test for the PrimeSense Sensor for the Real Good Robot project
 Author: Hongtao Wu
 Sep 29, 2019
 
+The primesense_sensor package can be installed from here:
+https://berkeleyautomation.github.io/perception/install/install.html
 '''
 
 from primesense_sensor import PrimesenseSensor
