@@ -555,3 +555,34 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 * Use `touch.py` to test calibrated camera extrinsics -- provides a UI where the user can click a point on the RGB-D image, and the robot moves its end-effector to the 3D location of that point
 * Use `debug.py` to test robot communication and primitive actions
+
+
+### ROS Based Image Collection Setup
+
+Install ROS Melodic
+
+```bash
+sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline
+```
+
+Running ROS with depth image processing:
+
+```bash
+roslaunch openni2_launch openni2.launch depth_registration:=true
+```
+
+Running RVIZ to look at the images:
+
+```
+rosrun rviz rviz
+```
+
+The correct images, as done in the [JHU costar dataset](https://sites.google.com/site/costardataset) class [collector](https://github.com/jhu-lcsr/costar_plan/blob/d469d62d72cd405ed07b10c62eb24391c0af1975/ctp_integration/python/ctp_integration/collector.py), are from the following ROS topics:
+
+```
+
+        self.rgb_topic = "/camera/rgb/image_rect_color"
+        # raw means it is in the format provided by the openi drivers, 16 bit int
+        self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
+```
+
