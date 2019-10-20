@@ -559,10 +559,10 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 ### ROS Based Image Collection Setup
 
-Install ROS Melodic
+First [Install ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu). Then install the primesense image pipeline:
 
 ```bash
-sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline
+sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
 ```
 
 Running ROS with depth image processing:
