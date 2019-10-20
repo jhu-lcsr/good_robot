@@ -571,6 +571,12 @@ Running ROS with depth image processing:
 roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
+In a separate tab run our small test script, which currently only supports python2:
+
+```bash
+python test_ros_images.py
+```
+
 Running RVIZ to look at the images:
 
 ```
@@ -585,4 +591,5 @@ The correct images, as done in the [JHU costar dataset](https://sites.google.com
         # raw means it is in the format provided by the openi drivers, 16 bit int
         self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
 ```
+
 
