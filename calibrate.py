@@ -8,7 +8,7 @@ from real.camera import Camera
 from robot import Robot
 from scipy import optimize  
 from mpl_toolkits.mplot3d import Axes3D  
-
+from tqdm import tqdm
 
 # User options (change me)
 # --------------- Setup options ---------------
@@ -17,9 +17,9 @@ tcp_port = 30002
 rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR5)
 rtc_port = 30003
 # workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-x_offset = 0.1
+x_offset = 0.0
 y_offset = -0.4
-workspace_limits = np.asarray([[0.3 + x_offset, 0.648 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 # workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.4 + y_offset], [0.3, 0.6]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 calib_grid_step = 0.05
 checkerboard_offset_from_tool = [0,-0.13,0.02]
@@ -71,9 +71,9 @@ robot.go_home()
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
-for calib_pt_idx in range(num_calib_grid_pts):
+for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
     tool_position = calib_grid_pts[calib_pt_idx,:]
-    print(str(calib_pt_idx) + ': pos: ' + str(tool_position) + ' rot: ' + str(tool_orientation))
+    print(' pos: ' + str(tool_position) + ' rot: ' + str(tool_orientation))
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
     
