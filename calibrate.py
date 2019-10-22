@@ -40,6 +40,7 @@ observed_pix = []
 
 # Move robot to home pose
 print('Connecting to robot...')
+print('WARNING: Have your STOP button ready! The robot may move suddenly!')
 robot = Robot(False, None, None, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None)
@@ -50,7 +51,9 @@ robot.joint_acc = 1.4
 robot.joint_vel = 1.05
 
 # Make robot gripper point upwards
-robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
+# robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
+# The tag is pointing upwards at home
+robot.go_home()
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
@@ -135,7 +138,7 @@ def get_rigid_transform_error(z_scale):
     registered_pts = np.dot(R,np.transpose(measured_pts)) + np.tile(t,(1,measured_pts.shape[0]))
     error = np.transpose(registered_pts) - new_observed_pts
     error = np.sum(np.multiply(error,error))
-    rmse = np.sqrt(error/measured_pts.shape[0]);
+    rmse = np.sqrt(error/measured_pts.shape[0])
     return rmse
 
 # Optimize z scale w.r.t. rigid transform error
