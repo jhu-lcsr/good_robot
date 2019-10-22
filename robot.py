@@ -161,11 +161,13 @@ class Robot(object):
 
             # Default home joint configuration
             # self.home_joint_config = [-np.pi, -np.pi/2, np.pi/2, -np.pi/2, -np.pi/2, 0]
-            self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi, (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
+            # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi, (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
+            self.home_joint_config = [-0.202, -0.980, -1.800, -0.278, 1.460, 1.613]
+
 
             # Default joint speed configuration
-            self.joint_acc = 8 # Safe: 1.4
-            self.joint_vel = 3 # Safe: 1.05
+            self.joint_acc = 1.4 # Safe: 1.4  Fast: 8
+            self.joint_vel = 1.05 # Safe: 1.05  Fast: 3
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
@@ -182,10 +184,10 @@ class Robot(object):
                 self.gripper = None
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
-                gripper.wait_for_connection()
+                self.gripper.wait_for_connection()
                 # if gripper.is_reset():
-                gripper.reset()
-                gripper.activate()
+                self.gripper.reset()
+                self.gripper.activate()
 
             # Move robot to home pose
             self.close_gripper()
@@ -562,6 +564,10 @@ class Robot(object):
                 gripper_fully_closed =  self.check_grasp()
         else:
             self.gripper.close(block=not nonblocking)
+            if nonblocking:
+                gripper_fully_closed = True
+            else:
+                gripper_fully_closed = self.gripper.is_closed()
 
         return gripper_fully_closed
 
