@@ -199,7 +199,7 @@ class RobotiqCGripper(object):
         #     return self.wait_until_stopped(timeout)
         # return True
         self.wait_until_stopped(timeout)
-        print("Finish moving!")
+        print("Gripper finished moving!")
 
 
     def stop(self, block=False, timeout=-1):
@@ -233,11 +233,13 @@ def main():
 
     print('Start Sleeping!')
     time.sleep(2)
+    print('Close!')
     
     gripper.close(block=True)
 
     print('Start Sleeping!')
     time.sleep(2)
+    print('Open!')
 
     gripper.open(block=True)
     # while not rospy.is_shutdown():
