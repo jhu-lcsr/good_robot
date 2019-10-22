@@ -16,11 +16,22 @@ tcp_host_ip = '192.168.1.155' # IP and port to robot arm as TCP client (UR5)
 tcp_port = 30002
 rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR5)
 rtc_port = 30003
-workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+x_offset = 0.1
+y_offset = -0.4
+workspace_limits = np.asarray([[0.3 + x_offset, 0.648 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.4 + y_offset], [0.3, 0.6]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 calib_grid_step = 0.05
 checkerboard_offset_from_tool = [0,-0.13,0.02]
-tool_orientation = [-np.pi/2,0,0] # [0,-2.22,2.22] # [2.22,2.22,0]
-# ---------------------------------------------
+# tool_orientation = [-np.pi/2,0,0] # [0,-2.22,2.22] # [2.22,2.22,0]
+# X is the axis from the robot to the clamp with the camera
+# Y is the axis from the window to the computer
+# Z is the vertical axis
+
+# This orientation is the gripper pointing towards the camera, with the tag up.
+# tool_orientation = [0, np.pi/2, 0]
+# This orientation is the tag pointing towards the camera (45 degree angle)
+tool_orientation = [0, np.pi/2 + np.pi/4, 0]
 
 
 # Construct 3D calibration grid across workspace
@@ -41,24 +52,28 @@ observed_pix = []
 # Move robot to home pose
 print('Connecting to robot...')
 print('WARNING: Have your STOP button ready! The robot may move suddenly!')
+print('WARNING: Be sure to move the bin from in front of the robot!')
 robot = Robot(False, None, None, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None)
+print('Robot active, open the gripper')
 robot.open_gripper()
 
 # Slow down robot
-robot.joint_acc = 1.4
-robot.joint_vel = 1.05
+robot.joint_acc = 0.4
+robot.joint_vel = 0.25
 
 # Make robot gripper point upwards
 # robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
 # The tag is pointing upwards at home
+print('MOVING THE ROBOT to home position...')
 robot.go_home()
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
 for calib_pt_idx in range(num_calib_grid_pts):
     tool_position = calib_grid_pts[calib_pt_idx,:]
+    print(str(calib_pt_idx) + ': pos: ' + str(tool_position) + ' rot: ' + str(tool_orientation))
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
     
