@@ -1,19 +1,25 @@
 #!/usr/bin/env python
 
+# Ros libraries
+import roslib
+import rospy
+
 import socket
 import numpy as np
 import cv2
 import os
 import time
 import struct
-try:
-    import primesense_sensor
-    from primesense_sensor as PrimesenseSenor
-except ImportError:
-    print('primesense_sensor is not available!'
-          'The primesense_sensor package can be installed from: '
-          'https://berkeleyautomation.github.io/perception/install/install.html')
-    primesense_sensor = None
+from ros_camera import ROSCamera
+# Not using the primesense_sensor package and switch to ROS with rectified images
+# try:
+#     import primesense_sensor
+#     from primesense_sensor as PrimesenseSenor
+# except ImportError:
+#     print('primesense_sensor is not available!'
+#           'The primesense_sensor package can be installed from: '
+#           'https://berkeleyautomation.github.io/perception/install/install.html')
+#     primesense_sensor = None
 
 class Camera(object):
 
@@ -36,12 +42,16 @@ class Camera(object):
             self.get_data()
 
         else:
-            # Connect to the PrimeSense Camera through USB
-            self.sensor = PrimesenseSenor()
+            # Lauch ROS to get the image
+            '''Initializes and cleanup ros node'''
+            print('Before you run test_ros_images.py, make sure you have first started the ROS node for reading the primesense sensor data:'
+            ' roslaunch openni2_launch openni2.launch depth_registration:=true')
+            self.camera = ROSCamera()
+            rospy.init_node('ros_camera', anonymous=True)
+            time.sleep(1)  
+            # Camera matrix K
             camera_matrix_txt = os.path.join(camera_intrinsic_folder, 'CameraMatrixRGB.dat')
-            distortion_txt = os.path.join(camera_intrinsic_folder, 'DistortionCoefficientRGB.dat')
             self.intrinsics = np.loadtxt(camera_matrix_txt)
-            self.intrinsic_distortion = np.loadtxt(distortion_txt)
 
 
     def get_data(self, undistort=False):
@@ -68,14 +78,6 @@ class Camera(object):
 
         else:
             # Get frame
-            color_img, depth_img, _ = self.sensor.frames()
-            color_img_raw = color_img.raw_data
-            if undistort:
-                # Undistorted image
-                color_img = cv2.undistort(color_img_raw, self.intrinsics, self.intrinsic_distortion)
-                #TODO: Depth image 
-            else:
-                color_img = color_img_raw
-                depth_img = depth_img.raw_data
+            color_img, depth_img, _ = self.camera.frames()
 
         return color_img, depth_img
