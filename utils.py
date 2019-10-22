@@ -322,7 +322,8 @@ def check_separation(values, distance_threshold):
     return True
 
 
-def polyfit(*args, silent=True, **kwargs):
+def polyfit(*args, **kwargs):
+    kwargs['silent'] = True
     with warnings.catch_warnings():
         # suppress the RankWarning, which just means the best fit line was bad.
         warnings.simplefilter('ignore', np.RankWarning)
