@@ -8,6 +8,13 @@ import itertools
 import utils
 from simulation import vrep
 from scipy import ndimage, misc
+try:
+    from gripper.robotiq_2f_gripper_ctrl import RobotiqCGripper
+except ImportError:
+    print('Real robotiq gripper control is not available. '
+          'Ensure pymodbus is installed:'
+          '    pip3 install --user --upgrade pymodbus')
+    RobotiqCGripper = None
 
 
 class Robot(object):
@@ -19,10 +26,18 @@ class Robot(object):
        self.object_handles: list of vrep object handles, the unique identifier integer indices needed for controlling objects in the vrep simulator
        self.workspace_limits: bounds of the valid object workspace.
     """
-    def __init__(self, is_sim, obj_mesh_dir, num_obj, workspace_limits,
-                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False):
-
+    def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
+                 tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
+                 real_gripper_ip='192.168.1.11'):
+        '''
+        
+        real_gripper_ip: None to assume the gripper is connected via the UR5, 
+             specify an ip address to directly use TCPModbus to talk directly with the gripper.
+             Default is 192.168.1.11.
+        '''
+        if workspace_limits is None:
+            workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.is_sim = is_sim
         self.workspace_limits = workspace_limits
         self.place_task = place
@@ -161,6 +176,16 @@ class Robot(object):
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
+
+            # Initialize the real gripper based on user configuration
+            if real_gripper_ip is None:
+                self.gripper = None
+            else:
+                self.gripper = RobotiqCGripper(real_gripper_ip)
+                gripper.wait_for_connection()
+                # if gripper.is_reset():
+                gripper.reset()
+                gripper.activate()
 
             # Move robot to home pose
             self.close_gripper()
@@ -524,7 +549,7 @@ class Robot(object):
                 gripper_joint_position = new_gripper_joint_position
             gripper_fully_closed = True
 
-        else:
+        elif self.gripper is None:
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "set_digital_out(8,True)\n"
@@ -535,6 +560,8 @@ class Robot(object):
             else:
                 time.sleep(1.5)
                 gripper_fully_closed =  self.check_grasp()
+        else:
+            self.gripper.close(block=not nonblocking)
 
         return gripper_fully_closed
 
@@ -551,7 +578,7 @@ class Robot(object):
             while gripper_joint_position < 0.03: # Block until gripper is fully open
                 sim_ret, gripper_joint_position = vrep.simxGetJointPosition(self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
 
-        else:
+        elif self.gripper is None:
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "set_digital_out(8,False)\n"
@@ -559,6 +586,8 @@ class Robot(object):
             self.tcp_socket.close()
             if not nonblocking:
                 time.sleep(1.5)
+        else:
+            self.gripper.open(block=not nonblocking)
 
 
     def get_state(self):
