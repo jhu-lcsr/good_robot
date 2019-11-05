@@ -166,15 +166,15 @@ class Robot(object):
 
 
             # Default joint speed configuration
-            self.joint_acc = 1.4 # Safe: 1.4  Fast: 8
-            self.joint_vel = 1.05 # Safe: 1.05  Fast: 3
+            self.joint_acc = 0.5 # Safe: 1.4  Fast: 8
+            self.joint_vel = 0.5 # Safe: 1.05  Fast: 3
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
 
             # Default tool speed configuration
-            self.tool_acc = 1.2 # Safe: 0.5
-            self.tool_vel = 0.25 # Safe: 0.2
+            self.tool_acc = 0.1 # Safe: 0.5 Fast: 1.2
+            self.tool_vel = 0.1 # Safe: 0.2 Fast: 0.25
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
@@ -209,6 +209,7 @@ class Robot(object):
                 self.cam_pose = None
                 self.cam_depth_scale = None
 
+
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
             test_preset_file = self.test_preset_file
@@ -226,6 +227,7 @@ class Robot(object):
             self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
         file.close()
         self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
+
 
     def setup_sim_camera(self):
 
@@ -277,12 +279,14 @@ class Robot(object):
 #                 time.sleep(2)
 #         self.prev_obj_positions = []
 #         self.obj_positions = []
+
     def generate_random_object_pose(self):
         drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
         drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
         object_position = [drop_x, drop_y, 0.15]
         object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
         return drop_x, drop_y, object_position, object_orientation
+
 
     def reposition_object_randomly(self, object_handle):
         drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
@@ -291,9 +295,11 @@ class Robot(object):
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
         # TODO(HK) finish this function to reset a specific object, see reposition_objects, and only do it for one index instead of looping over all of them as done in reposition_objects.
 
+
     def reposition_object_at_list_index_randomly(self, list_index):
         object_handle = self.object_handles[list_index]
         self.reposition_object_randomly(object_handle)
+
 
     def add_objects(self):
 

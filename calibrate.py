@@ -17,12 +17,14 @@ tcp_port = 30002
 rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR5)
 rtc_port = 30003
 # workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-x_offset = 0.0
-y_offset = -0.4
-workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-# workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.4 + y_offset], [0.3, 0.6]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-calib_grid_step = 0.05
+# x_offset = 0.0
+# y_offset = -0.4
+# workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+workspace_limits = np.asarray([[0.3, 0.5], [-0.4, 0.2], [0.17, 0.4]]) # Real Good Robot
+calib_grid_step = 0.1
 checkerboard_offset_from_tool = [0,-0.13,0.02]
+tool_orientation = [np.pi/8, 5*np.pi/6, 0.0] # Real Good Robot
+
 # tool_orientation = [-np.pi/2,0,0] # [0,-2.22,2.22] # [2.22,2.22,0]
 # X is the axis from the robot to the clamp with the camera
 # Y is the axis from the window to the computer
@@ -31,13 +33,13 @@ checkerboard_offset_from_tool = [0,-0.13,0.02]
 # This orientation is the gripper pointing towards the camera, with the tag up.
 # tool_orientation = [0, np.pi/2, 0]
 # This orientation is the tag pointing towards the camera (45 degree angle)
-tool_orientation = [0, np.pi/2 + np.pi/4, 0]
+# tool_orientation = [0, np.pi/2 + np.pi/4, 0]
 
 
 # Construct 3D calibration grid across workspace
-gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], 1 + (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
-gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], 1 + (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
-gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], 1 + (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
+gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
+gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
+gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
 calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
 num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
 calib_grid_x.shape = (num_calib_grid_pts,1)
@@ -58,6 +60,7 @@ robot = Robot(False, None, None, workspace_limits,
               False, None, None)
 print('Robot active, open the gripper')
 robot.open_gripper()
+print('Gripper opened!')
 
 # Slow down robot
 robot.joint_acc = 0.4
@@ -69,6 +72,8 @@ robot.joint_vel = 0.25
 print('MOVING THE ROBOT to home position...')
 robot.go_home()
 
+import ipdb; ipdb.set_trace()
+
 # Move robot to each calibration point in workspace
 print('Collecting data...')
 for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
@@ -77,41 +82,43 @@ for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
     
-    # Find checkerboard center
-    checkerboard_size = (3,3)
-    refine_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    camera_color_img, camera_depth_img = robot.get_camera_data()
-    bgr_color_data = cv2.cvtColor(camera_color_img, cv2.COLOR_RGB2BGR)
-    gray_data = cv2.cvtColor(bgr_color_data, cv2.COLOR_RGB2GRAY)
-    checkerboard_found, corners = cv2.findChessboardCorners(gray_data, checkerboard_size, None, cv2.CALIB_CB_ADAPTIVE_THRESH)
-    if checkerboard_found:
-        corners_refined = cv2.cornerSubPix(gray_data, corners, (3,3), (-1,-1), refine_criteria)
+    # # Find checkerboard center
+    # checkerboard_size = (3,3)
+    # refine_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    # camera_color_img, camera_depth_img = robot.get_camera_data()
+    # bgr_color_data = cv2.cvtColor(camera_color_img, cv2.COLOR_RGB2BGR)
+    # gray_data = cv2.cvtColor(bgr_color_data, cv2.COLOR_RGB2GRAY)
+    # checkerboard_found, corners = cv2.findChessboardCorners(gray_data, checkerboard_size, None, cv2.CALIB_CB_ADAPTIVE_THRESH)
+    # if checkerboard_found:
+    #     corners_refined = cv2.cornerSubPix(gray_data, corners, (3,3), (-1,-1), refine_criteria)
 
-        # Get observed checkerboard center 3D point in camera space
-        checkerboard_pix = np.round(corners_refined[4,0,:]).astype(int)
-        checkerboard_z = camera_depth_img[checkerboard_pix[1]][checkerboard_pix[0]]
-        checkerboard_x = np.multiply(checkerboard_pix[0]-robot.cam_intrinsics[0][2],checkerboard_z/robot.cam_intrinsics[0][0])
-        checkerboard_y = np.multiply(checkerboard_pix[1]-robot.cam_intrinsics[1][2],checkerboard_z/robot.cam_intrinsics[1][1])
-        if checkerboard_z == 0:
-            continue
+    #     # Get observed checkerboard center 3D point in camera space
+    #     checkerboard_pix = np.round(corners_refined[4,0,:]).astype(int)
+    #     checkerboard_z = camera_depth_img[checkerboard_pix[1]][checkerboard_pix[0]]
+    #     checkerboard_x = np.multiply(checkerboard_pix[0]-robot.cam_intrinsics[0][2],checkerboard_z/robot.cam_intrinsics[0][0])
+    #     checkerboard_y = np.multiply(checkerboard_pix[1]-robot.cam_intrinsics[1][2],checkerboard_z/robot.cam_intrinsics[1][1])
+    #     if checkerboard_z == 0:
+    #         continue
 
-        # Save calibration point and observed checkerboard center
-        observed_pts.append([checkerboard_x,checkerboard_y,checkerboard_z])
-        # tool_position[2] += checkerboard_offset_from_tool
-        tool_position = tool_position + checkerboard_offset_from_tool
+    #     # Save calibration point and observed checkerboard center
+    #     observed_pts.append([checkerboard_x,checkerboard_y,checkerboard_z])
+    #     # tool_position[2] += checkerboard_offset_from_tool
+    #     tool_position = tool_position + checkerboard_offset_from_tool
 
-        measured_pts.append(tool_position)
-        observed_pix.append(checkerboard_pix)
+    #     measured_pts.append(tool_position)
+    #     observed_pix.append(checkerboard_pix)
 
-        # Draw and display the corners
-        # vis = cv2.drawChessboardCorners(robot.camera.color_data, checkerboard_size, corners_refined, checkerboard_found)
-        vis = cv2.drawChessboardCorners(bgr_color_data, (1,1), corners_refined[4,:,:], checkerboard_found)
-        cv2.imwrite('%06d.png' % len(measured_pts), vis)
-        cv2.imshow('Calibration',vis)
-        cv2.waitKey(10)
+    #     # Draw and display the corners
+    #     # vis = cv2.drawChessboardCorners(robot.camera.color_data, checkerboard_size, corners_refined, checkerboard_found)
+    #     vis = cv2.drawChessboardCorners(bgr_color_data, (1,1), corners_refined[4,:,:], checkerboard_found)
+    #     cv2.imwrite('%06d.png' % len(measured_pts), vis)
+    #     cv2.imshow('Calibration',vis)
+    #     cv2.waitKey(10)
 
 # Move robot back to home pose
 robot.go_home()
+
+import ipdb; ipdb.set_trace()
 
 measured_pts = np.asarray(measured_pts)
 observed_pts = np.asarray(observed_pts)
