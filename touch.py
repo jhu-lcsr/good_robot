@@ -14,8 +14,12 @@ tcp_host_ip = '192.168.1.155' # IP and port to robot arm as TCP client (UR5)
 tcp_port = 30002
 rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR5)
 rtc_port = 30003
-workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
-tool_orientation = [2.22,-2.22,0]
+
+workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
+tool_orientation = [0, np.pi, 0.0] # Real Good Robot
+
+# workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# tool_orientation = [2.22,-2.22,0]
 # ---------------------------------------------
 
 
@@ -43,16 +47,20 @@ def mouseclick_callback(event, x, y, flags, param):
         click_y = np.multiply(y-robot.cam_intrinsics[1][2],click_z/robot.cam_intrinsics[1][1])
         if click_z == 0:
             return
-        click_point = np.asarray([click_x,click_y,click_z])
+        click_point = np.asarray([click_x,click_y,click_z]) / 1000  # Convert from unit from mm to m
         click_point.shape = (3,1)
 
         # Convert camera to robot coordinates
         # camera2robot = np.linalg.inv(robot.cam_pose)
-        camera2robot = robot.cam_pose
+        camera2robot = robot.cam_pose  # The transformation matrix is from meter to meter
         target_position = np.dot(camera2robot[0:3,0:3],click_point) + camera2robot[0:3,3:]
 
         target_position = target_position[0:3,0]
         print(target_position)
+        
+        # Move the gripper up a bit to protect the gripper (Real Good Robot)
+        target_position [-1] += 0.25 
+
         robot.move_to(target_position, tool_orientation)
 
 
