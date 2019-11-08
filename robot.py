@@ -166,8 +166,8 @@ class Robot(object):
 
 
             # Default joint speed configuration
-            self.joint_acc = 0.5 # Safe: 1.4  Fast: 8
-            self.joint_vel = 0.5 # Safe: 1.05  Fast: 3
+            self.joint_acc = 1.4 # Safe: 1.4  Fast: 8
+            self.joint_vel = 1.05 # Safe: 1.05  Fast: 3
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
