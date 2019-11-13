@@ -114,7 +114,14 @@ def main(args):
     if is_sim:
         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     else:
-        workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        # Corner near window on robot base side
+        # [0.47984089 0.34192974 0.02173636]
+        # Corner on the side of the cameras and far from the window
+        # [ 0.73409861 -0.45199446 -0.00229499]
+        workspace_limits = np.asarray([[0.48, 0.734], [-0.45, 0.34], [-0.21, 0.0]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+
+        # Original visual pushing graping paper workspace definition
+        # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
