@@ -73,9 +73,9 @@ while True:
     camera_color_img, camera_depth_img = robot.get_camera_data()
     bgr_data = cv2.cvtColor(camera_color_img, cv2.COLOR_RGB2BGR)
     if len(click_point_pix) != 0:
-        bgr_data = cv2.circle(bgr_data, click_point_pix, 7, (0,0,255), 2)
+        bgr_data = cv2.circle(camera_color_img, click_point_pix, 7, (0,0,255), 2)
     cv2.imshow('color', bgr_data)
-    cv2.imshow('depth', camera_depth_img)
+    cv2.imshow('depth', camera_depth_img*100)
     
     if cv2.waitKey(1) == ord('c'):
         break
