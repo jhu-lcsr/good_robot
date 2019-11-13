@@ -245,7 +245,11 @@ def main(args):
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+    if num_obj is not None:
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+    else:
+        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
+
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
