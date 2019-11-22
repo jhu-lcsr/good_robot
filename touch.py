@@ -16,7 +16,7 @@ rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR
 rtc_port = 30003
 
 workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
-tool_orientation = [0, np.pi, 0.0] # Real Good Robot
+tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
 
 # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 # tool_orientation = [2.22,-2.22,0]
@@ -56,10 +56,10 @@ def mouseclick_callback(event, x, y, flags, param):
         target_position = np.dot(camera2robot[0:3,0:3],click_point) + camera2robot[0:3,3:]
 
         target_position = target_position[0:3,0]
-        print(target_position)
+        print(target_position, tool_orientation)
         
         # Move the gripper up a bit to protect the gripper (Real Good Robot)
-        target_position [-1] += 0.25 
+        target_position [-1] += 0.17
 
         robot.move_to(target_position, tool_orientation)
 
