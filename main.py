@@ -118,7 +118,7 @@ def main(args):
         # [0.47984089 0.34192974 0.02173636]
         # Corner on the side of the cameras and far from the window
         # [ 0.73409861 -0.45199446 -0.00229499]
-        workspace_limits = np.asarray([[0.48, 0.734], [-0.45, 0.34], [-0.21, 0.0]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        workspace_limits = np.asarray([[0.41, 0.77], [-0.15, 0.21], [0.0, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -932,7 +932,6 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     # Get latest RGB-D image
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
-    # print(color_img)
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
     color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
     valid_depth_heightmap = depth_heightmap.copy()
