@@ -42,7 +42,7 @@ def mouseclick_callback(event, x, y, flags, param):
         click_point_pix = (x,y)
 
         # Get click point in camera coordinates
-        click_z = camera_depth_img[y][x] * robot.cam_depth_scale
+        click_z = camera_depth_img[y][x] * robot.cam_depth_scale * 1000 # unit from m -> mm
         click_x = np.multiply(x-robot.cam_intrinsics[0][2],click_z/robot.cam_intrinsics[0][0])
         click_y = np.multiply(y-robot.cam_intrinsics[1][2],click_z/robot.cam_intrinsics[1][1])
         if click_z == 0:
