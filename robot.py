@@ -174,8 +174,8 @@ class Robot(object):
             self.joint_tolerance = 0.01
 
             # Default tool speed configuration
-            self.tool_acc = 0.1 # Safe: 0.5 Fast: 1.2
-            self.tool_vel = 0.1 # Safe: 0.2 Fast: 0.25
+            self.tool_acc = 0.5 # Safe: 0.5 Fast: 1.2
+            self.tool_vel = 0.2 # Safe: 0.2 Fast: 0.25
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
@@ -551,6 +551,19 @@ class Robot(object):
 
 
     def close_gripper(self, nonblocking=False):
+        """
+        # Arguments
+
+        nonblocking: If true, the function will not wait for the robot to finish its action, it will return immediately.
+                     If false, the function will wait for the robot to finish its action, then return the result.
+
+        # Return
+
+        True if the gripper is fully closed at the end of the call, false otherwise. 
+        The gripper can take a full second to close, but this function may return in 1 ms 
+        May return False if nonblocking is True because an open gripper will not have closed completely yet, 
+        even if the gripper eventually closes all the way.
+        """
         if self.is_sim:
             gripper_motor_velocity = -0.5
             gripper_motor_force = 100
@@ -589,7 +602,11 @@ class Robot(object):
 
 
     def open_gripper(self, nonblocking=False):
+        """
+        # Returns
 
+        True if the gripper is open after the call, otherwise false.
+        """
         if self.is_sim:
             gripper_motor_velocity = 0.5
             gripper_motor_force = 20
@@ -599,6 +616,7 @@ class Robot(object):
             vrep.simxSetJointTargetVelocity(self.sim_client, RG2_gripper_handle, gripper_motor_velocity, vrep.simx_opmode_blocking)
             while gripper_joint_position < 0.03: # Block until gripper is fully open
                 sim_ret, gripper_joint_position = vrep.simxGetJointPosition(self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
+            return True
 
         elif self.gripper is None:
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -610,6 +628,7 @@ class Robot(object):
                 time.sleep(1.5)
         else:
             self.gripper.open(block=not nonblocking)
+            return self.gripper.is_opened()
 
 
     def get_state(self):
@@ -929,6 +948,7 @@ class Robot(object):
             # Attempt grasp
             position = np.asarray(position).copy()
             position[2] = max(position[2], workspace_limits[2][0] + self.gripper_ee_offset + 0.01)
+            position[2] = min(position[2], workspace_limits[2][1] + self.gripper_ee_offset - 0.01)
             print("Real Good Robot grasping at: " + str(position))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -958,7 +978,7 @@ class Robot(object):
             # else:
             # Close gripper
             time.sleep(2.0)
-            gripper_open = not self.close_gripper()
+            gripper_fully_closed = self.close_gripper()
             # Check if the gripper is closed
             # TODO(Hongtao and Andrew): Need to get gripper closing status
             color_success = None
@@ -974,10 +994,10 @@ class Robot(object):
 
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
-            if gripper_open:
+            if not gripper_fully_closed:
                 print("Grasp success, moving to drop object in bin...")
                 # Pre-compute blend radius
-                blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
+                # blend_radius = min(abs(bin_position[1] - position[1])/2 - 0.01, 0.2)
 
                 # Attempt placing
                 # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -991,41 +1011,47 @@ class Robot(object):
                 # self.tcp_socket.send(str.encode(tcp_command))
                 # self.tcp_socket.close()
                 # print(tcp_command) # Debug
+                # Move up to a height where we can drop the object
                 self.move_to([position[0],position[1],bin_position[2]],[tool_orientation[0],tool_orientation[1],0.0])
+                # Move over the bin
                 self.move_to([bin_position[0],bin_position[1],bin_position[2]], [tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2]])
 
                 # TODO(Hongtao and Andrew): Measure gripper width until robot reaches near bin location
-                state_data = self.get_state()
-                measurements = []
-                while True:
-                    state_data = self.get_state()
-                    tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-                    actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-                    measurements.append(tool_analog_input2)
-                    if abs(actual_tool_pose[1] - bin_position[1]) < 0.2 or all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-                        break
+                # state_data = self.get_state()
+                # measurements = []
+                # while True:
+                #     state_data = self.get_state()
+                #     tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
+                #     actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+                #     measurements.append(tool_analog_input2)
+                #     if abs(actual_tool_pose[1] - bin_position[1]) < 0.2 or all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
+                #         break
                 
                 # Placing the object
-                time.sleep(1)
+                # time.sleep(1)
+                # If gripper still does not fully close, then object remains
+                # in the gripper and thegrasp is successful
+                grasp_success = not self.close_gripper()
                 self.open_gripper()
+                # time.sleep(1)
 
-                self.move_to(home_position, [tool_orientation[0],tool_orientation[1],0.0])
-
-                # If gripper width did not change before reaching bin location, then object is in grip and grasp is successful
-                if len(measurements) >= 2:
-                    if abs(measurements[0] - measurements[1]) < 0.1:
-                        grasp_success = True
+                # # If gripper width did not change before reaching bin location, then object is in grip and grasp is successful
+                # if len(measurements) >= 2:
+                #     if abs(measurements[0] - measurements[1]) < 0.1:
+                #         grasp_success = True
 
             else:
                 print("Grasp failure, moving to home position...")
-                self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-                tcp_command = "def process():\n"
-                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
-                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.0)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
-                tcp_command += "end\n"
-                self.tcp_socket.send(str.encode(tcp_command))
-                self.tcp_socket.close()
+            #     self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            #     self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+            #     tcp_command = "def process():\n"
+            #     tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
+            #     tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.0)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
+            #     tcp_command += "end\n"
+            #     self.tcp_socket.send(str.encode(tcp_command))
+            #     self.tcp_socket.close()
+            
+            self.move_to(home_position, [tool_orientation[0],tool_orientation[1],0.0])
 
             # Block until robot reaches home location
             state_data = self.get_state()
@@ -1132,7 +1158,9 @@ class Robot(object):
             position[1] = min(max(position[1], workspace_limits[1][0]), workspace_limits[1][1])
             position[2] = max(position[2] + 0.005, workspace_limits[2][0] + 0.005) # Add buffer to surface
 
-            home_position = [0.49,0.11,0.03]
+            # home_position = [0.49,0.11,0.03]
+            # Real Good Robot
+            home_position = [0.42565109, 0.04298656, 0.30092444 + self.gripper_ee_offset]
 
             # Attempt push
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

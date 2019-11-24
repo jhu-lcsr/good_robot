@@ -118,7 +118,8 @@ def main(args):
         # [0.47984089 0.34192974 0.02173636]
         # Corner on the side of the cameras and far from the window
         # [ 0.73409861 -0.45199446 -0.00229499]
-        workspace_limits = np.asarray([[0.41, 0.77], [-0.15, 0.21], [0.0, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
+        workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.05, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -862,8 +863,9 @@ def main(args):
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.check_sim()
-                robot.reposition_objects()
+                if is_sim:
+                    robot.check_sim()
+                    robot.reposition_objects()
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
