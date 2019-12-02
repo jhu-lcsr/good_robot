@@ -215,15 +215,17 @@ def angle2rotm(angle, axis, point=None):
 
     sina = math.sin(angle)
     cosa = math.cos(angle)
-    axis = axis/np.linalg.norm(axis)
+    axis_magnitude = np.linalg.norm(axis)
+    axis = np.divide(axis, axis_magnitude, out=np.zeros_like(axis), where=axis_magnitude!=0)
 
     # Rotation matrix around unit vector
     R = np.diag([cosa, cosa, cosa])
-    R += np.outer(axis, axis) * (1.0 - cosa)
+    R += np.array(np.outer(axis, axis) * (1.0 - cosa))
     axis *= sina
-    R += np.array([[ 0.0,     -axis[2],  axis[1]],
+    RA = np.array([[ 0.0,     -axis[2],  axis[1]],
                       [ axis[2], 0.0,      -axis[0]],
                       [-axis[1], axis[0],  0.0]])
+    R = RA + np.array(R)
     M = np.identity(4)
     M[:3, :3] = R
     if point is not None:
