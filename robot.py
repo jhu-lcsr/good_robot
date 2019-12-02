@@ -1042,6 +1042,7 @@ class Robot(object):
 
             else:
                 print("Grasp failure, moving to home position...")
+                self.open_gripper(nonblocking=True)
             #     self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             #     self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             #     tcp_command = "def process():\n"
