@@ -167,7 +167,7 @@ class Robot(object):
             # Costar dataset home joint config
             # self.home_joint_config = [-0.202, -0.980, -1.800, -0.278, 1.460, 1.613]
             # Real Good Robot Home Joint Config
-            self.home_joint_config = [0.4, -1.62, -0.85, -2.22, 1.57, 1.71]
+            self.home_joint_config = [0.2, -1.62, -0.85, -2.22, 1.57, 1.71]
 
 
             # Default joint speed configuration
@@ -1183,6 +1183,10 @@ class Robot(object):
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (push_endpoint[0],push_endpoint[1],push_endpoint[2],tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.03)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
+            tcp_command += " movej([%f" % self.home_joint_config[0]
+            for joint_idx in range(1,6):
+                tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
+            tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
             # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
             tcp_command += "end\n"
             self.tcp_socket.send(str.encode(tcp_command))
@@ -1195,10 +1199,20 @@ class Robot(object):
             #     actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
             #     if all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
             #         break
-            # push_success = True
-            self.open_gripper(nonblocking=True)
-            self.go_home()
+
+            # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.5)
+            while True:
+                state_data = self.get_state()
+                actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
+                if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
+                    print('Push move complete')
+                    break
+                time.sleep(0.1)
+            
+            push_success = True
+            self.open_gripper(nonblocking=True)
+            # time.sleep(0.25)
 
         return push_success
 
