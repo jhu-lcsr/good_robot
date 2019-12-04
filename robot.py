@@ -1143,7 +1143,7 @@ class Robot(object):
         else:
             self.close_gripper(nonblocking=True)
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
-            position[2] += self.gripper_ee_offset + 0.01
+            position[2] += self.gripper_ee_offset + 0.02
 
             # Compute tool orientation from heightmap rotation angle
             push_orientation = [1.0,0.0]
