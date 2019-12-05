@@ -29,7 +29,7 @@ class Robot(object):
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11'):
+                 real_gripper_ip='192.168.1.11', calibrate=False):
         '''
         
         real_gripper_ip: None to assume the gripper is connected via the UR5, 
@@ -184,9 +184,11 @@ class Robot(object):
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
-
+            
+            if calibrate:
+                self.gripper = None
             # Initialize the real gripper based on user configuration
-            if real_gripper_ip is None:
+            elif real_gripper_ip is None:
                 self.gripper = None
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
@@ -202,7 +204,7 @@ class Robot(object):
 
             # Fetch RGB-D data from RealSense camera
             from real.camera import Camera
-            self.camera = Camera()
+            self.camera = Camera(calibrate=calibrate)
             self.cam_intrinsics = self.camera.intrinsics
 
             # Load camera pose (from running calibrate.py), intrinsics and depth scale
@@ -666,6 +668,7 @@ class Robot(object):
 
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0],tool_position[1],tool_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.tool_acc,self.tool_vel)
             self.tcp_socket.send(str.encode(tcp_command))
 
@@ -957,7 +960,7 @@ class Robot(object):
             print("Grasp position before applying workspace bounds: " + str(position))
             position[2] = max(position[2], workspace_limits[2][0] + self.gripper_ee_offset + 0.04)
             position[2] = min(position[2], workspace_limits[2][1] + self.gripper_ee_offset - 0.01)
-            print("Real Good Robot grasping at: " + str(position))
+            print("Real Good Robot grasping at: " + str(position), ", " + str(tool_orientation))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
@@ -1021,7 +1024,7 @@ class Robot(object):
                 # self.tcp_socket.close()
                 # print(tcp_command) # Debug
                 # Move up to a height where we can drop the object
-                self.move_to([position[0],position[1],bin_position[2]],[tool_orientation[0],tool_orientation[1],0.0])
+                self.move_to([position[0],position[1],bin_position[2] - 0.07],[tool_orientation[0],tool_orientation[1],0.0])
                 grasp_success = not self.close_gripper()
                 if grasp_success:
                     print("Grasp success, moving to drop object in bin...")
@@ -1082,7 +1085,7 @@ class Robot(object):
 
 
     def push(self, position, heightmap_rotation_angle, workspace_limits):
-        print('Executing: push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
+        print('Real Robot push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
 
         if self.is_sim:
 

@@ -23,7 +23,7 @@ from ros_camera import ROSCamera
 
 class Camera(object):
 
-    def __init__(self, model_name='primesense', camera_intrinsic_folder='/home/costar/src/real_good_robot/real/camera_param'):
+    def __init__(self, model_name='primesense', camera_intrinsic_folder='/home/costar/src/real_good_robot/real/camera_param', calibrate=False):
         
         self.model_name = model_name
 
@@ -46,7 +46,7 @@ class Camera(object):
             '''Initializes and cleanup ros node'''
             print('Before you run test_ros_images.py, make sure you have first started the ROS node for reading the primesense sensor data:'
             ' roslaunch openni2_launch openni2.launch depth_registration:=true')
-            self.camera = ROSCamera()
+            self.camera = ROSCamera(calibrate=calibrate)
             rospy.init_node('ros_camera', anonymous=True)
             time.sleep(1)  
             # Camera matrix K
@@ -81,3 +81,7 @@ class Camera(object):
             color_img, depth_img, _ = self.camera.frames()
 
         return color_img, depth_img
+    
+    def get_aruco_tf(self):
+        aruco_tf = self.camera.get_aruco_tf()
+        return aruco_tf

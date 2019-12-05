@@ -20,6 +20,13 @@ import rospy
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import JointState
 from sensor_msgs.msg import CameraInfo
+try:
+    from geometry_msgs.msg import Transform
+    from fiducial_msgs.msg import FiducialTransformArray
+except ImportError:
+    print('Could not import FiducialTransformArray\n'
+          'Please install https://github.com/UbiquityRobotics/fiducials to enable calibration')
+    FiducialTransformArray = None
 # We do not use cv_bridge it does not support CompressedImage in python
 # from cv_bridge import CvBridge, CvBridgeError
 
@@ -30,7 +37,7 @@ import message_filters
 
 class ROSCamera:
 
-    def __init__(self, synchronize=False):
+    def __init__(self, synchronize=False, calibrate=False):
 
         # http://wiki.ros.org/depth_image_proc
         # http://www.ros.org/reps/rep-0118.html
@@ -46,6 +53,14 @@ class ROSCamera:
         # self.image_pub = rospy.Publisher("/output/image_raw/compressed",
         #     CompressedImage)
         # # self.bridge = CvBridge()
+
+        if calibrate:
+            print("Please install https://github.com/UbiquityRobotics/fiducials to calibrate and run:\n"
+                  "     roslaunch roslaunch aruco_detect aruco_detect.launch")
+            self.aruco_tf_topic = "/fiducial_transforms"
+            self._aruco_tf_info_sub = rospy.Subscriber(self.aruco_tf_topic, FiducialTransformArray, self._tfCb)
+            self.aruco_tf = None
+
 
         # # subscribed Topic
         # self.subscriber = rospy.Subscriber("/camera/image/compressed",
@@ -237,6 +252,13 @@ class ROSCamera:
     def _gripperCb(self, msg):
         with self.mutex:
             self.gripper_msg = msg
+    
+    def _tfCb(self, tf_msg):
+        # print("_tfCb: running")
+        if tf_msg is None:
+            rospy.logwarn("_tfCb: tf_msg is None!")
+        with self.mutex:
+            self.aruco_tf = tf_msg
 
     def frames(self):
         rgb_image = None
@@ -247,3 +269,8 @@ class ROSCamera:
             if self.depth_img is not None:
                 depth_image = self.depth_img.copy()
         return rgb_image, depth_image, None
+    
+    def get_aruco_tf(self):
+        with self.mutex:
+            aruco_tf = self.aruco_tf
+        return aruco_tf
