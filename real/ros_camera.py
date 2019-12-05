@@ -256,7 +256,7 @@ class ROSCamera:
     def _tfCb(self, tf_msg):
         # print("_tfCb: running")
         if tf_msg is None:
-            rospy.logwarn("_tfCb: tf_msg is None!")
+            rospy.logwarn("_tfCb: tf_msg FiducialTransformArray is None!")
         with self.mutex:
             self.aruco_tf = tf_msg
 
