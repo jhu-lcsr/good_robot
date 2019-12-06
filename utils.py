@@ -40,8 +40,10 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
 
 
 def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, depth_median_filter_pixels=5):
+    
     if depth_median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=depth_median_filter_pixels)
+    
     # Compute heightmap size
     heightmap_size = np.round(((workspace_limits[1][1] - workspace_limits[1][0])/heightmap_resolution, (workspace_limits[0][1] - workspace_limits[0][0])/heightmap_resolution)).astype(int)
 
@@ -302,6 +304,149 @@ def rotm2angle(R):
     y = (R[0][2] - R[2][0])/s
     z = (R[1][0] - R[0][1])/s
     return [angle,x,y,z]
+
+
+def quat2rotm(quat):
+    """
+    Quaternion to rotation matrix.
+    
+    Args:
+    - quat (4, numpy array): quaternion w, x, y, z
+    Returns:
+    - rotm: (3x3 numpy array): rotation matrix
+    """
+    w = quat[0]
+    x = quat[1]
+    y = quat[2]
+    z = quat[3]
+
+    s = w*w + x*x + y*y + z*z
+
+    rotm = np.array([[1-2*(y*y+z*z)/s, 2*(x*y-z*w)/s,   2*(x*z+y*w)/s  ],
+                     [2*(x*y+z*w)/s,   1-2*(x*x+z*z)/s, 2*(y*z-x*w)/s  ],
+                     [2*(x*z-y*w)/s,   2*(y*z+x*w)/s,   1-2*(x*x+y*y)/s]
+    ])
+
+    return rotm
+
+
+def make_rigid_transformation(pos, orn):
+    """
+    Rigid transformation from position and orientation.
+    Args:
+    - pos (3, numpy array): translation
+    - orn (4, numpy array): orientation in quaternion
+    Returns:
+    - homo_mat (4x4 numpy array): homogenenous transformation matrix
+    """
+    rotm = quat2rotm(orn)
+    homo_mat = np.c_[rotm, np.reshape(pos, (3, 1))]
+    homo_mat = np.r_[homo_mat, [[0, 0, 0, 1]]]
+    
+    return homo_mat
+
+
+def axxb(robotPose, markerPose):
+    """
+    Copyright (c) 2019, Hongtao Wu
+    AX=XB solver for eye-on base
+    
+    Args:
+    - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.
+    - markerPose (list of 4x4 numpy array): poses (homogenous transformation) of the marker in the camera frame.
+    Return:
+    - tag2tool (4x4 numpy array): poses of the tag in the robot end-effector frame.
+    """
+
+    assert len(robotPose) == len(markerPose), 'robot poses and marker poses are not of the same length!'
+
+    n = len(robotPose)
+    print "Total number of poses: %i" % n
+    A = np.zeros((4, 4, n-1))
+    B = np.zeros((4, 4, n-1))
+    alpha = np.zeros((3, n-1))
+    beta = np.zeros((3, n-1))
+
+    M = np.zeros((3, 3))
+
+    nan_num = 0
+
+    sequence = np.arange(n)
+    np.random.shuffle(sequence)
+
+    for i in range(n-1):
+        A[:, :, i] = np.matmul(pose_inv(robotPose[sequence[i+1]]), robotPose[sequence[i]])
+        B[:, :, i] = np.matmul(pose_inv(markerPose[sequence[i+1]]), markerPose[sequence[i]])
+        alpha[:, i] = get_mat_log(A[:3, :3, i])
+        beta[:, i] = get_mat_log(B[:3, :3, i])
+        
+        if np.sum(np.isnan(alpha[:, i])) + np.sum(np.isnan(beta[:, i])) > 0:
+            nan_num += 1
+            continue
+        else:
+            M += np.outer(beta[:, i], alpha[:, i])
+
+    print "Invalid poses number: {}".format(nan_num)
+
+    # Get the rotation matrix
+    mtm = np.matmul(M.T, M)
+    u_mtm, s_mtm, vh_mtm = np.linalg.svd(mtm)
+
+    import ipdb; ipdb.set_trace()
+
+    R = np.matmul(np.matmul(np.matmul(u_mtm, np.diag(np.power(s_mtm, -0.5))), vh_mtm), M.T)
+
+    # Get the tranlation vector
+    I_Ra_Left = np.zeros((3*(n-1), 3))
+    ta_Rtb_Right = np.zeros((3 * (n-1), 1))
+    for i in range(n-1):
+        I_Ra_Left[(3*i):(3*(i+1)), :] = np.eye(3) - A[:3, :3, i]
+        ta_Rtb_Right[(3*i):(3*(i+1)), :] = np.reshape(A[:3, 3, i] - np.dot(R, B[:3, 3, i]), (3, 1))
+    t = np.linalg.lstsq(I_Ra_Left, ta_Rtb_Right, rcond=None)[0]
+    
+    tag2tool = np.c_[R, t]
+    tag2tool = np.r_[tag2tool, [[0, 0, 0, 1]]]
+
+    print "Calibration Result:\n", tag2tool
+    
+    return tag2tool
+
+
+def pose_inv(pose):
+    """
+    Inverse of a homogenenous transformation.
+    Args:
+    - pose (4x4 numpy array)
+    Return:
+    - inv_pose (4x4 numpy array)
+    """
+    R = pose[:3, :3]
+    t = pose[:3, 3]
+
+    inv_R = R.T
+    inv_t = - np.dot(inv_R, t)
+
+    inv_pose = np.c_[inv_R, np.transpose(inv_t)]
+    inv_pose = np.r_[inv_pose, [[0, 0, 0, 1]]]
+
+    return inv_pose
+
+
+def get_mat_log(R):
+    """
+    Get the log(R) of the rotation matrix R.
+    
+    Args:
+    - R (3x3 numpy array): rotation matrix
+    Returns:
+    - w (3, numpy array): log(R)
+    """
+    theta = np.arccos((np.trace(R) - 1) / 2)
+    w_hat = (R - R.T) * theta / (2 * np.sin(theta))  # Skew symmetric matrix
+    w = np.array([w_hat[2, 1], w_hat[0, 2], w_hat[1, 0]])  # [w1, w2, w3]
+
+    return w
+
 
 
 def check_separation(values, distance_threshold):

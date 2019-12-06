@@ -195,7 +195,7 @@ class Robot(object):
                 self.gripper.reset()
                 self.gripper.activate()
 
-            # # Move robot to home pose
+            # Move robot to home pose
             self.close_gripper()
             self.go_home()
             self.open_gripper()
