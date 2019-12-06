@@ -185,10 +185,8 @@ class Robot(object):
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
             
-            if calibrate:
-                self.gripper = None
             # Initialize the real gripper based on user configuration
-            elif real_gripper_ip is None:
+            if real_gripper_ip is None:
                 self.gripper = None
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
