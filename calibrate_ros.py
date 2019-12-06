@@ -32,7 +32,7 @@ def ros_transform_to_numpy_transform(transform):
 
 class Calibrate:
 
-    def __init__(self, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003):
+    def __init__(self, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003, save_dir=None):
         self.workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
         self.calib_grid_step = 0.05
         self.robot = Robot(False, None, None, self.workspace_limits,
@@ -50,7 +50,12 @@ class Calibrate:
         print('MOVING THE ROBOT to home position...')
         self.robot.go_home()
 
-        self.calibration_file_folder = '/home/costar/src/real_good_robot/calibration'
+        if save_dir is None:
+            # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
+            self.save_dir = '/home/costar/src/real_good_robot/calibration'
+        else:
+            self.save_dir = save_dir
+
         self.robot_poses = []
         self.marker_poses = []
 
@@ -71,16 +76,20 @@ class Calibrate:
             cv2.waitKey(1)
             print(aruco_tf.transforms)
     
-    def collect_data(self, calib_grid_step=0.1, workspace_limits=None):
+    def collect_data(self, calib_grid_step=0.06, workspace_limits=None):
         """
         # Arguments
 
-            calib_grid_step: Meters per cartesian data collection point, reasonable values are 0.1 and 0.05.
+            calib_grid_step: Meters per cartesian data collection point, reasonable values are 0.06, and 0.05.
+                             Smaller step sizes collect more data, but take exponentially longer to run.
         """
+
+        # Test the destination directory.
+        if ( False == os.path.isdir( self.save_dir ) ):
+            print("The destination directory (%s) does not exist. Creating the directory." % self.save_dir)
+            os.mkdir( self.save_dir )
         if workspace_limits is None:
             workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
-        # calib_grid_step = 0.05
-        calib_grid_step = 0.1
         # Checkerboard tracking point offset from the tool in the robot coordinate
         # checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
         # flat and level with fiducial facing up: [0, np.pi/2, 0.0]
@@ -92,41 +101,42 @@ class Calibrate:
 
         # Construct 3D calibration grid across workspace
         num_calib_grid_pts, calib_grid_pts = utils.calib_grid_cartesian(workspace_limits, calib_grid_step)
-        rate = rospy.Rate(0.5) # hz
+        rate = rospy.Rate(1.0/3.0) # hz
         robot_poses = []
         marker_poses = []
 
-        print("Start Calibrating...")
+        print("Starting Calibration and saving data in: " + str(self.save_dir))
+        with tqdm(total=num_calib_grid_pts * len(tool_orientations)) as pbar:
+            for calib_pt_idx in range(num_calib_grid_pts):
+                tool_position = calib_grid_pts[calib_pt_idx,:]
+                for tool_orientation_idx, tool_orientation in enumerate(tool_orientations):
+                    tool_orientation_idx += 1
+                    self.robot.move_to(tool_position, tool_orientation)
+                    rate.sleep()
 
-        for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
-            tool_position = calib_grid_pts[calib_pt_idx,:]
-            for tool_orientation_idx, tool_orientation in enumerate(tqdm(tool_orientations)):
-                tool_orientation_idx += 1
-                self.robot.move_to(tool_position, tool_orientation)
-                rate.sleep()
+                    color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
-                color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
+                    # cv2.imshow("color.png", aruco_img)
+                    # cv2.waitKey(1)
+                    img_prefix = str(calib_pt_idx) + '_' + str(tool_orientation_idx)
+                    aruco_img_file = os.path.join(self.save_dir, 'arucoimg_' + img_prefix + '.png')
+                    cv2.imwrite(aruco_img_file, aruco_img)
+                    rgb_img_file = os.path.join(self.save_dir, 'rgb_img_' + img_prefix + '.png')
+                    cv2.imwrite(rgb_img_file, color_img)
+                    depth_img_file = os.path.join(self.save_dir, 'depth_img_' + img_prefix + '.png')
+                    cv2.imwrite(depth_img_file, depth_img)
 
-                # cv2.imshow("color.png", aruco_img)
-                # cv2.waitKey(1)
-                img_prefix = str(calib_pt_idx) + '_' + str(tool_orientation_idx)
-                aruco_img_file = os.path.join(self.calibration_file_folder, 'arucoimg_' + img_prefix + '.png')
-                cv2.imwrite(aruco_img_file, aruco_img)
-                rgb_img_file = os.path.join(self.calibration_file_folder, 'rgb_img_' + img_prefix + '.png')
-                cv2.imwrite(rgb_img_file, color_img)
-                depth_img_file = os.path.join(self.calibration_file_folder, 'depth_img_' + img_prefix + '.png')
-                cv2.imwrite(depth_img_file, aruco_img)
-
-                if len(aruco_tf.transforms) > 0:
-                    # TODO(ahundt) we assume only one marker is visible, at least check that the id matches the whole time.
-                    transform = aruco_tf.transforms[0]
-                    # TODO (Hongtao): make sure that the transformations of robot and tag are correct
-                    tool_transformation = utils.axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orientation)
-                    robot_poses += [tool_transformation]
-                    marker_transformation = ros_transform_to_numpy_transform(transform)
-                    marker_poses += [marker_transformation]
-                    # TODO(ahundt) need cleaner separation of concerns, only save file once with np.savetxt, pandas, or some other one liner
-                    self.save_transforms_to_file(calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation)
+                    if len(aruco_tf.transforms) > 0:
+                        # TODO(ahundt) we assume only one marker is visible, at least check that the id matches the whole time.
+                        transform = aruco_tf.transforms[0]
+                        # TODO (Hongtao): make sure that the transformations of robot and tag are correct
+                        tool_transformation = utils.axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orientation)
+                        robot_poses += [tool_transformation]
+                        marker_transformation = ros_transform_to_numpy_transform(transform)
+                        marker_poses += [marker_transformation]
+                        # TODO(ahundt) need cleaner separation of concerns, only save file once with np.savetxt, pandas, or some other one liner
+                        self.save_transforms_to_file(calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation)
+                    pbar.update()
                 
         # print("robot poses: " + str(robot_poses))
         # print("marker poses: " + str(marker_poses))
@@ -134,8 +144,8 @@ class Calibrate:
 
     def save_transforms_to_file(self, calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation):
         
-        robot_pose_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_robotpose.txt')
-        marker_pose_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_markerpose.txt')
+        robot_pose_file = os.path.join(self.save_dir, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_robotpose.txt')
+        marker_pose_file = os.path.join(self.save_dir, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_markerpose.txt')
         if len(aruco_tf.transforms) > 0:
             # Tool pose in robot base frame
             with open(robot_pose_file, 'w') as file1:
@@ -161,13 +171,13 @@ class Calibrate:
     # TODO (Hongtao): After making sure that the tag transformation is correct, make sure that the function is correct
     def solve_axxb_horn(self):
         # Load robot pose and marker pose
-        for f in os.listdir(self.calibration_file_folder):
+        for f in os.listdir(self.save_dir):
             if 'robotpose.txt' in f:
                 robot_pose_file = f
                 marker_pose_file = f[:-13] + 'markerpose.txt'
                 
                 # tool pose in robot base frame
-                with open(os.path.join(self.calibration_file_folder, robot_pose_file), 'r') as file_robot:
+                with open(os.path.join(self.save_dir, robot_pose_file), 'r') as file_robot:
                     robotpose_str = file_robot.readline().split(' ')
                     robotpose = [float (x) for x in robotpose_str if x is not '']
                     assert len(robotpose) == 16
@@ -175,7 +185,7 @@ class Calibrate:
                 self.robot_poses.append(robotpose)
                 
                 # marker pose in camera frame
-                with open(os.path.join(self.calibration_file_folder, marker_pose_file), 'r') as file_marker:
+                with open(os.path.join(self.save_dir, marker_pose_file), 'r') as file_marker:
                     markerpose_str = file_marker.readline().split(' ')
                     markerpose = [float(x) for x in markerpose_str if x is not '']
                     assert len(markerpose) == 16
@@ -198,7 +208,7 @@ class Calibrate:
         robot_poses, marker_poses = calib.collect_data()
         X = SolverAXXB.LeastSquareAXXB(robot_poses, marker_poses)
         # error = SolverAXXB.Validation(X, ValidSet)
-        np.savetxt(os.path.join(self.calibration_file_folder, 'cam2base.txt'), X)
+        np.savetxt(os.path.join(self.save_dir, 'cam2base.txt'), X)
         print('Final Transform: \n' + str(X))
         return X
 
