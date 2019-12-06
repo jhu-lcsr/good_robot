@@ -58,7 +58,10 @@ class ROSCamera:
             print("Please install https://github.com/UbiquityRobotics/fiducials to calibrate and run:\n"
                   "     roslaunch roslaunch aruco_detect aruco_detect.launch")
             self.aruco_tf_topic = "/fiducial_transforms"
-            self._aruco_tf_info_sub = rospy.Subscriber(self.aruco_tf_topic, FiducialTransformArray, self._tfCb)
+            self.aruco_img_topic = "/fiducial_images"
+            self._aruco_tf_sub = rospy.Subscriber(self.aruco_tf_topic, FiducialTransformArray, self._tfCb)
+            self._aruco_img_sub = rospy.Subscriber(self.aruco_img_topic, Image, self._arucoimgCb)
+            self.aruco_img = None
             self.aruco_tf = None
 
 
@@ -260,6 +263,26 @@ class ROSCamera:
         with self.mutex:
             self.aruco_tf = tf_msg
 
+    def _arucoimgCb(self, msg):
+        if msg is None:
+            rospy.logwarn("_arucoimgCb: msg is None !!!!!!!!!")
+        try:
+            # max out at 10 hz assuming 30hz data source
+            if msg.header.seq % 3 == 0:
+                cv_image = self._bridge.imgmsg_to_cv2(msg, "rgb8")
+                # decode the data, this will take some time
+
+                # rospy.loginfo('rgb color cv_image shape: ' + str(cv_image.shape) + ' depth sequence number: ' + str(msg.header.seq))
+                # print('rgb color cv_image shape: ' + str(cv_image.shape))
+                cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+                # rgb_img = cv2.imencode('.jpg', cv_image)[1].tobytes()
+                # rgb_img = GetJpeg(np.asarray(cv_image))
+
+                with self.mutex:
+                    self.aruco_img = cv_image
+        except CvBridgeError as e:
+            rospy.logwarn(str(e))
+
     def frames(self):
         rgb_image = None
         depth_image = None
@@ -270,7 +293,8 @@ class ROSCamera:
                 depth_image = self.depth_img.copy()
         return rgb_image, depth_image, None
     
-    def get_aruco_tf(self):
+    def aruco(self):
         with self.mutex:
             aruco_tf = self.aruco_tf
-        return aruco_tf
+            aruco_img = self.aruco_img
+        return aruco_tf, aruco_img

@@ -346,6 +346,19 @@ def make_rigid_transformation(pos, orn):
     return homo_mat
 
 
+def axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orientation):
+    tool_orientation_angle = np.linalg.norm(tool_orientation)
+    tool_orientation_axis = tool_orientation/tool_orientation_angle
+    # Note that this following rotm is the base frame in tool frame
+    tool_orientation_rotm = angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
+    # Tool rigid body transformation
+    tool_transformation = np.zeros((4, 4))
+    tool_transformation[:3, :3] = tool_orientation_rotm.T # transpose so that it is tool frame in base frame
+    tool_transformation[:3, 3] = tool_position
+    tool_transformation[3, 3] = 1
+    return tool_transformation
+
+
 def axxb(robotPose, markerPose):
     """
     Copyright (c) 2019, Hongtao Wu
