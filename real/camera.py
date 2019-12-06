@@ -83,5 +83,5 @@ class Camera(object):
         return color_img, depth_img
     
     def get_aruco_tf(self):
-        aruco_tf = self.camera.get_aruco_tf()
-        return aruco_tf
+        aruco_tf, aruco_img = self.camera.aruco()
+        return aruco_tf, aruco_img
