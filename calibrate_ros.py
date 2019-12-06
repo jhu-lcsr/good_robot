@@ -82,7 +82,7 @@ class Calibrate:
         # calib_grid_step = 0.05
         calib_grid_step = 0.1
         # Checkerboard tracking point offset from the tool in the robot coordinate
-        checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
+        # checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
         # flat and level with fiducial facing up: [0, np.pi/2, 0.0]
         tool_orientations = [[0, np.pi/2, 0.0], [0, 3.0*np.pi/4.0, 0.0], [0, 5.0*np.pi/8.0, 0.0], [0, 5.0*np.pi/8.0, np.pi/8], [np.pi/8.0, 5.0*np.pi/8.0, 0.0]] # Real Good Robot
 
@@ -206,7 +206,7 @@ class Calibrate:
         X = SolverAXXB.LeastSquareAXXB(robot_poses, marker_poses)
         # error = SolverAXXB.Validation(X, ValidSet)
         np.savetxt(os.path.join(self.calibration_file_folder, 'cam2base.txt'), X)
-        print('Transform: \n' + str(X))
+        print('Final Transform: \n' + str(X))
         return X
 
 
