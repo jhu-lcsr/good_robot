@@ -1,3 +1,9 @@
+"""
+Using aruco_detect ROS package to calibrate eye-on-base camera calibration.
+@author: Hongtao Wu, Andrew Hundt
+Dec 05, 2019
+"""
+
 import rospy
 import roslib
 import numpy as np
@@ -5,6 +11,8 @@ import cv2
 from robot import Robot
 from ros_aruco import ROSArUcoCalibrate
 from tqdm import tqdm
+import time
+import os
 
 class Calibrate:
 
@@ -14,6 +22,7 @@ class Calibrate:
         self.robot = Robot(False, None, None, self.workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None, calibrate=True)
+        
         print('Robot active, open the gripper')
     
         self.robot.open_gripper()
@@ -25,10 +34,12 @@ class Calibrate:
         print('MOVING THE ROBOT to home position...')
         self.robot.go_home()
 
+        self.calibration_file_folder = '/home/costar/src/real_good_robot/calibration'
+
     def get_rgb_depth_image_and_transform(self):
         color_img, depth_img = self.robot.get_camera_data()
-        aruco_tf = self.robot.camera.get_aruco_tf()
-        return color_img, depth_img, aruco_tf
+        aruco_tf, aruco_img = self.robot.camera.get_aruco_tf()
+        return color_img, depth_img, aruco_tf, aruco_img
 
     def test(self):
         tool_position=[0.5, -0.3, 0.17]
@@ -66,28 +77,49 @@ class Calibrate:
         calib_grid_z.shape = (num_calib_grid_pts,1)
         calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
         rate = rospy.Rate(0.5) # hz
-        robot_poses = []
-        marker_poses = []
+        # robot_poses = []
+        # marker_poses = []
+
+        print("Start Calibrating...")
 
         for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
             tool_position = calib_grid_pts[calib_pt_idx,:]
+            tool_orientation_idx = 0
             for tool_orientation in tqdm(tool_orientations):
-                # print(' pos: ' + str(tool_position) + ' rot: ' + str(tool_orientation))
+                tool_orientation_idx += 1
                 self.robot.move_to(tool_position, tool_orientation)
                 rate.sleep()
-                color_img, depth_img, aruco_tf = self.get_rgb_depth_image_and_transform()
-                cv2.imshow("color.png", color_img)
+                time.sleep(1)
+                aruco_img_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_arucoimg.png')
+                robot_pose_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_robotpose.txt')
+                marker_pose_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_markerpose.txt')
+
+                color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
+
+                cv2.imshow("color.png", aruco_img)
+                cv2.imwrite(aruco_img_file, aruco_img)
                 cv2.waitKey(1)
+
                 if len(aruco_tf.transforms) > 0:
                     # TODO(ahundt) convert tool position and rpy orientation into position + quaternion
-                    robot_poses += [[tool_position + tool_orientation]]
-                    transform = aruco_tf.transforms[0]
-                    marker_poses += [[transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z, 
-                                    transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w]]
+                    with open(robot_pose_file, 'w') as file1:
+                        # robot_poses.append(list(tool_position) + tool_orientation)
+                        # tool position was of type numpy array
+                        for l in list(tool_position) + tool_orientation:
+                            file1.writelines(str(l) + ' ')
+
+                    with open(marker_pose_file, 'w') as file2:
+                        transform = aruco_tf.transforms[0]
+                        # marker_poses.append([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z, 
+                        #             transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w])
+                        for l in [transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z, 
+                                transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z]:
+                            file2.writelines(str(l) + ' ')
                 # TODO(ahundt) get several image transforms at each location and ensure position and orientation noise within some bounds
-                # print(aruco_tf.transforms)
-        print("robot poses: " + str(robot_poses))
-        print("marker poses: " + str(marker_poses))
+                
+        # print("robot poses: " + str(robot_poses))
+        # print("marker poses: " + str(marker_poses))
+        print('Finish!')
 
 if __name__ == "__main__":
     calib = Calibrate()
