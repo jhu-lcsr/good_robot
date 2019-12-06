@@ -91,7 +91,7 @@ class Calibrate:
         self.robot.joint_vel = 1.2
 
         # Construct 3D calibration grid across workspace
-        num_calib_grid_pts, calib_grid_pts = self.calib_grid_carteisan(workspace_limits, calib_grid_step)
+        num_calib_grid_pts, calib_grid_pts = utils.calib_grid_cartesian(workspace_limits, calib_grid_step)
         rate = rospy.Rate(0.5) # hz
         robot_poses = []
         marker_poses = []
@@ -109,8 +109,14 @@ class Calibrate:
 
                 # cv2.imshow("color.png", aruco_img)
                 # cv2.waitKey(1)
-                aruco_img_file = os.path.join(self.calibration_file_folder, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_arucoimg.png')
+                img_prefix = str(calib_pt_idx) + '_' + str(tool_orientation_idx)
+                aruco_img_file = os.path.join(self.calibration_file_folder, 'arucoimg_' + img_prefix + '.png')
                 cv2.imwrite(aruco_img_file, aruco_img)
+                rgb_img_file = os.path.join(self.calibration_file_folder, 'rgb_img_' + img_prefix + '.png')
+                cv2.imwrite(rgb_img_file, color_img)
+                depth_img_file = os.path.join(self.calibration_file_folder, 'depth_img_' + img_prefix + '.png')
+                cv2.imwrite(depth_img_file, aruco_img)
+
                 if len(aruco_tf.transforms) > 0:
                     # TODO(ahundt) we assume only one marker is visible, at least check that the id matches the whole time.
                     transform = aruco_tf.transforms[0]
@@ -125,19 +131,6 @@ class Calibrate:
         # print("robot poses: " + str(robot_poses))
         # print("marker poses: " + str(marker_poses))
         return robot_poses, marker_poses
-
-    def calib_grid_carteisan(self, workspace_limits, calib_grid_step):
-        # Construct 3D calibration grid across workspace
-        gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
-        gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
-        gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
-        calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
-        num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
-        calib_grid_x.shape = (num_calib_grid_pts,1)
-        calib_grid_y.shape = (num_calib_grid_pts,1)
-        calib_grid_z.shape = (num_calib_grid_pts,1)
-        calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
-        return num_calib_grid_pts, calib_grid_pts
 
     def save_transforms_to_file(self, calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation):
         
@@ -208,6 +201,8 @@ class Calibrate:
         np.savetxt(os.path.join(self.calibration_file_folder, 'cam2base.txt'), X)
         print('Final Transform: \n' + str(X))
         return X
+
+    
 
 
 if __name__ == "__main__":

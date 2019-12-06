@@ -424,6 +424,29 @@ def axxb(robotPose, markerPose):
     
     return tag2tool
 
+def calib_grid_cartesian(workspace_limits, calib_grid_step):
+    """
+    Construct 3D calibration grid across workspace
+    
+    # Arguments
+
+        workspace_limits: list of [min,max] coordinates for the list [x, y, z] in meters.
+        calib_grid_step: the step size of points in a 3d grid to be created in meters.
+    
+    # Returns
+
+        num_calib_grid_pts, calib_grid_pts
+    """
+    gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
+    gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
+    gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
+    calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
+    num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
+    calib_grid_x.shape = (num_calib_grid_pts,1)
+    calib_grid_y.shape = (num_calib_grid_pts,1)
+    calib_grid_z.shape = (num_calib_grid_pts,1)
+    calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
+    return num_calib_grid_pts, calib_grid_pts
 
 def pose_inv(pose):
     """
