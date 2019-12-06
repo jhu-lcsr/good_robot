@@ -13,6 +13,7 @@ from ros_aruco import ROSArUcoCalibrate
 from tqdm import tqdm
 import time
 import os
+import utils
 
 class Calibrate:
 
@@ -35,6 +36,8 @@ class Calibrate:
         self.robot.go_home()
 
         self.calibration_file_folder = '/home/costar/src/real_good_robot/calibration'
+        self.robot_poses = []
+        self.marker_poses = []
 
     def get_rgb_depth_image_and_transform(self):
         color_img, depth_img = self.robot.get_camera_data()
@@ -53,7 +56,7 @@ class Calibrate:
             cv2.waitKey(1)
             print(aruco_tf.transforms)
     
-    def calibrate(self):
+    def get_calibration_file(self):
         
         workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
         calib_grid_step = 0.05
@@ -96,31 +99,96 @@ class Calibrate:
 
                 color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
-                cv2.imshow("color.png", aruco_img)
+                # cv2.imshow("color.png", aruco_img)
+                # cv2.waitKey(1)
                 cv2.imwrite(aruco_img_file, aruco_img)
-                cv2.waitKey(1)
 
+                # TODO (Hongtao): make sure that the transformations of robot and tag are correct
                 if len(aruco_tf.transforms) > 0:
-                    # TODO(ahundt) convert tool position and rpy orientation into position + quaternion
+                    # Tool pose in robot base frame
                     with open(robot_pose_file, 'w') as file1:
-                        # robot_poses.append(list(tool_position) + tool_orientation)
-                        # tool position was of type numpy array
-                        for l in list(tool_position) + tool_orientation:
-                            file1.writelines(str(l) + ' ')
+                        # Tool rotation matrix
+                        tool_orientation_angle = np.linalg.norm(tool_orientation)
+                        tool_orientation_axis = tool_orientation/tool_orientation_angle
+                        # Note that this following rotm is the base frame in tool frame
+                        tool_orientation_rotm = utils.angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
+                        # Tool rigid body transformation
+                        tool_transformation = np.zeros((4, 4))
+                        tool_transformation[:3, :3] = tool_orientation_rotm.T # transpose so that it is tool frame in base frame
+                        tool_transformation[:3, 3] = tool_position
+                        tool_transformation[3, 3] = 1
 
+                        # print "Robot tool transformation"
+                        # print tool_transformation
+
+                        for l in np.reshape(tool_transformation, (16, )).tolist():
+                            file1.writelines(str(l) + ' ')
+                    
+                    # Marker pose in camera frame
                     with open(marker_pose_file, 'w') as file2:
                         transform = aruco_tf.transforms[0]
-                        # marker_poses.append([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z, 
-                        #             transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z, transform.transform.rotation.w])
-                        for l in [transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z, 
-                                transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z]:
+                        # Marker quaternion
+                        marker_quaternion = np.array([transform.transform.rotation.w, transform.transform.rotation.x, transform.transform.rotation.y, transform.transform.rotation.z])
+                        # Marker rotation matrix
+                        marker_orientation_rotm = utils.quat2rotm(marker_quaternion)
+                        # Marker transformation
+                        marker_position = np.array([transform.transform.translation.x, transform.transform.translation.y, transform.transform.translation.z])
+                        # Marker rigid body transformation
+                        marker_transformation = np.zeros((4, 4))
+                        marker_transformation[:3, :3] = marker_orientation_rotm
+                        marker_transformation[:3, 3] = marker_position
+                        marker_transformation[3, 3] = 1
+                        # marker_transformation = utils.make_rigid_transformation(marker_position, marker_quaternion)
+
+                        # print "Marker transformation"
+                        # print marker_transformation
+
+                        for l in np.reshape(marker_transformation, (16, )).tolist():
                             file2.writelines(str(l) + ' ')
-                # TODO(ahundt) get several image transforms at each location and ensure position and orientation noise within some bounds
+                    
+                    time.sleep(10)
                 
         # print("robot poses: " + str(robot_poses))
         # print("marker poses: " + str(marker_poses))
         print('Finish!')
 
+    # TODO (Hongtao): After making sure that the tag transformation is correct, make sure that the function is correct
+    def calibrate(self):
+        # Load robot pose and marker pose
+        for f in os.listdir(self.calibration_file_folder):
+            if 'robotpose.txt' in f:
+                robot_pose_file = f
+                marker_pose_file = f[:-13] + 'markerpose.txt'
+                
+                # tool pose in robot base frame
+                with open(os.path.join(self.calibration_file_folder, robot_pose_file), 'r') as file_robot:
+                    robotpose_str = file_robot.readline().split(' ')
+                    robotpose = [float (x) for x in robotpose_str if x is not '']
+                    assert len(robotpose) == 16
+                    robotpose = np.reshape(np.array(robotpose), (4, 4))
+                self.robot_poses.append(robotpose)
+                
+                # marker pose in camera frame
+                with open(os.path.join(self.calibration_file_folder, marker_pose_file), 'r') as file_marker:
+                    markerpose_str = file_marker.readline().split(' ')
+                    markerpose = [float(x) for x in markerpose_str if x is not '']
+                    assert len(markerpose) == 16
+                    markerpose = np.reshape(np.array(markerpose), (4, 4))
+
+                import ipdb; ipdb.set_trace()
+                self.marker_poses.append(markerpose)
+        
+        # AX=XB calibration: marker pose in tool frame
+        marker2tool = utils.axxb(self.robot_poses, self.marker_poses)
+        
+        print("Camera in robot base:")
+        for i in range(10):
+            cam2base = np.matmul(np.matmul(self.robot_poses[i], marker2tool), np.linalg.inv(self.marker_poses[i]))
+            print(cam2base)
+
+
+
 if __name__ == "__main__":
     calib = Calibrate()
-    calib.calibrate()
+    calib.get_calibration_file()
+    # calib.calibrate()
