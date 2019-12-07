@@ -394,12 +394,14 @@ def axxb(robotPose, markerPose):
         alpha[:, i] = get_mat_log(A[:3, :3, i])
         beta[:, i] = get_mat_log(B[:3, :3, i])
         
+        # Bad pair of transformation are very close in the orientation.
+        # They will give nan result
         if np.sum(np.isnan(alpha[:, i])) + np.sum(np.isnan(beta[:, i])) > 0:
             nan_num += 1
             continue
         else:
             M += np.outer(beta[:, i], alpha[:, i])
-
+            
     print "Invalid poses number: {}".format(nan_num)
 
     # Get the rotation matrix
@@ -418,8 +420,6 @@ def axxb(robotPose, markerPose):
     
     cam2base = np.c_[R, t]
     cam2base = np.r_[cam2base, [[0, 0, 0, 1]]]
-
-    print "Calibration Result:\n", cam2base
     
     return cam2base
 
