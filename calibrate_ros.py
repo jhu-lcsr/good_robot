@@ -32,23 +32,19 @@ def ros_transform_to_numpy_transform(transform):
 
 class Calibrate:
 
-    def __init__(self, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003, save_dir=None):
-        self.workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
-        self.calib_grid_step = 0.05
-        self.robot = Robot(False, None, None, self.workspace_limits,
-              tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-              False, None, None, calibrate=True)
-        
-        print('Robot active, open the gripper')
-    
-        self.robot.open_gripper()
-        print('Gripper opened!')
+    def __init__(
+            self, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003, 
+            save_dir=None, workspace_limits=None, calib_grid_step=0.06):
+        if workspace_limits is None:
+            self.workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
+        self.calib_grid_step = calib_grid_step
 
-        self.robot.joint_acc = 1.7
-        self.robot.joint_vel = 1.2
-
-        print('MOVING THE ROBOT to home position...')
-        self.robot.go_home()
+        # we only activate the robot when we are actually collect data
+        self.robot = None
+        self.tcp_host_ip = tcp_host_ip
+        self.tcp_port = tcp_port
+        self.rtc_host_ip = rtc_host_ip
+        self.rtc_port = rtc_port
 
         if save_dir is None:
             # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
@@ -76,20 +72,48 @@ class Calibrate:
             cv2.waitKey(1)
             print(aruco_tf.transforms)
     
-    def collect_data(self, calib_grid_step=0.06, workspace_limits=None):
+    def activate_robot(self):
+        if self.robot is None:
+            print('Activating the robot, prepare for it to move!')
+            self.robot = Robot(False, None, None, self.workspace_limits,
+                self.tcp_host_ip, self.tcp_port, self.rtc_host_ip, self.rtc_port,
+                False, None, None, calibrate=True)
+            
+            print('Robot active, open the gripper')
+        
+            self.robot.open_gripper()
+            print('Gripper opened!')
+
+            self.robot.joint_acc = 1.7
+            self.robot.joint_vel = 1.2
+
+            print('MOVING THE ROBOT to home position...')
+            self.robot.go_home()
+
+    
+    def collect_data(self, calib_grid_step=None, workspace_limits=None, rate_hz=0.5):
         """
         # Arguments
 
-            calib_grid_step: Meters per cartesian data collection point, reasonable values are 0.06, and 0.05.
+            calib_grid_step: Meters per cartesian data collection point, reasonable values are 0.06 (default), and 0.05.
                              Smaller step sizes collect more data, but take exponentially longer to run.
+            rate_hz: The rate at which each data point is collected. You may want this to be smaller if time is needed to settle in place.
         """
 
         # Test the destination directory.
         if ( False == os.path.isdir( self.save_dir ) ):
             print("The destination directory (%s) does not exist. Creating the directory." % self.save_dir)
             os.mkdir( self.save_dir )
+        if calib_grid_step is None:
+            calib_grid_step = self.calib_grid_step
         if workspace_limits is None:
-            workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
+            workspace_limits = self.workspace_limits
+
+        if self.robot is None:
+            self.activate_robot()
+        
+        rate = rospy.Rate(rate_hz) # hz
+        rate.sleep()
         # Checkerboard tracking point offset from the tool in the robot coordinate
         # checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
         # flat and level with fiducial facing up: [0, np.pi/2, 0.0]
@@ -101,7 +125,6 @@ class Calibrate:
 
         # Construct 3D calibration grid across workspace
         num_calib_grid_pts, calib_grid_pts = utils.calib_grid_cartesian(workspace_limits, calib_grid_step)
-        rate = rospy.Rate(1.0/3.0) # hz
         robot_poses = []
         marker_poses = []
 
@@ -167,23 +190,57 @@ class Calibrate:
                 for l in np.reshape(marker_transformation, (16, )).tolist():
                     file2.writelines(str(l) + ' ')
 
+    # TODO(Hongtao): After making sure that the tag transformation is correct, make sure that the function is correct
+    def calibrate(self, robot_poses=None, marker_poses=None, load_dir=None):
+        """Perform calibration
 
-    # TODO (Hongtao): After making sure that the tag transformation is correct, make sure that the function is correct
-    def solve_axxb_horn(self):
-        # Load robot pose and marker pose
+        robot_poses: a list of 4x4 transforms from the robot base to the tool tip
+        marker_poses: a list of 4x4 transforms from the camera to the AR tag marger
+        """
+        if load_dir is not None:
+            # Load robot pose and marker pose
+            robot_poses, marker_poses = self.load_marker_poses(load_dir)
+        elif robot_poses is None and marker_poses is None:
+            # collect the pose data
+            robot_poses, marker_poses = calib.collect_data()
+
+        
+        # TODO(ahundt) split train and validation sets, add loop for RANSAC consensus
+        # AX=XB calibration: marker pose in tool frame
+        # marker2tool = utils.axxb(self.robot_poses, self.marker_poses)
+        marker2tool = SolverAXXB.LeastSquareAXXB(robot_poses, marker_poses)
+        # error = SolverAXXB.Validation(X, ValidSet)
+        np.savetxt(os.path.join(self.save_dir, 'marker2tool.txt'), marker2tool)
+        
+        for i in range(len(robot_poses)):
+            print("Camera in robot base example" + str(i) + ":")
+            cam2base = np.matmul(np.matmul(self.robot_poses[i], marker2tool), np.linalg.inv(self.marker_poses[i]))
+            print(cam2base)
+            np.savetxt(os.path.join(self.save_dir, 'cam2base_' + str(i) + '.txt'), marker2tool)
+        # TODO(ahundt) Make sure this isn't actuall Marker to Tool
+        print('Final Marker to Tool Transform : \n' + str(marker2tool))
+
+        return marker2tool
+
+    def load_marker_poses(self, load_dir):
+        """ Load robot pose and marker pose from a save directory
+        """
+        robot_poses = []
+        marker_poses = []
         for f in os.listdir(self.save_dir):
             if 'robotpose.txt' in f:
                 robot_pose_file = f
+                # TODO(hongtao) this next line probably breaks when the number of digits in samples changes (9, 99, 999)
                 marker_pose_file = f[:-13] + 'markerpose.txt'
-                
+
                 # tool pose in robot base frame
                 with open(os.path.join(self.save_dir, robot_pose_file), 'r') as file_robot:
                     robotpose_str = file_robot.readline().split(' ')
                     robotpose = [float (x) for x in robotpose_str if x is not '']
                     assert len(robotpose) == 16
                     robotpose = np.reshape(np.array(robotpose), (4, 4))
-                self.robot_poses.append(robotpose)
-                
+                robot_poses.append(robotpose)
+
                 # marker pose in camera frame
                 with open(os.path.join(self.save_dir, marker_pose_file), 'r') as file_marker:
                     markerpose_str = file_marker.readline().split(' ')
@@ -191,26 +248,9 @@ class Calibrate:
                     assert len(markerpose) == 16
                     markerpose = np.reshape(np.array(markerpose), (4, 4))
 
-                import ipdb; ipdb.set_trace()
-                self.marker_poses.append(markerpose)
-        
-        # AX=XB calibration: marker pose in tool frame
-        marker2tool = utils.axxb(self.robot_poses, self.marker_poses)
-        
-        print("Camera in robot base:")
-        for i in range(10):
-            cam2base = np.matmul(np.matmul(self.robot_poses[i], marker2tool), np.linalg.inv(self.marker_poses[i]))
-            print(cam2base)
-    
-    def calibrate(self):
-
-        # TODO(ahundt) split train and validation sets, add loop for RANSAC consensus
-        robot_poses, marker_poses = calib.collect_data()
-        X = SolverAXXB.LeastSquareAXXB(robot_poses, marker_poses)
-        # error = SolverAXXB.Validation(X, ValidSet)
-        np.savetxt(os.path.join(self.save_dir, 'cam2base.txt'), X)
-        print('Final Transform: \n' + str(X))
-        return X
+                # import ipdb; ipdb.set_trace()
+                marker_poses.append(markerpose)
+        return robot_poses, marker_poses 
 
     
 
