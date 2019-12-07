@@ -353,7 +353,7 @@ def axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orien
     tool_orientation_rotm = angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
     # Tool rigid body transformation
     tool_transformation = np.zeros((4, 4))
-    tool_transformation[:3, :3] = tool_orientation_rotm.T # transpose so that it is tool frame in base frame
+    tool_transformation[:3, :3] = tool_orientation_rotm
     tool_transformation[:3, 3] = tool_position
     tool_transformation[3, 3] = 1
     return tool_transformation
@@ -367,8 +367,9 @@ def axxb(robotPose, markerPose):
     Args:
     - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.
     - markerPose (list of 4x4 numpy array): poses (homogenous transformation) of the marker in the camera frame.
+    
     Return:
-    - tag2tool (4x4 numpy array): poses of the tag in the robot end-effector frame.
+    - cam2base (4x4 numpy array): poses of the camera in robot base frame.
     """
 
     assert len(robotPose) == len(markerPose), 'robot poses and marker poses are not of the same length!'
@@ -388,8 +389,8 @@ def axxb(robotPose, markerPose):
     np.random.shuffle(sequence)
 
     for i in range(n-1):
-        A[:, :, i] = np.matmul(pose_inv(robotPose[sequence[i+1]]), robotPose[sequence[i]])
-        B[:, :, i] = np.matmul(pose_inv(markerPose[sequence[i+1]]), markerPose[sequence[i]])
+        A[:, :, i] = np.matmul(robotPose[sequence[i+1]], pose_inv(robotPose[sequence[i]]))
+        B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
         alpha[:, i] = get_mat_log(A[:3, :3, i])
         beta[:, i] = get_mat_log(B[:3, :3, i])
         
@@ -405,8 +406,6 @@ def axxb(robotPose, markerPose):
     mtm = np.matmul(M.T, M)
     u_mtm, s_mtm, vh_mtm = np.linalg.svd(mtm)
 
-    import ipdb; ipdb.set_trace()
-
     R = np.matmul(np.matmul(np.matmul(u_mtm, np.diag(np.power(s_mtm, -0.5))), vh_mtm), M.T)
 
     # Get the tranlation vector
@@ -417,36 +416,13 @@ def axxb(robotPose, markerPose):
         ta_Rtb_Right[(3*i):(3*(i+1)), :] = np.reshape(A[:3, 3, i] - np.dot(R, B[:3, 3, i]), (3, 1))
     t = np.linalg.lstsq(I_Ra_Left, ta_Rtb_Right, rcond=None)[0]
     
-    tag2tool = np.c_[R, t]
-    tag2tool = np.r_[tag2tool, [[0, 0, 0, 1]]]
+    cam2base = np.c_[R, t]
+    cam2base = np.r_[cam2base, [[0, 0, 0, 1]]]
 
-    print "Calibration Result:\n", tag2tool
+    print "Calibration Result:\n", cam2base
     
-    return tag2tool
+    return cam2base
 
-def calib_grid_cartesian(workspace_limits, calib_grid_step):
-    """
-    Construct 3D calibration grid across workspace
-    
-    # Arguments
-
-        workspace_limits: list of [min,max] coordinates for the list [x, y, z] in meters.
-        calib_grid_step: the step size of points in a 3d grid to be created in meters.
-    
-    # Returns
-
-        num_calib_grid_pts, calib_grid_pts
-    """
-    gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
-    gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
-    gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
-    calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
-    num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
-    calib_grid_x.shape = (num_calib_grid_pts,1)
-    calib_grid_y.shape = (num_calib_grid_pts,1)
-    calib_grid_z.shape = (num_calib_grid_pts,1)
-    calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
-    return num_calib_grid_pts, calib_grid_pts
 
 def pose_inv(pose):
     """
@@ -483,6 +459,30 @@ def get_mat_log(R):
 
     return w
 
+
+def calib_grid_cartesian(workspace_limits, calib_grid_step):
+    """
+    Construct 3D calibration grid across workspace
+    
+    # Arguments
+
+        workspace_limits: list of [min,max] coordinates for the list [x, y, z] in meters.
+        calib_grid_step: the step size of points in a 3d grid to be created in meters.
+    
+    # Returns
+
+        num_calib_grid_pts, calib_grid_pts
+    """
+    gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
+    gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
+    gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
+    calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
+    num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
+    calib_grid_x.shape = (num_calib_grid_pts,1)
+    calib_grid_y.shape = (num_calib_grid_pts,1)
+    calib_grid_z.shape = (num_calib_grid_pts,1)
+    calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
+    return num_calib_grid_pts, calib_grid_pts
 
 
 def check_separation(values, distance_threshold):
