@@ -116,9 +116,6 @@ class Calibrate:
         
         rate = rospy.Rate(rate_hz) # hz
         rate.sleep()
-        # Checkerboard tracking point offset from the tool in the robot coordinate
-        # checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
-        # flat and level with fiducial facing up: [0, np.pi/2, 0.0]
         tool_orientations = [[0, np.pi/2, 0.0], [0, 3.0*np.pi/4.0, 0.0], [0, 5.0*np.pi/8.0, 0.0], [0, 5.0*np.pi/8.0, np.pi/8], [np.pi/8.0, 5.0*np.pi/8.0, 0.0]] # Real Good Robot
 
         # Slow down robot
@@ -179,8 +176,8 @@ class Calibrate:
 
                 color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
-                # cv2.imshow("color.png", aruco_img)
-                # cv2.waitKey(1)
+                cv2.imshow("aruco.png", aruco_img)
+                cv2.waitKey(1)
                 img_prefix = str(calib_pt_idx) + '_' + str(tool_orientation_idx)
                 aruco_img_file = os.path.join(self.save_dir, 'arucoimg_' + img_prefix + '.png')
                 cv2.imwrite(aruco_img_file, aruco_img)
@@ -192,7 +189,6 @@ class Calibrate:
                 if len(aruco_tf.transforms) > 0:
                     # TODO(ahundt) we assume only one marker is visible, at least check that the id matches the whole time.
                     transform = aruco_tf.transforms[0]
-                    # TODO (Hongtao): make sure that the transformations of robot and tag are correct
                     tool_transformation = utils.axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orientation)
                     robot_poses += [tool_transformation]
                     marker_transformation = ros_transform_to_numpy_transform(transform)
@@ -200,9 +196,6 @@ class Calibrate:
                     # TODO(ahundt) need cleaner separation of concerns, only save file once with np.savetxt, pandas, or some other one liner
                     self.save_transforms_to_file(calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation)
 
-                
-        # print("robot poses: " + str(robot_poses))
-        # print("marker poses: " + str(marker_poses))
         return robot_poses, marker_poses
 
     def save_transforms_to_file(self, calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation):
@@ -212,25 +205,15 @@ class Calibrate:
         if len(aruco_tf.transforms) > 0:
             # Tool pose in robot base frame
             with open(robot_pose_file, 'w') as file1:
-
-                # print "Robot tool transformation"
-                # print tool_transformation
-
                 for l in np.reshape(tool_transformation, (16, )).tolist():
                     file1.writelines(str(l) + ' ')
 
             # Marker pose in camera frame
             with open(marker_pose_file, 'w') as file2:
-                # Marker quaternion
-                # marker_transformation = utils.make_rigid_transformation(marker_position, marker_quaternion)
-
-                # print "Marker transformation"
-                # print marker_transformation
-
                 for l in np.reshape(marker_transformation, (16, )).tolist():
                     file2.writelines(str(l) + ' ')
 
-    # TODO(Hongtao): After making sure that the tag transformation is correct, make sure that the function is correct
+
     def calibrate(self, robot_poses=None, marker_poses=None, load_dir=None):
         """Perform calibration
 
@@ -244,16 +227,17 @@ class Calibrate:
             # collect the pose data
             robot_poses, marker_poses = calib.collect_data()
 
-        # TODO(ahundt) split train and validation sets, add loop for RANSAC consensus
         # AX=XB calibration: marker pose in tool frame
         cam2base = utils.axxb(robot_poses, marker_poses)
+
+        print "Camera to base: ", cam2base
+
+        return cam2base
+
+        # TODO(ahundt) split train and validation sets, add loop for RANSAC consensus
         # marker2tool = SolverAXXB.LeastSquareAXXB(robot_poses, marker_poses)
         # error = SolverAXXB.Validation(X, ValidSet)
         # np.savetxt(os.path.join(self.save_dir, 'marker2tool.txt'), marker2tool)
-        
-        print("Camera to base: ", cam2base)
-
-        return cam2base
 
         # for i in range(len(robot_poses)):
         #     print("Camera in robot base example " + str(i) + ":")
