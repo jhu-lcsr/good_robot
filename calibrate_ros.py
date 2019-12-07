@@ -61,6 +61,7 @@ class Calibrate:
         return color_img, depth_img, aruco_tf, aruco_img
 
     def test(self):
+        self.activate_robot()
         tool_position=[0.5, -0.3, 0.17]
         tool_orientation = [0, np.pi/2, 0.0] # Real Good Robot
 
