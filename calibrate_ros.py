@@ -231,6 +231,8 @@ class Calibrate:
         cam2base = utils.axxb(robot_poses, marker_poses)
 
         print "Camera to base: ", cam2base
+        
+        np.savetxt('real/camera_pose.txt', cam2base, delimiter=' ')
 
         return cam2base
 
