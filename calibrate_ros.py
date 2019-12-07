@@ -224,6 +224,16 @@ class Calibrate:
 
     def load_transforms(self, load_dir):
         """ Load robot pose and marker pose from a save directory
+
+        # Arguments
+
+        load_dir: the directory where calibration data was previously acquired from the robot.
+
+        # Returns
+
+        Two lists of 4x4 transformation matrices.
+
+        robot_poses, marker_poses
         """
         robot_poses = []
         marker_poses = []
