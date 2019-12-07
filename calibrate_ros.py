@@ -199,7 +199,7 @@ class Calibrate:
         """
         if load_dir is not None:
             # Load robot pose and marker pose
-            robot_poses, marker_poses = self.load_marker_poses(load_dir)
+            robot_poses, marker_poses = self.load_transforms(load_dir)
         elif robot_poses is None and marker_poses is None:
             # collect the pose data
             robot_poses, marker_poses = calib.collect_data()
@@ -213,8 +213,8 @@ class Calibrate:
         np.savetxt(os.path.join(self.save_dir, 'marker2tool.txt'), marker2tool)
         
         for i in range(len(robot_poses)):
-            print("Camera in robot base example" + str(i) + ":")
-            cam2base = np.matmul(np.matmul(self.robot_poses[i], marker2tool), np.linalg.inv(self.marker_poses[i]))
+            print("Camera in robot base example " + str(i) + ":")
+            cam2base = np.matmul(np.matmul(robot_poses[i], marker2tool), np.linalg.inv(marker_poses[i]))
             print(cam2base)
             np.savetxt(os.path.join(self.save_dir, 'cam2base_' + str(i) + '.txt'), marker2tool)
         # TODO(ahundt) Make sure this isn't actuall Marker to Tool
@@ -222,7 +222,7 @@ class Calibrate:
 
         return marker2tool
 
-    def load_marker_poses(self, load_dir):
+    def load_transforms(self, load_dir):
         """ Load robot pose and marker pose from a save directory
         """
         robot_poses = []
@@ -258,3 +258,4 @@ class Calibrate:
 if __name__ == "__main__":
     calib = Calibrate()
     calib.calibrate()
+    # calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration')
