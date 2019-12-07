@@ -79,6 +79,7 @@ class Camera(object):
         else:
             # Get frame
             color_img, depth_img, _ = self.camera.frames()
+            color_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2RGB)
 
         return color_img, depth_img
     
