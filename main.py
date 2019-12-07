@@ -1052,7 +1052,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                 trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
-        print('Experience Replay: 0 prior training samples. Skipping experience replay.')
+        # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
         time.sleep(0.01)
 
 
