@@ -46,6 +46,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     
     # Compute heightmap size
     heightmap_size = np.round(((workspace_limits[1][1] - workspace_limits[1][0])/heightmap_resolution, (workspace_limits[0][1] - workspace_limits[0][0])/heightmap_resolution)).astype(int)
+    depth_heightmap = np.zeros(heightmap_size)
 
     # Get 3D point cloud from RGB-D images
     surface_pts, color_pts = get_pointcloud(color_img, depth_img, cam_intrinsics)
@@ -63,22 +64,29 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     surface_pts = surface_pts[heightmap_valid_ind]
     color_pts = color_pts[heightmap_valid_ind]
 
-    # Create orthographic top-down-view RGB-D heightmaps
-    color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
-    color_heightmap_g = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
-    color_heightmap_b = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
-    depth_heightmap = np.zeros(heightmap_size)
+    # Create orthographic top-down-view RGB-D depth heightmap
     heightmap_pix_x = np.floor((surface_pts[:,0] - workspace_limits[0][0])/heightmap_resolution).astype(int)
     heightmap_pix_y = np.floor((surface_pts[:,1] - workspace_limits[1][0])/heightmap_resolution).astype(int)
-    color_heightmap_r[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[0]]
-    color_heightmap_g[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[1]]
-    color_heightmap_b[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[2]]
-    color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
     depth_heightmap[heightmap_pix_y,heightmap_pix_x] = surface_pts[:,2]
     z_bottom = workspace_limits[2][0]
     depth_heightmap = depth_heightmap - z_bottom
     depth_heightmap[depth_heightmap < 0] = 0
+    if depth_median_filter_pixels > 0:
+        depth_heightmap = ndimage.median_filter(depth_heightmap, size=depth_median_filter_pixels)
     depth_heightmap[depth_heightmap == -z_bottom] = np.nan
+
+    # Create orthographic top-down-view RGB-D color heightmaps
+    color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
+    color_heightmap_g = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
+    color_heightmap_b = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
+    color_heightmap_r[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[0]]
+    color_heightmap_g[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[1]]
+    color_heightmap_b[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[2]]
+    if depth_median_filter_pixels > 0:
+        color_heightmap_r = ndimage.median_filter(color_heightmap_r, size=depth_median_filter_pixels)
+        color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=depth_median_filter_pixels)
+        color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=depth_median_filter_pixels)
+    color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
 
     return color_heightmap, depth_heightmap
 
@@ -401,7 +409,7 @@ def axxb(robotPose, markerPose):
             continue
         else:
             M += np.outer(beta[:, i], alpha[:, i])
-            
+
     print "Invalid poses number: {}".format(nan_num)
 
     # Get the rotation matrix
