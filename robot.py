@@ -820,7 +820,7 @@ class Robot(object):
         """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
-        print('Executing: grasp at (%f, %f, %f)' % (position[0], position[1], position[2]))
+        print('Executing: grasp at (%f, %f, %f) orientation: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
 
         if self.is_sim:
 
