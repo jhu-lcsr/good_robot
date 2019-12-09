@@ -446,7 +446,7 @@ def main(args):
                 # Add the common sense heuristic where we don't bother actually grasping if there is nothing there for grasps
                 nothing_present_assume_failure = False
                 if(skip_grasp_on_zero_heightmap and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or 
-                        valid_depth_heightmap[best_pix_y][best_pix_x] == 0.0)):
+                        valid_depth_heightmap[best_pix_y][best_pix_x] < 0.005)):
                     nothing_present_assume_failure = True
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
