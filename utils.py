@@ -383,7 +383,7 @@ def axxb(robotPose, markerPose):
     assert len(robotPose) == len(markerPose), 'robot poses and marker poses are not of the same length!'
 
     n = len(robotPose)
-    print "Total number of poses: %i" % n
+    print("Total number of poses: %i" % n)
     A = np.zeros((4, 4, n-1))
     B = np.zeros((4, 4, n-1))
     alpha = np.zeros((3, n-1))
@@ -410,7 +410,7 @@ def axxb(robotPose, markerPose):
         else:
             M += np.outer(beta[:, i], alpha[:, i])
 
-    print "Invalid poses number: {}".format(nan_num)
+    print("Invalid poses number: {}".format(nan_num))
 
     # Get the rotation matrix
     mtm = np.matmul(M.T, M)
