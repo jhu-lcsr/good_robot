@@ -1,6 +1,6 @@
 # Software License Agreement (BSD License)
 #
-# Copyright (c) 2012, Robotiq, Inc.
+# Copyright (c) 2012, Robotiq, Inc. 2019 Andrew Hundt.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -41,6 +41,7 @@ The module depends on pymodbus (http://code.google.com/p/pymodbus/) for the Modb
 """
 
 from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.exceptions import ModbusIOException
 from math import ceil
 
 class communication:	
@@ -79,6 +80,8 @@ class communication:
       #To do!: Implement try/except 
       #Get status from the device
       response = self.client.read_input_registers(0, numRegs)
+      while isinstance(response, ModbusIOException):
+         response = self.client.read_input_registers(0, numRegs)
 
       #Instantiate output as an empty list
       output = []

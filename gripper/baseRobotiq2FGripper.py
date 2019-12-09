@@ -105,16 +105,16 @@ class robotiqbaseRobotiq2FGripper:
         """Request the status from the gripper and return it in the Robotiq2FGripper_robot_input msg type."""
 
         #Acquire status from the Gripper
-        status = self.client.getStatus(6);
+        status = self.client.getStatus(6)
 
         #Message to output
         message = inputMsg()
 
         #Assign the values to their respective variables
-        message.gACT = (status[0] >> 0) & 0x01;        
-        message.gGTO = (status[0] >> 3) & 0x01;
-        message.gSTA = (status[0] >> 4) & 0x03;
-        message.gOBJ = (status[0] >> 6) & 0x03;
+        message.gACT = (status[0] >> 0) & 0x01        
+        message.gGTO = (status[0] >> 3) & 0x01
+        message.gSTA = (status[0] >> 4) & 0x03
+        message.gOBJ = (status[0] >> 6) & 0x03
         message.gFLT =  status[2]
         message.gPR  =  status[3]
         message.gPO  =  status[4]

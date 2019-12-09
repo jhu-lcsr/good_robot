@@ -58,7 +58,7 @@ class RobotiqCGripper(object):
             print("Successfully connected to the gripper!")
             return True
         else:
-            print("Fail to connect to the gripper!")
+            print("Failed to connect to the gripper!")
             return False
 
     def is_ready(self):
