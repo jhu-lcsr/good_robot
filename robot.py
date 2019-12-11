@@ -976,15 +976,17 @@ class Robot(object):
             # Get current tool pose
             state_data = self.get_state()
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+            # midpos is a hack to prevent the robot from going to an elbow down position on a long move,
+            # which leads to a security stop and an end to the program run.
             midpos = (np.array(actual_tool_pose[:3]) + up_pos) / 2.0
 
-            print("Real Good Robot grasping at: " + str(position), ", " + str(tool_orientation))
+            print("Real Good Robot grasping at: " + str(position) + ", " + str(tool_orientation))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (midpos[0],midpos[1],midpos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (midpos[0],midpos[1],midpos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
             tcp_command += "end\n"
