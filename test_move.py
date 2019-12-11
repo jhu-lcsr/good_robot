@@ -42,13 +42,31 @@ import time
 
 r = Robot(is_sim=False, tcp_host_ip='192.168.1.155', tcp_port=30002)
 
+print('Robot cartesian home: ' + str(r.get_cartesian_position()))
+r.move_to([0.4387914740866465, -0.02251891154755168, 0.6275728717960743], None)
+r.move_to([0.4387914740866465, -0.02251891154755168, 0.3275728717960743], None)
+
 # tool_orientation = [0.0, 0.0, 0.0] # Real Good Robot
 # above_bin_waypoint = [0.3, 0.0,  0.8]
-# r.move_to(above_bin_waypoint, tool_orientation)
-# time.sleep(.1)
+# r.move_to(above_bin_waypoint, tool_orientation)r.grasp([0.414000, -0.092000, 0.103734], 0.0)
+
+r.grasp([0.414000, -0.092000, 0.003734], 0.0)
+r.push([0.414000, -0.092000, 0.003734], 0.0)
 
 r.grasp([0.816000, -0.024000, -0.040000], 1.570796)
 r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+
+# time.sleep(.1)
+# Training iteration: 1
+# Change detected: True (value: 972)
+# Primitive confidence scores: 3.698842 (push), 3.391453 (grasp)
+# Strategy: exploit (exploration probability: 0.500000)
+# Action: push at (0, 86, 19)
+# Real Robot push at (0.414000, -0.092000, 0.003734) angle: 0.000000
+# Gripper finished moving!
+# Trainer.get_label_value(): Current reward: 1.000000 Current reward multiplier: 1.000000 Predicted Future reward: 3.698842 Expected reward: 1.000000 + 0.500000 x 3.698842 = 2.849421
+# Training loss: 0.984293
+
 
 # tool_pos = [0.6, -0.1, 0.4]
 # tool_orientation = [0.0, np.pi, 0.0]

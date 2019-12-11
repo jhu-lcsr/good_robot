@@ -177,6 +177,8 @@ class Robot(object):
             # self.home_joint_config = [-0.202, -0.980, -1.800, -0.278, 1.460, 1.613]
             # Real Good Robot Home Joint Config
             self.home_joint_config = [0.2, -1.62, -0.85, -2.22, 1.57, 1.71]
+            self.home_cart = [0.4387869054651441, -0.022525365646335706, 0.6275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
+            self.home_cart_low = [0.4387869054651441, -0.022525365646335706, 0.3275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
 
 
             # Default joint speed configuration
@@ -656,7 +658,7 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation):
+    def move_to(self, tool_position, tool_orientation=None):
 
         if self.is_sim:
 
@@ -674,7 +676,10 @@ class Robot(object):
             vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
 
         else:
-
+            if tool_orientation is None:
+                # If no orientation is provided, use the current one.
+                actual_pose = self.get_cartesian_position()
+                tool_orientation = actual_pose[3:]
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
 
@@ -694,6 +699,8 @@ class Robot(object):
             self.tcp_socket.close()
 
     def guarded_move_to(self, tool_position, tool_orientation):
+        if self.is_sim:
+            raise NotImplementedError
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.rtc_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -758,6 +765,8 @@ class Robot(object):
 
 
     def move_joints(self, joint_configuration):
+        if self.is_sim:
+            raise NotImplementedError
 
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
@@ -779,14 +788,20 @@ class Robot(object):
 
 
     def go_home(self, block_until_home=False):
+        if self.is_sim:
+            raise NotImplementedError
 
         self.move_joints(self.home_joint_config)
         if block_until_home:
             self.block_until_home()
 
 
-    # Note: must be preceded by close_gripper()
     def check_grasp(self):
+        """
+        Note: must be preceded by close_gripper()
+        """
+        if self.is_sim:
+            raise NotImplementedError
 
         state_data = self.get_state()
         tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
@@ -974,18 +989,14 @@ class Robot(object):
             up_pos = np.array([position[0],position[1],position[2]+0.1])
 
             # Get current tool pose
-            state_data = self.get_state()
-            actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            # midpos is a hack to prevent the robot from going to an elbow down position on a long move,
-            # which leads to a security stop and an end to the program run.
-            midpos = (np.array(actual_tool_pose[:3]) + up_pos) / 2.0
+            mid_pos = self.get_midpoint(up_pos)
 
             print("Real Good Robot grasping at: " + str(position) + ", " + str(tool_orientation))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (midpos[0],midpos[1],midpos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
@@ -995,7 +1006,7 @@ class Robot(object):
 
             # gripper_connected_to_robot = False
             # if gripper_connected_to_robot:
-            self.block_until_pose(position)
+            self.block_until_cartesian_position(position)
             # else:
             # Close gripper
             time.sleep(self.move_sleep)
@@ -1093,21 +1104,18 @@ class Robot(object):
         # TODO: change to 1 and 2 arguments
         return grasp_success, color_success
 
-    def block_until_pose(self, position, timeout=5):
-        """Block the program until it reaches a specified pose or the timeout in seconds.
+    def get_midpoint(self, pos):
+        """ Gets the cartesian midpoint between the current real robot position and some goal position
         """
-        # Block until robot reaches target tool position and gripper fingers have stopped moving
+        if self.is_sim:
+            raise NotImplementedError
+        # Get current tool pose
         state_data = self.get_state()
-        timeout_t0 = time.time()
-        tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        while True:
-            state_data = self.get_state()
-            new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-            actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            timeout_t1 = time.time()
-            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout:
-                break
-            tool_analog_input2 = new_tool_analog_input2
+        actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+        # midpos is a hack to prevent the robot from going to an elbow down position on a long move,
+        # which leads to a security stop and an end to the program run.
+        midpos = (np.array(actual_tool_pose[:3]) + pos) / 2.0
+        return midpos
 
 
     def push(self, position, heightmap_rotation_angle, workspace_limits=None):
@@ -1202,17 +1210,22 @@ class Robot(object):
             position[0] = min(max(position[0], workspace_limits[0][0]), workspace_limits[0][1])
             position[1] = min(max(position[1], workspace_limits[1][0]), workspace_limits[1][1])
             position[2] = max(position[2] + 0.005, workspace_limits[2][0] + 0.005) # Add buffer to surface
+            up_pos = np.array([position[0],position[1],position[2]+0.1])
 
             # home_position = [0.49,0.11,0.03]
             # Real Good Robot
             # home_position = [0.42565109, 0.04298656, 0.30092444 + self.gripper_ee_offset]
+
+            # Get current tool pose
+            mid_pos = self.get_midpoint(up_pos)
 
             # Attempt push
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,True)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.3,self.joint_vel*0.5)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.75,self.joint_vel*0.75)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (push_endpoint[0],push_endpoint[1],push_endpoint[2],tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.03)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
@@ -1241,9 +1254,19 @@ class Robot(object):
             # time.sleep(0.25)
 
         return push_success
+    
+    def get_cartesian_position(self):
+        if self.is_sim:
+            raise NotImplementedError
+
+        state_data = self.get_state()
+        actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+        return actual_tool_pose
 
     def block_until_home(self, max_seconds=20):
 
+        if self.is_sim:
+            raise NotImplementedError
         # Don't wait for more than 20 seconds
         iteration_time_0 = time.time()
         while True:
@@ -1258,19 +1281,39 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-    def block_until_position(self, position, max_seconds=20):
+    def block_until_cartesian_position(self, position, timeout=5):
+        """Block the real program until it reaches a specified cartesian pose or the timeout in seconds.
+        """
+        if self.is_sim:
+            raise NotImplementedError
+        # Block until robot reaches target tool position and gripper fingers have stopped moving
+        state_data = self.get_state()
+        timeout_t0 = time.time()
+        tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
+        while True:
+            timeout_t1 = time.time()
+            state_data = self.get_state()
+            new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
+            actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout:
+                break
+            tool_analog_input2 = new_tool_analog_input2
 
+    def block_until_joint_position(self, position, max_seconds=20):
+
+        if self.is_sim:
+            raise NotImplementedError
         # Don't wait for more than 20 seconds
         iteration_time_0 = time.time()
         while True:
             time_elapsed = time.time()-iteration_time_0
             if int(time_elapsed) > 20:
-                print('Move to Home Position Failed')
+                print('Move to Joint Position Failed')
                 return False
             state_data = self.get_state()
             actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
             if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
-                print('Move to Home Position Complete')
+                print('Move to Joint Position Complete')
                 return True
             time.sleep(0.1)
 
