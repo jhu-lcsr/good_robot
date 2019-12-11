@@ -993,20 +993,9 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
 
-            # Block until robot reaches target tool position and gripper fingers have stopped moving
-            state_data = self.get_state()
             # gripper_connected_to_robot = False
             # if gripper_connected_to_robot:
-            tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-            timeout_t0 = time.time()
-            while True:
-                state_data = self.get_state()
-                new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-                actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-                timeout_t1 = time.time()
-                if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > 5:
-                    break
-                tool_analog_input2 = new_tool_analog_input2
+            self.block_until_pose(position)
             # else:
             # Close gripper
             time.sleep(self.move_sleep)
@@ -1104,8 +1093,26 @@ class Robot(object):
         # TODO: change to 1 and 2 arguments
         return grasp_success, color_success
 
+    def block_until_pose(self, position, timeout=5):
+        """Block the program until it reaches a specified pose or the timeout in seconds.
+        """
+        # Block until robot reaches target tool position and gripper fingers have stopped moving
+        state_data = self.get_state()
+        timeout_t0 = time.time()
+        tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
+        while True:
+            state_data = self.get_state()
+            new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
+            actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+            timeout_t1 = time.time()
+            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout:
+                break
+            tool_analog_input2 = new_tool_analog_input2
 
-    def push(self, position, heightmap_rotation_angle, workspace_limits):
+
+    def push(self, position, heightmap_rotation_angle, workspace_limits=None):
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
         print('Real Robot push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
 
         if self.is_sim:
@@ -1165,7 +1172,6 @@ class Robot(object):
             push_success = True
 
         else:
-            self.close_gripper(nonblocking=True)
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             position[2] += self.gripper_ee_offset + 0.02
 
@@ -1218,6 +1224,7 @@ class Robot(object):
             tcp_command += "end\n"
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
+            self.close_gripper(nonblocking=True)
 
             # Block until robot reaches target tool position and gripper fingers have stopped moving
             # state_data = self.get_state()
@@ -1229,21 +1236,42 @@ class Robot(object):
 
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.5)
-            self.block_until_home()
-            
-            push_success = True
+            push_success = self.block_until_home()
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
         return push_success
 
-    def block_until_home(self):
+    def block_until_home(self, max_seconds=20):
+
+        # Don't wait for more than 20 seconds
+        iteration_time_0 = time.time()
         while True:
+            time_elapsed = time.time()-iteration_time_0
+            if int(time_elapsed) > 20:
+                print('Move to Home Position Failed')
+                return False
             state_data = self.get_state()
             actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
             if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
-                print('Push move complete')
-                break
+                print('Move to Home Position Complete')
+                return True
+            time.sleep(0.1)
+
+    def block_until_position(self, position, max_seconds=20):
+
+        # Don't wait for more than 20 seconds
+        iteration_time_0 = time.time()
+        while True:
+            time_elapsed = time.time()-iteration_time_0
+            if int(time_elapsed) > 20:
+                print('Move to Home Position Failed')
+                return False
+            state_data = self.get_state()
+            actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
+            if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
+                print('Move to Home Position Complete')
+                return True
             time.sleep(0.1)
 
 
