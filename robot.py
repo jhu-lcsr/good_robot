@@ -36,9 +36,18 @@ class Robot(object):
              specify an ip address to directly use TCPModbus to talk directly with the gripper.
              Default is 192.168.1.11.
         '''
-        if workspace_limits is None:
-            workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.is_sim = is_sim
+        if workspace_limits is None:
+            # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+            if is_sim:
+                workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+            else:
+                # Corner near window on robot base side
+                # [0.47984089 0.34192974 0.02173636]
+                # Corner on the side of the cameras and far from the window
+                # [ 0.73409861 -0.45199446 -0.00229499]
+                # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
+                workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.04, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.workspace_limits = workspace_limits
         self.place_task = place
         self.grasp_color_task = grasp_color_task
@@ -494,7 +503,9 @@ class Robot(object):
 
 
     def parse_tcp_state_data(self, state_data, subpackage):
-
+        """
+        state_data: 'joint_data', 'cartesian_info', 'force_mode_data', 'tool_data'
+        """
         # Read package header
         data_bytes = bytearray()
         data_bytes.extend(state_data)
@@ -544,7 +555,7 @@ class Robot(object):
         # Read package header
         data_bytes = bytearray()
         data_bytes.extend(state_data)
-        data_length = struct.unpack("!i", data_bytes[0:4])[0];
+        data_length = struct.unpack("!i", data_bytes[0:4])[0]
         assert(data_length == 812)
         byte_idx = 4 + 8 + 8*48 + 24 + 120
         TCP_forces = [0,0,0,0,0,0]
@@ -955,15 +966,25 @@ class Robot(object):
 
             # Attempt grasp
             position = np.asarray(position).copy()
+
+            # find position halfway between the current and final.
             print("Grasp position before applying workspace bounds: " + str(position))
             position[2] = max(position[2], workspace_limits[2][0] + self.gripper_ee_offset + 0.04)
             position[2] = min(position[2], workspace_limits[2][1] + self.gripper_ee_offset - 0.01)
+            up_pos = np.array([position[0],position[1],position[2]+0.1])
+
+            # Get current tool pose
+            state_data = self.get_state()
+            actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
+            midpos = (np.array(actual_tool_pose[:3]) + up_pos) / 2.0
+
             print("Real Good Robot grasping at: " + str(position), ", " + str(tool_orientation))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (midpos[0],midpos[1],midpos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
+            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.5,self.joint_vel*0.5)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
             tcp_command += "end\n"
@@ -1022,7 +1043,7 @@ class Robot(object):
                 # self.tcp_socket.close()
                 # print(tcp_command) # Debug
                 # Move up to a height where we can drop the object
-                self.move_to([position[0],position[1],bin_position[2] - 0.07],[tool_orientation[0],tool_orientation[1],0.0])
+                self.move_to([position[0],position[1],bin_position[2] - 0.14],[tool_orientation[0],tool_orientation[1],0.0])
                 grasp_success = not self.close_gripper()
                 if grasp_success:
                     print("Grasp success, moving to drop object in bin...")
