@@ -961,7 +961,7 @@ class Robot(object):
 
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
-            position[2] += self.gripper_ee_offset
+            position[2] += self.gripper_ee_offset - 0.01
             # Compute tool orientation from heightmap rotation angle
             grasp_orientation = [1.0,0.0]
             if heightmap_rotation_angle > np.pi:
@@ -987,9 +987,6 @@ class Robot(object):
             position[2] = max(position[2], workspace_limits[2][0] + self.gripper_ee_offset + 0.04)
             position[2] = min(position[2], workspace_limits[2][1] + self.gripper_ee_offset - 0.01)
             up_pos = np.array([position[0],position[1],position[2]+0.1])
-
-            # Get current tool pose
-            mid_pos = self.get_midpoint(up_pos)
 
             print("Real Good Robot grasping at: " + str(position) + ", " + str(tool_orientation))
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1211,13 +1208,6 @@ class Robot(object):
             position[1] = min(max(position[1], workspace_limits[1][0]), workspace_limits[1][1])
             position[2] = max(position[2] + 0.005, workspace_limits[2][0] + 0.005) # Add buffer to surface
             up_pos = np.array([position[0],position[1],position[2]+0.1])
-
-            # home_position = [0.49,0.11,0.03]
-            # Real Good Robot
-            # home_position = [0.42565109, 0.04298656, 0.30092444 + self.gripper_ee_offset]
-
-            # Get current tool pose
-            mid_pos = self.get_midpoint(up_pos)
 
             # Attempt push
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
