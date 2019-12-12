@@ -494,7 +494,7 @@ def main(args):
                         # We are too high to contact anything, don't bother actually pushing.
                         # TODO(ahundt) also check for case where we are too high for the local gripper path
                         nonlocal_variables['push_success'] = False
-                        print('Heuristics determined push would not contact anything, assuming push failure.')
+                        print('Push action failure, heuristics determined push would not contact anything.')
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
@@ -542,6 +542,7 @@ def main(args):
                             valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
                         # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
+                        print('Grasp action failure, heuristics determined grasp would not contact anything.')
                     else:
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
