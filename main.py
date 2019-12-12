@@ -147,7 +147,7 @@ def main(args):
     neural_network_name = args.nn
     disable_situation_removal = args.disable_situation_removal
     evaluate_random_objects = args.evaluate_random_objects
-    skip_grasp_on_zero_heightmap = args.skip_grasp_on_zero_heightmap
+    skip_noncontact_actions = args.skip_noncontact_actions
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -442,12 +442,6 @@ def main(args):
                 best_pix_x = nonlocal_variables['best_pix_ind'][2]
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
                 primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
-                
-                # Add the common sense heuristic where we don't bother actually grasping if there is nothing there for grasps
-                nothing_present_assume_failure = False
-                if(skip_grasp_on_zero_heightmap and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or 
-                        valid_depth_heightmap[best_pix_y][best_pix_x] < 0.005)):
-                    nothing_present_assume_failure = True
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
                 if nonlocal_variables['primitive_action'] == 'push': # or nonlocal_variables['primitive_action'] == 'place':
@@ -484,12 +478,12 @@ def main(args):
 
                 # Initialize variables that influence reward
                 set_nonlocal_success_variables_false()
-                change_detected = False
                 if place:
                     current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
+                    if skip_noncontact_actions and primitive_position[2] > 
                     nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
                     if place and check_row:
@@ -532,7 +526,9 @@ def main(args):
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
                     
-                    if nothing_present_assume_failure:
+                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or 
+                            valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
+                        # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
                     else:
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
@@ -1099,7 +1095,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
-    parser.add_argument('--skip_grasp_on_zero_heightmap', dest='skip_grasp_on_zero_heightmap', action='store_true', default=False,               help='enable skipping grasp actions when the heightmap is zero')
+    parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,               help='enable skipping grasp actions when the heightmap is zero')
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
