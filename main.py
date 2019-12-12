@@ -445,13 +445,12 @@ def main(args):
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
                 if nonlocal_variables['primitive_action'] == 'push': # or nonlocal_variables['primitive_action'] == 'place':
-                    finger_width = 0.02
+                    finger_width = 0.03
                     safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
                     local_region = valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
-                    if local_region.size == 0:
-                        safe_z_position = workspace_limits[2][0]
-                    else:
-                        safe_z_position = np.max(local_region) + workspace_limits[2][0]
+                    safe_z_position = workspace_limits[2][0]
+                    if local_region.size != 0:
+                        safe_z_position += np.max(local_region)
                     primitive_position[2] = safe_z_position
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
