@@ -1005,7 +1005,8 @@ class Robot(object):
             grasp_success = False
             if not gripper_fully_closed:
                 print("Possible Grasp success, moving up...")
-                self.move_to([position[0],position[1],bin_position[2] - 0.14],[tool_orientation[0],tool_orientation[1],0.0])
+                # self.move_to([position[0],position[1],bin_position[2] - 0.14],[tool_orientation[0],tool_orientation[1],0.0])
+                self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
                 grasp_success = not self.close_gripper()
                 if grasp_success and not self.place_task:
                     print("Grasp success, moving to drop object in bin...")
