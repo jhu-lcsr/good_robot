@@ -1015,7 +1015,7 @@ class Robot(object):
             else:
                 print("Grasp failure, moving to home position...")
             
-            if not self.place_task:
+            if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
             self.go_home()
 
@@ -1337,6 +1337,7 @@ class Robot(object):
             tcp_command += "end\n"
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
+            time.sleep(0.1)
             self.block_until_cartesian_position(position)
             time.sleep(0.1)
 
