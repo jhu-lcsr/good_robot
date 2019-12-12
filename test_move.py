@@ -40,21 +40,28 @@ import time
 # Grasp position before applying workspace bounds: [ 0.816 -0.024  0.11 ]                                                        
 # ('Real Good Robot grasping at: [ 0.816 -0.024  0.15 ]', ', [2.22144147 2.22144147 0.        ]')    
 
-r = Robot(is_sim=False, tcp_host_ip='192.168.1.155', tcp_port=30002)
+r = Robot(is_sim=False, tcp_host_ip='192.168.1.155', tcp_port=30002, place=False)
 
-print('Robot cartesian home: ' + str(r.get_cartesian_position()))
-r.move_to([0.4387914740866465, -0.02251891154755168, 0.6275728717960743], None)
-r.move_to([0.4387914740866465, -0.02251891154755168, 0.3275728717960743], None)
+# print('Robot cartesian home: ' + str(r.get_cartesian_position()))
+# r.move_to([0.4387914740866465, -0.02251891154755168, 0.6275728717960743], None)
+# r.move_to([0.4387914740866465, -0.02251891154755168, 0.3275728717960743], None)
 
 # tool_orientation = [0.0, 0.0, 0.0] # Real Good Robot
 # above_bin_waypoint = [0.3, 0.0,  0.8]
 # r.move_to(above_bin_waypoint, tool_orientation)r.grasp([0.414000, -0.092000, 0.103734], 0.0)
+r.grasp([0.818000, -0.226000, 0.003854], 3.141593)
 
 r.grasp([0.414000, -0.092000, 0.003734], 0.0)
-r.push([0.414000, -0.092000, 0.003734], 0.0)
+r.place([0.414000, -0.092000, 0.003734], 0.0)
+# r.push([0.414000, -0.092000, 0.003734], 0.0)
 
 r.grasp([0.816000, -0.024000, -0.040000], 1.570796)
 r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+
+# Action: grasp at (8, 19, 221)
+# Executing: grasp at (0.818000, -0.226000, 0.003854) orientation: 3.141593
+# Grasp position before applying workspace bounds: [ 0.818      -0.226       0.14385387]
+# Real Good Robot grasping at: [ 0.818 -0.226  0.15 ], [1.92367069e-16 3.14159265e+00 0.00000000e+00]
 
 # time.sleep(.1)
 # Training iteration: 1
