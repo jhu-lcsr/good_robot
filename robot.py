@@ -996,6 +996,7 @@ class Robot(object):
             self.tcp_socket.close()
 
             self.block_until_cartesian_position(position)
+            time.sleep(0.1)
             gripper_fully_closed = self.close_gripper()
             color_success = None
             bin_position = [0.33, 0.37, 0.33 + self.gripper_ee_offset]
@@ -1158,7 +1159,7 @@ class Robot(object):
             #         break
 
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
-            # time.sleep(0.5)
+            time.sleep(0.1)
             push_success = self.block_until_home()
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
@@ -1337,6 +1338,7 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
             self.block_until_cartesian_position(position)
+            time.sleep(0.1)
 
             self.open_gripper(nonblocking=True)
             self.move_to(up_pos)
