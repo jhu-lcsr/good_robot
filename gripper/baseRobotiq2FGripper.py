@@ -37,11 +37,10 @@
 Module baseRobotiq2FGripper: defines a base class for handling command and status of the Robotiq 2F gripper.
 After being instanciated, a 'client' member must be added to the object. This client depends on the communication protocol used by the Gripper. As an example, the ROS node 'Robotiq2FGripperTcpNode.py' instanciate a robotiqbaseRobotiq2FGripper and adds a client defined in the module comModbusTcp.
 """
-
 # from   robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_input  as inputMsg
 # from   robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output as outputMsg
-from robotiq_2f_gripper_control_msg import outputMsg
-from robotiq_2f_gripper_control_msg import inputMsg
+from .robotiq_2f_gripper_control_msg import outputMsg
+from .robotiq_2f_gripper_control_msg import inputMsg
 
 class robotiqbaseRobotiq2FGripper:
     """Base class (communication protocol agnostic) for sending commands and receiving the status of the Robotic 2F gripper"""

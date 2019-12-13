@@ -5,12 +5,11 @@ Control the Robotiq 2f-85 gripper based on robotiq_2f_gripper_ctrl.py in: https:
 @author: Hongtao Wu
 Oct 12, 2019
 """
-
 import numpy as np
-from robotiq_2f_gripper_control_msg import outputMsg
-from robotiq_2f_gripper_control_msg import inputMsg
-from baseRobotiq2FGripper import robotiqbaseRobotiq2FGripper
-import comModbusTcp
+from .robotiq_2f_gripper_control_msg import outputMsg
+from .robotiq_2f_gripper_control_msg import inputMsg
+from .baseRobotiq2FGripper import robotiqbaseRobotiq2FGripper
+from .comModbusTcp import communication
 import time
 
 
@@ -19,7 +18,7 @@ class RobotiqCGripper(object):
         self.cur_status = None
         #Gripper is a 2F with a TCP connection
         self.gripper = robotiqbaseRobotiq2FGripper()
-        self.gripper.client = comModbusTcp.communication()
+        self.gripper.client = communication()
 
         #We connect to the address received as an argument
         self.gripper.client.connectToDevice(address)

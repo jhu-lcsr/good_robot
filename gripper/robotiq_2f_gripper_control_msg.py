@@ -3,7 +3,6 @@ Message for communication with the robotiq 2f-85 gripper.
 @author: Hongtao Wu
 Oct 12, 2019
 """
-
 from collections import namedtuple
 
 class outputMsg(object):
