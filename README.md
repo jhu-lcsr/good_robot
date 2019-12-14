@@ -592,4 +592,23 @@ The correct images, as done in the [JHU costar dataset](https://sites.google.com
         self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
 ```
 
+## ROS Melodic Setup with python3
 
+[Build ros from source](http://wiki.ros.org/melodic/Installation/Source) with python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build.
+
+```
+export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
+```
+
+For the primesense camera add in the [openni2 launch repository](https://github.com/ros-drivers/openni2_launch).
+
+```
+cd ~/src/catkin_ros_ws
+git clone https://github.com/ros-drivers/openni2_launch
+```
+
+Run the build and install.
+
+```
+rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
+```
