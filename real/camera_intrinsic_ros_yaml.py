@@ -26,7 +26,7 @@ import argparse
 
 import numpy as np
 
-from CameraInfo import CameraInfo
+from .CameraInfo import CameraInfo
 
 DISTORTION_COEFFICIENTS_LENGTH = 14
 

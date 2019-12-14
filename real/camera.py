@@ -10,7 +10,7 @@ import cv2
 import os
 import time
 import struct
-from ros_camera import ROSCamera
+from .ros_camera import ROSCamera
 # Not using the primesense_sensor package and switch to ROS with rectified images
 # try:
 #     import primesense_sensor
