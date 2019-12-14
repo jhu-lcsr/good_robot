@@ -559,11 +559,31 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 ### ROS Based Image Collection Setup
 
-First [Install ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu). Then install the primesense image pipeline:
+Install ROS Melodic [Build ros from source](http://wiki.ros.org/melodic/Installation/Source) from source with python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build.
+
+```
+export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
+```
+
+For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories:
+
+```
+cd ~/src/catkin_ros_ws
+git clone https://github.com/ros-drivers/openni2_launch.git
+git clone https://github.com/ros-drivers/rgbd_launch.git
+```
+
+Run the build and install.
+
+```
+rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
+```
+<!-- 
+Then install the primesense image pipeline:
 
 ```bash
 sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
-```
+``` -->
 
 Running ROS with depth image processing:
 
@@ -592,23 +612,12 @@ The correct images, as done in the [JHU costar dataset](https://sites.google.com
         self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
 ```
 
-## ROS Melodic Setup with python3
-
-[Build ros from source](http://wiki.ros.org/melodic/Installation/Source) with python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build.
+Calibration:
 
 ```
-export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
+roslaunch aruco_detect aruco_detect.launch
 ```
 
-For the primesense camera add in the [openni2 launch repository](https://github.com/ros-drivers/openni2_launch).
-
 ```
-cd ~/src/catkin_ros_ws
-git clone https://github.com/ros-drivers/openni2_launch
-```
-
-Run the build and install.
-
-```
-rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
+python3 calibrate_ros.py
 ```
