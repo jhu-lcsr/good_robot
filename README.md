@@ -569,7 +569,7 @@ For the primesense camera add in the [openni2_launch](https://github.com/ros-dri
 
 ```
 cd ~/src/catkin_ros_ws
-git clone https://github.com/ros-drivers/openni2_launch.git
+git clone https://github.com/ros-drivers/openni2_camera.git
 git clone https://github.com/ros-drivers/rgbd_launch.git
 ```
 
