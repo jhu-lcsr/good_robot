@@ -12,8 +12,8 @@ try:
     from gripper.robotiq_2f_gripper_ctrl import RobotiqCGripper
 except ImportError:
     print('Real robotiq gripper control is not available. '
-          'Ensure pymodbus is installed:'
-          '    pip3 install --user --upgrade pymodbus')
+          'Ensure pymodbus is installed:\n'
+          '    pip3 install --user --upgrade pymodbus\n')
     RobotiqCGripper = None
 
 
@@ -199,6 +199,10 @@ class Robot(object):
             # Initialize the real gripper based on user configuration
             if real_gripper_ip is None:
                 self.gripper = None
+            elif RobotiqCGripper is None:
+                # Install instructions have already printed (see the imports section)
+                # and we cannot run in this mode without pymodbus, so exit. 
+                exit(1)
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
                 self.gripper.wait_for_connection()
