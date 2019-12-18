@@ -5,13 +5,13 @@ import os
 import random
 import threading
 import argparse
+import torch
+from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
 import cv2
 from collections import namedtuple
-import torch
-from torch.autograd import Variable
 from robot import Robot
 from trainer import Trainer
 from logger import Logger
