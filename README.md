@@ -28,7 +28,7 @@ Details of our specific training and test runs, command line commands, pre-train
 
 ### Starting the V-REP Simulation
 
-[Download V-REP](http://www.coppeliarobotics.com/index.html) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
+[Download CoppeliaSim](http://www.coppeliarobotics.com/index.html) (formerly V-REP) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
 
 ```bash
 ~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
@@ -559,23 +559,33 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 ### ROS Based Image Collection Setup
 
-Install ROS Melodic [Build ros from source](http://wiki.ros.org/melodic/Installation/Source) from source with python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build.
+We require python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build. A couple additional steps below will need to be added in the middle. We advise installing in the folder:
+
+```
+~/ros_catkin_ws
+```
+
+Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source). 
+
+In particular fix up this command:
 
 ```
 export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
 ```
 
-For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories:
+For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories, and for handeye calibration between the camera and robot add [UbiquityRobotics/fiducials](https://github.com/UbiquityRobotics):
 
 ```
-cd ~/src/catkin_ros_ws
+cd ~/catkin_ros_ws
 git clone https://github.com/ros-drivers/openni2_launch.git
 git clone https://github.com/ros-drivers/rgbd_launch.git
+git clone https://github.com/UbiquityRobotics/fiducials.git
 ```
 
 Run the build and install.
 
 ```
+cd ~/ros_catkin_ws
 rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
 ```
 <!-- 
@@ -584,6 +594,11 @@ Then install the primesense image pipeline:
 ```bash
 sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
 ``` -->
+
+Source the ros setup so you get access to the launch commands:
+```
+source ~/ros_catkin_ws/install_isolated/setup.zsh
+```
 
 Running ROS with depth image processing:
 
