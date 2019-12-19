@@ -1211,7 +1211,9 @@ class Robot(object):
             state_data = self.get_state()
             new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout_seconds):
+            if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and 
+                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or 
+                ((timeout_t1 - timeout_t0) > timeout_seconds)):
                 break
             tool_analog_input2 = new_tool_analog_input2
 
