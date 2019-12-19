@@ -665,7 +665,7 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation=None):
+    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10):
 
         if self.is_sim:
 
@@ -694,16 +694,7 @@ class Robot(object):
             self.tcp_socket.send(str.encode(tcp_command))
 
             # Block until robot reaches target tool position
-            tcp_state_data = self.tcp_socket.recv(2048)
-            actual_tool_pose = self.parse_tcp_state_data(tcp_state_data, 'cartesian_info')
-            while not all([np.abs(actual_tool_pose[j] - tool_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-                # [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) < self.tool_pose_tolerance[j] for j in range(3,6)]
-                # print([np.abs(actual_tool_pose[j] - tool_position[j]) for j in range(3)] + [min(np.abs(actual_tool_pose[j] - tool_orientation[j-3]), np.abs(np.abs(actual_tool_pose[j] - tool_orientation[j-3]) - np.pi*2)) for j in range(3,6)])
-                tcp_state_data = self.tcp_socket.recv(2048)
-                prev_actual_tool_pose = np.asarray(actual_tool_pose).copy()
-                actual_tool_pose = self.parse_tcp_state_data(tcp_state_data, 'cartesian_info')
-                time.sleep(0.01)
-            self.tcp_socket.close()
+            self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
 
     def guarded_move_to(self, tool_position, tool_orientation):
         if self.is_sim:
