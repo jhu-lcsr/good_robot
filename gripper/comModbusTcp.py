@@ -42,6 +42,7 @@ The module depends on pymodbus (http://code.google.com/p/pymodbus/) for the Modb
 
 from pymodbus.client.sync import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
+from pymodbus.exceptions import ConnectionException
 from math import ceil
 
 class communication:	
@@ -77,11 +78,16 @@ class communication:
       """Sends a request to read, wait for the response and returns the Gripper status. The method gets the number of bytes to read as an argument"""
       numRegs = int(ceil(numBytes/2.0))
 
-      #To do!: Implement try/except 
+      #To do!: Improve try/except to be more robust 
       #Get status from the device
       response = self.client.read_input_registers(0, numRegs)
-      while isinstance(response, ModbusIOException):
-         response = self.client.read_input_registers(0, numRegs)
+      connection_exception = False
+      while isinstance(response, ModbusIOException) or connection_exception:
+         try:
+            response = self.client.read_input_registers(0, numRegs)
+            connection_exception = False
+         except ConnectionException:
+            connection_exception = True
 
       #Instantiate output as an empty list
       output = []
