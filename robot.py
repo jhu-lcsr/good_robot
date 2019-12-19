@@ -460,19 +460,22 @@ class Robot(object):
 
     def reposition_objects(self, workspace_limits=None):
 
-        # Move gripper out of the way
-        self.move_to([-0.3, 0, 0.3], None)
-        # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-        # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        # time.sleep(1)
+        if self.is_sim:
+            # Move gripper out of the way
+            self.move_to([-0.3, 0, 0.3], None)
+            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+            # time.sleep(1)
 
-        for object_handle in self.object_handles:
+            for object_handle in self.object_handles:
 
-            # Drop object at random x,y location and random orientation in robot workspace
-            self.reposition_object_randomly(object_handle)
+                # Drop object at random x,y location and random orientation in robot workspace
+                self.reposition_object_randomly(object_handle)
+                time.sleep(0.5)
+            # an extra half second so things settle down
             time.sleep(0.5)
-        # an extra half second so things settle down
-        time.sleep(0.5)
+        
+        # TODO(ahundt) add real robot support for reposition_objects
 
 
     def get_camera_data(self):
