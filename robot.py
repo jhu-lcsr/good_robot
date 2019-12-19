@@ -434,7 +434,8 @@ class Robot(object):
 
 
     def get_obj_positions(self):
-
+        if not self.is_sim:
+            raise NotImplementedError('get_obj_positions() only supported in simulation, if you are training stacking try specifying --check_z_height')
         obj_positions = []
         for object_handle in self.object_handles:
             sim_ret, object_position = vrep.simxGetObjectPosition(self.sim_client, object_handle, -1, vrep.simx_opmode_blocking)
@@ -443,6 +444,8 @@ class Robot(object):
         return obj_positions
 
     def get_obj_positions_and_orientations(self):
+        if not self.is_sim:
+            raise NotImplementedError('get_obj_positions_and_orientations() only supported in simulation')
 
         obj_positions = []
         obj_orientations = []
