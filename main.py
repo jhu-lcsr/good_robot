@@ -294,16 +294,10 @@ def main(args):
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
-            # TODO(ahundt) make decrease threshold more accessible, perhaps a command line parameter
-            decrease_threshold = 0.1
             # decrease_threshold = None  # None means decrease_threshold will be disabled
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
-            # if it falls we will just keep going, and allow nonaction or objects out of scene checks to handle resets
-            needed_to_reset = False
-            max_workspace_height = nonlocal_variables['prev_stack_height'] - decrease_threshold
-            if decrease_threshold is not None and nonlocal_variables['stack_height'] < max_workspace_height:
-                needed_to_reset = True
-            # TODO(hkwon214) add a separate case for incremental height
+            stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
+            max_workspace_height = ' (see max_workspace_height printout above) '
+            # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
