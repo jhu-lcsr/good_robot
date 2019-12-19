@@ -1179,7 +1179,7 @@ class Robot(object):
         actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
         return actual_tool_pose
 
-    def block_until_home(self, max_seconds=20):
+    def block_until_home(self, timeout_seconds=10):
 
         if self.is_sim:
             raise NotImplementedError
@@ -1187,7 +1187,7 @@ class Robot(object):
         iteration_time_0 = time.time()
         while True:
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 20:
+            if int(time_elapsed) > timeout_seconds:
                 print('Move to Home Position Failed')
                 return False
             state_data = self.get_state()
@@ -1197,7 +1197,7 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-    def block_until_cartesian_position(self, position, timeout=5):
+    def block_until_cartesian_position(self, position, timeout_seconds=10):
         """Block the real program until it reaches a specified cartesian pose or the timeout in seconds.
         """
         if self.is_sim:
@@ -1211,11 +1211,11 @@ class Robot(object):
             state_data = self.get_state()
             new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout:
+            if (tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or (timeout_t1 - timeout_t0) > timeout_seconds):
                 break
             tool_analog_input2 = new_tool_analog_input2
 
-    def block_until_joint_position(self, position, max_seconds=20):
+    def block_until_joint_position(self, position, timeout_seconds=10):
 
         if self.is_sim:
             raise NotImplementedError
@@ -1223,7 +1223,7 @@ class Robot(object):
         iteration_time_0 = time.time()
         while True:
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 20:
+            if int(time_elapsed) > timeout_seconds:
                 print('Move to Joint Position Failed')
                 return False
             state_data = self.get_state()
