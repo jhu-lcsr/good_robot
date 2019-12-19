@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 import cv2
-from real.camera import Camera
 from robot import Robot
+from real.camera import Camera
     
 
 # User options (change me)

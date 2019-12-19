@@ -74,6 +74,15 @@
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "args": ["--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "4", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--place"]
+        },
+        {
+            "name": "main.py: Real Push and Grasp (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations"]
         }
     ]
 }
