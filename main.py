@@ -879,9 +879,9 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 20:
+            if int(time_elapsed) > 25:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
-                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 25 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 if is_sim:
                     robot.check_sim()
