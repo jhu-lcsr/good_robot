@@ -84,7 +84,7 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--place"]
+            "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--place", "--check_z_height"]
         },
         {
             "name": "main.py: Real Push and Grasp (External Terminal)",
