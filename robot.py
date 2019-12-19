@@ -795,12 +795,15 @@ class Robot(object):
 
 
     def go_home(self, block_until_home=False):
+        # TODO(ahundt) go_home() support for simulation mode
         if self.is_sim:
             raise NotImplementedError
 
         self.move_joints(self.home_joint_config)
         if block_until_home:
-            self.block_until_home()
+            return self.block_until_home()
+        else:
+            return True
 
 
     def check_grasp(self):
@@ -1353,8 +1356,8 @@ class Robot(object):
 
             self.open_gripper(nonblocking=True)
             self.move_to(up_pos)
-            self.go_home()
-            return 
+            # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
+            return self.go_home(block_until_home=True)
 
 
     def check_row(self, object_color_sequence,
