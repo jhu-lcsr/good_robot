@@ -371,6 +371,7 @@ def axxb(robotPose, markerPose):
     """
     Copyright (c) 2019, Hongtao Wu
     AX=XB solver for eye-on base
+    Using the Park and Martin Method: https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576
     
     Args:
     - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.

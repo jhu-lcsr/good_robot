@@ -524,11 +524,13 @@ python capture.py
 <img src="images/calibration.gif" height=200px align="right" />
 <img src="images/checkerboard.jpg" height=200px align="right" />
 
-We provide a simple calibration script to estimate camera extrinsics with respect to robot base coordinates. To do so, the script moves the robot gripper over a set of predefined 3D locations as the camera detects the center of a moving 4x4 checkerboard pattern taped onto the gripper. The checkerboard can be of any size (the larger, the better).
+We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. To do so, the script move the robot to several random positions and orientations within the workspace.
 
 #### Instructions:
 
-1. Predefined 3D locations are sampled from a 3D grid of points in the robot's workspace. To modify these locations, change the variables `workspace_limits` and `calib_grid_step` at the top of `calibrate.py`.
+1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct.
+
+1. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
 1. Measure the offset between the midpoint of the checkerboard pattern to the tool center point in robot coordinates (variable `checkerboard_offset_from_tool`). This offset can change depending on the orientation of the tool (variable `tool_orientation`) as it moves across the predefined locations. Change both of these variables respectively at the top of `calibrate.py`.
 
