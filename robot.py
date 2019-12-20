@@ -460,19 +460,22 @@ class Robot(object):
 
     def reposition_objects(self, workspace_limits=None):
 
-        # Move gripper out of the way
-        self.move_to([-0.3, 0, 0.3], None)
-        # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-        # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        # time.sleep(1)
+        if self.is_sim:
+            # Move gripper out of the way
+            self.move_to([-0.3, 0, 0.3], None)
+            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+            # time.sleep(1)
 
-        for object_handle in self.object_handles:
+            for object_handle in self.object_handles:
 
-            # Drop object at random x,y location and random orientation in robot workspace
-            self.reposition_object_randomly(object_handle)
+                # Drop object at random x,y location and random orientation in robot workspace
+                self.reposition_object_randomly(object_handle)
+                time.sleep(0.5)
+            # an extra half second so things settle down
             time.sleep(0.5)
-        # an extra half second so things settle down
-        time.sleep(0.5)
+        
+        # TODO(ahundt) add real robot support for reposition_objects
 
 
     def get_camera_data(self):
@@ -1536,7 +1539,7 @@ class Robot(object):
 
     def check_incremental_height(self,input_img, current_stack_goal):
         goal_success = False
-        max_z = self.check_z_height(input_img)
+        goal, max_z, decrease_threshold = self.check_z_height(input_img)
         #TODO(hkwon214) Double check this
         current_stack_goal = len(current_stack_goal)
         if (max_z <= 0.069):
@@ -1554,13 +1557,29 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.01, reward_multiplier=20.0):
-        # TODO(ahundt) make reward multiplier a command line parameter which can be modified, probably take it out of this function too.
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.03, decrease_threshold=0.02, reward_multiplier=20.0):
+        """ Checks the maximum z height after applying a median filter. Includes checks for significant increases and decreases.
+
+        # Returns
+
+            [goal_success, max_z, needed_to_reset]
+
+            goal_success: has height increased by the increase_threshold
+            max_z: what is the current maximum z height in the image
+            neede_to_reset: has the height decreased from the prev_height enough to warrant special reset/recovery actions.
+        """
+        # TODO(ahundt) make reward multiplier, increase threshold, and decrease threshold command line parameters which can be modified.
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median) * reward_multiplier
-        goal_success = max_z >= (prev_height + increase_threshold)
-        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + ' goal_success: ' + str(goal_success) + ' <<<<<<<<<<<')
-        return goal_success, max_z
+        # TODO(ahundt) should the reward multiplier be applied to increase_threshold, or should the parameter be totally indepenedent?
+        goal_success = max_z >= (prev_height + (increase_threshold * reward_multiplier))
+        needed_to_reset = False
+        max_workspace_height = prev_height - decrease_threshold
+        if decrease_threshold is not None and max_z < max_workspace_height:
+            needed_to_reset = True
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + 
+              ' goal_success: ' + str(goal_success) + ' needed to reset: ' + str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
+        return goal_success, max_z, needed_to_reset
 
     def restart_real(self):
         # position just over the box to dump
