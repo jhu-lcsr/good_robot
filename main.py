@@ -438,22 +438,32 @@ def main(args):
                 primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
-                if nonlocal_variables['primitive_action'] == 'push': # or nonlocal_variables['primitive_action'] == 'place':
+                if nonlocal_variables['primitive_action'] == 'push' or nonlocal_variables['primitive_action'] == 'place':
                     def get_local_region(region_width=0.03):
                         safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
                         return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
                     # make sure the fingers will not collide with the objects
-                    finger_width = 0.03
+                    finger_width = 0.05
                     finger_touchdown_region = get_local_region(region_width=finger_width)
                     safe_z_position = workspace_limits[2][0]
                     if finger_touchdown_region.size != 0:
                         safe_z_position += np.max(finger_touchdown_region)
+                    else:
+                        safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
                     primitive_position[2] = safe_z_position
-                    # determine if the safe z position might actually contact anything during the push action
-                    # TODO(ahundt) push motion region can be refined based on the rotation angle and the direction of travel
-                    push_width = 0.2
-                    local_push_region = get_local_region(region_width=push_width)
-                    push_may_contact_something = primitive_position[2] >= np.max(local_push_region) + workspace_limits[2][0] - 0.01
+                    if nonlocal_variables['primitive_action'] == 'push':
+                        # determine if the safe z position might actually contact anything during the push action
+                        # TODO(ahundt) push motion region can be refined based on the rotation angle and the direction of travel
+                        push_width = 0.2
+                        local_push_region = get_local_region(region_width=push_width)
+                        # push_may_contact_something is True for something noticeably higher than the push action z height
+                        max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+                        push_may_contact_something = primitive_position[2] < max_local_push_region
+                        push_str = ''
+                        if not push_may_contact_something:
+                            push_str += 'Predicting push action failure, heuristics determined '
+                        print('push at height ' + str(safe_z_position) + 
+                              ' would not contact anything at the max height of ' + str(max_local_push_region))
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 if nonlocal_variables['primitive_action'] == 'push':
@@ -488,7 +498,6 @@ def main(args):
                         # We are too high to contact anything, don't bother actually pushing.
                         # TODO(ahundt) also check for case where we are too high for the local gripper path
                         nonlocal_variables['push_success'] = False
-                        print('Push action failure, heuristics determined push would not contact anything.')
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
