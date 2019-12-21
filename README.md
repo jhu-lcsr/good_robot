@@ -530,23 +530,18 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 #### Instructions:
 
 1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
-
 1. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
-
 1. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
-
 1. Roslaunch the camera with, for example
 
 ```shell
 roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
-
 1. Roslaunch aruco_detect
 ```shell
 roslaunch aruco_detect aruco_detect.launch
 ```
 The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame.
-
 1. With caution, run the following to move the robot and calibrate:
 
     ```shell
