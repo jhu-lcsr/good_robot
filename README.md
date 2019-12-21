@@ -520,29 +520,41 @@ python capture.py
 ```
 
 ### Calibrating Camera Extrinsics
-
 <img src="images/calibration.gif" height=200px align="right" />
 <img src="images/checkerboard.jpg" height=200px align="right" />
 
-We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. To do so, the script move the robot to several random positions and orientations within the workspace.
+We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand here). To do so, the script move the robot to several random positions and orientations within the workspace.
+
+Before you start, make sure you have the ROS package [fiducials](http://wiki.ros.org/fiducials) installed. 
 
 #### Instructions:
 
-1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct.
+1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
 
 1. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
-1. Measure the offset between the midpoint of the checkerboard pattern to the tool center point in robot coordinates (variable `checkerboard_offset_from_tool`). This offset can change depending on the orientation of the tool (variable `tool_orientation`) as it moves across the predefined locations. Change both of these variables respectively at the top of `calibrate.py`.
+1. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
 
-1. The code directly communicates with the robot via TCP. At the top of `calibrate.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
+1. Roslaunch the camera with, for example
+
+```shell
+roslaunch openni2_launch openni2.launch depth_registration:=true
+```
+
+1. Roslaunch aruco_detect
+```shell
+roslaunch aruco_detect aruco_detect.launch
+```
+The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame.
 
 1. With caution, run the following to move the robot and calibrate:
 
     ```shell
-    python calibrate.py
+    python calibrate_ros.py
     ```
+The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
-The script also optimizes for a z-scale factor and saves it into `real/camera_depth_scale.txt`. This scale factor should be multiplied with each depth pixel captured from the camera. This step is more relevant for the RealSense SR300 cameras, which commonly suffer from a severe scaling problem where the 3D data is often 15-20% smaller than real world coordinates. The D400 series are less likely to have such a severe scaling problem.
+If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
 
 ### Training
 
