@@ -540,11 +540,10 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
-5. Roslaunch aruco_detect:
+5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
 ```shell
 roslaunch aruco_detect aruco_detect.launch
 ```
-The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame.
 
 6. With caution, run the following to move the robot and calibrate:
 
