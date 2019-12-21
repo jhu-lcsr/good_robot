@@ -58,6 +58,8 @@ class Calibrate:
 
         if save_dir is None:
             self.save_dir = '/home/costar/src/real_good_robot/calibration_1206'
+            # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
+            self.save_dir = '/home/costar/src/real_good_robot/calibration'
         else:
             self.save_dir = save_dir
 
@@ -155,6 +157,16 @@ class Calibrate:
 
                 color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
+                cv2.imshow("aruco.png", aruco_img)
+                cv2.waitKey(1)
+                img_prefix = str(calib_pt_idx) + '_' + str(tool_orientation_idx)
+                aruco_img_file = os.path.join(self.save_dir, 'arucoimg_' + img_prefix + '.png')
+                cv2.imwrite(aruco_img_file, aruco_img)
+                # rgb_img_file = os.path.join(self.save_dir, 'rgb_img_' + img_prefix + '.png')
+                # cv2.imwrite(rgb_img_file, color_img)
+                # depth_img_file = os.path.join(self.save_dir, 'depth_img_' + img_prefix + '.png')
+                # cv2.imwrite(depth_img_file, depth_img)
+
                 if len(aruco_tf.transforms) > 0:
                     cv2.imshow("aruco.png", aruco_img)
                     cv2.waitKey(1)
@@ -251,8 +263,6 @@ class Calibrate:
 
     
 if __name__ == "__main__":
-    calib = Calibrate(workspace_limits=None)
-    # Collect data for calibration
-    calib.collect_data(workspace_limits=None)
-    # Calibrate the collected data with 
+    calib = Calibrate()
+    # calib.collect_data()
     calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_1206')
