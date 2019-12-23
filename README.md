@@ -525,7 +525,7 @@ python capture.py
 
 We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand [here](https://github.com/IFL-CAMP/easy_handeye)). To do so, the script move the robot to several random positions and orientations within the workspace. 
 
-We are using the PrimeSense Carmine 1.08 for this project. If you are using other camera which needs calibration for the depth scale (e.g. Intel RealSense D415), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
+We are using the PrimeSense Carmine 1.08 for this project. If you are using other cameras which need calibration for the depth scale (e.g. [Intel RealSense D415]((https://click.intel.com/intelr-realsensetm-depth-camera-d415.html)), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
 
 Before you start, make sure you have the ROS package [fiducials](http://wiki.ros.org/fiducials) installed. 
 
