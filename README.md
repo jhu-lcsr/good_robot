@@ -523,7 +523,9 @@ python capture.py
 <img src="images/calibration.gif" height=200px align="right" />
 <img src="images/checkerboard.jpg" height=200px align="right" />
 
-We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand here). To do so, the script move the robot to several random positions and orientations within the workspace.
+We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand [here](https://github.com/IFL-CAMP/easy_handeye)). To do so, the script move the robot to several random positions and orientations within the workspace. 
+
+We are using the PrimeSense Carmine 1.08 for this project. If you are using other cameras which need calibration for the depth scale (e.g. [Intel RealSense D415]((https://click.intel.com/intelr-realsensetm-depth-camera-d415.html)), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
 
 Before you start, make sure you have the ROS package [fiducials](http://wiki.ros.org/fiducials) installed. 
 
@@ -547,9 +549,11 @@ roslaunch aruco_detect aruco_detect.launch
 
 6. With caution, run the following to move the robot and calibrate:
 
-    ```shell
-    python calibrate_ros.py
-    ```
+```shell
+python calibrate_ros.py
+```
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
 The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
 If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
