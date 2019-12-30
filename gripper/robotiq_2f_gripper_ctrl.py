@@ -96,7 +96,7 @@ class RobotiqCGripper(object):
 
     def is_closed(self):
         self.get_cur_status()
-        return self.cur_status.gPO >= 230
+        return self.cur_status.gPO >= 235
 
     def is_opened(self):
         self.get_cur_status()
