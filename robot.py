@@ -785,16 +785,15 @@ class Robot(object):
             tcp_command = tcp_command + (",%f" % joint_configuration[joint_idx])
         tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
         self.tcp_socket.send(str.encode(tcp_command))
+        self.tcp_socket.close()
 
         # Block until robot reaches home state
-        state_data = self.tcp_socket.recv(2048)
+        state_data = self.get_state()
         actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
         while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
-            state_data = self.tcp_socket.recv(2048)
+            state_data = self.get_state()
             actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
             time.sleep(0.01)
-
-        self.tcp_socket.close()
 
 
     def go_home(self, block_until_home=False):
