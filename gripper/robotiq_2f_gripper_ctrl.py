@@ -218,9 +218,10 @@ class RobotiqCGripper(object):
         return self.goto(1.0, vel, force, block=block, timeout=timeout)
 
     def close(self, vel=0.1, force=100, block=False, timeout=10):
-        if self.is_closed():
-            print("The gripper is already closed!")
-            return True
+        # Commented because sometimes we actually want to physically close it a second time
+        # if self.is_closed():
+        #     print("The gripper is already closed!")
+        #     return True
         return self.goto(-1.0, vel, force, timeout=timeout, block=block)
 
 def main():
