@@ -4,6 +4,8 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+
         {
             "name": "Python: Current File (Integrated Terminal)",
             "type": "python",
@@ -67,13 +69,31 @@
             "console": "externalTerminal"
         },
         {
-            "name": "main.py: Stack any block (External Terminal)",
+            "name": "main.py: Stack 4 blocks (External Terminal)",
             "type": "python",
             "request": "launch",
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": ["--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "4", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--place"]
+            "args": ["--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "4", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--place", "--skip_noncontact_actions"]
+        },
+        {
+            "name": "main.py: Real Stack 4 blocks (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--place", "--check_z_height", "--grasp_only"]
+        },
+        {
+            "name": "main.py: Real Push and Grasp (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions"]
         }
     ]
 }

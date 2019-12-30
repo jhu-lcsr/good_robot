@@ -8,31 +8,37 @@ from real.camera import Camera
 from robot import Robot
 from scipy import optimize  
 from mpl_toolkits.mplot3d import Axes3D  
-
+from tqdm import tqdm
 
 # User options (change me)
 # --------------- Setup options ---------------
-tcp_host_ip = '100.127.7.223' # IP and port to robot arm as TCP client (UR5)
+tcp_host_ip = '192.168.1.155' # IP and port to robot arm as TCP client (UR5)
 tcp_port = 30002
-rtc_host_ip = '100.127.7.223' # IP and port to robot arm as real-time client (UR5)
+rtc_host_ip = '192.168.1.155' # IP and port to robot arm as real-time client (UR5)
 rtc_port = 30003
-workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# workspace_limits = np.asarray([[0.3, 0.748], [0.05, 0.4], [-0.2, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+# x_offset = 0.0
+# y_offset = -0.4
+# workspace_limits = np.asarray([[0.3 + x_offset, 0.748 + x_offset], [0.05 + y_offset, 0.3 + y_offset], [0.15, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
 calib_grid_step = 0.05
-checkerboard_offset_from_tool = [0,-0.13,0.02]
-tool_orientation = [-np.pi/2,0,0] # [0,-2.22,2.22] # [2.22,2.22,0]
-# ---------------------------------------------
+# Checkerboard tracking point offset from the tool in the robot coordinate
+checkerboard_offset_from_tool = [-0.01, 0.0, 0.108]
+tool_orientation = [0, np.pi/2, 0.0] # Real Good Robot
+
+# tool_orientation = [-np.pi/2,0,0] # [0,-2.22,2.22] # [2.22,2.22,0]
+# X is the axis from the robot to the clamp with the camera
+# Y is the axis from the window to the computer
+# Z is the vertical axis
+
+# This orientation is the gripper pointing towards the camera, with the tag up.
+# tool_orientation = [0, np.pi/2, 0]
+# This orientation is the tag pointing towards the camera (45 degree angle)
+# tool_orientation = [0, np.pi/2 + np.pi/4, 0]
 
 
 # Construct 3D calibration grid across workspace
-gridspace_x = np.linspace(workspace_limits[0][0], workspace_limits[0][1], 1 + (workspace_limits[0][1] - workspace_limits[0][0])/calib_grid_step)
-gridspace_y = np.linspace(workspace_limits[1][0], workspace_limits[1][1], 1 + (workspace_limits[1][1] - workspace_limits[1][0])/calib_grid_step)
-gridspace_z = np.linspace(workspace_limits[2][0], workspace_limits[2][1], 1 + (workspace_limits[2][1] - workspace_limits[2][0])/calib_grid_step)
-calib_grid_x, calib_grid_y, calib_grid_z = np.meshgrid(gridspace_x, gridspace_y, gridspace_z)
-num_calib_grid_pts = calib_grid_x.shape[0]*calib_grid_x.shape[1]*calib_grid_x.shape[2]
-calib_grid_x.shape = (num_calib_grid_pts,1)
-calib_grid_y.shape = (num_calib_grid_pts,1)
-calib_grid_z.shape = (num_calib_grid_pts,1)
-calib_grid_pts = np.concatenate((calib_grid_x, calib_grid_y, calib_grid_z), axis=1)
+num_calib_grid_pts, calib_grid_pts = utils.calib_grid_cartesian(workspace_limits, calib_grid_step)
 
 measured_pts = []
 observed_pts = []
@@ -40,25 +46,33 @@ observed_pix = []
 
 # Move robot to home pose
 print('Connecting to robot...')
+print('WARNING: Have your STOP button ready! The robot may move suddenly!')
+print('WARNING: Be sure to move the bin from in front of the robot!')
 robot = Robot(False, None, None, workspace_limits,
               tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
               False, None, None)
+print('Robot active, open the gripper')
 robot.open_gripper()
+print('Gripper opened!')
 
 # Slow down robot
-robot.joint_acc = 1.4
-robot.joint_vel = 1.05
+robot.joint_acc = 1.7
+robot.joint_vel = 1.2
 
 # Make robot gripper point upwards
-robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
+# robot.move_joints([-np.pi, -np.pi/2, np.pi/2, 0, np.pi/2, np.pi])
+# The tag is pointing upwards at home
+print('MOVING THE ROBOT to home position...')
+robot.go_home()
 
 # Move robot to each calibration point in workspace
 print('Collecting data...')
-for calib_pt_idx in range(num_calib_grid_pts):
+for calib_pt_idx in tqdm(range(num_calib_grid_pts)):
     tool_position = calib_grid_pts[calib_pt_idx,:]
+    print(' pos: ' + str(tool_position) + ' rot: ' + str(tool_orientation))
     robot.move_to(tool_position, tool_orientation)
     time.sleep(1)
-    
+ 
     # Find checkerboard center
     checkerboard_size = (3,3)
     refine_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -66,10 +80,13 @@ for calib_pt_idx in range(num_calib_grid_pts):
     bgr_color_data = cv2.cvtColor(camera_color_img, cv2.COLOR_RGB2BGR)
     gray_data = cv2.cvtColor(bgr_color_data, cv2.COLOR_RGB2GRAY)
     checkerboard_found, corners = cv2.findChessboardCorners(gray_data, checkerboard_size, None, cv2.CALIB_CB_ADAPTIVE_THRESH)
+    
     if checkerboard_found:
+        print("Checkerboard found!")
         corners_refined = cv2.cornerSubPix(gray_data, corners, (3,3), (-1,-1), refine_criteria)
 
         # Get observed checkerboard center 3D point in camera space
+        # The point VPG is tracking is the middle one of a (3x3) checkerboard.
         checkerboard_pix = np.round(corners_refined[4,0,:]).astype(int)
         checkerboard_z = camera_depth_img[checkerboard_pix[1]][checkerboard_pix[0]]
         checkerboard_x = np.multiply(checkerboard_pix[0]-robot.cam_intrinsics[0][2],checkerboard_z/robot.cam_intrinsics[0][0])
@@ -92,13 +109,21 @@ for calib_pt_idx in range(num_calib_grid_pts):
         cv2.imshow('Calibration',vis)
         cv2.waitKey(10)
 
+
+
 # Move robot back to home pose
 robot.go_home()
 
-measured_pts = np.asarray(measured_pts)
-observed_pts = np.asarray(observed_pts)
+measured_pts = np.asarray(measured_pts)  # The measured_pts is in m unit. 
+observed_pts = np.asarray(observed_pts) / 1000  # The observed_pts is in mm unit. Changing the unit to m.
 observed_pix = np.asarray(observed_pix)
 world2camera = np.eye(4)
+
+# Save the collected points
+np.savetxt('measured_pts.txt', np.asarray(measured_pts), delimiter=' ')
+np.savetxt('observed_pts.txt', np.asarray(observed_pts), delimiter=' ')
+np.savetxt('observed_pix.txt', np.asarray(observed_pix), delimiter=' ')
+
 
 # Estimate rigid transform with SVD (from Nghia Ho)
 def get_rigid_transform(A, B):
@@ -135,7 +160,7 @@ def get_rigid_transform_error(z_scale):
     registered_pts = np.dot(R,np.transpose(measured_pts)) + np.tile(t,(1,measured_pts.shape[0]))
     error = np.transpose(registered_pts) - new_observed_pts
     error = np.sum(np.multiply(error,error))
-    rmse = np.sqrt(error/measured_pts.shape[0]);
+    rmse = np.sqrt(error/measured_pts.shape[0])
     return rmse
 
 # Optimize z scale w.r.t. rigid transform error

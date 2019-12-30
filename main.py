@@ -5,13 +5,13 @@ import os
 import random
 import threading
 import argparse
+import torch
+from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
 import cv2
 from collections import namedtuple
-import torch
-from torch.autograd import Variable
 from robot import Robot
 from trainer import Trainer
 from logger import Logger
@@ -114,7 +114,15 @@ def main(args):
     if is_sim:
         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     else:
-        workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        # Corner near window on robot base side
+        # [0.47984089 0.34192974 0.02173636]
+        # Corner on the side of the cameras and far from the window
+        # [ 0.73409861 -0.45199446 -0.00229499]
+        # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
+        workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+
+        # Original visual pushing graping paper workspace definition
+        # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     heightmap_resolution = args.heightmap_resolution # Meters per pixel of heightmap
     random_seed = args.random_seed
     force_cpu = args.force_cpu
@@ -139,6 +147,7 @@ def main(args):
     neural_network_name = args.nn
     disable_situation_removal = args.disable_situation_removal
     evaluate_random_objects = args.evaluate_random_objects
+    skip_noncontact_actions = args.skip_noncontact_actions
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -238,7 +247,11 @@ def main(args):
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+    if num_obj is not None:
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+    else:
+        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
+
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -281,16 +294,10 @@ def main(args):
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
-            # TODO(ahundt) make decrease threshold more accessible, perhaps a command line parameter
-            decrease_threshold = 0.1
             # decrease_threshold = None  # None means decrease_threshold will be disabled
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
-            # if it falls we will just keep going, and allow nonaction or objects out of scene checks to handle resets
-            needed_to_reset = False
-            max_workspace_height = nonlocal_variables['prev_stack_height'] - decrease_threshold
-            if decrease_threshold is not None and nonlocal_variables['stack_height'] < max_workspace_height:
-                needed_to_reset = True
-            # TODO(hkwon214) add a separate case for incremental height
+            stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
+            max_workspace_height = ' (see max_workspace_height printout above) '
+            # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
@@ -380,7 +387,7 @@ def main(args):
                     # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
                         print('Strategy: explore (exploration probability: %f)' % (explore_prob))
-                        push_frequency_one_in_n = 3
+                        push_frequency_one_in_n = 5
                         nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
@@ -431,15 +438,32 @@ def main(args):
                 primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
 
                 # If pushing, adjust start position, and make sure z value is safe and not too low
-                if nonlocal_variables['primitive_action'] == 'push': # or nonlocal_variables['primitive_action'] == 'place':
-                    finger_width = 0.02
-                    safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
-                    local_region = valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
-                    if local_region.size == 0:
-                        safe_z_position = workspace_limits[2][0]
+                if nonlocal_variables['primitive_action'] == 'push' or nonlocal_variables['primitive_action'] == 'place':
+                    def get_local_region(region_width=0.03):
+                        safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
+                        return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
+                    # make sure the fingers will not collide with the objects
+                    finger_width = 0.05
+                    finger_touchdown_region = get_local_region(region_width=finger_width)
+                    safe_z_position = workspace_limits[2][0]
+                    if finger_touchdown_region.size != 0:
+                        safe_z_position += np.max(finger_touchdown_region)
                     else:
-                        safe_z_position = np.max(local_region) + workspace_limits[2][0]
+                        safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
                     primitive_position[2] = safe_z_position
+                    if nonlocal_variables['primitive_action'] == 'push':
+                        # determine if the safe z position might actually contact anything during the push action
+                        # TODO(ahundt) push motion region can be refined based on the rotation angle and the direction of travel
+                        push_width = 0.2
+                        local_push_region = get_local_region(region_width=push_width)
+                        # push_may_contact_something is True for something noticeably higher than the push action z height
+                        max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+                        push_may_contact_something = primitive_position[2] < max_local_push_region
+                        push_str = ''
+                        if not push_may_contact_something:
+                            push_str += 'Predicting push action failure, heuristics determined '
+                        print('push at height ' + str(safe_z_position) + 
+                              ' would not contact anything at the max height of ' + str(max_local_push_region))
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 if nonlocal_variables['primitive_action'] == 'push':
@@ -465,13 +489,17 @@ def main(args):
 
                 # Initialize variables that influence reward
                 set_nonlocal_success_variables_false()
-                change_detected = False
                 if place:
                     current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
-                    nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+                    if skip_noncontact_actions and not push_may_contact_something:
+                        # We are too high to contact anything, don't bother actually pushing.
+                        # TODO(ahundt) also check for case where we are too high for the local gripper path
+                        nonlocal_variables['push_success'] = False
+                    else:
+                        nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal()
@@ -512,7 +540,14 @@ def main(args):
                     if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
-                    nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
+                    
+                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or 
+                            valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
+                        # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
+                        print('Grasp action failure, heuristics determined grasp would not contact anything.')
+                    else:
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     #TODO(hkwon214) Get image after executing grasp action. save also? better place to put?
                     valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
@@ -754,7 +789,7 @@ def main(args):
             depth_diff[depth_diff < 0.01] = 0
             depth_diff[depth_diff > 0] = 1
             # NOTE: original VPG change_threshold was 300
-            change_threshold = 100
+            change_threshold = 300
             change_value = np.sum(depth_diff)
             change_detected = change_value > change_threshold or prev_grasp_success
             print('Change detected: %r (value: %d)' % (change_detected, change_value))
@@ -847,12 +882,13 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 20:
+            if int(time_elapsed) > 25:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
-                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 20 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 25 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.check_sim()
-                robot.reposition_objects()
+                if is_sim:
+                    robot.check_sim()
+                    robot.reposition_objects()
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
@@ -921,7 +957,6 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     # Get latest RGB-D image
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
-    # print(color_img)
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
     color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
     valid_depth_heightmap = depth_heightmap.copy()
@@ -1040,7 +1075,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                 trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
-        print('Experience Replay: 0 prior training samples. Skipping experience replay.')
+        # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
         time.sleep(0.01)
 
 
@@ -1055,9 +1090,9 @@ if __name__ == '__main__':
     parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',                  help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
-    parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as TCP client (UR5)')
+    parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as TCP client (UR5)')
     parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                          help='port to robot arm as TCP client (UR5)')
-    parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='100.127.7.223',                     help='IP address to robot arm as real-time client (UR5)')
+    parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as real-time client (UR5)')
     parser.add_argument('--rtc_port', dest='rtc_port', type=int, action='store', default=30003,                           help='port to robot arm as real-time client (UR5)')
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
@@ -1076,6 +1111,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
+    parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,               help='enable skipping grasp actions when the heightmap is zero')
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')

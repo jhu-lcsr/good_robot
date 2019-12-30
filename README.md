@@ -28,10 +28,11 @@ Details of our specific training and test runs, command line commands, pre-train
 
 ### Starting the V-REP Simulation
 
-[Download V-REP](http://www.coppeliarobotics.com/index.html) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
+[Download CoppeliaSim](http://www.coppeliarobotics.com/index.html) (formerly V-REP) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
 
 ```bash
-~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
+cd ~/src/real_good_robot
+~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
 ```
 
 ### Cube Stacking
@@ -519,27 +520,43 @@ python capture.py
 ```
 
 ### Calibrating Camera Extrinsics
-
 <img src="images/calibration.gif" height=200px align="right" />
 <img src="images/checkerboard.jpg" height=200px align="right" />
 
-We provide a simple calibration script to estimate camera extrinsics with respect to robot base coordinates. To do so, the script moves the robot gripper over a set of predefined 3D locations as the camera detects the center of a moving 4x4 checkerboard pattern taped onto the gripper. The checkerboard can be of any size (the larger, the better).
+We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand [here](https://github.com/IFL-CAMP/easy_handeye)). To do so, the script move the robot to several random positions and orientations within the workspace. 
+
+We are using the PrimeSense Carmine 1.08 for this project. If you are using other cameras which need calibration for the depth scale (e.g. [Intel RealSense D415]((https://click.intel.com/intelr-realsensetm-depth-camera-d415.html)), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
+
+Before you start, make sure you have the ROS package [fiducials](http://wiki.ros.org/fiducials) installed. 
 
 #### Instructions:
 
-1. Predefined 3D locations are sampled from a 3D grid of points in the robot's workspace. To modify these locations, change the variables `workspace_limits` and `calib_grid_step` at the top of `calibrate.py`.
+1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
 
-1. Measure the offset between the midpoint of the checkerboard pattern to the tool center point in robot coordinates (variable `checkerboard_offset_from_tool`). This offset can change depending on the orientation of the tool (variable `tool_orientation`) as it moves across the predefined locations. Change both of these variables respectively at the top of `calibrate.py`.
+2. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
-1. The code directly communicates with the robot via TCP. At the top of `calibrate.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
+3. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
 
-1. With caution, run the following to move the robot and calibrate:
+4. Roslaunch the camera with, for example:
+```shell
+roslaunch openni2_launch openni2.launch depth_registration:=true
+```
 
-    ```shell
-    python calibrate.py
-    ```
+5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
+```shell
+roslaunch aruco_detect aruco_detect.launch
+```
 
-The script also optimizes for a z-scale factor and saves it into `real/camera_depth_scale.txt`. This scale factor should be multiplied with each depth pixel captured from the camera. This step is more relevant for the RealSense SR300 cameras, which commonly suffer from a severe scaling problem where the 3D data is often 15-20% smaller than real world coordinates. The D400 series are less likely to have such a severe scaling problem.
+6. With caution, run the following to move the robot and calibrate:
+
+```shell
+python calibrate_ros.py
+```
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
+The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
+
+If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
 
 ### Training
 
@@ -555,3 +572,84 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 * Use `touch.py` to test calibrated camera extrinsics -- provides a UI where the user can click a point on the RGB-D image, and the robot moves its end-effector to the 3D location of that point
 * Use `debug.py` to test robot communication and primitive actions
+
+
+### ROS Based Image Collection Setup
+
+We require python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build. A couple additional steps below will need to be added in the middle. We advise installing in the folder:
+
+```
+~/ros_catkin_ws
+```
+
+Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source). 
+
+In particular fix up this command:
+
+```
+export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
+```
+
+For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories, and for handeye calibration between the camera and robot add [UbiquityRobotics/fiducials](https://github.com/UbiquityRobotics):
+
+```
+cd ~/catkin_ros_ws
+git clone https://github.com/ros-drivers/openni2_launch.git
+git clone https://github.com/ros-drivers/rgbd_launch.git
+git clone https://github.com/UbiquityRobotics/fiducials.git
+```
+
+Run the build and install.
+
+```
+cd ~/ros_catkin_ws
+rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
+```
+<!-- 
+Then install the primesense image pipeline:
+
+```bash
+sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
+``` -->
+
+Source the ros setup so you get access to the launch commands:
+```
+source ~/ros_catkin_ws/install_isolated/setup.zsh
+```
+
+Running ROS with depth image processing:
+
+```bash
+roslaunch openni2_launch openni2.launch depth_registration:=true
+```
+
+In a separate tab run our small test script, which currently only supports python2:
+
+```bash
+python test_ros_images.py
+```
+
+Running RVIZ to look at the images:
+
+```
+rosrun rviz rviz
+```
+
+The correct images, as done in the [JHU costar dataset](https://sites.google.com/site/costardataset) class [collector](https://github.com/jhu-lcsr/costar_plan/blob/d469d62d72cd405ed07b10c62eb24391c0af1975/ctp_integration/python/ctp_integration/collector.py), are from the following ROS topics:
+
+```
+
+        self.rgb_topic = "/camera/rgb/image_rect_color"
+        # raw means it is in the format provided by the openi drivers, 16 bit int
+        self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
+```
+
+Calibration:
+
+```
+roslaunch aruco_detect aruco_detect.launch
+```
+
+```
+python3 calibrate_ros.py
+```

@@ -5,12 +5,11 @@ Control the Robotiq 2f-85 gripper based on robotiq_2f_gripper_ctrl.py in: https:
 @author: Hongtao Wu
 Oct 12, 2019
 """
-
 import numpy as np
-from robotiq_2f_gripper_control_msg import outputMsg
-from robotiq_2f_gripper_control_msg import inputMsg
-from baseRobotiq2FGripper import robotiqbaseRobotiq2FGripper
-import comModbusTcp
+from .robotiq_2f_gripper_control_msg import outputMsg
+from .robotiq_2f_gripper_control_msg import inputMsg
+from .baseRobotiq2FGripper import robotiqbaseRobotiq2FGripper
+from .comModbusTcp import communication
 import time
 
 
@@ -19,7 +18,7 @@ class RobotiqCGripper(object):
         self.cur_status = None
         #Gripper is a 2F with a TCP connection
         self.gripper = robotiqbaseRobotiq2FGripper()
-        self.gripper.client = comModbusTcp.communication()
+        self.gripper.client = communication()
 
         #We connect to the address received as an argument
         self.gripper.client.connectToDevice(address)
@@ -58,7 +57,7 @@ class RobotiqCGripper(object):
             print("Successfully connected to the gripper!")
             return True
         else:
-            print("Fail to connect to the gripper!")
+            print("Failed to connect to the gripper!")
             return False
 
     def is_ready(self):
@@ -97,7 +96,7 @@ class RobotiqCGripper(object):
 
     def is_closed(self):
         self.get_cur_status()
-        return self.cur_status.gPO >= 230
+        return self.cur_status.gPO >= 235
 
     def is_opened(self):
         self.get_cur_status()
@@ -198,8 +197,9 @@ class RobotiqCGripper(object):
         #         return False
         #     return self.wait_until_stopped(timeout)
         # return True
-        self.wait_until_stopped(timeout)
-        print("Finish moving!")
+        result = self.wait_until_stopped(timeout)
+        print("Gripper finished moving!")
+        return result
 
 
     def stop(self, block=False, timeout=-1):
@@ -218,9 +218,10 @@ class RobotiqCGripper(object):
         return self.goto(1.0, vel, force, block=block, timeout=timeout)
 
     def close(self, vel=0.1, force=100, block=False, timeout=10):
-        if self.is_closed():
-            print("The gripper is already closed!")
-            return True
+        # Commented because sometimes we actually want to physically close it a second time
+        # if self.is_closed():
+        #     print("The gripper is already closed!")
+        #     return True
         return self.goto(-1.0, vel, force, timeout=timeout, block=block)
 
 def main():
@@ -233,11 +234,13 @@ def main():
 
     print('Start Sleeping!')
     time.sleep(2)
+    print('Close!')
     
     gripper.close(block=True)
 
     print('Start Sleeping!')
     time.sleep(2)
+    print('Open!')
 
     gripper.open(block=True)
     # while not rospy.is_shutdown():
