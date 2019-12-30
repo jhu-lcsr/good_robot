@@ -197,8 +197,9 @@ class RobotiqCGripper(object):
         #         return False
         #     return self.wait_until_stopped(timeout)
         # return True
-        self.wait_until_stopped(timeout)
+        result = self.wait_until_stopped(timeout)
         print("Gripper finished moving!")
+        return result
 
 
     def stop(self, block=False, timeout=-1):
