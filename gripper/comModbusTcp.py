@@ -40,6 +40,7 @@ Module comModbusTcp: defines a class which communicates with Robotiq Grippers us
 The module depends on pymodbus (http://code.google.com/p/pymodbus/) for the Modbus TCP client.
 """
 
+import time
 from pymodbus.client.sync import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
 from pymodbus.exceptions import ConnectionException
@@ -88,6 +89,8 @@ class communication:
             connection_exception = False
          except ConnectionException:
             connection_exception = True
+            print('WARNING: comModbusTCP.py ConnectionException, retrying')
+            time.sleep(0.1)
 
       #Instantiate output as an empty list
       output = []
