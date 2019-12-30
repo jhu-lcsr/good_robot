@@ -661,10 +661,19 @@ class Robot(object):
 
     def get_state(self):
 
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        state_data = self.tcp_socket.recv(2048)
-        self.tcp_socket.close()
+        state_data = None
+        while state_data is None:
+            try:
+                self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.tcp_socket.settimeout(1.0)
+                self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+                state_data = self.tcp_socket.recv(2048)
+            except socket.timeout as e:
+                print('WARNING: robot.py get_state() TIMEOUT ' + str(e))
+            except TimeoutError as e:
+                print('WARNING: robot.py get_state() TIMEOUT' + str(e))
+                pass
+            self.tcp_socket.close()
         return state_data
 
 
