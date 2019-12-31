@@ -77,7 +77,10 @@ while test_gripper_functionality:
 # # r.push([0.414000, -0.092000, 0.003734], 0.0)
 
 # r.grasp([0.816000, -0.024000, -0.040000], 1.570796)
-r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+retry_grasp = True
+while retry_grasp:
+    r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+
 print_robot_pose = True
 while print_robot_pose:
     # Loop and print current position so you can use that data
