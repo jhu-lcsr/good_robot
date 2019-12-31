@@ -624,7 +624,7 @@ class Robot(object):
             # for cases like running close twice in a row
             # to first actually grasp an object then
             # to second check if the object is still present
-            self.gripper.stop(block=not nonblocking, timeout=0.5)
+            self.gripper.stop(block=not nonblocking, timeout=0.1)
             # actually close the gripper
             self.gripper.close(block=not nonblocking)
             if nonblocking:
