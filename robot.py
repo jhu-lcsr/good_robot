@@ -190,7 +190,7 @@ class Robot(object):
 
             # Default tool speed configuration
             self.tool_acc = 1.2 # Safe: 0.5 Fast: 1.2
-            self.tool_vel = 0.25 # Safe: 0.2 Fast: 0.25
+            self.tool_vel = 0.5 # Safe: 0.2 Fast: 0.5
             self.move_sleep = 1.0 # Safe: 2.0 Fast: 1.0
 
             # Tool pose tolerance for blocking calls
@@ -620,6 +620,12 @@ class Robot(object):
                 time.sleep(1.5)
                 gripper_fully_closed =  self.check_grasp()
         else:
+            # stop is done to clear the current state,
+            # for cases like running close twice in a row
+            # to first actually grasp an object then
+            # to second check if the object is still present
+            self.gripper.stop()
+            # actually close the gripper
             self.gripper.close(block=not nonblocking)
             if nonblocking:
                 gripper_fully_closed = True
@@ -1011,17 +1017,21 @@ class Robot(object):
             time.sleep(0.1)
             gripper_fully_closed = self.close_gripper()
             color_success = None
-            bin_position = [0.33, 0.37, 0.33 + self.gripper_ee_offset]
+            bin_position = np.array([0.33, 0.40, 0.33 + self.gripper_ee_offset])
 
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
             if not gripper_fully_closed:
-                print("Possible Grasp success, moving up...")
+                print("Possible Grasp success, moving up then closing again to see if object is still present...")
                 # self.move_to([position[0],position[1],bin_position[2] - 0.14],[tool_orientation[0],tool_orientation[1],0.0])
                 self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
                 grasp_success = not self.close_gripper()
                 if grasp_success and not self.place_task:
                     print("Grasp success, moving to drop object in bin...")
+                    # Move towards the bin, and up to the drop height
+                    move_waypoint = (bin_position - position) * 0.6 + position
+                    move_waypoint[2] = bin_position[2]
+                    self.move_to(move_waypoint, [tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2]])
                     # Move over the bin
                     self.move_to([bin_position[0],bin_position[1],bin_position[2]], [tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2]])
 
