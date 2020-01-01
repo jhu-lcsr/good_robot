@@ -692,6 +692,7 @@ def main(args):
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
         stuff_count[valid_depth_heightmap > 0.02] = 1
+        stuff_sum = np.sum(stuff_count)
         empty_threshold = 300
         if is_sim and is_testing:
             empty_threshold = 10
@@ -702,10 +703,11 @@ def main(args):
             if is_testing:
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
-        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
+        if stuff_sum < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
-                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
+                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
@@ -717,7 +719,7 @@ def main(args):
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
-                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
+                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (stuff_sum))
                 robot.restart_real()
 
             nonlocal_variables['trial_complete'] = True
