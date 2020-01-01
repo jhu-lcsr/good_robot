@@ -61,26 +61,6 @@ class Robot(object):
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
-        if self.grasp_color_task:
-            # TODO: check if the block color is in the workspace
-            # TODO: one hot encoding
-            # self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape_03']
-
-            self.stored_action_labels = [
-                b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
-                b'place_blue_on_red', b'grab_blue', b'place_red_on_blueyellow', b'place_green_on_redyellow',
-                b'place_red_on_yellow', b'place_green_on_blueyellow', b'place_red_on_greenblue', b'place_blue_on_green',
-                b'place_blue_on_redgreen',b'place_yellow_on_greenblue', b'place_yellow_on_blue', b'place_blue_on_greenyellow',
-                b'place_blue_on_yellowgreen', b'place_blue_on_greenred', b'place_yellow_on_redgreen', b'grab_yellow',
-                b'place_red_on_greenyellow', b'grab_green', b'place_red_on_green', b'place_yellow_on_bluered',
-                b'place_yellow_on_green', b'place_green_on_blue', b'place_yellow_on_bluegreen', b'place_blue_on_redyellow',
-                b'place_red_on_blue', b'place_red_on_yellowgreen', b'place_yellow_on_greenred', b'place_green_on_yellowblue',
-                b'place_red_on_bluegreen', b'place_green_on_red', b'place_red_on_yellowblue', b'place_green_on_yellowred',
-                b'place_green_on_redblue', b'grab_red', b'place_yellow_on_redblue', b'place_green_on_bluered', b'place_blue_on_yellow']
-
-            # create dictionary to lookup index of various strings
-            self.stored_action_label_to_index_dict = {k: v for v, k in enumerate(self.stored_action_labels)}
-
         # If in simulation...
         if self.is_sim:
 
