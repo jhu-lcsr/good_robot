@@ -710,6 +710,7 @@ class Robot(object):
 
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0],tool_position[1],tool_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.tool_acc,self.tool_vel)
             self.tcp_socket.send(str.encode(tcp_command))
+            self.tcp_socket.close()
 
             # Block until robot reaches target tool position
             self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
