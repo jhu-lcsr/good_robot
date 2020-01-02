@@ -512,7 +512,7 @@ class Trainer(object):
 
 
     # Compute labels and backpropagate
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
 
         if self.method == 'reactive':
 
@@ -567,26 +567,28 @@ class Trainer(object):
                 except:
                     loss_value += loss.cpu().data.numpy()
 
-                # Since grasping is symmetric, train with another forward pass of opposite rotation angle
-                opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
+                if symmetric and not self.place:
+                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
+                    # train with another forward pass of opposite rotation angle
+                    opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
+                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
 
-                if self.use_cuda:
-                    loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long().cuda()))
-                else:
-                    loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
-                loss.backward()
-                #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
+                    if self.use_cuda:
+                        loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long().cuda()))
+                    else:
+                        loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
+                    loss.backward()
+                    #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                    try:
+                        loss_value += loss.cpu().data.numpy()[0]
+                    except:
+                        loss_value += loss.cpu().data.numpy()
 
-                loss_value = loss_value/2
+                    loss_value = loss_value/2
 
-            #TODO(hkwon214): confirm that placing symmetric too?
             elif primitive_action == 'place':
+                # Note that placing is definitely not symmetric, because an off-center grasp will lead to two different oriented place actions.
                 # loss = self.grasp_criterion(output_prob[best_pix_ind[0]][1], Variable(torch.from_numpy(label).long().cuda()))
                 # loss += self.grasp_criterion(output_prob[(best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations][1], Variable(torch.from_numpy(label).long().cuda()))
 
@@ -603,26 +605,6 @@ class Trainer(object):
                     loss_value += loss.cpu().data.numpy()[0]
                 except:
                     loss_value += loss.cpu().data.numpy()
-
-                # Since grasping is symmetric, train with another forward pass of opposite rotation angle
-                opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
-
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
-
-                if self.use_cuda:
-                    loss = self.place_criterion(output_prob[0][2], Variable(torch.from_numpy(label).long().cuda()))
-                else:
-                    loss = self.place_criterion(output_prob[0][2], Variable(torch.from_numpy(label).long()))
-                loss.backward()
-                #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
-
-                loss_value = loss_value/2
-
-
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
@@ -682,28 +664,31 @@ class Trainer(object):
                 except:
                     loss_value = loss.cpu().data.numpy()
 
-                opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
+                if symmetric and not self.place:
+                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
+                    # train with another forward pass of opposite rotation angle
+                    opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
+                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
 
-                if self.use_cuda:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
-                else:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                    if self.use_cuda:
+                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                    else:
+                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
 
-                loss = loss.sum()
-                loss.backward()
-                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                    loss = loss.sum()
+                    loss.backward()
+                    #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
+                    try:
+                        loss_value = loss.cpu().data.numpy()[0]
+                    except:
+                        loss_value = loss.cpu().data.numpy()
 
-                loss_value = loss_value/2
+                    loss_value = loss_value/2
 
 
             elif primitive_action == 'place':
-
+                # Note that placing is definitely not symmetric, because an off-center grasp will lead to two different oriented place actions.
                 # Do forward pass with specified rotation (to save gradients)
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
 
@@ -718,25 +703,6 @@ class Trainer(object):
                     loss_value = loss.cpu().data.numpy()[0]
                 except:
                     loss_value = loss.cpu().data.numpy()
-
-                opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
-
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
-
-                if self.use_cuda:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
-                else:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-
-                loss = loss.sum()
-                loss.backward()
-                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
-
-                loss_value = loss_value/2
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()

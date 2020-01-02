@@ -1041,7 +1041,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
         elif method == 'reinforcement':
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+            if trial_reward:
+                actual_value_log = trainer.trial_reward_value_log
+            else:
+                actual_value_log = trainer.label_value_log
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(actual_value_log)[sample_ind[:,0]])
         sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
@@ -1088,21 +1092,22 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             reward_to_backprop = trainer.label_value_log[sample_iteration]
 
         # Get labels for sample and backpropagate, trainer.backprop also does a forward pass internally.
-        sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
+        sample_best_pix_ind = np.asarray(trainer.executed_action_log)[sample_iteration, 1:4].astype(np.int)
         trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
                          reward_to_backprop, goal_condition=exp_goal_condition)
-
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
-            if update_label_value_log:
-                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_push_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'grasp':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_grasp_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'place':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
-            if update_label_value_log:
-                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_place_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
+
+        if update_label_value_log:
+            trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
         # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
