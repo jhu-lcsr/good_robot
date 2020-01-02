@@ -43,12 +43,13 @@ robot.open_gripper()
 # robot.joint_vel = 1.05
 grasp_angle = 4.0
 grasp_success, grasp_color_success = False, False
+mutex = threading.Lock()
 # Callback function for clicking on OpenCV window
 click_point_pix = ()
 # camera_color_img, camera_depth_img = robot.get_camera_data()
 def mouseclick_callback(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        global camera, robot, click_point_pix, action, grasp_angle, grasp_success, grasp_color_success
+        global camera, robot, click_point_pix, action, grasp_angle, grasp_success, grasp_color_success, mutex
         click_point_pix = (x,y)
 
         # Get click point in camera coordinates
@@ -68,46 +69,55 @@ def mouseclick_callback(event, x, y, flags, param):
         target_position = target_position[0:3,0]
         print(target_position, tool_orientation)
         
-        if action == 'touch':
-            # Move the gripper up a bit to protect the gripper (Real Good Robot)
-            target_position[-1] += 0.17
-            def move_to():
-                robot.move_to(target_position, tool_orientation)
-            t = threading.Thread(target=move_to)
-            t.start()
-        elif action == 'grasp':
-            if not robot.place_task or (robot.place_task and not grasp_success):
-                def grasp():
-                    global grasp_success, grasp_color_success
-                    grasp_success, grasp_color_success = robot.grasp(target_position, grasp_angle * np.pi / 4)
-                t = threading.Thread(target=grasp)
+        with mutex:
+            if action == 'touch':
+                # Move the gripper up a bit to protect the gripper (Real Good Robot)
+                target_position[-1] += 0.17
+                def move_to():
+                    global mutex
+                    with mutex:
+                        robot.move_to(target_position, tool_orientation)
+                t = threading.Thread(target=move_to)
                 t.start()
-            else:
-                def place():
-                    global grasp_success
-                    robot.place(target_position, grasp_angle * np.pi / 4)
-                    grasp_success = False
-                t = threading.Thread(target=place)
-                t.start()
+            elif action == 'grasp':
+                if not robot.place_task or (robot.place_task and not grasp_success):
+                    def grasp():
+                        global grasp_success, grasp_color_success, mutex
+                        with mutex:
+                            grasp_success, grasp_color_success = robot.grasp(target_position, grasp_angle * np.pi / 4)
+                    t = threading.Thread(target=grasp)
+                    t.start()
+                else:
+                    def place():
+                        global grasp_success, mutex
+                        with mutex:
+                            robot.place(target_position, grasp_angle * np.pi / 4)
+                            grasp_success = False
+                    t = threading.Thread(target=place)
+                    t.start()
 
-        elif action == 'box':
-            t = threading.Thread(target=lambda: robot.restart_real())
-            t.start()
-        elif action == 'push':
-            target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.push(target_position, grasp_angle * np.pi / 4))
-            t.start()
-        elif action == 'place':
-            target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.place(target_position, grasp_angle * np.pi / 4))
-            t.start()
+            elif action == 'box':
+                t = threading.Thread(target=lambda: robot.restart_real())
+                t.start()
+            elif action == 'push':
+                target_position[-1] += 0.01
+                t = threading.Thread(target=lambda: robot.push(target_position, grasp_angle * np.pi / 4))
+                t.start()
+            elif action == 'place':
+                target_position[-1] += 0.01
+                t = threading.Thread(target=lambda: robot.place(target_position, grasp_angle * np.pi / 4))
+                t.start()
 
 
 # Show color and depth frames
 cv2.namedWindow('depth')
 cv2.namedWindow('color')
 cv2.setMouseCallback('color', mouseclick_callback)
+def print_task():
+    global robot
+    print('place task') if robot.place_task else print('push grasp task')
 
+print_task()
 while True:
     camera_color_img, camera_depth_img = robot.get_camera_data()
     if len(click_point_pix) != 0:
@@ -150,6 +160,7 @@ while True:
         # 1. filling the bin 
         # 2. grasping to hold and then place
         robot.place_task = not robot.place_task
+        print_task()
     elif key == ord('c'):
         break
 
