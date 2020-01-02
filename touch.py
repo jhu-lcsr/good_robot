@@ -9,12 +9,35 @@ from real.camera import Camera
 import threading
 
 class HumanControlOfRobot(object):
+    """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
 
-    def __init__(self, robot=None, action='touch', human_control=True, mutex=None):
+    Keyboard Controls:
+        'c': set self.stop to True indicating it is time to exit the program.
+        'a': autonomous mode, sets self.human_control = False, clicks will have no effect (unless move_robot=False).
+        'h': human control mode, sets self.human_control = True, clicks will move the robot (unless move_robot=False).
+        'g': set self.action = 'grasp', left click in the 'color' image window will do a grasp action.
+        'p': set self.action = 'place', left click will do a place action.
+        's': set self.action = 'push', left click will slide the gripper across the ground, aka a push action.
+        't': set self.action = 'touch', left click will do a touch action (go to a spot and stay there).
+        '1-9': Set the gripper rotation orientation at 45 degree increments, starting at the angle 0. Default is '5'.
+        'b': set self.action = box, left click will move the robot to go get the box and dump the objects inside.
+        '[': set self.robot.place_task = False, a successful grasp will immediately drop objects in the box.
+        ']': set self.robot.place_task = True, a successful grasp will hold on to objects so the robot can place them.
+        ' ': print the current robot cartesian position with xyz and axis angle and the current joint angles.
+
+    Member Variables:
+
+        self.stop: if True shut down your program, pressing 'c' on the keyboard sets this variable to True.
+    """
+    def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True):
         self.stop = False
         self.print_state_count = 0
         self.tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
         self.human_control = human_control
+        self.move_robot = move_robot
+        self.action = action
+        self.click_count = 0
+        self.target_position = None
         if robot is None:
 
             # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -40,7 +63,7 @@ class HumanControlOfRobot(object):
         
         self.camera_color_img, self.camera_depth_img = robot.get_camera_data()
         def mouseclick_callback(event, x, y, flags, param):
-            if event == cv2.EVENT_LBUTTONDOWN:
+            if event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
                 # global camera, robot, self.click_point_pix, action, self.grasp_angle, self.grasp_success, self.grasp_color_success, self.mutex
                 self.click_point_pix = (x,y)
 
@@ -63,45 +86,51 @@ class HumanControlOfRobot(object):
                 
                 if not self.human_control:
                     print('Human Control is disabled, press h for human control mode, a for autonomous mode')
-                    return
                 with self.mutex:
-                    if action == 'touch':
+                    self.target_position = target_position
+                    self.click_count += 1
+                    if self.action == 'touch':
                         # Move the gripper up a bit to protect the gripper (Real Good Robot)
-                        target_position[-1] += 0.17
+                        self.target_position[-1] += 0.17
                         def move_to():
                             # global self.mutex
                             with self.mutex:
                                 robot.move_to(target_position, self.tool_orientation)
-                        t = threading.Thread(target=move_to)
-                        t.start()
-                    elif action == 'grasp':
+                        if self.move_robot:
+                            t = threading.Thread(target=move_to)
+                            t.start()
+                    elif self.action == 'grasp':
                         if not robot.place_task or (robot.place_task and not self.grasp_success):
                             def grasp():
                                 # global self.grasp_success, self.grasp_color_success, self.mutex
                                 with self.mutex:
                                     self.grasp_success, self.grasp_color_success = robot.grasp(target_position, self.grasp_angle * np.pi / 4)
-                            t = threading.Thread(target=grasp)
-                            t.start()
+                            if self.move_robot:
+                                t = threading.Thread(target=grasp)
+                                t.start()
                         else:
                             def place():
                                 # global self.grasp_success, self.mutex
                                 with self.mutex:
                                     robot.place(target_position, self.grasp_angle * np.pi / 4)
                                     self.grasp_success = False
-                            t = threading.Thread(target=place)
-                            t.start()
+                            if self.move_robot:
+                                t = threading.Thread(target=place)
+                                t.start()
 
-                    elif action == 'box':
+                    elif self.action == 'box':
                         t = threading.Thread(target=lambda: robot.restart_real())
                         t.start()
-                    elif action == 'push':
-                        target_position[-1] += 0.01
+                    elif self.action == 'push':
+                        self.target_position[-1] += 0.01
                         t = threading.Thread(target=lambda: robot.push(target_position, self.grasp_angle * np.pi / 4))
                         t.start()
-                    elif action == 'place':
-                        target_position[-1] += 0.01
+                    elif self.action == 'place':
+                        self.target_position[-1] += 0.01
                         t = threading.Thread(target=lambda: robot.place(target_position, self.grasp_angle * np.pi / 4))
                         t.start()
+                    
+                    self.target_position = target_position
 
         # Show color and depth frames
         cv2.namedWindow('depth')
@@ -124,7 +153,7 @@ class HumanControlOfRobot(object):
             self.camera_color_img = cv2.circle(self.camera_color_img, self.click_point_pix, 7, (0,0,255), 2)
         self.camera_color_img = cv2.cvtColor(self.camera_color_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('color', self.camera_color_img)
-        cv2.imshow('depth', self.camera_color_img)
+        cv2.imshow('depth', self.camera_depth_img)
         
         key = cv2.waitKey(1)
         # Configure the system
@@ -160,27 +189,73 @@ class HumanControlOfRobot(object):
         elif key == ord('b'):
             self.action = 'box'
         elif key == ord(']'):
-            # Mode for stacking blocks
-            self.robot.place_task = True
-            self.print_task()
+            with self.mutex:
+                # Mode for stacking blocks
+                self.robot.place_task = True
+                self.print_task()
         elif key == ord('['):
-            # Mode for grasping to hold and then place
-            self.robot.place_task = False
-            self.print_task()
+            with self.mutex:
+                # Mode for grasping to hold and then place
+                self.robot.place_task = False
+                self.print_task()
         elif key == ord(' '):
-            # print the robot state
-            self.print_state_count += 1
-            state_data = robot.get_state()
-            actual_tool_pose = robot.parse_tcp_state_data(state_data, 'cartesian_info')
-            joint_position = robot.parse_tcp_state_data(state_data, 'joint_data')
-            robot_state = 'cart_pose: ' + str(actual_tool_pose) + ' joint pos: ' + str(joint_position)
-            print(str(self.print_state_count) + ' ' + robot_state)
+            with self.mutex:
+                # print the robot state
+                self.print_state_count += 1
+                state_data = robot.get_state()
+                actual_tool_pose = robot.parse_tcp_state_data(state_data, 'cartesian_info')
+                joint_position = robot.parse_tcp_state_data(state_data, 'joint_data')
+                robot_state = 'cart_pose: ' + str(actual_tool_pose) + ' joint pos: ' + str(joint_position)
+                print(str(self.print_state_count) + ' ' + robot_state)
         elif key == ord('c'):
             self.stop = True
         elif key == ord('h'):
             self.human_control = True
         elif key == ord('a'):
             self.human_control = False
+    
+    def run(self):
+        """ Blocking call that repeatedly calls run_one()
+        """
+        while not hcr.stop:
+            hcr.run_one()
+        
+    def get_action(self, camera_color_img=None, camera_depth_img=None, prev_click_count=None, block=True):
+        """ Get a human specified action
+        # Arguments
+            camera_color_img: show the human user a specific color image
+            camera_depth_img: show the human user a specific depth image
+            prev_click_count: pass the click count you saw most recently, used to determine if the user clicked in between calls to get_action.
+            block: when True this function will loop and get keypresses via run_one() until a click is received, when false it will just immediately return the current state.
+        # Returns
+            [action_name, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img]
+        """
+        running = True
+        if prev_click_count is None:
+            with self.mutex:
+                prev_click_count = self.click_count
+        while running:
+            self.run_one(camera_color_img, camera_depth_img)
+            with self.mutex:
+                cur_click_count = self.click_count
+                action = self.action
+                target_position = self.target_position
+                grasp_angle = self.grasp_angle
+                if running:
+                    running = not self.stop
+
+            if not block:
+                running = False
+            elif cur_click_count > prev_click_count:
+                running = False
+        if camera_color_img is None:
+            with self.mutex:
+                camera_color_img = self.camera_color_img
+                camera_depth_img = self.camera_depth_img
+        return action, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img
+    
+    def __del__(self):
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
 
@@ -204,8 +279,10 @@ if __name__ == '__main__':
     # Move robot to home pose
     robot = Robot(False, None, None, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None)
+                False, None, None, place=True)
     hcr = HumanControlOfRobot(robot, action=action)
-    while not hcr.stop:
-        hcr.run_one()
-    cv2.destroyAllWindows()
+    hcr.run()
+    # while not hcr.stop:
+    #     # hcr.run_one()
+    #     hcr.get_action()
+    # cv2.destroyAllWindows()
