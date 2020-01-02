@@ -412,6 +412,7 @@ def main(args):
                     each_action_predicted_value['place'] = place_predictions[each_action_max_coordinate['place']]
                 # we will actually execute the best pixel index of the selected action
                 nonlocal_variables['best_pix_ind'] = each_action_max_coordinate[nonlocal_variables['primitive_action']]
+                predicted_value = each_action_predicted_value[nonlocal_variables['primitive_action']]
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
@@ -455,7 +456,7 @@ def main(args):
                     push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp']
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
