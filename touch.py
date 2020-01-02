@@ -118,6 +118,7 @@ def print_task():
     print('place task') if robot.place_task else print('push grasp task')
 
 print_task()
+i = 0
 while True:
     camera_color_img, camera_depth_img = robot.get_camera_data()
     if len(click_point_pix) != 0:
@@ -127,6 +128,10 @@ while True:
     cv2.imshow('depth', camera_depth_img)
     
     key = cv2.waitKey(1)
+    # Configure the system
+    # Numbers 1-9 are orientations of the gripper
+    # t is touch mode, where the robot will go to the clicked spot
+
     if key == ord('1'):
         grasp_angle = 0.0
     elif key == ord('2'):
@@ -155,12 +160,22 @@ while True:
         action = 'place'
     elif key == ord('b'):
         action = 'box'
-    elif key == ord(' '):
-        # switchs between:
-        # 1. filling the bin 
-        # 2. grasping to hold and then place
-        robot.place_task = not robot.place_task
+    elif key == ord(']'):
+        # Mode for stacking blocks
+        robot.place_task = True
         print_task()
+    elif key == ord('['):
+        # Mode for grasping to hold and then place
+        robot.place_task = False
+        print_task()
+    elif key == ord(' '):
+        # print the robot state
+        i += 1
+        state_data = robot.get_state()
+        actual_tool_pose = robot.parse_tcp_state_data(state_data, 'cartesian_info')
+        joint_position = robot.parse_tcp_state_data(state_data, 'joint_data')
+        robot_state = 'cart_pose: ' + str(actual_tool_pose) + ' joint pos: ' + str(joint_position)
+        print(str(i) + ' ' + robot_state)
     elif key == ord('c'):
         break
 
