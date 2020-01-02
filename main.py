@@ -397,6 +397,22 @@ def main(args):
                 trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 logger.write_to_log('trial', trainer.trial_log)
 
+
+                # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+                each_action_max_coordinate = {
+                    'push': np.unravel_index(np.argmax(push_predictions), push_predictions.shape), # push, index 0
+                    'grasp': np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape),
+                }
+                each_action_predicted_value = {
+                    'push': push_predictions[each_action_max_coordinate['push']], # push, index 0
+                    'grasp': grasp_predictions[each_action_max_coordinate['grasp']],
+                }
+                if place:
+                    each_action_max_coordinate['place'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
+                    each_action_predicted_value['place'] = place_predictions[each_action_max_coordinate['place']]
+                # we will actually execute the best pixel index of the selected action
+                nonlocal_variables['best_pix_ind'] = each_action_max_coordinate[nonlocal_variables['primitive_action']]
+
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
                 if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
@@ -414,16 +430,6 @@ def main(args):
                 else:
                     use_heuristic = False
 
-                    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                    if nonlocal_variables['primitive_action'] == 'push':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(push_predictions), push_predictions.shape)
-                        predicted_value = np.max(push_predictions)
-                    elif nonlocal_variables['primitive_action'] == 'grasp':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape)
-                        predicted_value = np.max(grasp_predictions)
-                    elif nonlocal_variables['primitive_action'] == 'place':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
-                        predicted_value = np.max(place_predictions)
                 trainer.use_heuristic_log.append([1 if use_heuristic else 0])
                 logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
 
@@ -446,14 +452,14 @@ def main(args):
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp']
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
                         logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
