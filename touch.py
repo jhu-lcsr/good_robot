@@ -141,7 +141,7 @@ class HumanControlOfRobot(object):
     
     def print_task(self):
         # global robot
-        print('place task') if robot.place_task else print('push grasp task')
+        print('grasp and hold object task') if robot.place_task else print('grasp then drop in box task')
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
         if camera_color_img is None:
