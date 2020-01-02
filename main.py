@@ -619,12 +619,12 @@ def main(args):
 
     def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name):
         # Adjust start position of all actions, and make sure z value is safe and not too low
-        def get_local_region(region_width=0.03):
-            safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
-            return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
+        def get_local_region(heightmap, region_width=0.03):
+            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
+            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
         # make sure the fingers will not collide with the objects
         finger_width = 0.05
-        finger_touchdown_region = get_local_region(region_width=finger_width)
+        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
         safe_z_position = workspace_limits[2][0]
         if finger_touchdown_region.size != 0:
             safe_z_position += np.max(finger_touchdown_region)
@@ -632,13 +632,13 @@ def main(args):
             safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
         if robot.background_heightmap is not None:
             # add the height of the background scene
-            safe_z_position += robot.background_heightmap[best_pix_y][best_pix_x]
+            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
         push_may_contact_something = False
         if action_name == 'push':
             # determine if the safe z position might actually contact anything during the push action
             # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
             push_width = 0.2
-            local_push_region = get_local_region(region_width=push_width)
+            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
             # push_may_contact_something is True for something noticeably higher than the push action z height
             max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
             push_may_contact_something = safe_z_position < max_local_push_region
