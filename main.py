@@ -127,6 +127,7 @@ def main(args):
     random_seed = args.random_seed
     force_cpu = args.force_cpu
     flops = args.flops
+    show_heightmap = args.show_heightmap
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -435,43 +436,12 @@ def main(args):
                 best_rotation_angle = np.deg2rad(nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
                 best_pix_x = nonlocal_variables['best_pix_ind'][2]
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
-                primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
 
-                # If pushing, adjust start position, and make sure z value is safe and not too low
-                if nonlocal_variables['primitive_action'] == 'push' or nonlocal_variables['primitive_action'] == 'place':
-                    def get_local_region(region_width=0.03):
-                        safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
-                        return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
-                    # make sure the fingers will not collide with the objects
-                    finger_width = 0.05
-                    finger_touchdown_region = get_local_region(region_width=finger_width)
-                    safe_z_position = workspace_limits[2][0]
-                    if finger_touchdown_region.size != 0:
-                        safe_z_position += np.max(finger_touchdown_region)
-                    else:
-                        safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
-                    primitive_position[2] = safe_z_position
-                    if nonlocal_variables['primitive_action'] == 'push':
-                        # determine if the safe z position might actually contact anything during the push action
-                        # TODO(ahundt) push motion region can be refined based on the rotation angle and the direction of travel
-                        push_width = 0.2
-                        local_push_region = get_local_region(region_width=push_width)
-                        # push_may_contact_something is True for something noticeably higher than the push action z height
-                        max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
-                        push_may_contact_something = primitive_position[2] < max_local_push_region
-                        push_str = ''
-                        if not push_may_contact_something:
-                            push_str += 'Predicting push action failure, heuristics determined '
-                        print('push at height ' + str(safe_z_position) + 
-                              ' would not contact anything at the max height of ' + str(max_local_push_region))
+                # Adjust start position of all actions, and make sure z value is safe and not too low
+                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
-                if nonlocal_variables['primitive_action'] == 'push':
-                    trainer.executed_action_log.append([0, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 0 - push
-                elif nonlocal_variables['primitive_action'] == 'grasp':
-                    trainer.executed_action_log.append([1, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 1 - grasp
-                elif nonlocal_variables['primitive_action'] == 'place':
-                    trainer.executed_action_log.append([2, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 2 - place
+                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
                 # Visualize executed primitive, and affordances
@@ -647,6 +617,41 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
+    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name):
+        # Adjust start position of all actions, and make sure z value is safe and not too low
+        def get_local_region(region_width=0.03):
+            safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
+            return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
+        # make sure the fingers will not collide with the objects
+        finger_width = 0.05
+        finger_touchdown_region = get_local_region(region_width=finger_width)
+        safe_z_position = workspace_limits[2][0]
+        if finger_touchdown_region.size != 0:
+            safe_z_position += np.max(finger_touchdown_region)
+        else:
+            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
+        if robot.background_heightmap is not None:
+            # add the height of the background scene
+            safe_z_position += robot.background_heightmap[best_pix_y][best_pix_x]
+        push_may_contact_something = False
+        if action_name == 'push':
+            # determine if the safe z position might actually contact anything during the push action
+            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
+            push_width = 0.2
+            local_push_region = get_local_region(region_width=push_width)
+            # push_may_contact_something is True for something noticeably higher than the push action z height
+            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+            push_may_contact_something = safe_z_position < max_local_push_region
+            push_str = ''
+            if not push_may_contact_something:
+                push_str += 'Predicting push action failure, heuristics determined '
+                push_str += 'push at height ' + str(safe_z_position) 
+                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
+                print(push_str)
+
+        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
+        return primitive_position, push_may_contact_something
+
     # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
 
     action_thread = threading.Thread(target=process_actions)
@@ -692,6 +697,19 @@ def main(args):
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
         stuff_count[valid_depth_heightmap > 0.02] = 1
+        if show_heightmap:
+            # show the heightmap
+            f = plt.figure()
+            f.suptitle(str(trainer.iteration))
+            f.add_subplot(1,3, 1)
+            plt.imshow(valid_depth_heightmap)
+            f.add_subplot(1,3, 2)
+            # f.add_subplot(1,2, 1)
+            if robot.background_heightmap is not None:
+                plt.imshow(robot.background_heightmap)
+                f.add_subplot(1,3, 3)
+            plt.imshow(stuff_count)
+            plt.show(block=True)
         stuff_sum = np.sum(stuff_count)
         empty_threshold = 300
         if is_sim and is_testing:
@@ -960,7 +978,8 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, 
+                                                           workspace_limits, heightmap_resolution, background_heightmap=robot.background_heightmap)
     valid_depth_heightmap = depth_heightmap.copy()
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
@@ -1100,6 +1119,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
     parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
+    parser.add_argument('--show_heightmap', dest='show_heightmap', action='store_true', default=False,                    help='show the background heightmap for collecting a new one and debugging')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')

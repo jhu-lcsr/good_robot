@@ -653,3 +653,20 @@ roslaunch aruco_detect aruco_detect.launch
 ```
 python3 calibrate_ros.py
 ```
+
+### Collecting the Background heightmap
+
+The real robot also uses a background heightmap of the scene with no objects present. 
+
+1. Completely clear the table or working surface.
+2. Back up and remove the current `real/background_heightmap.depth.png`.
+3. Run pushing and grasping data collection with the `--show_heightmap` flag.
+4. View the heightmap images until you see one with no holes (black spots), and save the iteration number at the top.
+5. Copy the good heightmap from `logs/<run_folder>/data/depth_heightmaps/<iteration>.0.depth.png` and rename it to `real/background_heightmap.depth.png`.
+6. Stop and re-run pushing and grasping with the `--show_heightmap` flag.
+
+Here is an example of the matplotlib visualization of a good depth heightmap, there are no black specks aside from one corner which is out of the camera's field of view:
+
+![example_background_depth_map](images/example_background_depth_map.png)
+
+Your updated depth heightmaps should be good to go!

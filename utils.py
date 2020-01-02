@@ -39,7 +39,7 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
     return cam_pts, rgb_pts
 
 
-def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, median_filter_pixels=5):
+def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5):
     
     if median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=median_filter_pixels)
@@ -74,6 +74,9 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     if median_filter_pixels > 0:
         depth_heightmap = ndimage.median_filter(depth_heightmap, size=median_filter_pixels)
     depth_heightmap[depth_heightmap == -z_bottom] = np.nan
+    # subtract out the scene background heights, if available
+    if background_heightmap is not None:
+        depth_heightmap -= background_heightmap
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
@@ -87,6 +90,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
         color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=median_filter_pixels)
         color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=median_filter_pixels)
     color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
+
 
     return color_heightmap, depth_heightmap
 

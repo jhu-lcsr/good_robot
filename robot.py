@@ -54,6 +54,7 @@ class Robot(object):
         self.sim_home_position = [-0.3, 0.0, 0.45]
         # self.gripper_ee_offset = 0.17
         self.gripper_ee_offset = 0.15
+        self.background_heightmap = None
 
         # HK: If grasping specific block color...
         #
@@ -210,7 +211,13 @@ class Robot(object):
                 # Camera calibration
                 self.cam_pose = None
                 self.cam_depth_scale = None
-
+            
+            if os.path.isfile('real/background_heightmap.depth.png'):
+                import cv2
+                 # load depth image saved in 1e-5 meter increments 
+                 # see logger.py save_heightmaps() and trainer.py load_sample() 
+                 # for the corresponding save and load functions
+                self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
