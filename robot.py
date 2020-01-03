@@ -31,8 +31,8 @@ class Robot(object):
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
                  real_gripper_ip='192.168.1.11', calibrate=False):
         '''
-        
-        real_gripper_ip: None to assume the gripper is connected via the UR5, 
+
+        real_gripper_ip: None to assume the gripper is connected via the UR5,
              specify an ip address to directly use TCPModbus to talk directly with the gripper.
              Default is 192.168.1.11.
         '''
@@ -180,13 +180,13 @@ class Robot(object):
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
-            
+
             # Initialize the real gripper based on user configuration
             if real_gripper_ip is None:
                 self.gripper = None
             elif RobotiqCGripper is None:
                 # Install instructions have already printed (see the imports section)
-                # and we cannot run in this mode without pymodbus, so exit. 
+                # and we cannot run in this mode without pymodbus, so exit.
                 exit(1)
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
@@ -215,11 +215,11 @@ class Robot(object):
                 # Camera calibration
                 self.cam_pose = None
                 self.cam_depth_scale = None
-            
+
             if os.path.isfile('real/background_heightmap.depth.png'):
                 import cv2
-                 # load depth image saved in 1e-5 meter increments 
-                 # see logger.py save_heightmaps() and trainer.py load_sample() 
+                 # load depth image saved in 1e-5 meter increments
+                 # see logger.py save_heightmaps() and trainer.py load_sample()
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
 
@@ -340,10 +340,12 @@ class Robot(object):
             object_color_name = self.color_names[object_idx]
             # add the color of this object to the list.
             self.object_colors.append(object_color_name)
-            ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
-            if ret_resp == 8:
-                print('Failed to add new objects to simulation. Please restart.')
-                exit()
+            ret_ints = []
+            while len(ret_ints) == 0:
+                ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                if ret_resp == 8:
+                    print('Failed to add new objects to simulation. Please restart.')
+                    # exit()
             curr_shape_handle = ret_ints[0]
             self.object_handles.append(curr_shape_handle)
             if not (self.is_testing and self.test_preset_cases):
@@ -465,7 +467,7 @@ class Robot(object):
                 time.sleep(0.5)
             # an extra half second so things settle down
             time.sleep(0.5)
-        
+
         # TODO(ahundt) add real robot support for reposition_objects
 
 
@@ -578,9 +580,9 @@ class Robot(object):
 
         # Return
 
-        True if the gripper is fully closed at the end of the call, false otherwise. 
-        The gripper can take a full second to close, but this function may return in 1 ms 
-        May return False if nonblocking is True because an open gripper will not have closed completely yet, 
+        True if the gripper is fully closed at the end of the call, false otherwise.
+        The gripper can take a full second to close, but this function may return in 1 ms
+        May return False if nonblocking is True because an open gripper will not have closed completely yet,
         even if the gripper eventually closes all the way.
         """
         if self.is_sim:
@@ -1029,7 +1031,7 @@ class Robot(object):
 
             else:
                 print("Grasp failure, moving to home position...")
-            
+
             if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
             self.go_home()
@@ -1180,7 +1182,7 @@ class Robot(object):
             # time.sleep(0.25)
 
         return push_success
-    
+
     def get_cartesian_position(self):
         if self.is_sim:
             raise NotImplementedError
@@ -1221,8 +1223,8 @@ class Robot(object):
             state_data = self.get_state()
             new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and 
-                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or 
+            if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and
+                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or
                 ((timeout_t1 - timeout_t0) > timeout_seconds)):
                 break
             tool_analog_input2 = new_tool_analog_input2
@@ -1587,7 +1589,7 @@ class Robot(object):
         max_workspace_height = prev_height - decrease_threshold
         if decrease_threshold is not None and max_z < max_workspace_height:
             needed_to_reset = True
-        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + 
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) +
               ' goal_success: ' + str(goal_success) + ' needed to reset: ' + str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
         return goal_success, max_z, needed_to_reset
 
