@@ -531,7 +531,7 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 
 #### Instructions:
 
-1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
+1. Print an [ArUco Tag](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
 
 2. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
