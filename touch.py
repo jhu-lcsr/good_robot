@@ -14,7 +14,10 @@ class HumanControlOfRobot(object):
     Keyboard Controls:
         'c': set self.stop to True indicating it is time to exit the program.
         'a': autonomous mode, sets self.human_control = False, clicks will have no effect (unless move_robot=False).
-        'h': human control mode, sets self.human_control = True, clicks will move the robot (unless move_robot=False).
+        'z': human control mode, sets self.human_control = True, clicks will move the robot (unless move_robot=False).
+        'h': go home.
+        'j': stay in place after pushing, grasping, and placing (self.go_home=False).
+        'm': Automatically home when pushing, grasping, and placing (self.go_home=True).
         'g': set self.action = 'grasp', left click in the 'color' image window will do a grasp action.
         'p': set self.action = 'place', left click will do a place action.
         's': set self.action = 'push', left click will slide the gripper across the ground, aka a push action.
@@ -40,6 +43,8 @@ class HumanControlOfRobot(object):
         self.click_count = 0
         self.click_position = None
         self.target_position = None
+        # go home automatically during push, grasp place actions
+        self.go_home = True
         if robot is None:
 
             # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -91,7 +96,7 @@ class HumanControlOfRobot(object):
                 self.click_position = target_position.copy()
                 
                 if not self.human_control:
-                    print('Human Control is disabled, press h for human control mode, a for autonomous mode')
+                    print('Human Control is disabled, press z for human control mode, a for autonomous mode')
                 with self.mutex:
                     self.execute_action(target_position, heightmap_rotation_angle)
 
@@ -105,34 +110,36 @@ class HumanControlOfRobot(object):
     def execute_action(self, target_position, heightmap_rotation_angle):
         self.target_position = target_position
         self.click_count += 1
+        print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
+        def grasp(tp, ra, gh):
+            # global self.grasp_success, self.grasp_color_success, self.mutex
+            with self.mutex:
+                self.grasp_success, self.grasp_color_success = robot.grasp(tp, ra, go_home=gh)
+        
+        def place(tp, ra, gh):
+            # global self.grasp_success, self.mutex
+            with self.mutex:
+                robot.place(tp, ra, go_home=gh)
+                self.grasp_success = False
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
             self.target_position[-1] += 0.17
-            def move_to():
+            def move_to(tp, ra):
                 # global self.mutex
                 with self.mutex:
                     # robot.move_to(target_position, self.tool_orientation)
-                    robot.move_to(target_position, heightmap_rotation_angle=heightmap_rotation_angle)
+                    robot.move_to(tp, heightmap_rotation_angle=ra)
             if self.move_robot:
-                t = threading.Thread(target=move_to)
+                t = threading.Thread(target=move_to, args=(target_position, heightmap_rotation_angle))
                 t.start()
         elif self.action == 'grasp':
             if not robot.place_task or (robot.place_task and not self.grasp_success):
-                def grasp():
-                    # global self.grasp_success, self.grasp_color_success, self.mutex
-                    with self.mutex:
-                        self.grasp_success, self.grasp_color_success = robot.grasp(target_position, heightmap_rotation_angle)
                 if self.move_robot:
-                    t = threading.Thread(target=grasp)
+                    t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
             else:
-                def place():
-                    # global self.grasp_success, self.mutex
-                    with self.mutex:
-                        robot.place(target_position, heightmap_rotation_angle)
-                        self.grasp_success = False
                 if self.move_robot:
-                    t = threading.Thread(target=place)
+                    t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
 
         elif self.action == 'box':
@@ -140,16 +147,19 @@ class HumanControlOfRobot(object):
             t.start()
         elif self.action == 'push':
             self.target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.push(target_position, self.grasp_angle * np.pi / 4))
+            t = threading.Thread(target=lambda: robot.push(target_position, self.grasp_angle * np.pi / 4, go_home=self.go_home))
             t.start()
         elif self.action == 'place':
             self.target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.place(target_position, self.grasp_angle * np.pi / 4))
+            t = threading.Thread(target=lambda: robot.place(target_position, self.grasp_angle * np.pi / 4, go_home=self.go_home))
             t.start()
     
     def print_task(self):
         # global robot
-        print('grasp and hold object task') if robot.place_task else print('grasp then drop in box task')
+        state_str = 'Current action: ' + str(self.action) + ', '
+        state_str += 'grasp, HOLD, PLACE object task, ' if robot.place_task else 'grasp then drop in box task, '
+        state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
+        print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
         if camera_color_img is None:
@@ -188,14 +198,19 @@ class HumanControlOfRobot(object):
             self.grasp_angle = 8.0
         elif key == ord('t'):
             self.action = 'touch'
+            self.print_task()
         elif key == ord('g'):
             self.action = 'grasp'
+            self.print_task()
         elif key == ord('s'):
             self.action = 'push'
+            self.print_task()
         elif key == ord('p'):
             self.action = 'place'
+            self.print_task()
         elif key == ord('b'):
             self.action = 'box'
+            self.print_task()
         elif key == ord('r'):
             heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
             with self.mutex:
@@ -222,6 +237,14 @@ class HumanControlOfRobot(object):
         elif key == ord('c'):
             self.stop = True
         elif key == ord('h'):
+            robot.go_home()
+        elif key == ord('m'):
+            self.go_home = True
+            self.print_task()
+        elif key == ord('j'):
+            self.go_home = False
+            self.print_task()
+        elif key == ord('z'):
             self.human_control = True
         elif key == ord('a'):
             self.human_control = False
