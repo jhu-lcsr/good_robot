@@ -91,14 +91,12 @@ class HumanControlOfRobot(object):
                 target_position = target_position[0:3,0]
                 heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
                 # print(target_position, self.tool_orientation)
-
-                self.target_position = target_position
-                self.click_position = target_position.copy()
                 
                 if not self.human_control:
                     print('Human Control is disabled, press z for human control mode, a for autonomous mode')
                 with self.mutex:
-                    self.execute_action(target_position, heightmap_rotation_angle)
+                    self.click_position = target_position.copy()
+                    self.target_position, heightmap_rotation_angle = self.execute_action(target_position, heightmap_rotation_angle)
 
         # Show color and depth frames
         cv2.namedWindow('depth')
@@ -123,7 +121,7 @@ class HumanControlOfRobot(object):
                 self.grasp_success = False
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
-            self.target_position[-1] += 0.17
+            target_position[-1] += 0.17
             def move_to(tp, ra):
                 # global self.mutex
                 with self.mutex:
@@ -146,13 +144,14 @@ class HumanControlOfRobot(object):
             t = threading.Thread(target=lambda: robot.restart_real())
             t.start()
         elif self.action == 'push':
-            self.target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.push(target_position, self.grasp_angle * np.pi / 4, go_home=self.go_home))
+            target_position[-1] += 0.01
+            t = threading.Thread(target=lambda: robot.push(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
         elif self.action == 'place':
-            self.target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: robot.place(target_position, self.grasp_angle * np.pi / 4, go_home=self.go_home))
+            target_position[-1] += 0.01
+            t = threading.Thread(target=lambda: robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
+        return target_position, heightmap_rotation_angle
     
     def print_task(self):
         # global robot
@@ -214,7 +213,7 @@ class HumanControlOfRobot(object):
         elif key == ord('r'):
             heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
             with self.mutex:
-                self.execute_action(self.click_position.copy(), heightmap_rotation_angle)
+                self.target_position, heightmap_rotation_angle = self.execute_action(self.click_position.copy(), heightmap_rotation_angle)
         elif key == ord(']'):
             with self.mutex:
                 # Mode for stacking blocks
