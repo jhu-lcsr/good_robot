@@ -696,7 +696,7 @@ class Robot(object):
                 vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0], UR5_target_position[1] + move_step[1], UR5_target_position[2] + move_step[2]),vrep.simx_opmode_blocking)
                 sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client,self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
             vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
-
+            return True
         else:
             if tool_orientation is None and heightmap_rotation_angle is None:
                 # If no orientation is provided, use the current one.
@@ -717,7 +717,7 @@ class Robot(object):
             self.tcp_socket.close()
 
             # Block until robot reaches target tool position
-            self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
+            return self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
 
     def guarded_move_to(self, tool_position, tool_orientation):
         if self.is_sim:
@@ -863,7 +863,7 @@ class Robot(object):
 
     # Primitives ----------------------------------------------------------
 
-    def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None):
+    def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None, go_home=True):
         """
         object_color: The index in the list self.color_names expected for the object to be grasped. If object_color is None the color does not matter.
         """
@@ -926,7 +926,8 @@ class Robot(object):
             # Move gripper to location above grasp target
             self.move_to(location_above_grasp_target, None)
             # move to the simulator home position
-            self.move_to(self.sim_home_position, None)
+            if go_home:
+                self.move_to(self.sim_home_position, None)
 
             # Check if grasp is successful
             gripper_full_closed = self.close_gripper()
@@ -1010,7 +1011,8 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
@@ -1045,7 +1047,12 @@ class Robot(object):
 
             if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
-            self.go_home()
+            
+            if go_home:
+                self.go_home()
+            else:
+                # go back to the grasp up pos
+                self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
 
         # TODO: change to 1 and 2 arguments
         return grasp_success, color_success
@@ -1064,7 +1071,7 @@ class Robot(object):
         return midpos
 
 
-    def push(self, position, heightmap_rotation_angle, workspace_limits=None):
+    def push(self, position, heightmap_rotation_angle, workspace_limits=None, go_home=True):
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
         print('Real Robot push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
@@ -1122,6 +1129,7 @@ class Robot(object):
 
             # Move gripper to location above grasp target
             self.move_to([target_x, target_y, location_above_pushing_point[2]], None)
+            # TODO(ahundt) we may want to go home here
 
             push_success = True
 
@@ -1163,16 +1171,21 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,True)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.75,self.joint_vel*0.75)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (push_endpoint[0],push_endpoint[1],push_endpoint[2],tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.03)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
-            tcp_command += " movej([%f" % self.home_joint_config[0]
-            for joint_idx in range(1,6):
-                tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
-            tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
-            # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
+            if go_home:
+                tcp_command += " movej([%f" % self.home_joint_config[0]
+                for joint_idx in range(1,6):
+                    tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
+                tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
+                # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
+            else:
+                # go to up pos instead of home
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.75,self.joint_vel*0.75)
             tcp_command += "end\n"
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
@@ -1188,7 +1201,8 @@ class Robot(object):
 
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
-            push_success = self.block_until_home()
+            if go_home:
+                push_success = self.block_until_home()
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
@@ -1235,9 +1249,10 @@ class Robot(object):
             new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
             if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and
-                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or
-                ((timeout_t1 - timeout_t0) > timeout_seconds)):
-                break
+                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)]))):
+                return True
+            if (timeout_t1 - timeout_t0) > timeout_seconds:
+                return False
             tool_analog_input2 = new_tool_analog_input2
 
     def block_until_joint_position(self, position, timeout_seconds=10):
@@ -1259,7 +1274,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1360,7 +1375,8 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
@@ -1372,9 +1388,12 @@ class Robot(object):
             time.sleep(0.1)
 
             self.open_gripper(nonblocking=True)
-            self.move_to(up_pos)
-            # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
-            return self.go_home(block_until_home=True)
+            move_to_result = self.move_to(up_pos)
+            if go_home:
+                # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
+                return self.go_home(block_until_home=True)
+            else:
+                return move_to_result
 
 
     def check_row(self, object_color_sequence,
