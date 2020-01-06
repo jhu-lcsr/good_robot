@@ -539,7 +539,10 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 
 4. Roslaunch the camera with, for example:
 ```shell
-roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
 ```
 
 5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
