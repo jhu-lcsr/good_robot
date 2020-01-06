@@ -103,7 +103,7 @@ class HumanControlOfRobot(object):
         cv2.namedWindow('color')
         cv2.setMouseCallback('color', mouseclick_callback)
 
-        self.print_task()
+        self.print_config()
 
     def execute_action(self, target_position, heightmap_rotation_angle):
         self.target_position = target_position
@@ -153,10 +153,10 @@ class HumanControlOfRobot(object):
             t.start()
         return target_position, heightmap_rotation_angle
     
-    def print_task(self):
+    def print_config(self):
         # global robot
-        state_str = 'Current action: ' + str(self.action) + ', '
-        state_str += 'grasp, HOLD, PLACE object task, ' if robot.place_task else 'grasp then drop in box task, '
+        state_str = 'Current action: ' + str(self.action) + '. '
+        state_str += 'Grasp, HOLD, PLACE object task, ' if robot.place_task else 'Grasp then drop in box task, '
         state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
         print(state_str)
 
@@ -197,19 +197,19 @@ class HumanControlOfRobot(object):
             self.grasp_angle = 8.0
         elif key == ord('t'):
             self.action = 'touch'
-            self.print_task()
+            self.print_config()
         elif key == ord('g'):
             self.action = 'grasp'
-            self.print_task()
+            self.print_config()
         elif key == ord('s'):
             self.action = 'push'
-            self.print_task()
+            self.print_config()
         elif key == ord('p'):
             self.action = 'place'
-            self.print_task()
+            self.print_config()
         elif key == ord('b'):
             self.action = 'box'
-            self.print_task()
+            self.print_config()
         elif key == ord('r'):
             heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
             with self.mutex:
@@ -218,12 +218,12 @@ class HumanControlOfRobot(object):
             with self.mutex:
                 # Mode for stacking blocks
                 self.robot.place_task = True
-                self.print_task()
+                self.print_config()
         elif key == ord('['):
             with self.mutex:
                 # Mode for grasping to hold and then place
                 self.robot.place_task = False
-                self.print_task()
+                self.print_config()
         elif key == ord(' '):
             with self.mutex:
                 # print the robot state
@@ -239,10 +239,10 @@ class HumanControlOfRobot(object):
             robot.go_home()
         elif key == ord('m'):
             self.go_home = True
-            self.print_task()
+            self.print_config()
         elif key == ord('j'):
             self.go_home = False
-            self.print_task()
+            self.print_config()
         elif key == ord('z'):
             self.human_control = True
         elif key == ord('a'):
