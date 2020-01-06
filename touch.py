@@ -79,6 +79,7 @@ class HumanControlOfRobot(object):
                 click_x = np.multiply(x-robot.cam_intrinsics[0][2],click_z/robot.cam_intrinsics[0][0])
                 click_y = np.multiply(y-robot.cam_intrinsics[1][2],click_z/robot.cam_intrinsics[1][1])
                 if click_z == 0:
+                    print('Click included invalid camera data, ignoring the command.')
                     return
                 click_point = np.asarray([click_x,click_y,click_z]) / 1000  # Convert from unit from mm to m
                 click_point.shape = (3,1)
