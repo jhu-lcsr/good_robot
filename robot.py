@@ -676,10 +676,14 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10):
+    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None):
 
         if self.is_sim:
-
+            if tool_orientation is None and heightmap_rotation_angle is not None:
+                # Compute tool orientation from heightmap rotation angle
+                tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+                # TODO(ahundt) bring in some of the code from grasp() here to correctly update the orientation
+                raise NotImplementedError
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
 
@@ -694,10 +698,17 @@ class Robot(object):
             vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
 
         else:
-            if tool_orientation is None:
+            if tool_orientation is None and heightmap_rotation_angle is None:
                 # If no orientation is provided, use the current one.
                 actual_pose = self.get_cartesian_position()
                 tool_orientation = actual_pose[3:]
+            elif tool_orientation is None and heightmap_rotation_angle is not None:
+                # Compute tool orientation from heightmap rotation angle
+                grasp_orientation = [1.0,0.0]
+                if heightmap_rotation_angle > np.pi:
+                    heightmap_rotation_angle = heightmap_rotation_angle - 2*np.pi
+                tool_rotation_angle = heightmap_rotation_angle/2
+                tool_orientation = np.asarray([grasp_orientation[0]*np.cos(tool_rotation_angle) - grasp_orientation[1]*np.sin(tool_rotation_angle), grasp_orientation[0]*np.sin(tool_rotation_angle) + grasp_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
 
