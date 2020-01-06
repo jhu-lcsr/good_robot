@@ -169,11 +169,13 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.title(title)
     plt.legend()
     ax.yaxis.set_major_formatter(PercentFormatter())
-    plt.savefig(os.path.basename(log_dir).replace(':', '-').replace('.', '-') + '_success_plot.png')
+    save_file = os.path.basename(log_dir).replace(':', '-').replace('.', '-') + '_success_plot.png'
+    print('saving plot: ' + save_file)
+    plt.savefig(save_file)
 
 if __name__ == '__main__':
     window = 1000
     max_iter = None
-    log_dir = '../logs/a-real-cube-stacking-run-2019-12-19-17-03-07'
+    log_dir = './logs/00-a-real-cube-stacking-run-2019-12-19-17-03-07'
     title = 'Stack 4 Blocks, Training'
     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
