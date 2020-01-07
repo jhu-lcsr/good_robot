@@ -340,28 +340,29 @@ class Robot(object):
 
         sim_ret, self.UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, self.UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        success = 0
-        gripper_position = [1,1,1]
-        while success >= 0 and gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
+        sim_ok = False
+        while not sim_ok: # V-REP bug requiring multiple starts and stops to restart
             vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
             time.sleep(0.5)
-            success = vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
             time.sleep(0.5)
             sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
-            sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
             time.sleep(0.5)
+            # check sim, but we are already in the restart loop so don't recurse
+            sim_ok = self.check_sim(restart_if_not_ok=False)
 
 
-    def check_sim(self):
+    def check_sim(self, restart_if_not_ok=True):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
         sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
         sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
-        if not sim_ok:
+        if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim()
             self.add_objects()
+        return sim_ok
 
 
     def get_task_score(self):
