@@ -6,6 +6,7 @@
     "configurations": [
 
 
+
         {
             "name": "Python: Current File (Integrated Terminal)",
             "type": "python",
@@ -94,6 +95,15 @@
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions"]
+        },
+        {
+            "name": "main.py: Sim Push and Grasp (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--trial_reward", "--tcp_port", "19997"]
         }
     ]
 }
