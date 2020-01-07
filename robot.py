@@ -315,6 +315,7 @@ class Robot(object):
                 object_color_name = self.color_names[object_idx % len(self.color_names)]
                 # add the color of this object to the list.
                 self.object_colors.append(object_color_name)
+                do_break = False
                 ret_ints = []
                 while len(ret_ints) == 0:
                     ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
@@ -322,10 +323,13 @@ class Robot(object):
                         print('Failed to add new objects to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
                         if failure_count > 10:
+                            do_break = True
                             break
                         elif failure_count > 50:
                             print('Failed to add new objects to simulation. Quitting. Please restart manually.')
                             exit(1)
+                if do_break:
+                    break
                 curr_shape_handle = ret_ints[0]
                 self.object_handles.append(curr_shape_handle)
                 if not (self.is_testing and self.test_preset_cases):
