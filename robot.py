@@ -348,7 +348,7 @@ class Robot(object):
                 while len(ret_ints) == 0:
                     ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
                     if ret_resp == 8:
-                        print('Failed to add new objects to simulation. Auto retry ' + str(i))
+                        print('Failed to add new objects to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
                         if failure_count > 10:
                             break
