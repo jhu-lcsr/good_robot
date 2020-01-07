@@ -312,7 +312,7 @@ class Robot(object):
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
                 # If there are more objects than total colors this line will break, 
                 # applies mod to loop back to the first color.
-                object_color_name = self.color_names[object_idx % len(color_names)]
+                object_color_name = self.color_names[object_idx % len(self.color_names)]
                 # add the color of this object to the list.
                 self.object_colors.append(object_color_name)
                 ret_ints = []
