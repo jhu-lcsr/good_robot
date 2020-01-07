@@ -7,15 +7,16 @@ from glob import glob
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
-    
+
     """
     grasps = actions[:, 0] == 1
     if rewards is None:
         places = actions[:, 0] == 2
-    success_rate = np.zeros(actions.shape[0] - 1)
+    length = np.min([rewards.shape[0], actions.shape[0]])
+    success_rate = np.zeros(length - 1)
     lower = np.zeros_like(success_rate)
     upper = np.zeros_like(success_rate)
-    for i in range(success_rate.shape[0]):
+    for i in range(length - 1):
         start = max(i - window, 0)
         if rewards is None:
             successes = places[start+1: i+2][grasps[start:i+1]]
@@ -34,24 +35,24 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     stack_heights: length N array of integer stack heights
     actions: Nx4 array of actions giving [id, rotation, i, j]
     hot_fix: fix the stack_height bug, where the trial didn't end on successful pushes, which reached a stack of 4.
-    
+
     where id=0 is a push, id=1 is grasp, and id=2 is place.
-    
+
     """
     if hot_fix:
         indices = np.logical_or(stack_height < 4, np.array([True] + list(stack_height[:-1] < 4)))
         actions = actions[:stack_height.shape[0]][indices]
         stack_height = stack_height[indices]
-    
+
     if include_push:
         success_possible = actions[:, 0] == 2
     else:
         success_possible = np.logical_or(actions[:, 0] == 0, actions[:, 0] == 2)
-    
+
     stack_height_increased = np.zeros_like(stack_height, np.bool)
     stack_height_increased[0] = False
     stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
-    
+
     success_rate = np.zeros_like(stack_height)
     lower = np.zeros_like(success_rate)
     upper = np.zeros_like(success_rate)
@@ -72,7 +73,7 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
 
     trials: array giving the number of trials up to iteration i (TODO: unused?)
     min_actions: ideal number of actions per trial
-    
+
     Formula: successful_trial_count * ideal_actions_per_trial / window_size
     """
 
@@ -94,7 +95,7 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
     """Get grasp efficiency from when the trial count increases.
-    
+
     """
     grasps = actions[:, 0] == 1
     efficiency = np.zeros_like(rewards, np.float64)
@@ -102,9 +103,10 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     upper = np.zeros_like(efficiency)
     for i in range(efficiency.shape[0]):
         start = max(i - window, 0)
-        window_size = min(i+1, window)
+        window_size = np.array(min(i+1, window), np.float64)
         successful = rewards[start: i+1] > reward_threshold
-        successful_grasps = successful[grasps[start:start+successful.shape[0]]].sum()
+        successful_grasps = np.array(successful[grasps[start:start+successful.shape[0]]].sum(), np.float64)
+        # print(successful_grasps)
         efficiency[i] = successful_grasps / window_size
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
@@ -121,7 +123,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         rewards = np.loadtxt(os.path.join(log_dir, 'transitions', 'reward-value.log.txt'))
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
     trials = np.loadtxt(os.path.join(log_dir, 'transitions', 'trial.log.txt'))
-        
+
     if max_iter is not None:
         if place:
             heights = heights[:max_iter]
@@ -129,14 +131,14 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
             rewards = rewards[:max_iter]
         actions = actions[:max_iter]
         trials = trials[:max_iter]
-    
+
     grasp_success_file = os.path.join(log_dir, 'transitions', 'grasp-success.log.txt')
     if os.path.isfile(grasp_success_file):
         grasp_rewards = np.loadtxt(grasp_success_file)
     else:
         # old versions of logged code don't have the grasp-success.log.txt file, data must be extracted from rewards.
         grasp_rewards = rewards
-    
+
     grasp_rate, grasp_lower, grasp_upper = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
     if place:
         if 'row' in log_dir or 'row' in title.lower():
@@ -152,14 +154,14 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         plt.plot(mult*place_rate, color=colors[1], label='Place Success Rate')
     plt.plot(mult*eff, color=colors[2], label='Action Efficiency')
 
-    plt.fill_between(np.arange(1, grasp_rate.shape[0]+1), 
+    plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
                      mult*grasp_lower, mult*grasp_upper,
                      color=colors[0], alpha=alpha)
     if place:
-        plt.fill_between(np.arange(1, place_rate.shape[0]+1), 
+        plt.fill_between(np.arange(1, place_rate.shape[0]+1),
                          mult*place_lower, mult*place_upper,
                          color=colors[1], alpha=alpha)
-    plt.fill_between(np.arange(1, eff.shape[0]+1), 
+    plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
 
@@ -176,6 +178,8 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
 if __name__ == '__main__':
     window = 1000
     max_iter = None
-    log_dir = './logs/00-a-real-cube-stacking-run-2019-12-19-17-03-07'
+    # log_dir = './logs/2019-12-31-20-17-06'
+    # log_dir = './logs/2020-01-01-14-55-17'
+    log_dir = './logs/2020-01-06-19-15-55'
     title = 'Stack 4 Blocks, Training'
-    plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
