@@ -342,12 +342,14 @@ class Robot(object):
         vrep.simxSetObjectPosition(self.sim_client, self.UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
         success = 0
         gripper_position = [1,1,1]
-        while success <= 0 and gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
+        while success >= 0 and gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
             vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            time.sleep(0.5)
             success = vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
-            time.sleep(1)
+            time.sleep(0.5)
             sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
             sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
+            time.sleep(0.5)
 
 
     def check_sim(self):
