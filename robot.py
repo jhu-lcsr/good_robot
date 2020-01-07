@@ -320,36 +320,47 @@ class Robot(object):
         # object_handles is the list of unique vrep object integer identifiers, and it is how you control objects with the vrep API.
         # We need to keep track of the object names and the corresponding colors.
         self.object_handles = []
-        sim_obj_handles = []
         self.vrep_names = []
         self.object_colors = []
-        for object_idx in range(len(self.obj_mesh_ind)):
-            curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
-            if self.is_testing and self.test_preset_cases:
-                curr_mesh_file = self.test_obj_mesh_files[object_idx]
-            # TODO(HK) define more predictable object names for when the number of objects is beyond the number of colors
-            curr_shape_name = 'shape_%02d' % object_idx
-            self.vrep_names.append(curr_shape_name)
-            drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
-            if self.is_testing and self.test_preset_cases:
-                object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
-                object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
-            # Set the colors in order
-            object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
-            # TODO(HK) if there are more objects than total colors this line will break, fix it with mod (%), aka division remainder, to loop back to the first color.
-            object_color_name = self.color_names[object_idx]
-            # add the color of this object to the list.
-            self.object_colors.append(object_color_name)
-            ret_ints = []
-            while len(ret_ints) == 0:
-                ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
-                if ret_resp == 8:
-                    print('Failed to add new objects to simulation. Please restart.')
-                    # exit()
-            curr_shape_handle = ret_ints[0]
-            self.object_handles.append(curr_shape_handle)
-            if not (self.is_testing and self.test_preset_cases):
-                time.sleep(0.5)
+        add_success = False
+        failure_count = 0
+        while not add_success:
+            if failure_count > 10:
+                self.restart_sim()
+            for object_idx in range(len(self.obj_mesh_ind)):
+                curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+                if self.is_testing and self.test_preset_cases:
+                    curr_mesh_file = self.test_obj_mesh_files[object_idx]
+                # TODO(HK) define more predictable object names for when the number of objects is beyond the number of colors
+                curr_shape_name = 'shape_%02d' % object_idx
+                self.vrep_names.append(curr_shape_name)
+                drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
+                if self.is_testing and self.test_preset_cases:
+                    object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
+                    object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+                # Set the colors in order
+                object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
+                # TODO(HK) if there are more objects than total colors this line will break, fix it with mod (%), aka division remainder, to loop back to the first color.
+                object_color_name = self.color_names[object_idx]
+                # add the color of this object to the list.
+                self.object_colors.append(object_color_name)
+                ret_ints = []
+                while len(ret_ints) == 0:
+                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    if ret_resp == 8:
+                        print('Failed to add new objects to simulation. Auto retry ' + str(i))
+                        failure_count += 1
+                        if failure_count > 10:
+                            break
+                        elif failure_count > 50:
+                            print('Failed to add new objects to simulation. Quitting. Please restart manually.')
+                            exit(1)
+                curr_shape_handle = ret_ints[0]
+                self.object_handles.append(curr_shape_handle)
+                if not (self.is_testing and self.test_preset_cases):
+                    time.sleep(0.5)
+            # we have completed the loop adding all objects!
+            add_success = True
         self.prev_obj_positions = []
         self.obj_positions = []
 
@@ -358,15 +369,13 @@ class Robot(object):
 
         sim_ret, self.UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, self.UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
-        vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
-        time.sleep(1)
-        sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
-        while gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
+        success = 0
+        gripper_position = [1,1,1]
+        while success <= 0 and gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
             vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
-            vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            success = vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
             time.sleep(1)
+            sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
             sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
 
 
@@ -711,8 +720,9 @@ class Robot(object):
                 tool_orientation = np.asarray([grasp_orientation[0]*np.cos(tool_rotation_angle) - grasp_orientation[1]*np.sin(tool_rotation_angle), grasp_orientation[0]*np.sin(tool_rotation_angle) + grasp_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-
+            tcp_command = "set_tcp(p[-0.1,0.0,0.0,0.0,0.0,0.0])\n"
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0],tool_position[1],tool_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.tool_acc,self.tool_vel)
+            print(tcp_command)
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
 
