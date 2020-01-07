@@ -331,7 +331,7 @@ class Robot(object):
                 curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
                 if self.is_testing and self.test_preset_cases:
                     curr_mesh_file = self.test_obj_mesh_files[object_idx]
-                # TODO(HK) define more predictable object names for when the number of objects is beyond the number of colors
+                # TODO(ahundt) define more predictable object names for when the number of objects is beyond the number of colors
                 curr_shape_name = 'shape_%02d' % object_idx
                 self.vrep_names.append(curr_shape_name)
                 drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
@@ -340,8 +340,9 @@ class Robot(object):
                     object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
                 # Set the colors in order
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
-                # TODO(HK) if there are more objects than total colors this line will break, fix it with mod (%), aka division remainder, to loop back to the first color.
-                object_color_name = self.color_names[object_idx]
+                # If there are more objects than total colors this line will break, 
+                # applies mod to loop back to the first color.
+                object_color_name = self.color_names[object_idx % len(color_names)]
                 # add the color of this object to the list.
                 self.object_colors.append(object_color_name)
                 ret_ints = []
