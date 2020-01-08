@@ -918,7 +918,11 @@ def main(args):
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 if is_sim:
                     robot.check_sim()
-                    robot.reposition_objects()
+                    if not robot.reposition_objects():
+                        # This can happen if objects are in impossible positions (NaN),
+                        # so set the variable to immediately and completely restart
+                        # the simulation below.
+                        num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
