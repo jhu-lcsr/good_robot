@@ -322,7 +322,8 @@ class Robot(object):
                     if ret_resp == 8:
                         print('Failed to add new objects to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
-                        if failure_count > 10:
+                        if failure_count % 5 == 4:
+                            # If a few failures happen in a row, do a simulation reset and try again
                             do_break = True
                             break
                         elif failure_count > 50:
