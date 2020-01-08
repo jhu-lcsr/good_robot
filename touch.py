@@ -310,11 +310,15 @@ if __name__ == '__main__':
         workspace_limits = None
     else:
         raise NotImplementedError
-
+    is_sim = False
+    # if is_sim:
+    #     tcp_port = 19990
     # Move robot to home pose
-    robot = Robot(False, None, None, workspace_limits,
+    robot = Robot(is_sim, None, None, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                 False, None, None, place=True)
+    if is_sim:
+        robot.add_objects()
     hcr = HumanControlOfRobot(robot, action=action)
     hcr.run()
     # while not hcr.stop:
