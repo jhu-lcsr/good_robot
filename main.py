@@ -253,6 +253,12 @@ def main(args):
     else:
         nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
 
+    num_trials = 0
+    if continue_logging:
+        num_trials = int(max(trainer.trial_log)[0])
+        nonlocal_variables['trial'] = num_trials
+        nonlocal_variables['stack'].trial = num_trials + 1
+
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -688,7 +694,6 @@ def main(args):
         robot.shutdown()
         return
 
-    num_trials = 0
     do_continue = False
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
