@@ -5,7 +5,6 @@ import numpy as np
 import time
 import cv2
 from robot import Robot
-from real.camera import Camera
 import threading
 
 class HumanControlOfRobot(object):
@@ -67,7 +66,7 @@ class HumanControlOfRobot(object):
             self.mutex = threading.Lock()
         # Callback function for clicking on OpenCV window
         self.click_point_pix = ()
-        
+
         self.camera_color_img, self.camera_depth_img = robot.get_camera_data()
         def mouseclick_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
@@ -90,9 +89,9 @@ class HumanControlOfRobot(object):
                 target_position = np.dot(camera2robot[0:3,0:3],click_point) + camera2robot[0:3,3:]
 
                 target_position = target_position[0:3,0]
-                heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
+                heightmap_rotation_angle = self.grasp_angle * np.pi / 4
                 # print(target_position, self.tool_orientation)
-                
+
                 if not self.human_control:
                     print('Human Control is disabled, press z for human control mode, a for autonomous mode')
                 with self.mutex:
@@ -114,7 +113,7 @@ class HumanControlOfRobot(object):
             # global self.grasp_success, self.grasp_color_success, self.mutex
             with self.mutex:
                 self.grasp_success, self.grasp_color_success = robot.grasp(tp, ra, go_home=gh)
-        
+
         def place(tp, ra, gh):
             # global self.grasp_success, self.mutex
             with self.mutex:
@@ -153,7 +152,7 @@ class HumanControlOfRobot(object):
             t = threading.Thread(target=lambda: robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
         return target_position, heightmap_rotation_angle
-    
+
     def print_config(self):
         # global robot
         state_str = 'Current action: ' + str(self.action) + '. '
@@ -163,7 +162,11 @@ class HumanControlOfRobot(object):
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
         if camera_color_img is None:
-            self.camera_color_img, self.camera_depth_img = robot.get_camera_data()
+            shape = [0, 0, 0, 0]
+            # get the camera data, but make sure all the images are valid first
+            while not all(shape):
+                self.camera_color_img, self.camera_depth_img = robot.get_camera_data()
+                shape = self.camera_color_img.shape + self.camera_depth_img.shape
         else:
             self.camera_color_img = camera_color_img
             self.camera_depth_img = camera_depth_img
@@ -172,7 +175,7 @@ class HumanControlOfRobot(object):
         self.camera_color_img = cv2.cvtColor(self.camera_color_img, cv2.COLOR_RGB2BGR)
         cv2.imshow('color', self.camera_color_img)
         cv2.imshow('depth', self.camera_depth_img)
-        
+
         key = cv2.waitKey(1)
         # Configure the system
         # Numbers 1-9 are orientations of the gripper
@@ -212,7 +215,7 @@ class HumanControlOfRobot(object):
             self.action = 'box'
             self.print_config()
         elif key == ord('r'):
-            heightmap_rotation_angle = self.grasp_angle * np.pi / 4 
+            heightmap_rotation_angle = self.grasp_angle * np.pi / 4
             with self.mutex:
                 self.target_position, heightmap_rotation_angle = self.execute_action(self.click_position.copy(), heightmap_rotation_angle)
         elif key == ord(']'):
@@ -248,13 +251,13 @@ class HumanControlOfRobot(object):
             self.human_control = True
         elif key == ord('a'):
             self.human_control = False
-    
+
     def run(self):
         """ Blocking call that repeatedly calls run_one()
         """
         while not hcr.stop:
             hcr.run_one()
-        
+
     def get_action(self, camera_color_img=None, camera_depth_img=None, prev_click_count=None, block=True):
         """ Get a human specified action
         # Arguments
@@ -288,7 +291,7 @@ class HumanControlOfRobot(object):
                 camera_color_img = self.camera_color_img
                 camera_depth_img = self.camera_depth_img
         return action, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img
-    
+
     def __del__(self):
         cv2.destroyAllWindows()
 
@@ -312,13 +315,13 @@ if __name__ == '__main__':
         raise NotImplementedError
     is_sim = False
     # if is_sim:
-    #     tcp_port = 19990
+    #     tcp_port = 19993
     # Move robot to home pose
     robot = Robot(is_sim, None, None, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                 False, None, None, place=True)
-    if is_sim:
-        robot.add_objects()
+    # if is_sim:
+    #     robot.add_objects()
     hcr = HumanControlOfRobot(robot, action=action)
     hcr.run()
     # while not hcr.stop:
