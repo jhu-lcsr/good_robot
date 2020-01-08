@@ -176,18 +176,21 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
-        # self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
-        # self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
-        # self.trial_reward_value_log.shape = (self.iteration, 1)
-        # self.trial_reward_value_log = self.trial_reward_value_log.tolist()
-        # self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), delimiter=' ')
-        # self.trial_predicted_value_log = self.trial_predicted_value_log[0:self.iteration]
-        # self.trial_predicted_value_log.shape = (self.iteration, 1)
-        # self.trial_predicted_value_log = self.trial_predicted_value_log.tolist()
-        # self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
-        # self.goal_condition_log = self.goal_condition_log[0:self.iteration]
-        # self.goal_condition_log.shape = (self.iteration, 1)
-        # self.goal_condition_log = self.goal_condition_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'trial-reward-value.log.txt')):
+            self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
+            self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
+            self.trial_reward_value_log.shape = (self.iteration, 1)
+            self.trial_reward_value_log = self.trial_reward_value_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'trial-predicted-value.log.txt')):
+            self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), delimiter=' ')
+            self.trial_predicted_value_log = self.trial_predicted_value_log[0:self.iteration]
+            self.trial_predicted_value_log.shape = (self.iteration, 1)
+            self.trial_predicted_value_log = self.trial_predicted_value_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'goal-condition.log.txt')):
+            self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
+            self.goal_condition_log = self.goal_condition_log[0:self.iteration]
+            self.goal_condition_log.shape = (self.iteration, 1)
+            self.goal_condition_log = self.goal_condition_log.tolist()
         self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), delimiter=' ')
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
         self.use_heuristic_log.shape = (self.iteration, 1)
@@ -196,9 +199,10 @@ class Trainer(object):
         self.is_exploit_log = self.is_exploit_log[0:self.iteration]
         self.is_exploit_log.shape = (self.iteration, 1)
         self.is_exploit_log = self.is_exploit_log.tolist()
-        # self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
-        # self.clearance_log.shape = (self.clearance_log.shape[0],1)
-        # self.clearance_log = self.clearance_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
+            self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
+            self.clearance_log.shape = (self.clearance_log.shape[0],1)
+            self.clearance_log = self.clearance_log.tolist()
         self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ')
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log.shape = (self.iteration, 1)
@@ -207,10 +211,11 @@ class Trainer(object):
         self.grasp_success_log = self.grasp_success_log[0:self.iteration]
         self.grasp_success_log.shape = (self.iteration, 1)
         self.grasp_success_log = self.grasp_success_log.tolist()
-        # self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
-        # self.color_success_log = self.color_success_log[0:self.iteration]
-        # self.color_success_log.shape = (self.iteration, 1)
-        # self.color_success_log = self.color_success_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'color-success.log.txt')):
+            self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+            self.color_success_log = self.color_success_log[0:self.iteration]
+            self.color_success_log.shape = (self.iteration, 1)
+            self.color_success_log = self.color_success_log.tolist()
         self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), delimiter=' ')
         self.change_detected_log = self.change_detected_log[0:self.iteration]
         self.change_detected_log.shape = (self.iteration, 1)
