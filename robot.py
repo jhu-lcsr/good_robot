@@ -64,7 +64,10 @@ class Robot(object):
 
         # If in simulation...
         if self.is_sim:
-
+            if num_obj is None:
+                num_obj = 10
+            if obj_mesh_dir is None:
+                obj_mesh_dir = os.path.abspath('objects/toys')
             # Define colors for object meshes (Tableau palette)
             # self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
             #                                [89.0, 161.0, 79.0], # green
