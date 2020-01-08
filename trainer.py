@@ -176,11 +176,6 @@ class Trainer(object):
         self.reward_value_log = self.reward_value_log[0:self.iteration]
         self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
-        if os.path.exists(os.path.join(transitions_directory, 'trial-reward-value.log.txt')):
-            self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
-            self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
-            self.trial_reward_value_log.shape = (self.iteration, 1)
-            self.trial_reward_value_log = self.trial_reward_value_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'trial-predicted-value.log.txt')):
             self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), delimiter=' ')
             self.trial_predicted_value_log = self.trial_predicted_value_log[0:self.iteration]
@@ -200,10 +195,10 @@ class Trainer(object):
         self.is_exploit_log.shape = (self.iteration, 1)
         self.is_exploit_log = self.is_exploit_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
-            self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ')
+            self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ').astype(np.int64)
             self.clearance_log.shape = (self.clearance_log.shape[0],1)
             self.clearance_log = self.clearance_log.tolist()
-        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ')
+        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ').astype(np.int64)
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log.shape = (self.iteration, 1)
         self.trial_log = self.trial_log.tolist()
@@ -233,10 +228,17 @@ class Trainer(object):
             self.place_success_log = self.place_success_log[0:self.iteration]
             self.place_success_log.shape = (self.iteration, 1)
             self.place_success_log = self.place_success_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'trial-reward-value.log.txt')):
+            self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
+            self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
+            self.trial_reward_value_log.shape = (self.trial_reward_value_log.shape[0], 1)
+            self.trial_reward_value_log = self.trial_reward_value_log.tolist()
+            if self.trial_reward_value_log.shape[0] < self.iteration:
+                self.trial_reward_value_log_update()
 
     def trial_reward_value_log_update(self):
         # update the reward values for a whole trial, not just recent time steps
-        end = self.clearance_log[-1][0]
+        end = int(self.clearance_log[-1][0])
         clearance_length = len(self.clearance_log)
 
         if end <= len(self.reward_value_log):
@@ -244,7 +246,7 @@ class Trainer(object):
             if clearance_length == 1:
                 start = 0
             else:
-                start = self.clearance_log[-2][0]
+                start = int(self.clearance_log[-2][0])
 
             new_log_values = []
             future_r = None
