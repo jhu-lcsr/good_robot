@@ -871,6 +871,7 @@ def main(args):
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
+            logger.write_to_log('iteration', np.array([trainer.iteration]))
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
