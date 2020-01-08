@@ -256,7 +256,6 @@ def main(args):
     num_trials = 0
     if continue_logging:
         num_trials = int(max(trainer.trial_log)[0])
-        nonlocal_variables['trial'] = num_trials
         nonlocal_variables['stack'].trial = num_trials + 1
 
     if place:
@@ -770,8 +769,6 @@ def main(args):
             nonlocal_variables['finalize_prev_trial_log'] = True
             if is_testing and test_preset_cases:
                 # min(num_preset_files-1, int(float(trial_idx-1)/float(preset_trials_per_case)))
-                # TODO(ahundt) we shouldn't really be setting nonlocal_variables['trial'] here, but it is a workaround so the trials log file lines up
-                nonlocal_variables['trial'] = num_trials
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                 # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
                 # load the current preset case, incrementing as trials are cleared
