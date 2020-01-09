@@ -57,11 +57,11 @@ class Calibrate:
         self.rtc_port = rtc_port
 
         if save_dir is None:
-            self.save_dir = '/home/costar/src/real_good_robot/calibration_1206'
+            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration_2019_01_08')
             # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
-            self.save_dir = '/home/costar/src/real_good_robot/calibration'
+            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration')
         else:
-            self.save_dir = save_dir
+            self.save_dir = os.path.expanduser(save_dir)
 
         self.robot_poses = []
         self.marker_poses = []
