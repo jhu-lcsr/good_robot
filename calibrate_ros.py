@@ -99,8 +99,10 @@ class Calibrate:
             self.robot.open_gripper()
             print('Gripper opened!')
 
-            self.robot.joint_acc = 1.7
-            self.robot.joint_vel = 1.2
+            self.robot.joint_acc = 0.4
+            self.robot.joint_vel = 0.4
+            self.robot.tool_acc = 0.4
+            self.robot.tool_vel = 0.4
 
             print('MOVING THE ROBOT to home position...')
             self.robot.go_home()
@@ -131,8 +133,12 @@ class Calibrate:
         tool_orientations = [[0, np.pi/2, 0.0], [0, 3.0*np.pi/4.0, 0.0], [0, 5.0*np.pi/8.0, 0.0], [0, 5.0*np.pi/8.0, np.pi/8], [np.pi/8.0, 5.0*np.pi/8.0, 0.0]] # Real Good Robot
 
         # Slow down robot
-        self.robot.joint_acc = 1.7
-        self.robot.joint_vel = 1.2
+        # self.robot.joint_acc = 1.7
+        # self.robot.joint_vel = 1.2
+        self.robot.joint_acc = 0.4
+        self.robot.joint_vel = 0.4
+        self.robot.tool_acc = 0.4
+        self.robot.tool_vel = 0.4
 
         robot_poses = []
         marker_poses = []
