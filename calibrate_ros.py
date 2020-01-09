@@ -81,10 +81,15 @@ class Calibrate:
         self.robot.move_to(tool_position, tool_orientation)
 
         while True:
-            color_img, depth_img, aruco_tf = self.get_rgb_depth_image_and_transform()
+            color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
             cv2.imshow("color.png", color_img)
+            if aruco_img is not None:
+                cv2.imshow("aruco.png", aruco_img)
             cv2.waitKey(1)
-            print(aruco_tf.transforms)
+            if aruco_tf is not None:
+                print(aruco_tf.transforms)
+            else:
+                print('no aruco transforms available, ensure you have run the tag program: taskset 0x000000FF roslaunch aruco_detect aruco_detect.launch')
     
 
     def activate_robot(self):
