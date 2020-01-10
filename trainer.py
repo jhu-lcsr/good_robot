@@ -24,7 +24,7 @@ except ImportError:
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
+                 is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet'):
 
         self.method = method
@@ -99,7 +99,7 @@ class Trainer(object):
                 self.criterion = self.criterion.cuda()
 
         # Load pre-trained model
-        if load_snapshot:
+        if snapshot_file:
 
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
             loaded_snapshot_state_dict = torch.load(snapshot_file)
@@ -156,84 +156,73 @@ class Trainer(object):
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
-        self.iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), delimiter=' ') - 1)
-        self.executed_action_log = np.loadtxt(os.path.join(transitions_directory, 'executed-action.log.txt'), delimiter=' ')
+        kwargs = {'delimiter': ' ', 'ndmin': 2}
+        self.iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0] - 1)
+        self.executed_action_log = np.loadtxt(os.path.join(transitions_directory, 'executed-action.log.txt'), **kwargs)
         self.executed_action_log = self.executed_action_log[0:self.iteration, :]
         self.executed_action_log = self.executed_action_log.tolist()
-        self.label_value_log = np.loadtxt(os.path.join(transitions_directory, 'label-value.log.txt'), delimiter=' ')
+        self.label_value_log = np.loadtxt(os.path.join(transitions_directory, 'label-value.log.txt'), **kwargs)
         self.label_value_log = self.label_value_log[0:self.iteration]
-        self.label_value_log.shape = (self.iteration, 1)
         self.label_value_log = self.label_value_log.tolist()
-        # self.trial_label_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-label-value.log.txt'), delimiter=' ')
+        # self.trial_label_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-label-value.log.txt'), **kwargs)
         # self.trial_label_value_log = self.trial_label_value_log[0:self.iteration]
-        # self.trial_label_value_log.shape = (self.iteration, 1)
         # self.trial_label_value_log = self.trial_label_value_log.tolist()
-        self.predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'predicted-value.log.txt'), delimiter=' ')
+        self.predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'predicted-value.log.txt'), **kwargs)
         self.predicted_value_log = self.predicted_value_log[0:self.iteration]
-        self.predicted_value_log.shape = (self.iteration, 1)
         self.predicted_value_log = self.predicted_value_log.tolist()
-        self.reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), delimiter=' ')
+        self.reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), **kwargs)
         self.reward_value_log = self.reward_value_log[0:self.iteration]
-        self.reward_value_log.shape = (self.iteration, 1)
         self.reward_value_log = self.reward_value_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'trial-reward-value.log.txt')):
+            self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), **kwargs)
+            self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
+            self.trial_reward_value_log = self.trial_reward_value_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'trial-predicted-value.log.txt')):
-            self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), delimiter=' ')
+            self.trial_predicted_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-predicted-value.log.txt'), **kwargs)
             self.trial_predicted_value_log = self.trial_predicted_value_log[0:self.iteration]
-            self.trial_predicted_value_log.shape = (self.iteration, 1)
             self.trial_predicted_value_log = self.trial_predicted_value_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'goal-condition.log.txt')):
-            self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), delimiter=' ')
+            self.goal_condition_log = np.loadtxt(os.path.join(transitions_directory, 'goal-condition.log.txt'), **kwargs)
             self.goal_condition_log = self.goal_condition_log[0:self.iteration]
-            self.goal_condition_log.shape = (self.iteration, 1)
             self.goal_condition_log = self.goal_condition_log.tolist()
-        self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), delimiter=' ')
+        self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), **kwargs)
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
-        self.use_heuristic_log.shape = (self.iteration, 1)
         self.use_heuristic_log = self.use_heuristic_log.tolist()
-        self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), delimiter=' ')
+        self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), **kwargs)
         self.is_exploit_log = self.is_exploit_log[0:self.iteration]
-        self.is_exploit_log.shape = (self.iteration, 1)
         self.is_exploit_log = self.is_exploit_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
-            self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), delimiter=' ').astype(np.int64)
-            self.clearance_log.shape = (self.clearance_log.shape[0],1)
+            self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), **kwargs).astype(np.int64)
             self.clearance_log = self.clearance_log.tolist()
-        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), delimiter=' ').astype(np.int64)
+        self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), **kwargs)
         self.trial_log = self.trial_log[0:self.iteration]
-        self.trial_log.shape = (self.iteration, 1)
         self.trial_log = self.trial_log.tolist()
-        self.grasp_success_log = np.loadtxt(os.path.join(transitions_directory, 'grasp-success.log.txt'), delimiter=' ')
+        self.grasp_success_log = np.loadtxt(os.path.join(transitions_directory, 'grasp-success.log.txt'), **kwargs)
         self.grasp_success_log = self.grasp_success_log[0:self.iteration]
-        self.grasp_success_log.shape = (self.iteration, 1)
         self.grasp_success_log = self.grasp_success_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'color-success.log.txt')):
-            self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), delimiter=' ')
+            self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), **kwargs)
             self.color_success_log = self.color_success_log[0:self.iteration]
-            self.color_success_log.shape = (self.iteration, 1)
             self.color_success_log = self.color_success_log.tolist()
-        self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), delimiter=' ')
+        self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), **kwargs)
         self.change_detected_log = self.change_detected_log[0:self.iteration]
-        self.change_detected_log.shape = (self.iteration, 1)
         self.change_detected_log = self.change_detected_log.tolist()
         if self.place:
-            self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), delimiter=' ')
+            self.stack_height_log = np.loadtxt(os.path.join(transitions_directory, 'stack-height.log.txt'), **kwargs)
             self.stack_height_log = self.stack_height_log[0:self.iteration]
-            self.stack_height_log.shape = (self.iteration, 1)
             self.stack_height_log = self.stack_height_log.tolist()
-            self.partial_stack_success_log = np.loadtxt(os.path.join(transitions_directory, 'partial-stack-success.log.txt'), delimiter=' ')
+            self.partial_stack_success_log = np.loadtxt(os.path.join(transitions_directory, 'partial-stack-success.log.txt'), **kwargs)
             self.partial_stack_success_log = self.partial_stack_success_log[0:self.iteration]
-            self.partial_stack_success_log.shape = (self.iteration, 1)
             self.partial_stack_success_log = self.partial_stack_success_log.tolist()
-            self.place_success_log = np.loadtxt(os.path.join(transitions_directory, 'place-success.log.txt'), delimiter=' ')
+            self.place_success_log = np.loadtxt(os.path.join(transitions_directory, 'place-success.log.txt'), **kwargs)
             self.place_success_log = self.place_success_log[0:self.iteration]
-            self.place_success_log.shape = (self.iteration, 1)
             self.place_success_log = self.place_success_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'trial-reward-value.log.txt')):
             self.trial_reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'trial-reward-value.log.txt'), delimiter=' ')
             self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
             self.trial_reward_value_log.shape = (self.trial_reward_value_log.shape[0], 1)
             self.trial_reward_value_log = self.trial_reward_value_log.tolist()
-            if self.trial_reward_value_log.shape[0] < self.iteration:
+            if len(self.trial_reward_value_log) < self.iteration:
                 self.trial_reward_value_log_update()
 
     def trial_reward_value_log_update(self):
@@ -431,9 +420,11 @@ class Trainer(object):
 
 
     def end_trial(self):
-            self.clearance_log.append([self.iteration])
-            return len(self.clearance_log)
+        self.clearance_log.append([self.iteration])
+        return len(self.clearance_log)
 
+    def num_trials(self):
+        return len(self.clearance_log)
 
     def get_label_value(
             self, primitive_action, push_success, grasp_success, change_detected, prev_push_predictions, prev_grasp_predictions,
