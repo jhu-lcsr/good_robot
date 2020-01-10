@@ -21,9 +21,10 @@ import utils
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
+
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True):
+    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -38,9 +39,9 @@ class StackSequence(object):
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
-        self.trial = 0
+        self.trial = trial
         self.reset_sequence()
-        self.total_steps = 1
+        self.total_steps = total_steps
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -176,10 +177,34 @@ def main(args):
         test_preset_file = None
 
     # ------ Pre-loading and logging options ------
-    load_snapshot = args.load_snapshot # Load pre-trained snapshot of model?
-    snapshot_file = os.path.abspath(args.snapshot_file)  if load_snapshot else None
-    continue_logging = args.continue_logging # Continue logging from previous session
-    logging_directory = os.path.abspath(args.logging_directory) if continue_logging else os.path.abspath('logs')
+    if args.resume == 'last':
+        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
+        dirs = list(filter(os.path.isdir, dirs))
+        if dirs:
+            continue_logging = True
+            logging_directory = sorted(dirs)[-1]
+        else:
+            print('no logging dirs to resume, starting new run')
+            continue_logging = False
+            logging_directory = os.path.abspath('logs')
+    elif args.resume:
+        continue_logging = True
+        logging_directory = os.path.abspath(args.resume)
+    else:
+        continue_logging = False
+        logging_directory = os.path.abspath('logs')
+
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    if continue_logging and not snapshot_file:
+        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
+        print('loading snapshot file: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
+            print('snapshot file does not exist, trying backup: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
+            exit(1)
+
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
@@ -202,7 +227,7 @@ def main(args):
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, load_snapshot, snapshot_file, force_cpu,
+                      is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops, network=neural_network_name)
 
     if transfer_grasp_to_place:
@@ -216,6 +241,9 @@ def main(args):
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
         trainer.preload(logger.transitions_directory)
+        num_trials = trainer.end_trial()
+    else:
+        num_trials = 0
 
     # Initialize variables for heuristic bootstrapping and exploration probability
     no_change_count = [2, 2] if not is_testing else [0, 0]
@@ -249,9 +277,9 @@ def main(args):
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     if num_obj is not None:
-        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
     else:
-        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
+        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
 
     num_trials = 0
     if continue_logging:
@@ -693,6 +721,7 @@ def main(args):
         robot.shutdown()
         return
 
+    num_trials = trainer.num_trials()
     do_continue = False
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -768,7 +797,6 @@ def main(args):
             # we're still not totally done, we still need to finilaize the log for the trial
             nonlocal_variables['finalize_prev_trial_log'] = True
             if is_testing and test_preset_cases:
-                # min(num_preset_files-1, int(float(trial_idx-1)/float(preset_trials_per_case)))
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                 # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
                 # load the current preset case, incrementing as trials are cleared
@@ -1174,15 +1202,11 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
 
-
     # ------ Pre-loading and logging options ------
-    parser.add_argument('--load_snapshot', dest='load_snapshot', action='store_true', default=False,                      help='load pre-trained snapshot of model?')
-    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store')
+    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='efficientnet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
-    parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
-    parser.add_argument('--logging_directory', dest='logging_directory', action='store')
+    parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
-
 
     # Run main program with specified arguments
     args = parser.parse_args()
