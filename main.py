@@ -196,7 +196,14 @@ def main(args):
 
     snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
     if continue_logging and not snapshot_file:
-        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
+        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
+        print('loading snapshot file: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
+            print('snapshot file does not exist, trying backup: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
+            exit(1)
 
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
