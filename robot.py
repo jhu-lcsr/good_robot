@@ -807,15 +807,14 @@ class Robot(object):
 
 
     def go_home(self, block_until_home=False):
-        # TODO(ahundt) go_home() support for simulation mode
         if self.is_sim:
-            raise NotImplementedError
-
-        self.move_joints(self.home_joint_config)
-        if block_until_home:
-            return self.block_until_home()
+            return self.move_to(self.sim_home_position, None)
         else:
-            return True
+            self.move_joints(self.home_joint_config)
+            if block_until_home:
+                return self.block_until_home()
+            else:
+                return True
 
 
     def check_grasp(self):
@@ -926,7 +925,7 @@ class Robot(object):
             self.move_to(location_above_grasp_target, None)
             # move to the simulator home position
             if go_home:
-                self.move_to(self.sim_home_position, None)
+                self.go_home()
 
             # Check if grasp is successful
             gripper_full_closed = self.close_gripper()
@@ -1128,7 +1127,10 @@ class Robot(object):
 
             # Move gripper to location above grasp target
             self.move_to([target_x, target_y, location_above_pushing_point[2]], None)
-            # TODO(ahundt) we may want to go home here
+
+            # move to the simulator home position
+            if go_home:
+                self.go_home()
 
             push_success = True
 
@@ -1325,6 +1327,10 @@ class Robot(object):
 
             # Move gripper to location above place target
             self.move_to(location_above_place_target, None)
+
+            # move to the simulator home position
+            if go_home:
+                self.go_home()
 
             sim_ret, placed_object_position = vrep.simxGetObjectPosition(self.sim_client, grasped_object_handle, -1, vrep.simx_opmode_blocking)
             placed_object_position = np.array(placed_object_position)
