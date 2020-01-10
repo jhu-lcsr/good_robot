@@ -273,13 +273,15 @@ To train a regular VPG policy from scratch in simulation, first start the simula
 python main.py --is_sim --push_rewards --experience_replay --explore_rate_decay --save_visualizations
 ```
 
-Data collected from each training session (including RGB-D images, camera parameters, heightmaps, actions, rewards, model snapshots, visualizations, etc.) is saved into a directory in the `logs` folder. A training session can be resumed by adding the flags `--load_snapshot` and `--continue_logging`, which then loads the latest model snapshot specified by `--snapshot_file` and transition history from the session directory specified by `--logging_directory`:
+Data collected from each training session (including RGB-D images, camera parameters, heightmaps, actions, rewards, model snapshots, visualizations, etc.) is saved into a directory in the `logs` folder. A training session can be resumed by adding the `--resume` flag, which then loads the model snapshot specified by `--snapshot_file` and transition history from the provided session directory:
 
 ```shell
 python main.py --is_sim --push_rewards --experience_replay --explore_rate_decay --save_visualizations \
-    --load_snapshot --snapshot_file 'logs/YOUR-SESSION-DIRECTORY-NAME-HERE/models/snapshot-backup.reinforcement.pth' \
-    --continue_logging --logging_directory 'logs/YOUR-SESSION-DIRECTORY-NAME-HERE' \
+    --snapshot_file 'logs/YOUR-SESSION-DIRECTORY-NAME-HERE/models/snapshot-backup.reinforcement.pth' \
+    --resume 'logs/YOUR-SESSION-DIRECTORY-NAME-HERE' \
 ```
+
+If the `--resume` flag is raised without an argument, the most recent log file is used. If `--resume` is raised but no `--snapshot-file` is specified, the snapshot file from the implied or specified logging directory is used.
 
 Various training options can be modified or toggled on/off with different flags (run `python main.py -h` to see all options):
 

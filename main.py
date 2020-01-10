@@ -176,7 +176,6 @@ def main(args):
         test_preset_file = None
 
     # ------ Pre-loading and logging options ------
-    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
     if args.resume == 'last':
         continue_logging = True
         logging_directory = sorted([p for p in os.path.listdir(os.path.abspath('logs')) if os.path.isdir(p)])[-1]
@@ -186,6 +185,10 @@ def main(args):
     else:
         continue_logging = False
         logging_directory = os.path.abspath('logs')
+
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    if continue_logging and not snapshot_file:
+        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
 
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
