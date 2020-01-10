@@ -371,7 +371,7 @@ def axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orien
     return tool_transformation
 
 
-def axxb(robotPose, markerPose):
+def axxb(robotPose, markerPose, baseToCamera=True):
     """
     Copyright (c) 2019, Hongtao Wu
     AX=XB solver for eye-on base
@@ -380,6 +380,7 @@ def axxb(robotPose, markerPose):
     Args:
     - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.
     - markerPose (list of 4x4 numpy array): poses (homogenous transformation) of the marker in the camera frame.
+    - baseToCamera (boolean): If true it will compute the base to camera transform, if false it will compute the robot tip to fiducial transform.
 
     Return:
     - cam2base (4x4 numpy array): poses of the camera in robot base frame.
@@ -402,8 +403,15 @@ def axxb(robotPose, markerPose):
     np.random.shuffle(sequence)
 
     for i in range(n-1):
-        A[:, :, i] = np.matmul(robotPose[sequence[i+1]], pose_inv(robotPose[sequence[i]]))
-        B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
+        if baseToCamera:
+            # compute the robot base to the robot camera
+            A[:, :, i] = np.matmul(robotPose[sequence[i+1]], pose_inv(robotPose[sequence[i]]))
+            B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
+        else:
+            # compute the robot tool tip to the robot fiducial marker seen by the camera
+            A[:, :, i] = np.matmul(pose_inv(robotPose[sequence[i+1]]), robotPose[sequence[i]])
+            B[:, :, i] = np.matmul(pose_inv(markerPose[sequence[i+1]]), markerPose[sequence[i]])
+
         alpha[:, i] = get_mat_log(A[:3, :3, i])
         beta[:, i] = get_mat_log(B[:3, :3, i])
 

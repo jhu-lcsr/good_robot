@@ -224,12 +224,15 @@ class Calibrate:
             # collect the pose data
             robot_poses, marker_poses = calib.collect_data()
 
-        # AX=XB calibration: marker pose in tool frame
+        # AX=XB calibration: camera pose in robot base frame
         cam2base = utils.axxb(robot_poses, marker_poses)
-
         print("Camera to base: ", cam2base)
-        
         np.savetxt('real/camera_pose.txt', cam2base, delimiter=' ')
+
+        # AX=XB calibration: marker pose in tool frame
+        tool2AR = utils.axxb(robot_poses, marker_poses, baseToCamera=False)
+        print("Tool Tip to AR Tag: ", tool2AR)
+        np.savetxt('real/tool_tip_to_ar_tag_transform.txt', tool2AR, delimiter=' ')
 
         return cam2base
 
