@@ -222,7 +222,7 @@ class Trainer(object):
             self.trial_reward_value_log = self.trial_reward_value_log[0:self.iteration]
             self.trial_reward_value_log.shape = (self.trial_reward_value_log.shape[0], 1)
             self.trial_reward_value_log = self.trial_reward_value_log.tolist()
-            if self.trial_reward_value_log.shape[0] < self.iteration:
+            if len(self.trial_reward_value_log) < self.iteration:
                 self.trial_reward_value_log_update()
 
     def trial_reward_value_log_update(self):
