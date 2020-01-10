@@ -24,7 +24,7 @@ except ImportError:
 
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
-                 is_testing, load_snapshot, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
+                 is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet'):
 
         self.method = method
@@ -99,7 +99,7 @@ class Trainer(object):
                 self.criterion = self.criterion.cuda()
 
         # Load pre-trained model
-        if load_snapshot:
+        if snapshot_file is not None:
 
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
             loaded_snapshot_state_dict = torch.load(snapshot_file)
