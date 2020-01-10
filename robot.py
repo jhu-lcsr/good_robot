@@ -31,8 +31,8 @@ class Robot(object):
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
                  real_gripper_ip='192.168.1.11', calibrate=False):
         '''
-        
-        real_gripper_ip: None to assume the gripper is connected via the UR5, 
+
+        real_gripper_ip: None to assume the gripper is connected via the UR5,
              specify an ip address to directly use TCPModbus to talk directly with the gripper.
              Default is 192.168.1.11.
         '''
@@ -47,13 +47,14 @@ class Robot(object):
                 # Corner on the side of the cameras and far from the window
                 # [ 0.73409861 -0.45199446 -0.00229499]
                 # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
-                workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.04, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+                workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.workspace_limits = workspace_limits
         self.place_task = place
         self.grasp_color_task = grasp_color_task
         self.sim_home_position = [-0.3, 0.0, 0.45]
         # self.gripper_ee_offset = 0.17
         self.gripper_ee_offset = 0.15
+        self.background_heightmap = None
 
         # HK: If grasping specific block color...
         #
@@ -61,29 +62,12 @@ class Robot(object):
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
-        if self.grasp_color_task:
-            # TODO: check if the block color is in the workspace
-            # TODO: one hot encoding
-            # self.vrep_names = ['shape_00', 'shape_01', 'shape_02', 'shape_03']
-
-            self.stored_action_labels = [
-                b'place_green_on_yellow', b'move_to_home', b'place_blue_on_yellowred', b'place_yellow_on_red',
-                b'place_blue_on_red', b'grab_blue', b'place_red_on_blueyellow', b'place_green_on_redyellow',
-                b'place_red_on_yellow', b'place_green_on_blueyellow', b'place_red_on_greenblue', b'place_blue_on_green',
-                b'place_blue_on_redgreen',b'place_yellow_on_greenblue', b'place_yellow_on_blue', b'place_blue_on_greenyellow',
-                b'place_blue_on_yellowgreen', b'place_blue_on_greenred', b'place_yellow_on_redgreen', b'grab_yellow',
-                b'place_red_on_greenyellow', b'grab_green', b'place_red_on_green', b'place_yellow_on_bluered',
-                b'place_yellow_on_green', b'place_green_on_blue', b'place_yellow_on_bluegreen', b'place_blue_on_redyellow',
-                b'place_red_on_blue', b'place_red_on_yellowgreen', b'place_yellow_on_greenred', b'place_green_on_yellowblue',
-                b'place_red_on_bluegreen', b'place_green_on_red', b'place_red_on_yellowblue', b'place_green_on_yellowred',
-                b'place_green_on_redblue', b'grab_red', b'place_yellow_on_redblue', b'place_green_on_bluered', b'place_blue_on_yellow']
-
-            # create dictionary to lookup index of various strings
-            self.stored_action_label_to_index_dict = {k: v for v, k in enumerate(self.stored_action_labels)}
-
         # If in simulation...
         if self.is_sim:
-
+            if num_obj is None:
+                num_obj = 10
+            if obj_mesh_dir is None:
+                obj_mesh_dir = os.path.abspath('objects/toys')
             # Define colors for object meshes (Tableau palette)
             # self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
             #                                [89.0, 161.0, 79.0], # green
@@ -175,10 +159,14 @@ class Robot(object):
             # self.home_joint_config = [-(180.0/360.0)*2*np.pi, -(84.2/360.0)*2*np.pi, (112.8/360.0)*2*np.pi, -(119.7/360.0)*2*np.pi, -(90.0/360.0)*2*np.pi, 0.0]
             # Costar dataset home joint config
             # self.home_joint_config = [-0.202, -0.980, -1.800, -0.278, 1.460, 1.613]
-            # Real Good Robot Home Joint Config
-            self.home_joint_config = [0.2, -1.62, -0.85, -2.22, 1.57, 1.71]
-            self.home_cart = [0.4387869054651441, -0.022525365646335706, 0.6275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
-            self.home_cart_low = [0.4387869054651441, -0.022525365646335706, 0.3275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
+            # Real Good Robot Home Joint Config (gripper low and near base)
+            self.home_joint_config = [-0.021765167640454663, -0.7721485323791424, -2.137509664960675, -1.8396634790764201, 1.5608016750418263, 1.7122485182908058]
+            self.home_cart = [0.16452807896085456, -0.1140799890027773, 0.3401360989767276, -0.25284986938091303, -3.0949552373620137, 0.018920323919325615]
+            self.home_cart_low = self.home_cart
+            # gripper high above scene and camera
+            # self.home_joint_config = [0.2, -1.62, -0.85, -2.22, 1.57, 1.71]
+            # self.home_cart = [0.4387869054651441, -0.022525365646335706, 0.6275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
+            # self.home_cart_low = [0.4387869054651441, -0.022525365646335706, 0.3275609068446096, -0.09490323444344208, 3.1179780725241626, 0.004632836623511681]
 
 
             # Default joint speed configuration
@@ -190,18 +178,18 @@ class Robot(object):
 
             # Default tool speed configuration
             self.tool_acc = 1.2 # Safe: 0.5 Fast: 1.2
-            self.tool_vel = 0.25 # Safe: 0.2 Fast: 0.25
+            self.tool_vel = 0.5 # Safe: 0.2 Fast: 0.5
             self.move_sleep = 1.0 # Safe: 2.0 Fast: 1.0
 
             # Tool pose tolerance for blocking calls
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
-            
+
             # Initialize the real gripper based on user configuration
             if real_gripper_ip is None:
                 self.gripper = None
             elif RobotiqCGripper is None:
                 # Install instructions have already printed (see the imports section)
-                # and we cannot run in this mode without pymodbus, so exit. 
+                # and we cannot run in this mode without pymodbus, so exit.
                 exit(1)
             else:
                 self.gripper = RobotiqCGripper(real_gripper_ip)
@@ -231,6 +219,12 @@ class Robot(object):
                 self.cam_pose = None
                 self.cam_depth_scale = None
 
+            if os.path.isfile('real/background_heightmap.depth.png'):
+                import cv2
+                 # load depth image saved in 1e-5 meter increments
+                 # see logger.py save_heightmaps() and trainer.py load_sample()
+                 # for the corresponding save and load functions
+                self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
@@ -272,36 +266,6 @@ class Robot(object):
         self.bg_color_img, self.bg_depth_img = self.get_camera_data()
         self.bg_depth_img = self.bg_depth_img * self.cam_depth_scale
 
-# # TODO: HK add picked up object
-#     def add_objects(self), :
-
-#         # Add each object to robot workspace at x,y location and orientation (random or pre-loaded)
-#         self.object_handles = []
-#         sim_obj_handles = []
-#         for object_idx in range(len(self.obj_mesh_ind)):
-#             curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
-#             if self.is_testing and self.test_preset_cases:
-#                 curr_mesh_file = self.test_obj_mesh_files[object_idx]
-#             curr_shape_name = 'shape_%02d' % object_idx
-#             drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
-#             drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
-#             object_position = [drop_x, drop_y, 0.15]
-#             object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-#             if self.is_testing and self.test_preset_cases:
-#                 object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
-#                 object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
-#             object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
-#             ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
-#             if ret_resp == 8:
-#                 print('Failed to add new objects to simulation. Please restart.')
-#                 exit()
-#             curr_shape_handle = ret_ints[0]
-#             self.object_handles.append(curr_shape_handle)
-#             if not (self.is_testing and self.test_preset_cases):
-#                 time.sleep(2)
-#         self.prev_obj_positions = []
-#         self.obj_positions = []
-
     def generate_random_object_pose(self):
         drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
         drop_y = (self.workspace_limits[1][1] - self.workspace_limits[1][0] - 0.2) * np.random.random_sample() + self.workspace_limits[1][0] + 0.1
@@ -329,34 +293,55 @@ class Robot(object):
         # object_handles is the list of unique vrep object integer identifiers, and it is how you control objects with the vrep API.
         # We need to keep track of the object names and the corresponding colors.
         self.object_handles = []
-        sim_obj_handles = []
         self.vrep_names = []
         self.object_colors = []
-        for object_idx in range(len(self.obj_mesh_ind)):
-            curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
-            if self.is_testing and self.test_preset_cases:
-                curr_mesh_file = self.test_obj_mesh_files[object_idx]
-            # TODO(HK) define more predictable object names for when the number of objects is beyond the number of colors
-            curr_shape_name = 'shape_%02d' % object_idx
-            self.vrep_names.append(curr_shape_name)
-            drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
-            if self.is_testing and self.test_preset_cases:
-                object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
-                object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
-            # Set the colors in order
-            object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
-            # TODO(HK) if there are more objects than total colors this line will break, fix it with mod (%), aka division remainder, to loop back to the first color.
-            object_color_name = self.color_names[object_idx]
-            # add the color of this object to the list.
-            self.object_colors.append(object_color_name)
-            ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
-            if ret_resp == 8:
-                print('Failed to add new objects to simulation. Please restart.')
-                exit()
-            curr_shape_handle = ret_ints[0]
-            self.object_handles.append(curr_shape_handle)
-            if not (self.is_testing and self.test_preset_cases):
-                time.sleep(0.5)
+        add_success = False
+        failure_count = 0
+        while not add_success:
+            if failure_count > 10:
+                self.restart_sim()
+            for object_idx in range(len(self.obj_mesh_ind)):
+                curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+                if self.is_testing and self.test_preset_cases:
+                    curr_mesh_file = self.test_obj_mesh_files[object_idx]
+                # TODO(ahundt) define more predictable object names for when the number of objects is beyond the number of colors
+                curr_shape_name = 'shape_%02d' % object_idx
+                self.vrep_names.append(curr_shape_name)
+                drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
+                if self.is_testing and self.test_preset_cases:
+                    object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
+                    object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+                # Set the colors in order
+                object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
+                # If there are more objects than total colors this line will break,
+                # applies mod to loop back to the first color.
+                object_color_name = self.color_names[object_idx % len(self.color_names)]
+                # add the color of this object to the list.
+                self.object_colors.append(object_color_name)
+                print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
+                do_break = False
+                ret_ints = []
+                while len(ret_ints) == 0:
+                    do_break = False
+                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_customizationscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    if ret_resp == 8:
+                        print('Failed to add new objects to simulation. Auto retry ' + str(failure_count))
+                        failure_count += 1
+                        if failure_count % 5 == 4:
+                            # If a few failures happen in a row, do a simulation reset and try again
+                            do_break = True
+                            break
+                        elif failure_count > 50:
+                            print('Failed to add new objects to simulation. Quitting. Please restart manually.')
+                            exit(1)
+                if do_break:
+                    break
+                curr_shape_handle = ret_ints[0]
+                self.object_handles.append(curr_shape_handle)
+                if not (self.is_testing and self.test_preset_cases):
+                    time.sleep(0.5)
+            # we have completed the loop adding all objects!
+            add_success = True
         self.prev_obj_positions = []
         self.obj_positions = []
 
@@ -365,28 +350,29 @@ class Robot(object):
 
         sim_ret, self.UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, self.UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-        vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
-        vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
-        time.sleep(1)
-        sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
-        while gripper_position[2] > 0.4: # V-REP bug requiring multiple starts and stops to restart
+        sim_ok = False
+        while not sim_ok: # V-REP bug requiring multiple starts and stops to restart
             vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
+            time.sleep(0.5)
             vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
-            time.sleep(1)
-            sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
+            time.sleep(0.5)
+            sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
+            time.sleep(0.5)
+            # check sim, but we are already in the restart loop so don't recurse
+            sim_ok = self.check_sim(restart_if_not_ok=False)
 
 
-    def check_sim(self):
+    def check_sim(self, restart_if_not_ok=True):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
         sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
         sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
-        if not sim_ok:
+        if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim()
             self.add_objects()
+        return sim_ok
 
 
     def get_task_score(self):
@@ -462,7 +448,9 @@ class Robot(object):
 
         if self.is_sim:
             # Move gripper out of the way
-            self.move_to([-0.3, 0, 0.3], None)
+            success = self.move_to([-0.3, 0, 0.3], None)
+            if not success:
+                return False
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
             # time.sleep(1)
@@ -474,7 +462,8 @@ class Robot(object):
                 time.sleep(0.5)
             # an extra half second so things settle down
             time.sleep(0.5)
-        
+            return True
+
         # TODO(ahundt) add real robot support for reposition_objects
 
 
@@ -587,9 +576,9 @@ class Robot(object):
 
         # Return
 
-        True if the gripper is fully closed at the end of the call, false otherwise. 
-        The gripper can take a full second to close, but this function may return in 1 ms 
-        May return False if nonblocking is True because an open gripper will not have closed completely yet, 
+        True if the gripper is fully closed at the end of the call, false otherwise.
+        The gripper can take a full second to close, but this function may return in 1 ms
+        May return False if nonblocking is True because an open gripper will not have closed completely yet,
         even if the gripper eventually closes all the way.
         """
         if self.is_sim:
@@ -620,6 +609,12 @@ class Robot(object):
                 time.sleep(1.5)
                 gripper_fully_closed =  self.check_grasp()
         else:
+            # stop is done to clear the current state,
+            # for cases like running close twice in a row
+            # to first actually grasp an object then
+            # to second check if the object is still present
+            self.gripper.stop(block=not nonblocking, timeout=0.1)
+            # actually close the gripper
             self.gripper.close(block=not nonblocking)
             if nonblocking:
                 gripper_fully_closed = True
@@ -677,12 +672,18 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10):
+    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None):
 
         if self.is_sim:
-
+            if tool_orientation is None and heightmap_rotation_angle is not None:
+                # Compute tool orientation from heightmap rotation angle
+                tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+                # TODO(ahundt) bring in some of the code from grasp() here to correctly update the orientation
+                raise NotImplementedError
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
+            if np.isnan(UR5_target_position).any():
+                return False
 
             move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
             move_magnitude = np.linalg.norm(move_direction)
@@ -693,20 +694,29 @@ class Robot(object):
                 vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0], UR5_target_position[1] + move_step[1], UR5_target_position[2] + move_step[2]),vrep.simx_opmode_blocking)
                 sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client,self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
             vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
-
+            return True
         else:
-            if tool_orientation is None:
+            if tool_orientation is None and heightmap_rotation_angle is None:
                 # If no orientation is provided, use the current one.
                 actual_pose = self.get_cartesian_position()
                 tool_orientation = actual_pose[3:]
+            elif tool_orientation is None and heightmap_rotation_angle is not None:
+                # Compute tool orientation from heightmap rotation angle
+                grasp_orientation = [1.0,0.0]
+                if heightmap_rotation_angle > np.pi:
+                    heightmap_rotation_angle = heightmap_rotation_angle - 2*np.pi
+                tool_rotation_angle = heightmap_rotation_angle/2
+                tool_orientation = np.asarray([grasp_orientation[0]*np.cos(tool_rotation_angle) - grasp_orientation[1]*np.sin(tool_rotation_angle), grasp_orientation[0]*np.sin(tool_rotation_angle) + grasp_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
             self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-
+            tcp_command = "set_tcp(p[-0.1,0.0,0.0,0.0,0.0,0.0])\n"
             tcp_command = "movel(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0)\n" % (tool_position[0],tool_position[1],tool_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.tool_acc,self.tool_vel)
+            print(tcp_command)
             self.tcp_socket.send(str.encode(tcp_command))
+            self.tcp_socket.close()
 
             # Block until robot reaches target tool position
-            self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
+            return self.block_until_cartesian_position(tool_position, timeout_seconds=timeout_seconds)
 
     def guarded_move_to(self, tool_position, tool_orientation):
         if self.is_sim:
@@ -852,7 +862,7 @@ class Robot(object):
 
     # Primitives ----------------------------------------------------------
 
-    def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None):
+    def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None, go_home=True):
         """
         object_color: The index in the list self.color_names expected for the object to be grasped. If object_color is None the color does not matter.
         """
@@ -915,7 +925,8 @@ class Robot(object):
             # Move gripper to location above grasp target
             self.move_to(location_above_grasp_target, None)
             # move to the simulator home position
-            self.move_to(self.sim_home_position, None)
+            if go_home:
+                self.move_to(self.sim_home_position, None)
 
             # Check if grasp is successful
             gripper_full_closed = self.close_gripper()
@@ -999,7 +1010,8 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
@@ -1011,26 +1023,35 @@ class Robot(object):
             time.sleep(0.1)
             gripper_fully_closed = self.close_gripper()
             color_success = None
-            bin_position = [0.33, 0.37, 0.33 + self.gripper_ee_offset]
+            bin_position = np.array([0.33, 0.40, 0.33 + self.gripper_ee_offset])
 
             # If gripper is open, drop object in bin and check if grasp is successful
             grasp_success = False
             if not gripper_fully_closed:
-                print("Possible Grasp success, moving up...")
+                print("Possible Grasp success, moving up then closing again to see if object is still present...")
                 # self.move_to([position[0],position[1],bin_position[2] - 0.14],[tool_orientation[0],tool_orientation[1],0.0])
                 self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
                 grasp_success = not self.close_gripper()
                 if grasp_success and not self.place_task:
                     print("Grasp success, moving to drop object in bin...")
+                    # Move towards the bin, and up to the drop height
+                    move_waypoint = (bin_position - position) * 0.6 + position
+                    move_waypoint[2] = bin_position[2]
+                    self.move_to(move_waypoint, [tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2]])
                     # Move over the bin
                     self.move_to([bin_position[0],bin_position[1],bin_position[2]], [tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2]])
 
             else:
                 print("Grasp failure, moving to home position...")
-            
+
             if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
-            self.go_home()
+
+            if go_home:
+                self.go_home()
+            else:
+                # go back to the grasp up pos
+                self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
 
         # TODO: change to 1 and 2 arguments
         return grasp_success, color_success
@@ -1049,7 +1070,7 @@ class Robot(object):
         return midpos
 
 
-    def push(self, position, heightmap_rotation_angle, workspace_limits=None):
+    def push(self, position, heightmap_rotation_angle, workspace_limits=None, go_home=True):
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
         print('Real Robot push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
@@ -1107,12 +1128,13 @@ class Robot(object):
 
             # Move gripper to location above grasp target
             self.move_to([target_x, target_y, location_above_pushing_point[2]], None)
+            # TODO(ahundt) we may want to go home here
 
             push_success = True
 
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
-            position[2] += self.gripper_ee_offset + 0.02
+            position[2] += self.gripper_ee_offset + 0.01
 
             # Compute tool orientation from heightmap rotation angle
             push_orientation = [1.0,0.0]
@@ -1148,16 +1170,21 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,True)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.75,self.joint_vel*0.75)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (push_endpoint[0],push_endpoint[1],push_endpoint[2],tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.03)\n" % (position[0],position[1],position[2]+0.1,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
-            tcp_command += " movej([%f" % self.home_joint_config[0]
-            for joint_idx in range(1,6):
-                tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
-            tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
-            # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
+            if go_home:
+                tcp_command += " movej([%f" % self.home_joint_config[0]
+                for joint_idx in range(1,6):
+                    tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
+                tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
+                # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
+            else:
+                # go to up pos instead of home
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.75,self.joint_vel*0.75)
             tcp_command += "end\n"
             self.tcp_socket.send(str.encode(tcp_command))
             self.tcp_socket.close()
@@ -1173,12 +1200,13 @@ class Robot(object):
 
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
-            push_success = self.block_until_home()
+            if go_home:
+                push_success = self.block_until_home()
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
         return push_success
-    
+
     def get_cartesian_position(self):
         if self.is_sim:
             raise NotImplementedError
@@ -1219,10 +1247,11 @@ class Robot(object):
             state_data = self.get_state()
             new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
             actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-            if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and 
-                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)])) or 
-                ((timeout_t1 - timeout_t0) > timeout_seconds)):
-                break
+            if ((tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and
+                 all([np.abs(actual_tool_pose[j] - position[j]) < self.tool_pose_tolerance[j] for j in range(3)]))):
+                return True
+            if (timeout_t1 - timeout_t0) > timeout_seconds:
+                return False
             tool_analog_input2 = new_tool_analog_input2
 
     def block_until_joint_position(self, position, timeout_seconds=10):
@@ -1244,7 +1273,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1345,7 +1374,8 @@ class Robot(object):
             self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
             tcp_command = "def process():\n"
             tcp_command += " set_digital_out(8,False)\n"
-            tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
+            if go_home:
+                tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (self.home_cart_low[0],self.home_cart_low[1],self.home_cart_low[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (up_pos[0],up_pos[1],up_pos[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc,self.joint_vel)
             tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (position[0],position[1],position[2],tool_orientation[0],tool_orientation[1],0.0,self.joint_acc*0.1,self.joint_vel*0.1)
             tcp_command += " set_digital_out(8,True)\n"
@@ -1357,9 +1387,12 @@ class Robot(object):
             time.sleep(0.1)
 
             self.open_gripper(nonblocking=True)
-            self.move_to(up_pos)
-            # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
-            return self.go_home(block_until_home=True)
+            move_to_result = self.move_to(up_pos)
+            if go_home:
+                # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
+                return self.go_home(block_until_home=True)
+            else:
+                return move_to_result
 
 
     def check_row(self, object_color_sequence,
@@ -1585,7 +1618,7 @@ class Robot(object):
         max_workspace_height = prev_height - decrease_threshold
         if decrease_threshold is not None and max_z < max_workspace_height:
             needed_to_reset = True
-        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + 
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) +
               ' goal_success: ' + str(goal_success) + ' needed to reset: ' + str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
         return goal_success, max_z, needed_to_reset
 

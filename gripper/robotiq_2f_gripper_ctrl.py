@@ -207,10 +207,12 @@ class RobotiqCGripper(object):
         cmd.rACT = 1
         cmd.rGTO = 0
         # self.cmd_pub.publish(cmd)
+        self.update(cmd)
+        time.sleep(0.1)
         # rospy.sleep(0.1)
-        # if block:
-        #     return self.wait_until_stopped(timeout)
-        # return True
+        if block:
+            return self.wait_until_stopped(timeout)
+        return True
 
     def open(self, vel=0.1, force=100, block=False, timeout=10):
         if self.is_opened():

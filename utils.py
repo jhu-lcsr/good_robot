@@ -39,11 +39,11 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
     return cam_pts, rgb_pts
 
 
-def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, median_filter_pixels=5):
-    
+def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5):
+
     if median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=median_filter_pixels)
-    
+
     # Compute heightmap size
     heightmap_size = np.round(((workspace_limits[1][1] - workspace_limits[1][0])/heightmap_resolution, (workspace_limits[0][1] - workspace_limits[0][0])/heightmap_resolution)).astype(int)
     depth_heightmap = np.zeros(heightmap_size)
@@ -74,6 +74,9 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     if median_filter_pixels > 0:
         depth_heightmap = ndimage.median_filter(depth_heightmap, size=median_filter_pixels)
     depth_heightmap[depth_heightmap == -z_bottom] = np.nan
+    # subtract out the scene background heights, if available
+    if background_heightmap is not None:
+        depth_heightmap -= background_heightmap
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
@@ -87,6 +90,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
         color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=median_filter_pixels)
         color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=median_filter_pixels)
     color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
+
 
     return color_heightmap, depth_heightmap
 
@@ -184,11 +188,11 @@ def euler2rotm(theta):
     R_y = np.array([[math.cos(theta[1]),    0,      math.sin(theta[1])  ],
                     [0,                     1,      0                   ],
                     [-math.sin(theta[1]),   0,      math.cos(theta[1])  ]
-                    ])         
+                    ])
     R_z = np.array([[math.cos(theta[2]),    -math.sin(theta[2]),    0],
                     [math.sin(theta[2]),    math.cos(theta[2]),     0],
                     [0,                     0,                      1]
-                    ])            
+                    ])
     R = np.dot(R_z, np.dot( R_y, R_x ))
     return R
 
@@ -200,11 +204,11 @@ def isRotm(R) :
     I = np.identity(3, dtype = R.dtype)
     n = np.linalg.norm(I - shouldBeIdentity)
     return n < 1e-6
- 
- 
+
+
 # Calculates rotation matrix to euler angles
 def rotm2euler(R) :
- 
+
     assert(isRotm(R))
 
     sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
@@ -218,7 +222,7 @@ def rotm2euler(R) :
         x = math.atan2(-R[1,2], R[1,1])
         y = math.atan2(-R[2,0], sy)
         z = 0
- 
+
     return np.array([x, y, z])
 
 
@@ -303,7 +307,7 @@ def rotm2angle(R):
     # As we have reached here there are no singularities so we can handle normally
     s = np.sqrt((R[2][1] - R[1][2])*(R[2][1] - R[1][2]) + (R[0][2] - R[2][0])*(R[0][2] - R[2][0]) + (R[1][0] - R[0][1])*(R[1][0] - R[0][1])) # used to normalise
     if (abs(s) < 0.001):
-        s = 1 
+        s = 1
 
     # Prevent divide by zero, should not happen if matrix is orthogonal and should be
     # Caught by singularity test above, but I've left it in just in case
@@ -317,7 +321,7 @@ def rotm2angle(R):
 def quat2rotm(quat):
     """
     Quaternion to rotation matrix.
-    
+
     Args:
     - quat (4, numpy array): quaternion w, x, y, z
     Returns:
@@ -350,7 +354,7 @@ def make_rigid_transformation(pos, orn):
     rotm = quat2rotm(orn)
     homo_mat = np.c_[rotm, np.reshape(pos, (3, 1))]
     homo_mat = np.r_[homo_mat, [[0, 0, 0, 1]]]
-    
+
     return homo_mat
 
 
@@ -372,11 +376,11 @@ def axxb(robotPose, markerPose):
     Copyright (c) 2019, Hongtao Wu
     AX=XB solver for eye-on base
     Using the Park and Martin Method: https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576
-    
+
     Args:
     - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.
     - markerPose (list of 4x4 numpy array): poses (homogenous transformation) of the marker in the camera frame.
-    
+
     Return:
     - cam2base (4x4 numpy array): poses of the camera in robot base frame.
     """
@@ -402,7 +406,7 @@ def axxb(robotPose, markerPose):
         B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
         alpha[:, i] = get_mat_log(A[:3, :3, i])
         beta[:, i] = get_mat_log(B[:3, :3, i])
-        
+
         # Bad pair of transformation are very close in the orientation.
         # They will give nan result
         if np.sum(np.isnan(alpha[:, i])) + np.sum(np.isnan(beta[:, i])) > 0:
@@ -426,10 +430,10 @@ def axxb(robotPose, markerPose):
         I_Ra_Left[(3*i):(3*(i+1)), :] = np.eye(3) - A[:3, :3, i]
         ta_Rtb_Right[(3*i):(3*(i+1)), :] = np.reshape(A[:3, 3, i] - np.dot(R, B[:3, 3, i]), (3, 1))
     t = np.linalg.lstsq(I_Ra_Left, ta_Rtb_Right, rcond=None)[0]
-    
+
     cam2base = np.c_[R, t]
     cam2base = np.r_[cam2base, [[0, 0, 0, 1]]]
-    
+
     return cam2base
 
 
@@ -456,7 +460,7 @@ def pose_inv(pose):
 def get_mat_log(R):
     """
     Get the log(R) of the rotation matrix R.
-    
+
     Args:
     - R (3x3 numpy array): rotation matrix
     Returns:
@@ -472,12 +476,12 @@ def get_mat_log(R):
 def calib_grid_cartesian(workspace_limits, calib_grid_step):
     """
     Construct 3D calibration grid across workspace
-    
+
     # Arguments
 
         workspace_limits: list of [min,max] coordinates for the list [x, y, z] in meters.
         calib_grid_step: the step size of points in a 3d grid to be created in meters.
-    
+
     # Returns
 
         num_calib_grid_pts, calib_grid_pts
@@ -517,13 +521,12 @@ def check_separation(values, distance_threshold):
 
 
 def polyfit(*args, **kwargs):
-    kwargs['silent'] = True
     with warnings.catch_warnings():
         # suppress the RankWarning, which just means the best fit line was bad.
         warnings.simplefilter('ignore', np.RankWarning)
         out = np.polyfit(*args, **kwargs)
     return out
-     
+
 
 # Cross entropy loss for 2D outputs
 class CrossEntropyLoss2d(nn.Module):

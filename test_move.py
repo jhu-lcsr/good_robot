@@ -40,6 +40,7 @@ import time
 # Grasp position before applying workspace bounds: [ 0.816 -0.024  0.11 ]                                                        
 # ('Real Good Robot grasping at: [ 0.816 -0.024  0.15 ]', ', [2.22144147 2.22144147 0.        ]')    
 
+i = 0
 r = Robot(is_sim=False, tcp_host_ip='192.168.1.155', tcp_port=30002, place=False)
 
 # print('Robot cartesian home: ' + str(r.get_cartesian_position()))
@@ -49,14 +50,47 @@ r = Robot(is_sim=False, tcp_host_ip='192.168.1.155', tcp_port=30002, place=False
 # tool_orientation = [0.0, 0.0, 0.0] # Real Good Robot
 # above_bin_waypoint = [0.3, 0.0,  0.8]
 # r.move_to(above_bin_waypoint, tool_orientation)r.grasp([0.414000, -0.092000, 0.103734], 0.0)
-r.grasp([0.818000, -0.226000, 0.003854], 3.141593)
+# r.grasp([0.818000, -0.226000, 0.003854], 3.141593)
 
-r.grasp([0.414000, -0.092000, 0.003734], 0.0)
-r.place([0.414000, -0.092000, 0.003734], 0.0)
-# r.push([0.414000, -0.092000, 0.003734], 0.0)
 
-r.grasp([0.816000, -0.024000, -0.040000], 1.570796)
-r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+# The test gripper functionality loop 
+# closes the gripper 5 times in a row,
+# then opens the gripper. This allows
+# you to test and check the gripper's
+# built in object detection functionality
+test_gripper_functionality = False
+while test_gripper_functionality:
+    i += 1
+    # Loop to 
+    stat1 = r.close_gripper()
+    time.sleep(1.0)
+    stat2 = r.close_gripper()
+    time.sleep(1.0)
+    stat3 = r.close_gripper()
+    time.sleep(1.0)
+    stat4 = r.close_gripper()
+    stat5 = r.open_gripper()
+    print('i: ' + str(i) + ' close1: ' + str(stat1) + ' close2: ' + str(stat2) + ' close3: ' + str(stat3) + ' close4: ' + str(stat4) + ' open5: ' + str(stat3))
+
+# r.grasp([0.414000, -0.092000, 0.003734], 0.0)
+# r.place([0.414000, -0.092000, 0.003734], 0.0)
+# # r.push([0.414000, -0.092000, 0.003734], 0.0)
+
+# r.grasp([0.816000, -0.024000, -0.040000], 1.570796)
+retry_grasp = True
+while retry_grasp:
+    r.grasp([0.380000, -0.226000, -0.040000], 5.497787)
+
+print_robot_pose = True
+while print_robot_pose:
+    # Loop and print current position so you can use that data
+    # for updating and configuring the robot.
+    state_data = r.get_state()
+    actual_tool_pose = r.parse_tcp_state_data(state_data, 'cartesian_info')
+    joint_position = r.parse_tcp_state_data(state_data, 'joint_data')
+    robot_state = 'cart_pose: ' + str(actual_tool_pose) + ' joint pos: ' + str(joint_position)
+    print(robot_state)
+    time.sleep(1.0)
 
 # Action: grasp at (8, 19, 221)
 # Executing: grasp at (0.818000, -0.226000, 0.003854) orientation: 3.141593

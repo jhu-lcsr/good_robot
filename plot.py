@@ -1,126 +1,186 @@
-#!/usr/bin/env python
-
 import os
-import argparse
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+from glob import glob
 
+def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
+    """Evaluate moving window of grasp success rate
+    actions: Nx4 array of actions giving [id, rotation, i, j]
 
-# Plot options (change me)
-interval_size = 200 # Report performance over the last 200 training steps
-max_plot_iteration = 2500 # Maximum number of training steps to report performance
-
-# Parse session directories
-parser = argparse.ArgumentParser(description='Plot performance of a session over training time.')
-parser.add_argument('session_directories', metavar='N', type=str, nargs='+', help='path to session directories for which to plot performance')
-args = parser.parse_args()
-session_directories = args.session_directories
-
-# Define plot colors (Tableau palette)
-colors = [[078.0/255.0,121.0/255.0,167.0/255.0], # blue
-          [255.0/255.0,087.0/255.0,089.0/255.0], # red
-          [089.0/255.0,169.0/255.0,079.0/255.0], # green
-          [237.0/255.0,201.0/255.0,072.0/255.0], # yellow
-          [242.0/255.0,142.0/255.0,043.0/255.0], # orange
-          [176.0/255.0,122.0/255.0,161.0/255.0], # purple
-          [255.0/255.0,157.0/255.0,167.0/255.0], # pink 
-          [118.0/255.0,183.0/255.0,178.0/255.0], # cyan
-          [156.0/255.0,117.0/255.0,095.0/255.0], # brown
-          [186.0/255.0,176.0/255.0,172.0/255.0]] # gray
-
-# Determine whether each session directory is trained in 'reactive' or 'reinforcement' mode (reward schemes differ between methods)
-methods = []
-for session_directory in session_directories:
-
-    # Check name of saved weights
-    model_list = os.listdir(os.path.join(session_directory, 'models'))
-    if len(model_list) > 0:
-        if 'reactive' in model_list[0]:
-            methods.append('reactive')
-        elif 'reinforcement' in model_list[0]:
-            methods.append('reinforcement')
+    """
+    grasps = actions[:, 0] == 1
+    if rewards is None:
+        places = actions[:, 0] == 2
+    length = np.min([rewards.shape[0], actions.shape[0]])
+    success_rate = np.zeros(length - 1)
+    lower = np.zeros_like(success_rate)
+    upper = np.zeros_like(success_rate)
+    for i in range(length - 1):
+        start = max(i - window, 0)
+        if rewards is None:
+            successes = places[start+1: i+2][grasps[start:i+1]]
         else:
-            print('Error: cannot determine whether session was trained in \'reactive\' or \'reinforcement\' mode.')
+            successes = (rewards[start: i+1] > reward_threshold)[grasps[start:i+1]]
+        success_rate[i] = successes.mean()
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+        lower[i] = success_rate[i] + 3*var
+        upper[i] = success_rate[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return success_rate, lower, upper
+
+def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
+    """
+    stack_heights: length N array of integer stack heights
+    actions: Nx4 array of actions giving [id, rotation, i, j]
+    hot_fix: fix the stack_height bug, where the trial didn't end on successful pushes, which reached a stack of 4.
+
+    where id=0 is a push, id=1 is grasp, and id=2 is place.
+
+    """
+    if hot_fix:
+        indices = np.logical_or(stack_height < 4, np.array([True] + list(stack_height[:-1] < 4)))
+        actions = actions[:stack_height.shape[0]][indices]
+        stack_height = stack_height[indices]
+
+    if include_push:
+        success_possible = actions[:, 0] == 2
     else:
-        print('Error: no model weights saved, cannot determine whether session was trained in \'reactive\' or \'reinforcement\' mode.')
+        success_possible = np.logical_or(actions[:, 0] == 0, actions[:, 0] == 2)
 
-# Create plot design
-plt.ylim((0, 1))
-plt.ylabel('Grasping performance (success rate)')
-plt.xlim((0, max_plot_iteration))
-plt.xlabel('Number of training steps')
-plt.grid(True, linestyle='-', color=[0.8,0.8,0.8])
-ax = plt.gca()
-for axis in ['top','bottom','left','right']:
-    ax.spines[axis].set_color('#000000')
-plt.rcParams.update({'font.size': 18})
-plt.rcParams['mathtext.default']='regular'
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-legend = []
+    stack_height_increased = np.zeros_like(stack_height, np.bool)
+    stack_height_increased[0] = False
+    stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
 
-for session_idx in range(len(session_directories)):
-    session_directory = session_directories[session_idx]
-    method = methods[session_idx]
-    color = colors[session_idx % 10]
+    success_rate = np.zeros_like(stack_height)
+    lower = np.zeros_like(success_rate)
+    upper = np.zeros_like(success_rate)
+    for i in range(stack_height.shape[0]):
+        start = max(i - window, 0)
+        successes = stack_height_increased[start:i+1][success_possible[start:i+1]]
+        success_rate[i] = successes.mean()
+        success_rate[np.isnan(success_rate)] = 0
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+        lower[i] = success_rate[i] + 3*var
+        upper[i] = success_rate[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return success_rate, lower, upper
 
-    # Get logged data
-    transitions_directory = os.path.join(session_directory, 'transitions')
-    executed_action_log = np.loadtxt(os.path.join(transitions_directory, 'executed-action.log.txt'), delimiter=' ')
-    max_iteration = min(executed_action_log.shape[0] - 2, max_plot_iteration)
-    executed_action_log = executed_action_log[0:max_iteration,:]
-    reward_value_log = np.loadtxt(os.path.join(transitions_directory, 'reward-value.log.txt'), delimiter=' ')
-    reward_value_log = reward_value_log[0:max_iteration]
+def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
+    """Calculate the running action efficiency from successful trials.
 
-    # Initialize plot variables
-    grasp_to_push_ratio = np.zeros((max_iteration))
-    grasp_success = np.zeros((max_iteration))
-    push_then_grasp_success = np.zeros((max_iteration))
+    trials: array giving the number of trials up to iteration i (TODO: unused?)
+    min_actions: ideal number of actions per trial
 
-    for step in range(max_iteration):
+    Formula: successful_trial_count * ideal_actions_per_trial / window_size
+    """
 
-        # Get indicies for previous x grasps, where x is the interval size
-        grasp_attempt_ind = np.argwhere(executed_action_log[:,0] == 1)
-        grasp_attempt_ind_before_step = grasp_attempt_ind[np.argwhere(grasp_attempt_ind[:,0] < step)]
-        grasp_attempt_ind_over_interval = grasp_attempt_ind_before_step[max(0,len(grasp_attempt_ind_before_step)-interval_size):len(grasp_attempt_ind_before_step),0]
+    success = np.rint(stack_height) == max_height
+    efficiency = np.zeros_like(stack_height, np.float64)
+    lower = np.zeros_like(efficiency)
+    upper = np.zeros_like(efficiency)
+    for i in range(1, efficiency.shape[0]):
+        start = max(i - window, 1)
+        # window_size = min(i, window)
+        window_size = np.array(min(i+1, window), np.float64)
+        num_trials = success[start:i+1].sum()
+        efficiency[i] = num_trials * ideal_actions_per_trial / window_size
+        var = efficiency[i] / np.sqrt(window_size)
+        lower[i] = efficiency[i] + 3*var
+        upper[i] = efficiency[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return efficiency, lower, upper
 
-        # Count number of times grasp attempts were successful
-        # NOTE: reward_value_log just stores some value which is indicative of successful grasping, which could be a class ID (reactive) or actual reward value (from MDP, reinforcement)
-        if method == 'reactive':
-            grasp_success_over_interval = np.sum(reward_value_log[grasp_attempt_ind_over_interval] == 0)/float(min(interval_size,max(step,1))) # Class ID for successful grasping is 0 (reactive policy)
-        elif method == 'reinforcement':
-            grasp_success_over_interval = np.sum(reward_value_log[grasp_attempt_ind_over_interval] >= 0.5)/float(min(interval_size,max(step,1))) # Reward value for successful grasping is anything larger than 0.5 (reinforcement policy)
-        if step < interval_size:
-            grasp_success_over_interval *= (float(step)/float(interval_size))
-        grasp_success[step] = grasp_success_over_interval
+def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
+    """Get grasp efficiency from when the trial count increases.
 
-        # Get grasp to push ratio over previous x attempts, where x is the interval size
-        grasp_to_push_ratio_over_interval = float(np.sum(executed_action_log[max(0,step-interval_size):step,0] == 1))/float(min(interval_size,max(step,1)))
-        grasp_to_push_ratio[step] = grasp_to_push_ratio_over_interval
+    """
+    grasps = actions[:, 0] == 1
+    efficiency = np.zeros_like(rewards, np.float64)
+    lower = np.zeros_like(efficiency)
+    upper = np.zeros_like(efficiency)
+    for i in range(efficiency.shape[0]):
+        start = max(i - window, 0)
+        window_size = np.array(min(i+1, window), np.float64)
+        successful = rewards[start: i+1] > reward_threshold
+        successful_grasps = np.array(successful[grasps[start:start+successful.shape[0]]].sum(), np.float64)
+        # print(successful_grasps)
+        efficiency[i] = successful_grasps / window_size
+        var = efficiency[i] / np.sqrt(window_size)
+        lower[i] = efficiency[i] + 3*var
+        upper[i] = efficiency[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return efficiency, lower, upper
 
-        # Get indicies for push-then-grasp cases
-        push_attempt_ind = np.argwhere(executed_action_log[0:(max_iteration-1),0] == 0)
-        grasp_after_push_attempt_ind = push_attempt_ind[np.argwhere(executed_action_log[push_attempt_ind[:,0] + 1,0] == 1),:] + 1
-        grasp_after_push_attempt_ind_before_step = grasp_after_push_attempt_ind[np.argwhere(grasp_after_push_attempt_ind[:,0] < step)]
-        grasp_after_push_attempt_ind_over_interval = grasp_after_push_attempt_ind_before_step[max(0,len(grasp_after_push_attempt_ind_before_step)-interval_size):len(grasp_after_push_attempt_ind_before_step),0]
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
+    if place:
+        heights = np.loadtxt(os.path.join(log_dir, 'transitions', 'stack-height.log.txt'))
+        rewards = None
+    else:
+        rewards = np.loadtxt(os.path.join(log_dir, 'transitions', 'reward-value.log.txt'))
+    actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
+    trials = np.loadtxt(os.path.join(log_dir, 'transitions', 'trial.log.txt'))
 
-        # Count number of times grasp after push attempts were successful
-        if method == 'reactive':
-            grasp_after_push_success_over_interval = np.sum(reward_value_log[grasp_after_push_attempt_ind_over_interval] == 0)/float(min(interval_size,max(step,1)))
-        elif method == 'reinforcement':
-            grasp_after_push_success_over_interval = np.sum(reward_value_log[grasp_after_push_attempt_ind_over_interval] >= 0.5)/float(min(interval_size,max(step,1)))
-        if step < interval_size:
-            grasp_after_push_success_over_interval *= (float(step)/float(interval_size))
-        push_then_grasp_success[step] = grasp_after_push_success_over_interval
+    if max_iter is not None:
+        if place:
+            heights = heights[:max_iter]
+        else:
+            rewards = rewards[:max_iter]
+        actions = actions[:max_iter]
+        trials = trials[:max_iter]
 
-    # Plot grasp information
-    plt.plot(range(0, max_iteration), grasp_success, color=color, linewidth=3) # color='blue', linewidth=3)
-    # plt.fill_between(range(0, max_iteration), push_then_grasp_success, 0, color=color, alpha=0.5)
-    plt.plot(range(0, max_iteration), push_then_grasp_success, dashes=[8,7], color=color, linewidth=3, alpha=1, dash_capstyle='round', dash_joinstyle='round',label='_nolegend_') # color='blue', dashes=[5,5], linewidth=2, dash_capstyle='butt')
-    # plt.plot(range(0, max_iteration), grasp_to_push_ratio, dashes=[1,5], color=color, linewidth=2, alpha=0.5, dash_capstyle='round', dash_joinstyle='round') # color='blue', dashes=[5,5], linewidth=2, dash_capstyle='butt')
-    legend.append(session_directories[session_idx])
+    grasp_success_file = os.path.join(log_dir, 'transitions', 'grasp-success.log.txt')
+    if os.path.isfile(grasp_success_file):
+        grasp_rewards = np.loadtxt(grasp_success_file)
+    else:
+        # old versions of logged code don't have the grasp-success.log.txt file, data must be extracted from rewards.
+        grasp_rewards = rewards
 
-plt.legend(legend, loc='lower right', fontsize=18)
-plt.tight_layout()
-plt.show()
+    grasp_rate, grasp_lower, grasp_upper = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    if place:
+        if 'row' in log_dir or 'row' in title.lower():
+            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
+        else:
+            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, window=window)
+        eff, eff_lower, eff_upper = get_action_efficiency(heights, window=window)
+    else:
+        eff, eff_lower, eff_upper = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+
+    plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
+    if place:
+        plt.plot(mult*place_rate, color=colors[1], label='Place Success Rate')
+    plt.plot(mult*eff, color=colors[2], label='Action Efficiency')
+
+    plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
+                     mult*grasp_lower, mult*grasp_upper,
+                     color=colors[0], alpha=alpha)
+    if place:
+        plt.fill_between(np.arange(1, place_rate.shape[0]+1),
+                         mult*place_lower, mult*place_upper,
+                         color=colors[1], alpha=alpha)
+    plt.fill_between(np.arange(1, eff.shape[0]+1),
+                     mult*eff_lower, mult*eff_upper,
+                     color=colors[2], alpha=alpha)
+
+    ax = plt.gca()
+    plt.xlabel('Number of Actions')
+    plt.ylabel('Running Mean')
+    plt.title(title)
+    plt.legend()
+    ax.yaxis.set_major_formatter(PercentFormatter())
+    save_file = os.path.basename(log_dir).replace(':', '-').replace('.', '-') + '_success_plot.png'
+    print('saving plot: ' + save_file)
+    plt.savefig(save_file)
+
+if __name__ == '__main__':
+    window = 1000
+    max_iter = None
+    # log_dir = './logs/2019-12-31-20-17-06'
+    # log_dir = './logs/2020-01-01-14-55-17'
+    log_dir = './logs/2020-01-06-19-15-55'
+    title = 'Stack 4 Blocks, Training'
+    plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)

@@ -127,6 +127,7 @@ def main(args):
     random_seed = args.random_seed
     force_cpu = args.force_cpu
     flops = args.flops
+    show_heightmap = args.show_heightmap
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -251,6 +252,11 @@ def main(args):
         nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
     else:
         nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
+
+    num_trials = 0
+    if continue_logging:
+        num_trials = int(max(trainer.trial_log)[0])
+        nonlocal_variables['stack'].trial = num_trials + 1
 
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
@@ -396,6 +402,23 @@ def main(args):
                 trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 logger.write_to_log('trial', trainer.trial_log)
 
+
+                # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+                each_action_max_coordinate = {
+                    'push': np.unravel_index(np.argmax(push_predictions), push_predictions.shape), # push, index 0
+                    'grasp': np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape),
+                }
+                each_action_predicted_value = {
+                    'push': push_predictions[each_action_max_coordinate['push']], # push, index 0
+                    'grasp': grasp_predictions[each_action_max_coordinate['grasp']],
+                }
+                if place:
+                    each_action_max_coordinate['place'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
+                    each_action_predicted_value['place'] = place_predictions[each_action_max_coordinate['place']]
+                # we will actually execute the best pixel index of the selected action
+                nonlocal_variables['best_pix_ind'] = each_action_max_coordinate[nonlocal_variables['primitive_action']]
+                predicted_value = each_action_predicted_value[nonlocal_variables['primitive_action']]
+
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
                 if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
@@ -413,16 +436,6 @@ def main(args):
                 else:
                     use_heuristic = False
 
-                    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                    if nonlocal_variables['primitive_action'] == 'push':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(push_predictions), push_predictions.shape)
-                        predicted_value = np.max(push_predictions)
-                    elif nonlocal_variables['primitive_action'] == 'grasp':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape)
-                        predicted_value = np.max(grasp_predictions)
-                    elif nonlocal_variables['primitive_action'] == 'place':
-                        nonlocal_variables['best_pix_ind'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
-                        predicted_value = np.max(place_predictions)
                 trainer.use_heuristic_log.append([1 if use_heuristic else 0])
                 logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
 
@@ -435,55 +448,24 @@ def main(args):
                 best_rotation_angle = np.deg2rad(nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
                 best_pix_x = nonlocal_variables['best_pix_ind'][2]
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
-                primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], valid_depth_heightmap[best_pix_y][best_pix_x] + workspace_limits[2][0]]
 
-                # If pushing, adjust start position, and make sure z value is safe and not too low
-                if nonlocal_variables['primitive_action'] == 'push' or nonlocal_variables['primitive_action'] == 'place':
-                    def get_local_region(region_width=0.03):
-                        safe_kernel_width = int(np.round((finger_width/2)/heightmap_resolution))
-                        return valid_depth_heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, valid_depth_heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, valid_depth_heightmap.shape[1])]
-                    # make sure the fingers will not collide with the objects
-                    finger_width = 0.05
-                    finger_touchdown_region = get_local_region(region_width=finger_width)
-                    safe_z_position = workspace_limits[2][0]
-                    if finger_touchdown_region.size != 0:
-                        safe_z_position += np.max(finger_touchdown_region)
-                    else:
-                        safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
-                    primitive_position[2] = safe_z_position
-                    if nonlocal_variables['primitive_action'] == 'push':
-                        # determine if the safe z position might actually contact anything during the push action
-                        # TODO(ahundt) push motion region can be refined based on the rotation angle and the direction of travel
-                        push_width = 0.2
-                        local_push_region = get_local_region(region_width=push_width)
-                        # push_may_contact_something is True for something noticeably higher than the push action z height
-                        max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
-                        push_may_contact_something = primitive_position[2] < max_local_push_region
-                        push_str = ''
-                        if not push_may_contact_something:
-                            push_str += 'Predicting push action failure, heuristics determined '
-                        print('push at height ' + str(safe_z_position) + 
-                              ' would not contact anything at the max height of ' + str(max_local_push_region))
+                # Adjust start position of all actions, and make sure z value is safe and not too low
+                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
-                if nonlocal_variables['primitive_action'] == 'push':
-                    trainer.executed_action_log.append([0, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 0 - push
-                elif nonlocal_variables['primitive_action'] == 'grasp':
-                    trainer.executed_action_log.append([1, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 1 - grasp
-                elif nonlocal_variables['primitive_action'] == 'place':
-                    trainer.executed_action_log.append([2, nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])  # 2 - place
+                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, nonlocal_variables['best_pix_ind'])
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
                         logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
@@ -549,7 +531,8 @@ def main(args):
                     else:
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    #TODO(hkwon214) Get image after executing grasp action. save also? better place to put?
+                    # Get image after executing grasp action. 
+                    # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
@@ -583,7 +566,8 @@ def main(args):
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
 
-                    #TODO(hkwon214) Get image after executing place action. save also? better place to put?
+                    # Get image after executing place action.
+                    # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
@@ -647,6 +631,41 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
+    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name):
+        # Adjust start position of all actions, and make sure z value is safe and not too low
+        def get_local_region(heightmap, region_width=0.03):
+            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
+            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
+        # make sure the fingers will not collide with the objects
+        finger_width = 0.05
+        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
+        safe_z_position = workspace_limits[2][0]
+        if finger_touchdown_region.size != 0:
+            safe_z_position += np.max(finger_touchdown_region)
+        else:
+            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
+        if robot.background_heightmap is not None:
+            # add the height of the background scene
+            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
+        push_may_contact_something = False
+        if action_name == 'push':
+            # determine if the safe z position might actually contact anything during the push action
+            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
+            push_width = 0.2
+            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
+            # push_may_contact_something is True for something noticeably higher than the push action z height
+            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+            push_may_contact_something = safe_z_position < max_local_push_region
+            push_str = ''
+            if not push_may_contact_something:
+                push_str += 'Predicting push action failure, heuristics determined '
+                push_str += 'push at height ' + str(safe_z_position) 
+                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
+                print(push_str)
+
+        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
+        return primitive_position, push_may_contact_something
+
     # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
 
     action_thread = threading.Thread(target=process_actions)
@@ -674,7 +693,6 @@ def main(args):
         robot.shutdown()
         return
 
-    num_trials = 0
     do_continue = False
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -692,6 +710,20 @@ def main(args):
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
         stuff_count[valid_depth_heightmap > 0.02] = 1
+        if show_heightmap:
+            # show the heightmap
+            f = plt.figure()
+            f.suptitle(str(trainer.iteration))
+            f.add_subplot(1,3, 1)
+            plt.imshow(valid_depth_heightmap)
+            f.add_subplot(1,3, 2)
+            # f.add_subplot(1,2, 1)
+            if robot.background_heightmap is not None:
+                plt.imshow(robot.background_heightmap)
+                f.add_subplot(1,3, 3)
+            plt.imshow(stuff_count)
+            plt.show(block=True)
+        stuff_sum = np.sum(stuff_count)
         empty_threshold = 300
         if is_sim and is_testing:
             empty_threshold = 10
@@ -702,10 +734,11 @@ def main(args):
             if is_testing:
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
-        if np.sum(stuff_count) < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
+        if stuff_sum < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
-                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (np.sum(stuff_count)))
+                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
@@ -717,7 +750,7 @@ def main(args):
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
-                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (np.sum(stuff_count)))
+                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (stuff_sum))
                 robot.restart_real()
 
             nonlocal_variables['trial_complete'] = True
@@ -736,8 +769,6 @@ def main(args):
             nonlocal_variables['finalize_prev_trial_log'] = True
             if is_testing and test_preset_cases:
                 # min(num_preset_files-1, int(float(trial_idx-1)/float(preset_trials_per_case)))
-                # TODO(ahundt) we shouldn't really be setting nonlocal_variables['trial'] here, but it is a workaround so the trials log file lines up
-                nonlocal_variables['trial'] = num_trials
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                 # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
                 # load the current preset case, incrementing as trials are cleared
@@ -842,6 +873,7 @@ def main(args):
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
+            logger.write_to_log('iteration', np.array([trainer.iteration]))
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -888,7 +920,11 @@ def main(args):
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 if is_sim:
                     robot.check_sim()
-                    robot.reposition_objects()
+                    if not robot.reposition_objects():
+                        # This can happen if objects are in impossible positions (NaN),
+                        # so set the variable to immediately and completely restart
+                        # the simulation below.
+                        num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
@@ -958,7 +994,8 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, workspace_limits, heightmap_resolution)
+    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, 
+                                                           workspace_limits, heightmap_resolution, background_heightmap=robot.background_heightmap)
     valid_depth_heightmap = depth_heightmap.copy()
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
@@ -1011,7 +1048,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
         elif method == 'reinforcement':
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+            if trial_reward:
+                actual_value_log = trainer.trial_reward_value_log
+            else:
+                actual_value_log = trainer.label_value_log
+            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(actual_value_log)[sample_ind[:,0]])
         sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
@@ -1058,21 +1099,22 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             reward_to_backprop = trainer.label_value_log[sample_iteration]
 
         # Get labels for sample and backpropagate, trainer.backprop also does a forward pass internally.
-        sample_best_pix_ind = (np.asarray(trainer.executed_action_log)[sample_iteration, 1:4]).astype(int)
+        sample_best_pix_ind = np.asarray(trainer.executed_action_log)[sample_iteration, 1:4].astype(np.int)
         trainer.backprop(sample_color_heightmap, sample_depth_heightmap, sample_primitive_action, sample_best_pix_ind,
                          reward_to_backprop, goal_condition=exp_goal_condition)
-
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
-            if update_label_value_log:
-                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_push_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'grasp':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_grasp_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'place':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
-            if update_label_value_log:
-                trainer.label_value_log[sample_iteration] = [new_sample_label_value]
+            # trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [sample_place_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
+
+        if update_label_value_log:
+            trainer.label_value_log[sample_iteration] = [new_sample_label_value]
 
     else:
         # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
@@ -1098,6 +1140,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_seed', dest='random_seed', type=int, action='store', default=1234,                      help='random seed for simulation and neural net initialization')
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
     parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
+    parser.add_argument('--show_heightmap', dest='show_heightmap', action='store_true', default=False,                    help='show the background heightmap for collecting a new one and debugging')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')

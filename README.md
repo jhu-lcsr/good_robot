@@ -531,7 +531,7 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 
 #### Instructions:
 
-1. Print an ArUco Tag from [here](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
+1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 100mm tags. Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
 
 2. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
@@ -539,7 +539,10 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 
 4. Roslaunch the camera with, for example:
 ```shell
-roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
 ```
 
 5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
@@ -549,10 +552,11 @@ roslaunch aruco_detect aruco_detect.launch
 
 6. With caution, run the following to move the robot and calibrate:
 
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
 ```shell
 python calibrate_ros.py
 ```
-The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
 
 The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
@@ -620,10 +624,12 @@ source ~/ros_catkin_ws/install_isolated/setup.zsh
 Running ROS with depth image processing:
 
 ```bash
-roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
-In a separate tab run our small test script, which currently only supports python2:
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
+In a separate tab run our small test script:
 
 ```bash
 python test_ros_images.py
@@ -653,3 +659,20 @@ roslaunch aruco_detect aruco_detect.launch
 ```
 python3 calibrate_ros.py
 ```
+
+### Collecting the Background heightmap
+
+The real robot also uses a background heightmap of the scene with no objects present. 
+
+1. Completely clear the table or working surface.
+2. Back up and remove the current `real/background_heightmap.depth.png`.
+3. Run pushing and grasping data collection with the `--show_heightmap` flag.
+4. View the heightmap images until you see one with no holes (black spots), and save the iteration number at the top.
+5. Copy the good heightmap from `logs/<run_folder>/data/depth_heightmaps/<iteration>.0.depth.png` and rename it to `real/background_heightmap.depth.png`.
+6. Stop and re-run pushing and grasping with the `--show_heightmap` flag.
+
+Here is an example of the matplotlib visualization of a good depth heightmap, there are no black specks aside from one corner which is out of the camera's field of view:
+
+![example_background_depth_map](images/example_background_depth_map.png)
+
+Your updated depth heightmaps should be good to go!

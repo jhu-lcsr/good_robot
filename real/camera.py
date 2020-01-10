@@ -23,7 +23,7 @@ from .ros_camera import ROSCamera
 
 class Camera(object):
 
-    def __init__(self, model_name='primesense', camera_intrinsic_folder='/home/costar/src/real_good_robot/real/camera_param', calibrate=False):
+    def __init__(self, model_name='primesense', camera_intrinsic_folder='~/src/real_good_robot/real/camera_param', calibrate=False):
         
         self.model_name = model_name
 
@@ -50,7 +50,7 @@ class Camera(object):
             rospy.init_node('ros_camera', anonymous=True)
             time.sleep(1)  
             # Camera matrix K
-            camera_matrix_txt = os.path.join(camera_intrinsic_folder, 'CameraMatrixRGB.dat')
+            camera_matrix_txt = os.path.join(os.path.expanduser(camera_intrinsic_folder), 'CameraMatrixRGB.dat')
             self.intrinsics = np.loadtxt(camera_matrix_txt)
 
 
