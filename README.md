@@ -531,7 +531,7 @@ Before you start, make sure you have the ROS package [fiducials](http://wiki.ros
 
 #### Instructions:
 
-1. Print an [ArUco Tag](http://chev.me/arucogen/). Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
+1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 100mm tags. Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
 
 2. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
@@ -552,10 +552,11 @@ roslaunch aruco_detect aruco_detect.launch
 
 6. With caution, run the following to move the robot and calibrate:
 
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
 ```shell
 python calibrate_ros.py
 ```
-The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
 
 The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
@@ -623,10 +624,12 @@ source ~/ros_catkin_ws/install_isolated/setup.zsh
 Running ROS with depth image processing:
 
 ```bash
-roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
-In a separate tab run our small test script, which currently only supports python2:
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
+In a separate tab run our small test script:
 
 ```bash
 python test_ros_images.py
