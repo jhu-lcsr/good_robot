@@ -163,6 +163,171 @@ jupyter lab ~/src/costar_visual_stacking/plot_success_rate
 
 Open jupyter in your favorite browser and there you will also find instructions for generating the plots.
 
+
+## Running on a Real UR5 with ROS Based Image Collection
+
+### ROS Based Image Collection Setup
+
+We require python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build. A couple additional steps below will need to be added in the middle. We advise installing in the folder:
+
+```
+~/ros_catkin_ws
+```
+
+Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source). 
+
+In particular fix up this command:
+
+```
+export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
+```
+
+For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories, and for handeye calibration between the camera and robot add [UbiquityRobotics/fiducials](https://github.com/UbiquityRobotics):
+
+```
+cd ~/catkin_ros_ws
+git clone https://github.com/ros-drivers/openni2_launch.git
+git clone https://github.com/ros-drivers/rgbd_launch.git
+git clone https://github.com/UbiquityRobotics/fiducials.git
+```
+
+Run the build and install.
+
+```
+cd ~/ros_catkin_ws
+rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
+```
+<!-- 
+Then install the primesense image pipeline:
+
+```bash
+sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
+``` -->
+
+Source the ros setup so you get access to the launch commands:
+```
+source ~/ros_catkin_ws/install_isolated/setup.zsh
+```
+
+Running ROS with depth image processing:
+
+```bash
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+```
+
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
+In a separate tab run our small test script:
+
+```bash
+python test_ros_images.py
+```
+
+Running RVIZ to look at the images:
+
+```
+rosrun rviz rviz
+```
+
+The correct images, as done in the [JHU costar dataset](https://sites.google.com/site/costardataset) class [collector](https://github.com/jhu-lcsr/costar_plan/blob/d469d62d72cd405ed07b10c62eb24391c0af1975/ctp_integration/python/ctp_integration/collector.py), are from the following ROS topics:
+
+```
+
+        self.rgb_topic = "/camera/rgb/image_rect_color"
+        # raw means it is in the format provided by the openi drivers, 16 bit int
+        self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
+```
+
+#### Calibrating Camera Intrincics
+
+You must first calibrate your rgb and depth camera intrinsics and rectify your images to ensure you can accurately convert camera positions to robot poses. We do this using [camera_calibration](http://wiki.ros.org/camera_calibration) in the [ros-perception/image_pipeline](https://github.com/ros-perception/image_pipeline) library.
+
+You will need to generate and load a calibration yaml file which goes in a location like `~/.ros/camera_info/rgb_PS1080_PrimeSense.yaml`. We have an examle from our robot in this repository saved at [real/rgb_PS1080_PrimeSense.yaml](real/rgb_PS1080_PrimeSense.yaml).
+
+#### Calibrating Camera Extrinsics
+
+1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 100mm tags with the original design (dictionary 16). Make sure the ArUco dictionary id in the launch files is correct. Attach the ArUco Tag on the robot.
+
+2. Edit the fiducials ROS package [aruco_detect.launch](https://github.com/UbiquityRobotics/fiducials/blob/kinetic-devel/aruco_detect/launch/aruco_detect.launch) file in `~/ros_catkin_ws/src/fiducials/aruco_detect/launch/aruco_detect.launch` from the [fiducials github repository](https://github.com/UbiquityRobotics/fiducials) you cloned earlier, see [the fiducials wiki for reference](http://wiki.ros.org/fiducials). Modify the launch file in [fiducials/aruco to detect your markers and receive images from your sensor. Here is our configuration:
+
+```
+
+<!-- Run the aruco_detect node -->
+<launch>
+  <!-- namespace for camera input -->
+  <!-- /camera/rgb/image_rect_color/compressed -->
+  <arg name="camera" default="/camera/rgb"/>
+  <arg name="image" default="image_rect_color"/>
+  <arg name="transport" default="compressed"/>
+  <arg name="fiducial_len" default="0.1"/>
+  <arg name="dictionary" default="16"/>
+  <arg name="do_pose_estimation" default="true"/>
+  <arg name="ignore_fiducials" default="" />
+  <arg name="fiducial_len_override" default="" />
+
+  <node pkg="aruco_detect" name="aruco_detect"
+    type="aruco_detect" output="screen" respawn="false">
+    <param name="image_transport" value="$(arg transport)"/>
+    <param name="publish_images" value="true" />
+    <param name="fiducial_len" value="$(arg fiducial_len)"/>
+    <param name="dictionary" value="$(arg dictionary)"/>
+    <param name="do_pose_estimation" value="$(arg do_pose_estimation)"/>
+    <param name="ignore_fiducials" value="$(arg ignore_fiducials)"/>
+    <param name="fiducial_len_override" value="$(arg fiducial_len_override)"/>
+    <remap from="/camera/compressed" 
+        to="$(arg camera)/$(arg image)/$(arg transport)"/>
+    <remap from="/camera_info" to="$(arg camera)/camera_info"/>
+  </node>
+</launch>
+```
+
+5. You must predefine the workspace limits in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
+
+3. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
+
+4. Roslaunch the camera with, for example:
+```shell
+taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
+
+```
+
+5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
+```shell
+taskset 0x000000FF roslaunch aruco_detect aruco_detect.launch
+```
+
+6. With caution, run the following to move the robot and calibrate:
+
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
+```shell
+python calibrate_ros.py
+```
+
+The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
+
+If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
+
+### Collecting the Background heightmap
+
+The real robot also uses a background heightmap of the scene with no objects present. 
+
+1. Completely clear the table or working surface.
+2. Back up and remove the current `real/background_heightmap.depth.png`.
+3. Run pushing and grasping data collection with the `--show_heightmap` flag.
+4. View the heightmap images until you see one with no holes (black spots), and save the iteration number at the top.
+5. Copy the good heightmap from `logs/<run_folder>/data/depth_heightmaps/<iteration>.0.depth.png` and rename it to `real/background_heightmap.depth.png`.
+6. Stop and re-run pushing and grasping with the `--show_heightmap` flag.
+
+Here is an example of the matplotlib visualization of a good depth heightmap, there are no black specks aside from one corner which is out of the camera's field of view:
+
+![example_background_depth_map](images/example_background_depth_map.png)
+
+Your updated depth heightmaps should be good to go!
+
+
 ## "Good Robot!" is forked from the Visual Pushing and Grasping Toolbox
 
 [Original Visual Pushing Grasping (VPG) Repository](https://github.com/andyzeng/visual-pushing-grasping). Edits have been made to the text below to reflect some configuration and code updates needed to reproduce the previous VPG paper's original behavior:
@@ -488,7 +653,7 @@ To design your own challenging test case:
 
 ## Running on a Real Robot (UR5)
 
-The same code in this repository can be used to train on a real UR5 robot arm (tested with UR Software version 1.8). To communicate with later versions of UR software, several minor changes may be necessary in `robot.py` (*e.g.* functions like `parse_tcp_state_data`). Tested with Python 2.7 (not fully tested with Python 3).
+The same code in this repository can be used to train on a real UR5 robot arm (tested with UR Software version 1.8). To communicate with later versions of UR software, several minor changes may be necessary in `robot.py` (*e.g.* functions like `parse_tcp_state_data`). Tested with Python 3.
 
 ### Setting Up Camera System
 
@@ -529,40 +694,7 @@ We provide a simple calibration script `calibration_ros.py` to estimate camera e
 
 We are using the PrimeSense Carmine 1.08 for this project. If you are using other cameras which need calibration for the depth scale (e.g. [Intel RealSense D415]((https://click.intel.com/intelr-realsensetm-depth-camera-d415.html)), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
 
-Before you start, make sure you have the ROS package [fiducials](http://wiki.ros.org/fiducials) installed. 
 
-#### Instructions:
-
-1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 100mm tags. Make sure the ArUco dictionary is correct. Attach the ArUco Tag on the robot.
-
-2. Predefined the workspace in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
-
-3. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
-
-4. Roslaunch the camera with, for example:
-```shell
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
-
-We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
-
-```
-
-5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
-```shell
-roslaunch aruco_detect aruco_detect.launch
-```
-
-6. With caution, run the following to move the robot and calibrate:
-
-The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
-
-```shell
-python calibrate_ros.py
-```
-
-The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
-
-If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
 
 ### Training
 
@@ -578,103 +710,3 @@ where `XXX.XXX.X.XXX` is the network IP address of your UR5 robot controller.
 
 * Use `touch.py` to test calibrated camera extrinsics -- provides a UI where the user can click a point on the RGB-D image, and the robot moves its end-effector to the 3D location of that point
 * Use `debug.py` to test robot communication and primitive actions
-
-
-### ROS Based Image Collection Setup
-
-We require python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is set for the build. A couple additional steps below will need to be added in the middle. We advise installing in the folder:
-
-```
-~/ros_catkin_ws
-```
-
-Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source). 
-
-In particular fix up this command:
-
-```
-export ROS_PYTHON_VERSION=3 && rosinstall_generator desktop_full --rosdistro melodic --deps --tar > melodic-desktop-full.rosinstall && wstool init -j8 src melodic-desktop-full.rosinstall
-```
-
-For the primesense camera add in the [openni2_launch](https://github.com/ros-drivers/openni2_launch), and [rgbd_launch](https://github.com/ros-drivers/rgbd_launch) repositories, and for handeye calibration between the camera and robot add [UbiquityRobotics/fiducials](https://github.com/UbiquityRobotics):
-
-```
-cd ~/catkin_ros_ws
-git clone https://github.com/ros-drivers/openni2_launch.git
-git clone https://github.com/ros-drivers/rgbd_launch.git
-git clone https://github.com/UbiquityRobotics/fiducials.git
-```
-
-Run the build and install.
-
-```
-cd ~/ros_catkin_ws
-rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
-```
-<!-- 
-Then install the primesense image pipeline:
-
-```bash
-sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
-``` -->
-
-Source the ros setup so you get access to the launch commands:
-```
-source ~/ros_catkin_ws/install_isolated/setup.zsh
-```
-
-Running ROS with depth image processing:
-
-```bash
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
-```
-
-We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
-
-In a separate tab run our small test script:
-
-```bash
-python test_ros_images.py
-```
-
-Running RVIZ to look at the images:
-
-```
-rosrun rviz rviz
-```
-
-The correct images, as done in the [JHU costar dataset](https://sites.google.com/site/costardataset) class [collector](https://github.com/jhu-lcsr/costar_plan/blob/d469d62d72cd405ed07b10c62eb24391c0af1975/ctp_integration/python/ctp_integration/collector.py), are from the following ROS topics:
-
-```
-
-        self.rgb_topic = "/camera/rgb/image_rect_color"
-        # raw means it is in the format provided by the openi drivers, 16 bit int
-        self.depth_topic = "/camera/depth_registered/hw_registered/image_rect"
-```
-
-Calibration:
-
-```
-roslaunch aruco_detect aruco_detect.launch
-```
-
-```
-python3 calibrate_ros.py
-```
-
-### Collecting the Background heightmap
-
-The real robot also uses a background heightmap of the scene with no objects present. 
-
-1. Completely clear the table or working surface.
-2. Back up and remove the current `real/background_heightmap.depth.png`.
-3. Run pushing and grasping data collection with the `--show_heightmap` flag.
-4. View the heightmap images until you see one with no holes (black spots), and save the iteration number at the top.
-5. Copy the good heightmap from `logs/<run_folder>/data/depth_heightmaps/<iteration>.0.depth.png` and rename it to `real/background_heightmap.depth.png`.
-6. Stop and re-run pushing and grasping with the `--show_heightmap` flag.
-
-Here is an example of the matplotlib visualization of a good depth heightmap, there are no black specks aside from one corner which is out of the camera's field of view:
-
-![example_background_depth_map](images/example_background_depth_map.png)
-
-Your updated depth heightmaps should be good to go!
