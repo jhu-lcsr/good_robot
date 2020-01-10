@@ -274,6 +274,11 @@ def main(args):
     else:
         nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
 
+    num_trials = 0
+    if continue_logging:
+        num_trials = int(max(trainer.trial_log)[0])
+        nonlocal_variables['stack'].trial = num_trials + 1
+
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
@@ -939,7 +944,11 @@ def main(args):
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 if is_sim:
                     robot.check_sim()
-                    robot.reposition_objects()
+                    if not robot.reposition_objects():
+                        # This can happen if objects are in impossible positions (NaN),
+                        # so set the variable to immediately and completely restart
+                        # the simulation below.
+                        num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()

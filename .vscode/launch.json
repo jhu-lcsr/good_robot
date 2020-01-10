@@ -7,6 +7,7 @@
 
 
 
+
         {
             "name": "Python: Current File (Integrated Terminal)",
             "type": "python",
@@ -103,7 +104,25 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--trial_reward", "--tcp_port", "19997"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--tcp_port", "19997"]
+        },
+        {
+            "name": "main.py: Sim Stack check_z_height (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place"]
+        },
+        {
+            "name": "main.py: RESUME Sim Stack check_z_height (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--continue_logging", "--logging_directory", "./logs/2020-01-08-13-58-27", "--load_snapshot", "--snapshot_file", "./logs/2020-01-08-13-58-27/models/snapshot.reinforcement.pth"]
         }
     ]
 }

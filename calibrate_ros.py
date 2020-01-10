@@ -57,11 +57,11 @@ class Calibrate:
         self.rtc_port = rtc_port
 
         if save_dir is None:
-            self.save_dir = '/home/costar/src/real_good_robot/calibration_1206'
+            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration_2019_01_08')
             # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
-            self.save_dir = '/home/costar/src/real_good_robot/calibration'
+            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration')
         else:
-            self.save_dir = save_dir
+            self.save_dir = os.path.expanduser(save_dir)
 
         self.robot_poses = []
         self.marker_poses = []
@@ -81,10 +81,15 @@ class Calibrate:
         self.robot.move_to(tool_position, tool_orientation)
 
         while True:
-            color_img, depth_img, aruco_tf = self.get_rgb_depth_image_and_transform()
+            color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
             cv2.imshow("color.png", color_img)
+            if aruco_img is not None:
+                cv2.imshow("aruco.png", aruco_img)
             cv2.waitKey(1)
-            print(aruco_tf.transforms)
+            if aruco_tf is not None:
+                print(aruco_tf.transforms)
+            else:
+                print('no aruco transforms available, ensure you have run the tag program: taskset 0x000000FF roslaunch aruco_detect aruco_detect.launch')
     
 
     def activate_robot(self):
@@ -99,8 +104,10 @@ class Calibrate:
             self.robot.open_gripper()
             print('Gripper opened!')
 
-            self.robot.joint_acc = 1.7
-            self.robot.joint_vel = 1.2
+            self.robot.joint_acc = 0.4
+            self.robot.joint_vel = 0.4
+            self.robot.tool_acc = 0.4
+            self.robot.tool_vel = 0.4
 
             print('MOVING THE ROBOT to home position...')
             self.robot.go_home()
@@ -131,8 +138,12 @@ class Calibrate:
         tool_orientations = [[0, np.pi/2, 0.0], [0, 3.0*np.pi/4.0, 0.0], [0, 5.0*np.pi/8.0, 0.0], [0, 5.0*np.pi/8.0, np.pi/8], [np.pi/8.0, 5.0*np.pi/8.0, 0.0]] # Real Good Robot
 
         # Slow down robot
-        self.robot.joint_acc = 1.7
-        self.robot.joint_vel = 1.2
+        # self.robot.joint_acc = 1.7
+        # self.robot.joint_vel = 1.2
+        self.robot.joint_acc = 0.4
+        self.robot.joint_vel = 0.4
+        self.robot.tool_acc = 0.4
+        self.robot.tool_vel = 0.4
 
         robot_poses = []
         marker_poses = []
