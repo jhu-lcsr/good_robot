@@ -21,9 +21,10 @@ import utils
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
+
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True):
+    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -38,9 +39,9 @@ class StackSequence(object):
         """
         self.num_obj = num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
-        self.trial = 0
+        self.trial = trial
         self.reset_sequence()
-        self.total_steps = 1
+        self.total_steps = total_steps
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -177,8 +178,15 @@ def main(args):
 
     # ------ Pre-loading and logging options ------
     if args.resume == 'last':
-        continue_logging = True
-        logging_directory = sorted([p for p in os.path.listdir(os.path.abspath('logs')) if os.path.isdir(p)])[-1]
+        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
+        dirs = list(filter(os.path.isdir, dirs))
+        if dirs:
+            continue_logging = True
+            logging_directory = sorted(dirs)[-1]
+        else:
+            print('no logging dirs to resume, starting new run')
+            continue_logging = False
+            logging_directory = os.path.abspath('logs')
     elif args.resume:
         continue_logging = True
         logging_directory = os.path.abspath(args.resume)
@@ -226,6 +234,9 @@ def main(args):
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
         trainer.preload(logger.transitions_directory)
+        num_trials = trainer.end_trial()
+    else:
+        num_trials = 0
 
     # Initialize variables for heuristic bootstrapping and exploration probability
     no_change_count = [2, 2] if not is_testing else [0, 0]
@@ -259,9 +270,9 @@ def main(args):
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     if num_obj is not None:
-        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned)
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
     else:
-        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned)
+        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
 
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
@@ -698,7 +709,7 @@ def main(args):
         robot.shutdown()
         return
 
-    num_trials = 0
+    num_trials = trainer.num_trials()
     do_continue = False
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -776,7 +787,7 @@ def main(args):
             if is_testing and test_preset_cases:
                 # min(num_preset_files-1, int(float(trial_idx-1)/float(preset_trials_per_case)))
                 # TODO(ahundt) we shouldn't really be setting nonlocal_variables['trial'] here, but it is a workaround so the trials log file lines up
-                nonlocal_variables['trial'] = num_trials
+                nonlocal_variables['trial'] = num_trials  # TODO(killeen) is this even used? Should we be setting stack.trial?
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                 # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
                 # load the current preset case, incrementing as trials are cleared
