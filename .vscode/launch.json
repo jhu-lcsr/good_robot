@@ -113,7 +113,7 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--future_reward_discount", "0.65"]
         },
         {
             "name": "main.py: RESUME Sim Stack check_z_height (External Terminal)",
@@ -122,7 +122,7 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--continue_logging", "--logging_directory", "./logs/2020-01-08-13-58-27", "--load_snapshot", "--snapshot_file", "./logs/2020-01-08-13-58-27/models/snapshot.reinforcement.pth"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--resume", "./logs/2020-01-08-17-03-58-test-resume", "--future_reward_discount", "0.65"]
         }
     ]
 }
