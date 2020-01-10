@@ -99,7 +99,7 @@ class Trainer(object):
                 self.criterion = self.criterion.cuda()
 
         # Load pre-trained model
-        if snapshot_file is not None:
+        if snapshot_file:
 
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
             loaded_snapshot_state_dict = torch.load(snapshot_file)

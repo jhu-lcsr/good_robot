@@ -176,9 +176,17 @@ def main(args):
         test_preset_file = None
 
     # ------ Pre-loading and logging options ------
-    snapshot_file = None is args.snapshot_file is None else os.path.abspath(args.snapshot_file)
-    continue_logging = args.continue_logging # Continue logging from previous session
-    logging_directory = os.path.abspath(args.logging_directory) if continue_logging else os.path.abspath('logs')
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    if args.resume == 'last':
+        continue_logging = True
+        logging_directory = sorted([p for p in os.path.listdir(os.path.abspath('logs')) if os.path.isdir(p)])[-1]
+    elif args.resume:
+        continue_logging = True
+        logging_directory = os.path.abspath(args.resume)
+    else:
+        continue_logging = False
+        logging_directory = os.path.abspath('logs')
+
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
@@ -1168,11 +1176,9 @@ if __name__ == '__main__':
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
 
     # ------ Pre-loading and logging options ------
-    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default=None,                            help='snapshot file to load for the model')
+    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='efficientnet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
-    parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last', help='resume a previous run. If no run specified, resumes the most recent')
-    parser.add_argument('--continue_logging', dest='continue_logging', action='store_true', default=False,                help='continue logging from previous session?')
-    parser.add_argument('--logging_directory', dest='logging_directory', action='store')
+    parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
 
     # Run main program with specified arguments
