@@ -42,7 +42,7 @@ def ros_transform_to_numpy_transform(transform):
 class Calibrate:
 
     def __init__(
-            self, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003, 
+            self, robot=None, tcp_host_ip='192.168.1.155', tcp_port=30002, rtc_host_ip='192.168.1.155', rtc_port = 30003, 
             save_dir=None, workspace_limits=None, calib_point_num=30):
         
         if workspace_limits is None:
@@ -50,16 +50,18 @@ class Calibrate:
 
         self.calib_point_num = calib_point_num
 
-        self.robot = None
-        self.tcp_host_ip = tcp_host_ip
-        self.tcp_port = tcp_port
-        self.rtc_host_ip = rtc_host_ip
-        self.rtc_port = rtc_port
+        self.robot = robot
+        if self.robot is None:
+            self.tcp_host_ip = tcp_host_ip
+            self.tcp_port = tcp_port
+            self.rtc_host_ip = rtc_host_ip
+            self.rtc_port = rtc_port
 
         if save_dir is None:
-            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration_2019_01_08')
-            # TODO(ahundt) make this path something reasonable, and create the directory if it doesn't exist
-            self.save_dir = os.path.expanduser('~/src/real_good_robot/calibration')
+            folder = utils.timeStamped('calibration')
+            self.save_dir = os.path.join(os.path.expanduser('~/src/real_good_robot/'), folder)
+            print('Saving calibration to : ' + self.save_dir)
+            utils.mkdir_p(folder)
         else:
             self.save_dir = os.path.expanduser(save_dir)
 
@@ -104,13 +106,13 @@ class Calibrate:
             self.robot.open_gripper()
             print('Gripper opened!')
 
-            self.robot.joint_acc = 0.4
-            self.robot.joint_vel = 0.4
-            self.robot.tool_acc = 0.4
-            self.robot.tool_vel = 0.4
+        self.robot.joint_acc = 0.4
+        self.robot.joint_vel = 0.4
+        self.robot.tool_acc = 0.4
+        self.robot.tool_vel = 0.4
 
-            print('MOVING THE ROBOT to home position...')
-            self.robot.go_home()
+        print('MOVING THE ROBOT to home position...')
+        self.robot.go_home()
 
     
     def collect_data(self, workspace_limits=None, rate_hz=0.5):
@@ -164,7 +166,7 @@ class Calibrate:
                 
                 self.robot.move_to(tool_position, tool_orientation)
                 rate.sleep()
-                time.sleep(1)
+                # time.sleep(1)
 
                 color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
@@ -197,8 +199,8 @@ class Calibrate:
 
     def save_transforms_to_file(self, calib_pt_idx, tool_orientation_idx, aruco_tf, tool_transformation, marker_transformation):
         
-        robot_pose_file = os.path.join(self.save_dir, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_robotpose.txt')
-        marker_pose_file = os.path.join(self.save_dir, str(calib_pt_idx) + '_' + str(tool_orientation_idx) + '_markerpose.txt')
+        robot_pose_file = os.path.join(self.save_dir, "{:04d}_{:04d}_robotpose.txt".format(calib_pt_idx, tool_orientation_idx))
+        marker_pose_file = os.path.join(self.save_dir, "{:04d}_{:04d}_markerpose.txt".format(calib_pt_idx, tool_orientation_idx))
         if len(aruco_tf.transforms) > 0:
             # Tool pose in robot base frame
             with open(robot_pose_file, 'w') as file1:
@@ -222,16 +224,18 @@ class Calibrate:
             robot_poses, marker_poses = self.load_transforms(load_dir)
         elif robot_poses is None and marker_poses is None:
             # collect the pose data
-            robot_poses, marker_poses = calib.collect_data()
+            robot_poses, marker_poses = self.collect_data()
 
         # AX=XB calibration: camera pose in robot base frame
         cam2base = utils.axxb(robot_poses, marker_poses)
-        print("Camera to base: ", cam2base)
-        np.savetxt('real/camera_pose.txt', cam2base, delimiter=' ')
+        print("Camera to base: \n", cam2base)
+        print('Saving results to: real/robot_base_to_camera_pose.txt')
+        np.savetxt('real/robot_base_to_camera_pose.txt', cam2base, delimiter=' ')
 
         # AX=XB calibration: marker pose in tool frame
         tool2AR = utils.axxb(robot_poses, marker_poses, baseToCamera=False)
-        print("Tool Tip to AR Tag: ", tool2AR)
+        print("Tool Tip to AR Tag: \n", tool2AR)
+        print('Saving results to: real/tool_tip_to_ar_tag_transform.txt')
         np.savetxt('real/tool_tip_to_ar_tag_transform.txt', tool2AR, delimiter=' ')
 
         return cam2base
@@ -277,6 +281,7 @@ class Calibrate:
 
     
 if __name__ == "__main__":
-    calib = Calibrate()
+    calib = Calibrate(save_dir='/home/costar/src/real_good_robot/calibration_2019_01_09')
+    calib.test()
     # calib.collect_data()
-    calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_1206')
+    # calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_1206')

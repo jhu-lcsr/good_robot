@@ -53,17 +53,9 @@ class ROSCamera:
         # self.image_pub = rospy.Publisher("/output/image_raw/compressed",
         #     CompressedImage)
         # # self.bridge = CvBridge()
-
+        self._aruco_tf_sub = None
         if calibrate:
-            print("Please install https://github.com/UbiquityRobotics/fiducials to calibrate and run:\n"
-                  "     roslaunch roslaunch aruco_detect aruco_detect.launch")
-            self.aruco_tf_topic = "/fiducial_transforms"
-            self.aruco_img_topic = "/fiducial_images"
-            self._aruco_tf_sub = rospy.Subscriber(self.aruco_tf_topic, FiducialTransformArray, self._tfCb)
-            self._aruco_img_sub = rospy.Subscriber(self.aruco_img_topic, Image, self._arucoimgCb)
-            self.aruco_img = None
-            self.aruco_tf = None
-
+            self.subscribe_aruco_tf()
 
         # # subscribed Topic
         # self.subscriber = rospy.Subscriber("/camera/image/compressed",
@@ -99,6 +91,17 @@ class ROSCamera:
             self._camera_rgb_info_sub = rospy.Subscriber(self.camera_rgb_info_topic, CameraInfo, self._rgbInfoCb)
             self._rgb_sub = rospy.Subscriber(self.rgb_topic, Image, self._rgbCb)
             self._depth_sub = rospy.Subscriber(self.depth_topic, Image, self._depthCb)
+
+    def subscribe_aruco_tf(self):
+        print("Please install https://github.com/UbiquityRobotics/fiducials to calibrate and run:\n"
+              "     roslaunch roslaunch aruco_detect aruco_detect.launch")
+        if self._aruco_tf_sub is None:
+            self.aruco_tf_topic = "/fiducial_transforms"
+            self.aruco_img_topic = "/fiducial_images"
+            self._aruco_tf_sub = rospy.Subscriber(self.aruco_tf_topic, FiducialTransformArray, self._tfCb)
+            self._aruco_img_sub = rospy.Subscriber(self.aruco_img_topic, Image, self._arucoimgCb)
+            self.aruco_img = None
+            self.aruco_tf = None
 
     def _rgbdCb(self, rgb_msg, depth_msg):
         if rgb_msg is None:

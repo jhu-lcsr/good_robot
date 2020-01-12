@@ -3,11 +3,31 @@ import math
 import numpy as np
 import warnings
 import cv2
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 from scipy import ndimage
+import datetime
+import os
+
+
+def mkdir_p(path):
+    """Create the specified path on the filesystem like the `mkdir -p` command
+    Creates one or more filesystem directory levels as needed,
+    and does not return an error if the directory already exists.
+    """
+    # http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
+def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
+    """ Apply a timestamp to the front of a filename description.
+    see: http://stackoverflow.com/a/5215012/99379
+    """
+    return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
 def get_pointcloud(color_img, depth_img, camera_intrinsics):
@@ -534,29 +554,3 @@ def polyfit(*args, **kwargs):
         warnings.simplefilter('ignore', np.RankWarning)
         out = np.polyfit(*args, **kwargs)
     return out
-
-
-# Cross entropy loss for 2D outputs
-class CrossEntropyLoss2d(nn.Module):
-
-    def __init__(self, weight=None, size_average=True):
-        super(CrossEntropyLoss2d, self).__init__()
-        self.nll_loss = nn.NLLLoss2d(weight, size_average)
-
-    def forward(self, inputs, targets):
-        return self.nll_loss(F.log_softmax(inputs, dim=1), targets)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
