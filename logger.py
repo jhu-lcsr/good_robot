@@ -95,7 +95,9 @@ class Logger():
 
     def write_to_log(self, log_name, log):
         np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
-        np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), np.squeeze(log), delimiter=', ')
+        shortlog = np.squeeze(log)
+        if len(shortlog.shape) > 0:
+            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ')
 
     def save_model(self, model, name):
         torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
