@@ -275,11 +275,12 @@ class Robot(object):
 
 
     def reposition_object_randomly(self, object_handle):
+        """ randomly set a specific object's position and orientation on
+        """
         drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
         # Drop object at random x,y location and random orientation in robot workspace
         vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
-        # TODO(HK) finish this function to reset a specific object, see reposition_objects, and only do it for one index instead of looping over all of them as done in reposition_objects.
 
 
     def reposition_object_at_list_index_randomly(self, list_index):
