@@ -298,7 +298,7 @@ class Robot(object):
         add_success = False
         failure_count = 0
         while not add_success:
-            if failure_count > 10:
+            if failure_count > 10 or len(self.object_handles) > len(self.obj_mesh_ind):
                 self.restart_sim()
             for object_idx in range(len(self.obj_mesh_ind)):
                 curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
@@ -323,7 +323,7 @@ class Robot(object):
                 ret_ints = []
                 while len(ret_ints) == 0:
                     do_break = False
-                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_customizationscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
                     if ret_resp == 8:
                         print('Failed to add new objects to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
@@ -341,7 +341,7 @@ class Robot(object):
                 if not (self.is_testing and self.test_preset_cases):
                     time.sleep(0.5)
             # we have completed the loop adding all objects!
-            add_success = True
+            add_success = len(self.object_handles) == len(self.obj_mesh_ind)
         self.prev_obj_positions = []
         self.obj_positions = []
 
