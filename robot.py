@@ -361,10 +361,11 @@ class Robot(object):
             time.sleep(0.5)
             vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
             time.sleep(0.5)
-            sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
+            sim_started = vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking) > 0
             time.sleep(0.5)
+            sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
             # check sim, but we are already in the restart loop so don't recurse
-            sim_ok = self.check_sim(restart_if_not_ok=False)
+            sim_ok = sim_started and self.check_sim(restart_if_not_ok=False)
 
 
     def check_sim(self, restart_if_not_ok=True):
