@@ -313,7 +313,7 @@ The robot will move suddenly and rapidly. Users **must** be ready to push the **
 ```
 Total number of poses: 26
 Invalid poses number: 0
-Camera to base:  
+Robot Base to Camera:  
 [[ 0.1506513   0.87990966 -0.45062533  0.79319678]
  [ 0.98857761 -0.13210593  0.07254191 -0.14601768]
  [ 0.00430005 -0.45640664 -0.88976092  0.55173518]
@@ -325,11 +325,9 @@ Tool Tip to AR Tag:
  [ 0.03295954  0.99940367 -0.01029385  0.01899328]
  [ 0.98248344 -0.03050802  0.18383565  0.10822485]
  [ 0.          0.          0.          1.        ]]
-
-
 ```
 
-Backup procedure (starting from step 6 above): 
+Backup procedure (in place of the steps 6 and later from above): 
 with caution, run the following to move the robot and calibrate:
 
 The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
@@ -338,7 +336,7 @@ The robot will move suddenly and rapidly. Users **must** be ready to push the **
 python calibrate_ros.py
 ```
 
-The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
+The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to solve the AX=XB problem for the hand-eye calibration. And the method is implemented in the `utils.py`. The script will generate a `robot_base_to_camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
 If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
 

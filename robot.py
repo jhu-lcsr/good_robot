@@ -209,12 +209,12 @@ class Robot(object):
             self.cam_intrinsics = self.camera.intrinsics
 
             # Load camera pose (from running calibrate.py), intrinsics and depth scale
-            if os.path.isfile('real/camera_pose.txt') and os.path.isfile('real/camera_depth_scale.txt'):
-                self.cam_pose = np.loadtxt('real/camera_pose.txt', delimiter=' ')
+            if os.path.isfile('real/robot_base_to_camera_pose.txt') and os.path.isfile('real/camera_depth_scale.txt'):
+                self.cam_pose = np.loadtxt('real/robot_base_to_camera_pose.txt', delimiter=' ')
                 self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
             else:
                 print('WARNING: Camera Calibration is not yet available, running calibrate.py '
-                      'will create the required files: real/camera_pose.txt and real/camera_depth_scale.txt')
+                      'will create the required files: real/robot_base_to_camera_pose.txt and real/camera_depth_scale.txt')
                 # Camera calibration
                 self.cam_pose = None
                 self.cam_depth_scale = None

@@ -174,7 +174,7 @@ print('Saving...')
 np.savetxt('real/camera_depth_scale.txt', camera_depth_offset, delimiter=' ')
 get_rigid_transform_error(camera_depth_offset)
 camera_pose = np.linalg.inv(world2camera)
-np.savetxt('real/camera_pose.txt', camera_pose, delimiter=' ')
+np.savetxt('real/robot_base_to_camera_pose.txt', camera_pose, delimiter=' ')
 print('Done.')
 
 # DEBUG CODE -----------------------------------------------------------------------------------
