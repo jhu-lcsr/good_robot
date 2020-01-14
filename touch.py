@@ -128,9 +128,11 @@ class HumanControlOfRobot(object):
                 self.grasp_success = False
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
-            target_position[-1] += 0.17
             def move_to(tp, ra):
                 # global self.mutex
+                tp = tp.copy()
+                # move to a spot just above the clicked spot to avoid collision
+                tp[-1] += 0.04
                 with self.mutex:
                     # self.robot.move_to(target_position, self.tool_orientation)
                     self.robot.move_to(tp, heightmap_rotation_angle=ra)
