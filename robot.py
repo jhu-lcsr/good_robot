@@ -1729,7 +1729,7 @@ class Robot(object):
         drag_goal = [0.67, -0.16, 0.20]
         self.move_to(drag_goal, tool_orientation)
         time.sleep(.1)
-        move_up_goal = [0.67, -0.16, 0.36]
+        move_up_goal = [0.67, -0.16, 0.33]
         self.move_to(move_up_goal, tool_orientation)
         time.sleep(.1)
         self.move_to(above_box_waypoint, tool_orientation)
