@@ -172,7 +172,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.title(title)
     plt.legend()
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir).replace(':', '-').replace('.', '-') + '_success_plot.png'
+    save_file = os.path.basename(log_dir + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
     print('saving plot: ' + save_file)
     plt.savefig(save_file)
 
