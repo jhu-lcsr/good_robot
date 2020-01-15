@@ -629,6 +629,7 @@ def main(args):
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
+                    trainer.trial_success_log.append([int(successful_trial_count)])
 
                     if partial_stack_count > 0 and place_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
@@ -902,10 +903,10 @@ def main(args):
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
+                logger.write_to_log('trial-success', trainer.trial_success_log)
                 if trainer.iteration > 1000:
                     plot.plot_it(logger.base_directory, plot.plot_title(args), place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
-
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
