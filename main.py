@@ -710,7 +710,7 @@ def main(args):
             push_width = 0.2
             local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
             # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0]
             push_may_contact_something = safe_z_position < max_local_push_region
             push_str = ''
             if not push_may_contact_something:
