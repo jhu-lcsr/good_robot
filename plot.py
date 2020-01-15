@@ -24,7 +24,7 @@ def get_trial_success_rate(trials, trial_successes, window=200):
         # the beginning of the trial window, by subtracting the 
         # min successful trial count in the window from the current
         success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
-        success_rate[i] = np.max(trial_window) / np.max(success_window)
+        success_rate[i] = np.max(success_window) / np.max(trial_window)
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
@@ -208,11 +208,11 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
-    plt.ylabel('Mean Percentage During ' + str(window) + 'Action Window, Higher is Better')
+    plt.ylabel('Mean % Over ' + str(window) + ' Action Window\nHigher is Better')
     plt.title(title)
-    plt.legend()
+    plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
     print('saving plot: ' + save_file)
     plt.savefig(save_file)
 
