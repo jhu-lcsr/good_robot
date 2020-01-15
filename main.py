@@ -417,6 +417,8 @@ def main(args):
         needed_to_reset = False
         grasp_str = ''
         successful_trial_count = 0
+        if continue_logging:
+            successful_trial_count = int(np.max(trainer.trial_success_log))
         trial_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
