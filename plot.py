@@ -208,7 +208,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
-    plt.ylabel('Mean % Over ' + str(window) + ' Action Window\nHigher is Better')
+    plt.ylabel('Mean % Over ' + str(window) + ' Actions, Higher is Better')
     plt.title(title)
     plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
