@@ -23,6 +23,30 @@ ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
 
+def run_title(args):
+    """
+    # Returns
+
+    title, dirname
+    """
+    title = ''
+    title += 'Sim ' if args.is_sim else 'Real '
+    if args.place:
+        title += 'Stack, '
+    if args.check_rows:
+        title += 'Rows, '
+    if not args.place and not args.check_rows:
+        title += 'Push and Grasp, '
+    if args.trial_reward:
+        title += 'Trial Reward, '
+    else:
+        title += 'Two Step Reward, '
+    title += 'Testing' if args.is_testing else 'Training'
+
+    save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
+    dirname = utils.timeStamped(save_file)
+    return title, dirname
+
 # killeen: this is defining the goal
 class StackSequence(object):
     def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
@@ -234,8 +258,10 @@ def main(args):
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
         trainer.model.transfer_grasp_to_place()
+    
     # Initialize data logger
-    logger = Logger(continue_logging, logging_directory, args=args)
+    title, dir_name = run_title(args)
+    logger = Logger(continue_logging, logging_directory, args=args, dir_name=dir_name)
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
@@ -905,7 +931,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 if trainer.iteration > 1000:
-                    plot.plot_it(logger.base_directory, plot.plot_title(args), place=place)
+                    plot.plot_it(logger.base_directory, title, place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
             # Backpropagate

@@ -215,21 +215,6 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
     print('saving plot: ' + save_file)
     plt.savefig(save_file)
-
-def plot_title(args):
-    title = ''
-    if args.place:
-        title += 'Stack, '
-    if args.check_rows:
-        title += 'Rows, '
-    if not args.place and not args.check_rows:
-        title += 'Push and Grasp, '
-    if args.trial_reward:
-        title += 'Trial Reward, '
-    else:
-        title += 'Two Step Reward, '
-    title += 'Testing' if args.is_testing else 'Training'
-    return title
     
 
 
@@ -250,7 +235,7 @@ if __name__ == '__main__':
     # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-13-10-15-49 # stopped after 1750 actions
     log_dir = './logs/2020-01-14-18-36-16'
     # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-14-18-36-16
-
+    log_dir = './logs/2020-01-15-15-44-39'
 
     title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)

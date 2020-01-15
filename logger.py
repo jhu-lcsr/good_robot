@@ -6,21 +6,22 @@ import cv2
 import torch
 import glob
 import json
+import utils
 # import h5py
 
 class Logger():
 
-    def __init__(self, continue_logging, logging_directory, args=None):
+    def __init__(self, continue_logging, logging_directory, args=None, dir_name=''):
 
         # Create directory to save data
-        timestamp = time.time()
-        timestamp_value = datetime.datetime.fromtimestamp(timestamp)
         self.continue_logging = continue_logging
         if self.continue_logging:
             self.base_directory = logging_directory
             print('Pre-loading data logging session: %s' % (self.base_directory))
         else:
-            self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d-%H-%M-%S'))
+            if not dir_name:
+                dir_name = utils.timeStamped('')
+            self.base_directory = os.path.join(logging_directory, dir_name)
             print('Creating data logging session: %s' % (self.base_directory))
         self.info_directory = os.path.join(self.base_directory, 'info')
         self.color_images_directory = os.path.join(self.base_directory, 'data', 'color-images')

@@ -145,6 +145,7 @@ class Trainer(object):
         self.clearance_log = []
         self.goal_condition_log = []
         self.trial_log = []
+        self.trial_success_log = []
         self.grasp_success_log = []
         self.color_success_log = []
         self.change_detected_log = []
@@ -197,6 +198,9 @@ class Trainer(object):
         self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), **kwargs)
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log = self.trial_log.tolist()
+        self.trial_success_log = np.loadtxt(os.path.join(transitions_directory, 'trial-success.log.txt'), **kwargs)
+        self.trial_success_log = self.trial_success_log[0:self.iteration]
+        self.trial_success_log = self.trial_success_log.tolist()
         self.grasp_success_log = np.loadtxt(os.path.join(transitions_directory, 'grasp-success.log.txt'), **kwargs)
         self.grasp_success_log = self.grasp_success_log[0:self.iteration]
         self.grasp_success_log = self.grasp_success_log.tolist()
