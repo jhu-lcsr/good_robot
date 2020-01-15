@@ -4,6 +4,34 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
 
+def get_trial_success_rate(trials, trial_successes, window=200):
+    """Evaluate moving window of grasp success rate
+    trials: Nx1 array of the current total trial count at that action
+    trial_successes: Nx1 array of the current total successful trial count at the time of that action
+
+    """
+    length = np.min([trials.shape[0], trial_successes.shape[0]])
+    success_rate = np.zeros(length - 1)
+    lower = np.zeros_like(success_rate)
+    upper = np.zeros_like(success_rate)
+    for i in range(length - 1):
+        start = max(i - window, 0)
+        # get the number of trials that have passed starting with 0 at 
+        # the beginning of the trial window, by subtracting the 
+        # min trial count in the window from the current
+        trial_window = trials[start:i+1] - np.min(trials[start:i+1])
+        # get the number of successful trials that have passed starting with 0 at 
+        # the beginning of the trial window, by subtracting the 
+        # min successful trial count in the window from the current
+        success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
+        success_rate[i] = np.max(trial_window) / np.max(success_window)
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
+        lower[i] = success_rate[i] + 3*var
+        upper[i] = success_rate[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return success_rate, lower, upper
+
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
@@ -116,7 +144,7 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     upper = np.clip(upper, 0, 1)
     return efficiency, lower, upper
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
     if place:
         heights = np.loadtxt(os.path.join(log_dir, 'transitions', 'stack-height.log.txt'))
         rewards = None
@@ -165,10 +193,22 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
+    
+    # Plot the rate and variance of trial successes
+    trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
+    if os.path.isfile(trial_success_file):
+        trial_successes = np.loadtxt(trial_success_file)
+        if max_iter is not None:
+            trial_successes = trial_successes[:max_iter]
+        trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+        plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
+        plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+                        mult*trial_success_lower, mult*trial_success_upper,
+                        color=colors[0], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
-    plt.ylabel('Running Mean')
+    plt.ylabel('Mean Percentage During ' + str(window) + 'Action Window, Higher is Better')
     plt.title(title)
     plt.legend()
     ax.yaxis.set_major_formatter(PercentFormatter())
@@ -185,9 +225,10 @@ def plot_title(args):
     if not args.place and not args.check_rows:
         title += 'Push and Grasp, '
     if args.trial_reward:
-        title += 'Trial Reward'
+        title += 'Trial Reward, '
     else:
-        title += 'Two Step Reward'
+        title += 'Two Step Reward, '
+    title += 'Testing' if args.is_testing else 'Training'
     return title
     
 
