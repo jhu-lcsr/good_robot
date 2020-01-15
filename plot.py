@@ -4,6 +4,34 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
 
+def get_trial_success_rate(trials, trial_successes, window=200):
+    """Evaluate moving window of grasp success rate
+    trials: Nx1 array of the current total trial count at that action
+    trial_successes: Nx1 array of the current total successful trial count at the time of that action
+
+    """
+    length = np.min([trials.shape[0], trial_successes.shape[0]])
+    success_rate = np.zeros(length - 1)
+    lower = np.zeros_like(success_rate)
+    upper = np.zeros_like(success_rate)
+    for i in range(length - 1):
+        start = max(i - window, 0)
+        # get the number of trials that have passed starting with 0 at 
+        # the beginning of the trial window, by subtracting the 
+        # min trial count in the window from the current
+        trial_window = trials[start:i+1] - np.min(trials[start:i+1])
+        # get the number of successful trials that have passed starting with 0 at 
+        # the beginning of the trial window, by subtracting the 
+        # min successful trial count in the window from the current
+        success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
+        success_rate[i] = np.max(success_window) / np.max(trial_window)
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
+        lower[i] = success_rate[i] + 3*var
+        upper[i] = success_rate[i] - 3*var
+    lower = np.clip(lower, 0, 1)
+    upper = np.clip(upper, 0, 1)
+    return success_rate, lower, upper
+
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
@@ -116,7 +144,7 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     upper = np.clip(upper, 0, 1)
     return efficiency, lower, upper
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
     if place:
         heights = np.loadtxt(os.path.join(log_dir, 'transitions', 'stack-height.log.txt'))
         rewards = None
@@ -165,22 +193,49 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
+    
+    # Plot the rate and variance of trial successes
+    trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
+    if os.path.isfile(trial_success_file):
+        trial_successes = np.loadtxt(trial_success_file)
+        if max_iter is not None:
+            trial_successes = trial_successes[:max_iter]
+        trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+        plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
+        plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+                        mult*trial_success_lower, mult*trial_success_upper,
+                        color=colors[0], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
-    plt.ylabel('Running Mean')
+    plt.ylabel('Mean % Over ' + str(window) + ' Actions, Higher is Better')
     plt.title(title)
-    plt.legend()
+    plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir).replace(':', '-').replace('.', '-') + '_success_plot.png'
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
     print('saving plot: ' + save_file)
     plt.savefig(save_file)
+    
+
 
 if __name__ == '__main__':
-    window = 1000
+    window = 500
     max_iter = None
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
-    log_dir = './logs/2020-01-06-19-15-55'
-    title = 'Stack 4 Blocks, Training'
-    plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
+    log_dir = './logs/2020-01-08-17-03-58'
+    log_dir = './logs/2020-01-08-17-03-58-test-resume'
+    # Stacking 0.
+    log_dir = './logs/2020-01-12-12-33-41'
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-12-33-41 # this run had a problem
+
+    # ± /usr/bin/python3 /home/costar/src/real_good_robot/main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --skip_noncontact_actions --check_z_height --tcp_port 19997 --place --future_reward_discount 0.65
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-17-56-46
+    # log_dir = './logs/2020-01-13-10-15-49' # this run stopped after 1750 actions
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-13-10-15-49 # stopped after 1750 actions
+    log_dir = './logs/2020-01-14-18-36-16'
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-14-18-36-16
+    log_dir = './logs/2020-01-15-15-44-39'
+
+    title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
+    plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)

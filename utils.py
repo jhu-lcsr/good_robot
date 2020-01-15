@@ -3,11 +3,31 @@ import math
 import numpy as np
 import warnings
 import cv2
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 from scipy import ndimage
+import datetime
+import os
+
+
+def mkdir_p(path):
+    """Create the specified path on the filesystem like the `mkdir -p` command
+    Creates one or more filesystem directory levels as needed,
+    and does not return an error if the directory already exists.
+    """
+    # http://stackoverflow.com/questions/600268/mkdir-p-functionality-in-python
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
+def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
+    """ Apply a timestamp to the front of a filename description.
+    see: http://stackoverflow.com/a/5215012/99379
+    """
+    return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
 def get_pointcloud(color_img, depth_img, camera_intrinsics):
@@ -371,7 +391,7 @@ def axis_angle_and_translation_to_rigid_transformation(tool_position, tool_orien
     return tool_transformation
 
 
-def axxb(robotPose, markerPose):
+def axxb(robotPose, markerPose, baseToCamera=True):
     """
     Copyright (c) 2019, Hongtao Wu
     AX=XB solver for eye-on base
@@ -380,6 +400,7 @@ def axxb(robotPose, markerPose):
     Args:
     - robotPose (list of 4x4 numpy array): poses (homogenous transformation) of the robot end-effector in the robot base frame.
     - markerPose (list of 4x4 numpy array): poses (homogenous transformation) of the marker in the camera frame.
+    - baseToCamera (boolean): If true it will compute the base to camera transform, if false it will compute the robot tip to fiducial transform.
 
     Return:
     - cam2base (4x4 numpy array): poses of the camera in robot base frame.
@@ -402,8 +423,15 @@ def axxb(robotPose, markerPose):
     np.random.shuffle(sequence)
 
     for i in range(n-1):
-        A[:, :, i] = np.matmul(robotPose[sequence[i+1]], pose_inv(robotPose[sequence[i]]))
-        B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
+        if baseToCamera:
+            # compute the robot base to the robot camera
+            A[:, :, i] = np.matmul(robotPose[sequence[i+1]], pose_inv(robotPose[sequence[i]]))
+            B[:, :, i] = np.matmul(markerPose[sequence[i+1]], pose_inv(markerPose[sequence[i]]))
+        else:
+            # compute the robot tool tip to the robot fiducial marker seen by the camera
+            A[:, :, i] = np.matmul(pose_inv(robotPose[sequence[i+1]]), robotPose[sequence[i]])
+            B[:, :, i] = np.matmul(pose_inv(markerPose[sequence[i+1]]), markerPose[sequence[i]])
+
         alpha[:, i] = get_mat_log(A[:3, :3, i])
         beta[:, i] = get_mat_log(B[:3, :3, i])
 
@@ -526,29 +554,3 @@ def polyfit(*args, **kwargs):
         warnings.simplefilter('ignore', np.RankWarning)
         out = np.polyfit(*args, **kwargs)
     return out
-
-
-# Cross entropy loss for 2D outputs
-class CrossEntropyLoss2d(nn.Module):
-
-    def __init__(self, weight=None, size_average=True):
-        super(CrossEntropyLoss2d, self).__init__()
-        self.nll_loss = nn.NLLLoss2d(weight, size_average)
-
-    def forward(self, inputs, targets):
-        return self.nll_loss(F.log_softmax(inputs, dim=1), targets)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

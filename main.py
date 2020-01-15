@@ -16,11 +16,36 @@ from robot import Robot
 from trainer import Trainer
 from logger import Logger
 import utils
+import plot
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
 ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
+
+def run_title(args):
+    """
+    # Returns
+
+    title, dirname
+    """
+    title = ''
+    title += 'Sim ' if args.is_sim else 'Real '
+    if args.place:
+        title += 'Stack, '
+    if args.check_rows:
+        title += 'Rows, '
+    if not args.place and not args.check_rows:
+        title += 'Push and Grasp, '
+    if args.trial_reward:
+        title += 'Trial Reward, '
+    else:
+        title += 'Two Step Reward, '
+    title += 'Testing' if args.is_testing else 'Training'
+
+    save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
+    dirname = utils.timeStamped(save_file)
+    return title, dirname
 
 # killeen: this is defining the goal
 class StackSequence(object):
@@ -233,8 +258,10 @@ def main(args):
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
         trainer.model.transfer_grasp_to_place()
+    
     # Initialize data logger
-    logger = Logger(continue_logging, logging_directory, args=args)
+    title, dir_name = run_title(args)
+    logger = Logger(continue_logging, logging_directory, args=args, dir_name=dir_name)
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
@@ -351,7 +378,7 @@ def main(args):
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects:
             # we are two blocks off the goal, reset the scene.
-            mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
             if not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
             print(mismatch_str)
@@ -390,6 +417,8 @@ def main(args):
         needed_to_reset = False
         grasp_str = ''
         successful_trial_count = 0
+        if continue_logging:
+            successful_trial_count = int(np.max(trainer.trial_success_log))
         trial_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
@@ -628,6 +657,7 @@ def main(args):
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
+                    trainer.trial_success_log.append([int(successful_trial_count)])
 
                     if partial_stack_count > 0 and place_count > 0:
                         partial_stack_rate = float(action_count)/float(partial_stack_count)
@@ -682,7 +712,7 @@ def main(args):
             push_width = 0.2
             local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
             # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] + 0.01
+            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0]
             push_may_contact_something = safe_z_position < max_local_push_region
             push_str = ''
             if not push_may_contact_something:
@@ -900,8 +930,11 @@ def main(args):
                 nonlocal_variables['finalize_prev_trial_log'] = False
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
+                logger.write_to_log('iteration', np.array([trainer.iteration]))
+                logger.write_to_log('trial-success', trainer.trial_success_log)
+                if trainer.iteration > 1000:
+                    plot.plot_it(logger.base_directory, title, place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
-            logger.write_to_log('iteration', np.array([trainer.iteration]))
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -1033,7 +1066,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
-def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.2, trial_reward=False):
+def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.05, trial_reward=False):
     # Here we will try to sample a reward value from the same action as the current one
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.

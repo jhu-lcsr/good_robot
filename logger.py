@@ -6,21 +6,22 @@ import cv2
 import torch
 import glob
 import json
+import utils
 # import h5py
 
 class Logger():
 
-    def __init__(self, continue_logging, logging_directory, args=None):
+    def __init__(self, continue_logging, logging_directory, args=None, dir_name=''):
 
         # Create directory to save data
-        timestamp = time.time()
-        timestamp_value = datetime.datetime.fromtimestamp(timestamp)
         self.continue_logging = continue_logging
         if self.continue_logging:
             self.base_directory = logging_directory
             print('Pre-loading data logging session: %s' % (self.base_directory))
         else:
-            self.base_directory = os.path.join(logging_directory, timestamp_value.strftime('%Y-%m-%d-%H-%M-%S'))
+            if not dir_name:
+                dir_name = utils.timeStamped('')
+            self.base_directory = os.path.join(logging_directory, dir_name)
             print('Creating data logging session: %s' % (self.base_directory))
         self.info_directory = os.path.join(self.base_directory, 'info')
         self.color_images_directory = os.path.join(self.base_directory, 'data', 'color-images')
@@ -95,6 +96,9 @@ class Logger():
 
     def write_to_log(self, log_name, log):
         np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
+        shortlog = np.squeeze(log)
+        if len(shortlog.shape) > 0:
+            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ')
 
     def save_model(self, model, name):
         torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))

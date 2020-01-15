@@ -212,7 +212,7 @@ source ~/ros_catkin_ws/install_isolated/setup.zsh
 Running ROS with depth image processing:
 
 ```bash
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x00000FFF roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
 We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
@@ -246,7 +246,7 @@ You will need to generate and load a calibration yaml file which goes in a locat
 
 #### Calibrating Camera Extrinsics
 
-1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 100mm tags with the original design (dictionary 16). Make sure the ArUco dictionary id in the launch files is correct. Attach the ArUco Tag on the robot.
+1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 70mm tags with the original design (dictionary 16), so it can fit in the gripper. Make sure the ArUco dictionary id in the launch files is correct. Attach the ArUco Tag on the robot.
 
 2. Edit the fiducials ROS package [aruco_detect.launch](https://github.com/UbiquityRobotics/fiducials/blob/kinetic-devel/aruco_detect/launch/aruco_detect.launch) file in `~/ros_catkin_ws/src/fiducials/aruco_detect/launch/aruco_detect.launch` from the [fiducials github repository](https://github.com/UbiquityRobotics/fiducials) you cloned earlier, see [the fiducials wiki for reference](http://wiki.ros.org/fiducials). Modify the launch file in [fiducials/aruco to detect your markers and receive images from your sensor. Here is our configuration:
 
@@ -281,13 +281,13 @@ You will need to generate and load a calibration yaml file which goes in a locat
 </launch>
 ```
 
-5. You must predefine the workspace limits in the `calibration_ros.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
+5. You must predefine the `workspace_limits` python variables in the `calibration_ros.py`, `touch.py`, and `main.py`, and `robot.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
 3. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
 
 4. Roslaunch the camera with, for example:
 ```shell
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x00000FFF roslaunch openni2_launch openni2.launch depth_registration:=true
 
 We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
 
@@ -295,10 +295,40 @@ We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([exampl
 
 5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
 ```shell
-taskset 0x000000FF roslaunch aruco_detect aruco_detect.launch
+taskset 0x00000FFF roslaunch aruco_detect aruco_detect.launch
 ```
 
-6. With caution, run the following to move the robot and calibrate:
+The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
+
+6. CAREFULLY run `python touch.py` to start the arm, it will move suddenly!
+
+7. Center the AR tag on the gripper manually using the teach mode button on the robot.
+
+8. Click on the title bar of the `color` image window, do not click on the general color area the robot may move suddenly!
+
+8. Press `-` to close the gripper (`=` will open it), and check that the center of the AR tag is where you want your gripper center to be defined.
+
+9. Press `k` to calibrate, and after going to a number of positions you should see a calibration result like the following:
+
+```
+Total number of poses: 26
+Invalid poses number: 0
+Robot Base to Camera:  
+[[ 0.1506513   0.87990966 -0.45062533  0.79319678]
+ [ 0.98857761 -0.13210593  0.07254191 -0.14601768]
+ [ 0.00430005 -0.45640664 -0.88976092  0.55173518]
+ [ 0.          0.          0.          1.        ]]
+Total number of poses: 26
+Invalid poses number: 0
+Tool Tip to AR Tag:  
+[[ 0.18341198 -0.01617267 -0.98290309  0.0050482 ]
+ [ 0.03295954  0.99940367 -0.01029385  0.01899328]
+ [ 0.98248344 -0.03050802  0.18383565  0.10822485]
+ [ 0.          0.          0.          1.        ]]
+```
+
+Backup procedure (in place of the steps 6 and later from above): 
+with caution, run the following to move the robot and calibrate:
 
 The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
 
@@ -306,7 +336,7 @@ The robot will move suddenly and rapidly. Users **must** be ready to push the **
 python calibrate_ros.py
 ```
 
-The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to calculate the AX=XB problem. And the method is implemented in the `utils.py`. The script will generate a `camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
+The script will record the pose of the robot and the ArUco tag in the camera frame with correspondence. Then it uses the [Park and Martin Method](https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=326576) to solve the AX=XB problem for the hand-eye calibration. And the method is implemented in the `utils.py`. The script will generate a `robot_base_to_camera_pose.txt` in `real/`. This txt basically is the pose of the camera in the robot base frame.
 
 If you already have corresponded pose file of the robot and the ArUco tag, you can also use the `calibrate()` function in the `calibrate_ros.py` to directly calculate the pose of the camera without the data collection step.
 

@@ -2,7 +2,7 @@
 
 import time
 import matplotlib.pyplot as plt
-from camera import Camera
+from real.camera import Camera
 
 camera = Camera()
 time.sleep(1) # Give camera some time to load data
