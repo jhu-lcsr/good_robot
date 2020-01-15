@@ -16,6 +16,7 @@ from robot import Robot
 from trainer import Trainer
 from logger import Logger
 import utils
+import plot
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -351,7 +352,7 @@ def main(args):
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects:
             # we are two blocks off the goal, reset the scene.
-            mismatch_str = 'main.py check_stack() DETECTED A MISMATCH between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
             if not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
             print(mismatch_str)
@@ -900,8 +901,11 @@ def main(args):
                 nonlocal_variables['finalize_prev_trial_log'] = False
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
+                logger.write_to_log('iteration', np.array([trainer.iteration]))
+                if trainer.iteration > 1000:
+                    plot.plot_it(logger.base_directory, plot.plot_title(args), place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
-            logger.write_to_log('iteration', np.array([trainer.iteration]))
+
 
             # Backpropagate
             trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)

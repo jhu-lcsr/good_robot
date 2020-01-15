@@ -176,11 +176,40 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file)
     plt.savefig(save_file)
 
+def plot_title(args):
+    title = ''
+    if args.place:
+        title += 'Stack, '
+    if args.check_rows:
+        title += 'Rows, '
+    if not args.place and not args.check_rows:
+        title += 'Push and Grasp, '
+    if args.trial_reward:
+        title += 'Trial Reward'
+    else:
+        title += 'Two Step Reward'
+    return title
+    
+
+
 if __name__ == '__main__':
-    window = 1000
+    window = 500
     max_iter = None
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
-    log_dir = './logs/2020-01-06-19-15-55'
-    title = 'Stack 4 Blocks, Training'
-    plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
+    log_dir = './logs/2020-01-08-17-03-58'
+    log_dir = './logs/2020-01-08-17-03-58-test-resume'
+    # Stacking 0.
+    log_dir = './logs/2020-01-12-12-33-41'
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-12-33-41 # this run had a problem
+
+    # ± /usr/bin/python3 /home/costar/src/real_good_robot/main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --skip_noncontact_actions --check_z_height --tcp_port 19997 --place --future_reward_discount 0.65
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-17-56-46
+    # log_dir = './logs/2020-01-13-10-15-49' # this run stopped after 1750 actions
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-13-10-15-49 # stopped after 1750 actions
+    log_dir = './logs/2020-01-14-18-36-16'
+    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-14-18-36-16
+
+
+    title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
+    plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
