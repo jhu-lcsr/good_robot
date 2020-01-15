@@ -212,7 +212,7 @@ source ~/ros_catkin_ws/install_isolated/setup.zsh
 Running ROS with depth image processing:
 
 ```bash
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x00000FFF roslaunch openni2_launch openni2.launch depth_registration:=true
 ```
 
 We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
@@ -287,7 +287,7 @@ You will need to generate and load a calibration yaml file which goes in a locat
 
 4. Roslaunch the camera with, for example:
 ```shell
-taskset 0x000000FF roslaunch openni2_launch openni2.launch depth_registration:=true
+taskset 0x00000FFF roslaunch openni2_launch openni2.launch depth_registration:=true
 
 We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
 
@@ -295,7 +295,7 @@ We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([exampl
 
 5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
 ```shell
-taskset 0x000000FF roslaunch aruco_detect aruco_detect.launch
+taskset 0x00000FFF roslaunch aruco_detect aruco_detect.launch
 ```
 
 The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
