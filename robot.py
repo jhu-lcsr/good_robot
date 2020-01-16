@@ -195,6 +195,11 @@ class Robot(object):
                 tcp_port = 19997
             self.tcp_port = tcp_port
             self.restart_sim(connect=True)
+            # initialize some startup state values and handles for 
+            # the joint configurations and home position
+            # sim_joint_handles are unique identifying integers to control the robot joints in the simulator
+            self.sim_joint_handles = []
+            # home_joint_config will contain the floating point joint angles representing the home configuration.
             self.home_joint_config = []
             self.go_home()
             # set the home joint config based on the initialized simulation
@@ -437,6 +442,7 @@ class Robot(object):
         if connect:
             # Connect to simulator
             vrep.simxFinish(-1) # Just in case, close all opened connections
+            self.sim_joint_handles = []
             self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
             if self.sim_client == -1:
                 print('Failed to connect to simulation (V-REP remote API server). Exiting.')
@@ -890,11 +896,12 @@ class Robot(object):
 
     def move_joints(self, joint_configuration):
         if self.is_sim:
-            joint_handles = []
-            for i in range(1,6):
-                sim_ret, joint_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_joint' + str(i), vrep.simx_opmode_blocking)
-                joint_handles += [joint_handle]
-            for handle, position in zip(joint_handles, joint_configuration):
+            if not self.sim_joint_handles:
+                # set all of the joint handles
+                for i in range(1,6):
+                    sim_ret, joint_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_joint' + str(i), vrep.simx_opmode_blocking)
+                    self.sim_joint_handles += [joint_handle]
+            for handle, position in zip(self.sim_joint_handles, joint_configuration):
                 sim_ret= vrep.simxSetJointPosition(self.sim_client, handle, position, vrep.simx_opmode_blocking)
             return True
         else:
@@ -1326,8 +1333,8 @@ class Robot(object):
             sim_ret, joint_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_joint' + str(i), vrep.simx_opmode_blocking)
             joint_handles += [joint_handle]
         joint_positions = []
-        for joint in joint_handles:
-            sim_ret, position = vrep.simxGetJointPosition(self.sim_client, vrep.simx_opmode_blocking)
+        for joint_handle in joint_handles:
+            sim_ret, position = vrep.simxGetJointPosition(self.sim_client, joint_handle, vrep.simx_opmode_blocking)
             joint_positions += [position]
         return joint_positions
 
