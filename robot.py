@@ -127,7 +127,7 @@ class Robot(object):
         self.workspace_limits = workspace_limits
         self.place_task = place
         self.grasp_color_task = grasp_color_task
-        self.sim_home_position = [-0.3, 0.0, 0.45]
+        self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
         # self.gripper_ee_offset = 0.15
         self.background_heightmap = None
@@ -195,6 +195,10 @@ class Robot(object):
                 tcp_port = 19997
             self.tcp_port = tcp_port
             self.restart_sim(connect=True)
+            self.home_joint_config = []
+            self.go_home()
+            # set the home joint config based on the initialized simulation
+            self.home_joint_config = self.get_joint_position()
 
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
@@ -543,10 +547,10 @@ class Robot(object):
     def reposition_objects(self, workspace_limits=None):
 
         if self.is_sim:
-            # Move gripper out of the way
-            success = self.move_to([-0.3, 0, 0.3], None)
+            # Move gripper out of the way to the home position
+            success = self.go_home()
             if not success:
-                return False
+                return success
             # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
             # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
             # time.sleep(1)
@@ -886,29 +890,42 @@ class Robot(object):
 
     def move_joints(self, joint_configuration):
         if self.is_sim:
-            raise NotImplementedError
+            joint_handles = []
+            for i in range(1,6):
+                sim_ret, joint_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_joint' + str(i), vrep.simx_opmode_blocking)
+                joint_handles += [joint_handle]
+            for handle, position in zip(joint_handles, joint_configuration):
+                sim_ret= vrep.simxSetJointPosition(self.sim_client, handle, position, vrep.simx_opmode_blocking)
+            return True
+        else:
+            self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
+            tcp_command = "movej([%f" % joint_configuration[0]
+            for joint_idx in range(1,6):
+                tcp_command = tcp_command + (",%f" % joint_configuration[joint_idx])
+            tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
+            self.tcp_socket.send(str.encode(tcp_command))
+            self.tcp_socket.close()
 
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        tcp_command = "movej([%f" % joint_configuration[0]
-        for joint_idx in range(1,6):
-            tcp_command = tcp_command + (",%f" % joint_configuration[joint_idx])
-        tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
-        self.tcp_socket.send(str.encode(tcp_command))
-        self.tcp_socket.close()
-
-        # Block until robot reaches home state
-        state_data = self.get_state()
-        actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
-        while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
+            # Block until robot reaches home state
             state_data = self.get_state()
             actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
-            time.sleep(0.01)
+            while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
+                state_data = self.get_state()
+                actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
+                time.sleep(0.01)
+            return True
 
 
     def go_home(self, block_until_home=False):
         if self.is_sim:
-            return self.move_to(self.sim_home_position, None)
+            success = self.move_to(self.sim_home_position, None)
+            if not self.home_joint_config:
+                return success
+            else:
+                # hard set the joint position to the home position to work around IK choosing
+                # elbow down positions, which leads to physically impossible simulator states.
+                return self.move_joints(self.home_joint_config)
         else:
             self.move_joints(self.home_joint_config)
             if block_until_home:
@@ -1296,6 +1313,23 @@ class Robot(object):
         state_data = self.get_state()
         actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
         return actual_tool_pose
+    
+    def get_joint_position(self):
+        """ get the position of all the joints.
+
+        Also see the sister function move_joints()
+        """
+        if not self.is_sim:
+            raise NotImplementedError
+        joint_handles = []
+        for i in range(1,6):
+            sim_ret, joint_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_joint' + str(i), vrep.simx_opmode_blocking)
+            joint_handles += [joint_handle]
+        joint_positions = []
+        for joint in joint_handles:
+            sim_ret, position = vrep.simxGetJointPosition(self.sim_client, vrep.simx_opmode_blocking)
+            joint_positions += [position]
+        return joint_positions
 
     def block_until_home(self, timeout_seconds=10):
 
