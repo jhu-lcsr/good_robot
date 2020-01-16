@@ -193,16 +193,8 @@ class Robot(object):
             if tcp_port == 30002:
                 print("WARNING: default tcp port changed to 19997 for is_sim")
                 tcp_port = 19997
-
-            # Connect to simulator
-            vrep.simxFinish(-1) # Just in case, close all opened connections
-            self.sim_client = vrep.simxStart('127.0.0.1', tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
-            if self.sim_client == -1:
-                print('Failed to connect to simulation (V-REP remote API server). Exiting.')
-                exit()
-            else:
-                print('Connected to simulation.')
-                self.restart_sim()
+            self.tcp_port = tcp_port
+            self.restart_sim(connect=True)
 
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
@@ -381,9 +373,13 @@ class Robot(object):
         add_success = False
         failure_count = 0
         while not add_success:
-            if failure_count > 10 or len(self.object_handles) > len(self.obj_mesh_ind):
+            if (failure_count > 10 and failure_count %3 == 2) or len(self.object_handles) > len(self.obj_mesh_ind):
                 # If the simulation is not currently running, attempt to recover by restarting the simulation
-                self.restart_sim()
+                connect = False
+                if failure_count > 50:
+                    connect=True
+                # try restarting the simulation, and if that doesn't work disonnect entirely then reconnect
+                self.restart_sim(connect=connect)
                 self.object_handles = []
                 self.vrep_names = []
                 self.object_colors = []
@@ -414,11 +410,11 @@ class Robot(object):
                     if ret_resp == 8:
                         print('Failed to add ' + curr_mesh_file + ' to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
-                        if failure_count % 5 == 4:
+                        if failure_count % 3 == 2:
                             # If a few failures happen in a row, do a simulation reset and try again
                             do_break = True
                             break
-                        elif failure_count > 50:
+                        elif failure_count > 100:
                             print('Failed to add new objects to simulation. Quitting. Please restart manually.')
                             exit(1)
                 if do_break:
@@ -433,7 +429,17 @@ class Robot(object):
         self.obj_positions = []
 
 
-    def restart_sim(self):
+    def restart_sim(self, connect=False):
+        if connect:
+            # Connect to simulator
+            vrep.simxFinish(-1) # Just in case, close all opened connections
+            self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
+            if self.sim_client == -1:
+                print('Failed to connect to simulation (V-REP remote API server). Exiting.')
+                exit()
+            else:
+                print('Connected to simulation.')
+                # self.restart_sim()
 
         sim_ret, self.UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, self.UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
