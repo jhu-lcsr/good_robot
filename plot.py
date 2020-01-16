@@ -207,7 +207,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
         plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
                         mult*trial_success_lower, mult*trial_success_upper,
-                        color=colors[0], alpha=alpha)
+                        color=colors[3], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
