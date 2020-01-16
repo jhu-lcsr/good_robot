@@ -178,6 +178,9 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     else:
         eff, eff_lower, eff_upper = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
 
+    # create and clear the figure
+    fig = plt.figure()
+    fig.clf()
     plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
     if place:
         plt.plot(mult*place_rate, color=colors[1], label='Place Success Rate')
