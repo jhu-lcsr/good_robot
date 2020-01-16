@@ -98,7 +98,7 @@ class Logger():
         np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
         shortlog = np.squeeze(log)
         if len(shortlog.shape) > 0:
-            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ')
+            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
 
     def save_model(self, model, name):
         torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
