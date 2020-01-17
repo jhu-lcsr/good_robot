@@ -689,7 +689,7 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
-    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name):
+    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name, robot_push_vertical_offset=0.026):
         # Adjust start position of all actions, and make sure z value is safe and not too low
         def get_local_region(heightmap, region_width=0.03):
             safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
@@ -712,8 +712,12 @@ def main(args):
             push_width = 0.2
             local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
             # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] - 0.026 # see robot.push_vertical_offset
-            push_may_contact_something = safe_z_position < max_local_push_region
+            max_local_push_region = np.max(local_push_region)
+            if max_local_push_region < 0.01:
+                # if there is nothing more than 1cm tall, there is nothing to push
+                push_may_contact_something = False
+            else:
+                push_may_contact_something = safe_z_position - workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
             # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
             push_str = ''
             if not push_may_contact_something:
