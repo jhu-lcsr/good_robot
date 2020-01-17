@@ -739,7 +739,7 @@ class Robot(object):
         return gripper_fully_closed
 
 
-    def open_gripper(self, nonblocking=False):
+    def open_gripper(self, nonblocking=False, timeout_seconds=5):
         """
         # Returns
 
@@ -752,8 +752,12 @@ class Robot(object):
             sim_ret, gripper_joint_position = vrep.simxGetJointPosition(self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
             vrep.simxSetJointForce(self.sim_client, RG2_gripper_handle, gripper_motor_force, vrep.simx_opmode_blocking)
             vrep.simxSetJointTargetVelocity(self.sim_client, RG2_gripper_handle, gripper_motor_velocity, vrep.simx_opmode_blocking)
+            time_start = time.time()
             while gripper_joint_position < 0.03: # Block until gripper is fully open
                 sim_ret, gripper_joint_position = vrep.simxGetJointPosition(self.sim_client, RG2_gripper_handle, vrep.simx_opmode_blocking)
+                time_snapshot = time.time()
+                if time_snapshot - time_start > timeout_seconds:
+                    return False
             return True
 
         elif self.gripper is None:
