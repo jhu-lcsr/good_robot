@@ -141,6 +141,10 @@ class Robot(object):
 
         # If in simulation...
         if self.is_sim:
+            # Tool pose tolerance for blocking calls, [x, y, z, roll, pitch, yaw] 
+            # with units [m, m, m, rad, rad, rad] 
+            # TODO(ahundt) double check rad rad rad, it might be axis/angle where magnitude is rotation length.
+            self.tool_pose_tolerance = [0.001,0.001,0.001,0.01,0.01,0.01]
             if num_obj is None:
                 num_obj = 10
             if obj_mesh_dir is None:
@@ -222,6 +226,10 @@ class Robot(object):
 
         # If in real-settings...
         else:
+            # Tool pose tolerance for blocking calls, [x, y, z, roll, pitch, yaw] 
+            # with units [m, m, m, rad, rad, rad] 
+            # TODO(ahundt) double check rad rad rad, it might be axis/angle where magnitude is rotation length.
+            self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
 
             # Connect to robot client
             self.tcp_host_ip = tcp_host_ip
@@ -258,9 +266,6 @@ class Robot(object):
             self.tool_acc = 1.2 # Safe: 0.5 Fast: 1.2
             self.tool_vel = 0.5 # Safe: 0.2 Fast: 0.5
             self.move_sleep = 1.0 # Safe: 2.0 Fast: 1.0
-
-            # Tool pose tolerance for blocking calls
-            self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
 
             # Initialize the real gripper based on user configuration
             if real_gripper_ip is None:
@@ -465,7 +470,7 @@ class Robot(object):
             sim_started = vrep.simxStartSimulation(self.sim_client, vrep.simx_opmode_blocking)
             print('sim started 2: ' + str(sim_started))
             time.sleep(0.5)
-            sim_ret, self.RG2_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
+            sim_ret, self.UR5_tip_handle = vrep.simxGetObjectHandle(self.sim_client, 'UR5_tip', vrep.simx_opmode_blocking)
             # check sim, but we are already in the restart loop so don't recurse
             sim_ok = sim_started == vrep.simx_return_ok and self.check_sim(restart_if_not_ok=False)
 
@@ -474,11 +479,11 @@ class Robot(object):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.RG2_tip_handle, -1, vrep.simx_opmode_blocking)
+        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, -1, vrep.simx_opmode_blocking)
         sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
         if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
-            self.restart_sim()
+            self.restart_sim(connect=True)
             self.add_objects()
         return sim_ok
 
@@ -781,22 +786,30 @@ class Robot(object):
 
 
     def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None, legacy_mode=False):
+        """
+        legacy_mode: bool, Legacy mode manually increments the gripper position, rather than using simulator motion commands. 
+        Note to use legacy mode in the simulator you need to go into the simulation and disable the "threaded child script"
+        associated with the object UR5_position_goal_target.
+        """
 
         if self.is_sim:
+            # note there are 3 approaches to moving in sim below. 
+            # orientation only mode
+            motion_mode = 3
+            if tool_orientation is None and heightmap_rotation_angle is not None:
+                # Compute tool orientation from heightmap rotation angle
+                tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+                tool_orientation = [np.pi/2, tool_rotation_angle, np.pi/2]
+            elif tool_orientation is None:
+                # position only mode
+                motion_mode = 1
+                # we still need a tool orientation as dummy parameters
+                tool_orientation = [np.pi/2, 0.0, np.pi/2]
+
             if not legacy_mode:
-                # orientation only mode
-                motion_mode = 3
-                if tool_orientation is None and heightmap_rotation_angle is not None:
-                    # Compute tool orientation from heightmap rotation angle
-                    tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-                    tool_orientation = [np.pi/2, tool_rotation_angle, np.pi/2]
-                elif tool_orientation is None:
-                    # position only mode
-                    motion_mode = 1
-                    # we still need a tool orientation as dummy parameters
-                    tool_orientation = [np.pi/2, 0.0, np.pi/2]
-                online = True
+                online = False
                 if online:
+                    # here we make a call that calls moveToObject() in v-rep
                     failure_count = 0
                     ret_ints = []
                     while len(ret_ints) == 0:
@@ -822,15 +835,31 @@ class Robot(object):
                                 return False
                                 # exit(1)
                 else:
-                    vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
-                    vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-
+                    time.sleep(0.1) # give simulator a moment to settle and prevent teleportation
+                    # TODO(ahundt) maybe introducing a script function to call and set pos/rot simultaneously will prevent the teleportation issue
+                    if motion_mode == 1 or motion_mode == 3:
+                        vrep.simxSetObjectPosition(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_position,vrep.simx_opmode_blocking)
+                    if motion_mode == 2 or motion_mode == 3:
+                        vrep.simxSetObjectOrientation(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_orientation, vrep.simx_opmode_blocking)
+                    # Wait until the gripper is close to the goal
+                    time_start = time.time()
+                    sim_ret, gripper_goal_dist = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, self.UR5_position_goal_target_handle, vrep.simx_opmode_blocking)
+                    sim_ret, gripper_goal_rot = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_tip_handle, self.UR5_position_goal_target_handle, vrep.simx_opmode_blocking)
+                    gripper_combined = gripper_goal_dist + gripper_goal_rot
+                    while not np.all(np.abs(gripper_combined) < np.array(self.tool_pose_tolerance)):
+                        sim_ret, gripper_goal_dist = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, self.UR5_position_goal_target_handle, vrep.simx_opmode_blocking)
+                        sim_ret, gripper_goal_rot = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_tip_handle, self.UR5_position_goal_target_handle, vrep.simx_opmode_blocking)
+                        gripper_combined = gripper_goal_dist + gripper_goal_rot
+                        time_snapshot = time.time()
+                        if time_snapshot - time_start > timeout_seconds:
+                            print('robot.move_to() timeout, robot did not reach goal')
+                            return False
+                        time.sleep(0.01) # give simulator a moment to settle and prevent teleportation
+                    return True
             else:
-                if tool_orientation is None and heightmap_rotation_angle is not None:
-                    # Compute tool orientation from heightmap rotation angle
-                    tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-                    # TODO(ahundt) bring in some of the code from grasp() here to correctly update the orientation
-                    raise NotImplementedError
+                # this is the original way motion was handled, the absolute position of the motion target dummy
+                # is incremented linearly with each time step. However this is very slow and can result in stability
+                # problems when there is a collision.
                 # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
                 sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
                 if np.isnan(UR5_target_position).any():
@@ -847,6 +876,7 @@ class Robot(object):
                 vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
                 return True
         else:
+            # move the real robot to a position.
             if tool_orientation is None and heightmap_rotation_angle is None:
                 # If no orientation is provided, use the current one.
                 actual_pose = self.get_cartesian_position()
@@ -1254,7 +1284,6 @@ class Robot(object):
 
             # Compute tool orientation from heightmap rotation angle
             tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-            tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
 
             # Adjust pushing point to be on tip of finger
             position[2] = position[2] + 0.026
@@ -1262,6 +1291,8 @@ class Robot(object):
             # compute push direction
             position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation = push_poses(heightmap_rotation_angle, position, workspace_limits, 
                                                                                                                     gripper_to_arm_transform=self.tool_tip_to_gripper_center_transform)
+            # sim has a different base orientation definition, use that instead
+            tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
 
             # Move gripper to location above pushing point
             pushing_point_margin = 0.2
