@@ -695,7 +695,7 @@ def main(args):
             safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
             return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
         # make sure the fingers will not collide with the objects
-        finger_width = 0.05
+        finger_width = 0.04
         finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
         safe_z_position = workspace_limits[2][0]
         if finger_touchdown_region.size != 0:
@@ -712,8 +712,9 @@ def main(args):
             push_width = 0.2
             local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
             # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0]
+            max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] - 0.026 # see robot.push_vertical_offset
             push_may_contact_something = safe_z_position < max_local_push_region
+            print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
             push_str = ''
             if not push_may_contact_something:
                 push_str += 'Predicting push action failure, heuristics determined '

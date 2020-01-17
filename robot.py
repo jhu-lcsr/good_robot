@@ -145,6 +145,7 @@ class Robot(object):
             # with units [m, m, m, rad, rad, rad] 
             # TODO(ahundt) double check rad rad rad, it might be axis/angle where magnitude is rotation length.
             self.tool_pose_tolerance = [0.001,0.001,0.001,0.01,0.01,0.01]
+            self.push_vertical_offset = 0.026
             if num_obj is None:
                 num_obj = 10
             if obj_mesh_dir is None:
@@ -230,6 +231,7 @@ class Robot(object):
             # with units [m, m, m, rad, rad, rad] 
             # TODO(ahundt) double check rad rad rad, it might be axis/angle where magnitude is rotation length.
             self.tool_pose_tolerance = [0.002,0.002,0.002,0.01,0.01,0.01]
+            self.push_vertical_offset = 0.01
 
             # Connect to robot client
             self.tcp_host_ip = tcp_host_ip
@@ -1286,7 +1288,7 @@ class Robot(object):
             tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
 
             # Adjust pushing point to be on tip of finger
-            position[2] = position[2] + 0.026
+            position[2] = position[2] + self.push_vertical_offset
 
             # compute push direction
             position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation = push_poses(heightmap_rotation_angle, position, workspace_limits, 
@@ -1345,7 +1347,7 @@ class Robot(object):
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             position = np.asarray(position).copy()
-            position[2] += 0.01
+            position[2] += self.push_vertical_offset
 
             # Compute push direction and endpoint (push to right of rotated heightmap)
             position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation = push_poses(heightmap_rotation_angle, position, workspace_limits, 
