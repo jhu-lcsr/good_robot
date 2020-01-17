@@ -787,7 +787,7 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None, legacy_mode=False):
+    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None, legacy_mode=True):
         """
         legacy_mode: bool, Legacy mode manually increments the gripper position, rather than using simulator motion commands. 
         Note to use legacy mode in the simulator you need to go into the simulation and disable the "threaded child script"
@@ -795,22 +795,32 @@ class Robot(object):
         """
 
         if self.is_sim:
+
             # note there are 3 approaches to moving in sim below. 
             # orientation only mode
             motion_mode = 3
+            tool_rotation_angle = None
             if tool_orientation is None and heightmap_rotation_angle is not None:
                 # Compute tool orientation from heightmap rotation angle
                 tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-                tool_orientation = [np.pi/2, tool_rotation_angle, np.pi/2]
-            elif tool_orientation is None:
-                # position only mode
-                motion_mode = 1
-                # we still need a tool orientation as dummy parameters
-                tool_orientation = [np.pi/2, 0.0, np.pi/2]
+                if not legacy_mode:
+                    # set the goal orientation if we are using a newer moving mode,
+                    # otherwise leave it None because the original way to move in sim
+                    # only accepts heightmap_rotation_angle
+                    tool_orientation = [np.pi/2, tool_rotation_angle, np.pi/2]
 
             if not legacy_mode:
-                online = False
-                if online:
+                    
+                # simulator_moves_to_goal switches between using a version that automatically detects changes in vrep, 
+                # and another version which tries to directly send the motion command to vrep
+                simulator_moves_to_goal = False 
+
+                if simulator_moves_to_goal:
+                    if tool_orientation is None and heightmap_rotation_angle is None:
+                        # position only mode
+                        motion_mode = 1
+                        # we still need a tool orientation as dummy parameters
+                        tool_orientation = [np.pi/2, 0.0, np.pi/2]
                     # here we make a call that calls moveToObject() in v-rep
                     failure_count = 0
                     ret_ints = []
@@ -837,12 +847,39 @@ class Robot(object):
                                 return False
                                 # exit(1)
                 else:
-                    time.sleep(0.1) # give simulator a moment to settle and prevent teleportation
-                    # TODO(ahundt) maybe introducing a script function to call and set pos/rot simultaneously will prevent the teleportation issue
-                    if motion_mode == 1 or motion_mode == 3:
-                        vrep.simxSetObjectPosition(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_position,vrep.simx_opmode_blocking)
-                    if motion_mode == 2 or motion_mode == 3:
-                        vrep.simxSetObjectOrientation(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_orientation, vrep.simx_opmode_blocking)
+                    # here we make a call that calls moveToObject() in v-rep
+                    # This first while loop is to set the target position and orientation in a single sim time step
+                    failure_count = 0
+                    ret_ints = []
+                    while len(ret_ints) == 0:
+                        # do_break = False
+                        # see simMoveToObject for details, our script function is in the actual V-REP sim. http://coppeliarobotics.com/helpFiles/en/apiFunctions.htm#simMoveToObject
+                        move_velocity = 3.0
+                        move_accel = 5.0
+                        # The integer configuration for the motion mode, the 4th integer in the list, is 1: position only, 2: rotation only, 3: position and rotation
+                        ret_resp,ret_ints, ret_floats, ret_strings, ret_buffer = vrep.simxCallScriptFunction(
+                                self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'setObjectPose',
+                                 # int params object to move, object to teleport for moving towards, base frame object, motion mode
+                                [self.UR5_position_goal_target_handle, -1, motion_mode], 
+                                [tool_position[0], tool_position[1], tool_position[2], tool_orientation[0], tool_orientation[1], tool_orientation[2]], 
+                                [], bytearray(), vrep.simx_opmode_blocking)
+                        if ret_resp == 8:
+                            print('Failed to move gripper. Auto retry ' + str(failure_count))
+                            failure_count += 1
+                            # if failure_count % 3 == 2:
+                            #     # If a few failures happen in a row, do a simulation reset and try again
+                            #     do_break = True
+                            #     break
+                            if failure_count > 10:
+                                print('Failed to move gripper to target.')
+                                return False
+                                # exit(1)
+                    # time.sleep(0.1) # give simulator a moment to settle and prevent teleportation
+                    # # Set the position then the orientation one after the other
+                    # if motion_mode == 1 or motion_mode == 3:
+                    #     vrep.simxSetObjectPosition(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_position,vrep.simx_opmode_blocking)
+                    # if motion_mode == 2 or motion_mode == 3:
+                    #     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_position_goal_target_handle, -1, tool_orientation, vrep.simx_opmode_blocking)
                     # Wait until the gripper is close to the goal
                     time_start = time.time()
                     sim_ret, gripper_goal_dist = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, self.UR5_position_goal_target_handle, vrep.simx_opmode_blocking)
@@ -859,23 +896,49 @@ class Robot(object):
                         time.sleep(0.01) # give simulator a moment to settle and prevent teleportation
                     return True
             else:
-                # this is the original way motion was handled, the absolute position of the motion target dummy
+                if tool_orientation is not None:
+                    raise NotImplementedError('move_to() tool_orientation is not supported when is stepping to arbitrary orientations')
+                # this is the original way sim motion was handled, the absolute position of the motion target dummy
                 # is incremented linearly with each time step. However this is very slow and can result in stability
                 # problems when there is a collision.
                 # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-                sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
+                sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle, -1, vrep.simx_opmode_blocking)
                 if np.isnan(UR5_target_position).any():
                     return False
 
                 move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
                 move_magnitude = np.linalg.norm(move_direction)
-                move_step = 0.02*move_direction/move_magnitude
-                num_move_steps = int(np.floor(move_magnitude/0.02))
+                # Increase move_step_scale to move more per step, very large is 0.05, small is 0.01, we use 0.02 at the time of writing
+                move_step_scale = 0.02
+                # prevent division by 0, source: https://stackoverflow.com/a/37977222/99379
+                move_step = move_step_scale * np.divide(move_direction, move_magnitude, out=np.zeros_like(move_direction), where=move_magnitude!=0)
+                num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
 
-                for step_iter in range(num_move_steps):
-                    vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0], UR5_target_position[1] + move_step[1], UR5_target_position[2] + move_step[2]),vrep.simx_opmode_blocking)
-                    sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client,self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
+                num_rotation_steps = 1
+                if tool_rotation_angle is not None:
+                    # Compute gripper orientation and rotation increments
+                    sim_ret, gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, vrep.simx_opmode_blocking)
+                    rotation_step = 0.3 if (tool_rotation_angle - gripper_orientation[1] > 0) else -0.3
+                    num_rotation_steps = int(np.floor((tool_rotation_angle - gripper_orientation[1])/rotation_step))
+
+                # Simultaneously move and rotate gripper if an orientation is provided, only translate otherwise
+                for step_iter in range(max(num_move_steps, num_rotation_steps)):
+                    vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0]*min(step_iter,num_move_steps), UR5_target_position[1] + move_step[1]*min(step_iter,num_move_steps), UR5_target_position[2] + move_step[2]*min(step_iter,num_move_steps)),vrep.simx_opmode_blocking)
+                    if tool_rotation_angle is not None:
+                        vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter, num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
                 vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
+                if tool_rotation_angle is not None:
+                    vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
+
+                # move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
+                # move_magnitude = np.linalg.norm(move_direction)
+                # move_step = 0.02*move_direction/move_magnitude
+                # num_move_steps = int(np.floor(move_magnitude/0.02))
+
+                # for step_iter in range(num_move_steps):
+                #     vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0], UR5_target_position[1] + move_step[1], UR5_target_position[2] + move_step[2]),vrep.simx_opmode_blocking)
+                #     sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client,self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
+                # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
                 return True
         else:
             # move the real robot to a position.
@@ -1113,7 +1176,8 @@ class Robot(object):
             #     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter,num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
             # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
             # vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-            self.move_to(tool_position, tool_orientation=tool_orientation)
+            # # not supported in some sim move_to() modes self.move_to(tool_position, tool_orientation)
+            self.move_to(tool_position, heightmap_rotation_angle=tool_rotation_angle)
 
             # Ensure gripper is open
             self.open_gripper()
@@ -1283,9 +1347,11 @@ class Robot(object):
         print('Executing: Push at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
 
         if self.is_sim:
-
+            # TODO(ahundt) extra_rot line is brand new and wasn't needed before move_to() became for all motions. Check why, debug/simplify.
             # Compute tool orientation from heightmap rotation angle
-            tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+            # extra 90 deg gripper rotation to line up push the long way
+            extra_rot = (heightmap_rotation_angle + np.pi/2)
+            tool_rotation_angle = (extra_rot % np.pi) - np.pi/2
 
             # Adjust pushing point to be on tip of finger
             position[2] = position[2] + self.push_vertical_offset
@@ -1319,7 +1385,8 @@ class Robot(object):
             #     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter,num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
             # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
             # vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-            self.move_to(tool_position, tool_orientation)
+            # # not supported in some sim move_to() modes self.move_to(tool_position, tool_orientation)
+            self.move_to(tool_position, heightmap_rotation_angle=tool_rotation_angle)
 
             # Ensure gripper is closed
             self.close_gripper()
@@ -1522,7 +1589,9 @@ class Robot(object):
             #     time.sleep(0.005)
             #     sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
             # vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-            self.move_to(location_above_place_target, tool_orientation)
+               
+            # # not supported in some sim move_to() modes: self.move_to(location_above_place_target, tool_orientation)         
+            self.move_to(location_above_place_target, heightmap_rotation_angle=tool_rotation_angle)
 
             # Approach place target
             self.move_to(position, None)
