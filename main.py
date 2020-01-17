@@ -43,7 +43,7 @@ def run_title(args):
         title += 'Two Step Reward, '
     title += 'Testing' if args.is_testing else 'Training'
 
-    save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
+    save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
     return title, dirname
 
