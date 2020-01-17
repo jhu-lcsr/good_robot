@@ -1833,7 +1833,7 @@ class Robot(object):
         # TODO(ahundt) should the reward multiplier be applied to increase_threshold, or should the parameter be totally indepenedent?
         goal_success = max_z >= (prev_height + (increase_threshold * reward_multiplier))
         needed_to_reset = False
-        max_workspace_height = prev_height - decrease_threshold
+        max_workspace_height = prev_height - (decrease_threshold * reward_multiplier)
         if decrease_threshold is not None and max_z < max_workspace_height:
             needed_to_reset = True
         print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) +
