@@ -1003,7 +1003,7 @@ def main(args):
                 num_problems_detected += 1
                 if num_problems_detected > 2 and is_sim:
                     # Try more drastic recovery methods the second time around
-                    robot.restart_sim()
+                    robot.restart_sim(connect=True)
                     robot.add_objects()
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
