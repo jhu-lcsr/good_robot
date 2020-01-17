@@ -927,8 +927,9 @@ class Robot(object):
 
                 # Simultaneously move and rotate gripper if an orientation is provided, only translate otherwise
                 for step_iter in range(max(num_move_steps, num_rotation_steps)):
-                    vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0]*min(step_iter,num_move_steps), UR5_target_position[1] + move_step[1]*min(step_iter,num_move_steps), UR5_target_position[2] + move_step[2]*min(step_iter,num_move_steps)),vrep.simx_opmode_blocking)
-                    if tool_rotation_angle is not None:
+                    if step_iter <= num_move_steps:
+                        vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0]*min(step_iter,num_move_steps), UR5_target_position[1] + move_step[1]*min(step_iter,num_move_steps), UR5_target_position[2] + move_step[2]*min(step_iter,num_move_steps)),vrep.simx_opmode_blocking)
+                    if tool_rotation_angle is not None and step_iter <= num_rotation_steps:
                         vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter, num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
                 vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
                 if tool_rotation_angle is not None:
