@@ -714,7 +714,7 @@ def main(args):
             # push_may_contact_something is True for something noticeably higher than the push action z height
             max_local_push_region = np.max(local_push_region) + workspace_limits[2][0] - 0.026 # see robot.push_vertical_offset
             push_may_contact_something = safe_z_position < max_local_push_region
-            print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
+            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
             push_str = ''
             if not push_may_contact_something:
                 push_str += 'Predicting push action failure, heuristics determined '
