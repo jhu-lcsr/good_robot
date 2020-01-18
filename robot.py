@@ -448,15 +448,22 @@ class Robot(object):
     def restart_sim(self, connect=False):
         if connect:
             # Connect to simulator
-            vrep.simxFinish(-1) # Just in case, close all opened connections
-            self.sim_joint_handles = []
-            self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, True, 5000, 5) # Connect to V-REP on port 19997
-            if self.sim_client == -1:
-                print('Failed to connect to simulation (V-REP remote API server). Exiting.')
-                exit()
-            else:
-                print('Connected to simulation.')
-                # self.restart_sim()
+            failure_count = 0
+            connected = False
+            while not connected:
+                vrep.simxFinish(-1) # Just in case, close all opened connections
+                self.sim_joint_handles = []
+                self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, False, 5000, 5) # Connect to V-REP on port 19997
+                if self.sim_client == -1:
+                    failure_count += 1
+                    print('Failed to connect to simulation (V-REP remote API server) on attempt ' + str(failure_count))
+                    if failure_count > 10:
+                        print('Could not connect, Exiting')
+                        exit(1)
+                else:
+                    print('Connected to simulation.')
+                    connected = True
+                    # self.restart_sim()
 
         sim_ret, self.UR5_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5',vrep.simx_opmode_blocking)
         sim_ret, self.UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
