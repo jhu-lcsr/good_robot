@@ -27,6 +27,9 @@ class Trainer(object):
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet'):
 
+        self.heightmap_pixels = 224
+        self.buffered_heightmap_pixels = 320
+        self.half_heightmap_diff = (self.buffered_heightmap_pixels - self.heightmap_pixels) / 2
         self.method = method
         self.place = place
         self.flops = flops
@@ -522,14 +525,14 @@ class Trainer(object):
             fill_value = 2
 
             # Compute labels
-            label = np.zeros((1,320,320)) + fill_value
-            action_area = np.zeros((224,224))
+            label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels)) + fill_value
+            action_area = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             action_area[best_pix_ind[1]][best_pix_ind[2]] = 1
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
-            tmp_label = np.zeros((224,224)) + fill_value
+            tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels)) + fill_value
             tmp_label[action_area > 0] = label_value
-            label[0,48:(320-48),48:(320-48)] = tmp_label
+            label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
             # Compute loss and backward pass
             self.optimizer.zero_grad()
@@ -614,20 +617,20 @@ class Trainer(object):
         elif self.method == 'reinforcement':
 
             # Compute labels
-            label = np.zeros((1,320,320))
-            action_area = np.zeros((224,224))
+            label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))
+            action_area = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             action_area[best_pix_ind[1]][best_pix_ind[2]] = 1
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
-            tmp_label = np.zeros((224,224))
+            tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label[action_area > 0] = label_value
-            label[0,48:(320-48),48:(320-48)] = tmp_label
+            label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
             # Compute label mask
             label_weights = np.zeros(label.shape)
-            tmp_label_weights = np.zeros((224,224))
+            tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label_weights[action_area > 0] = 1
-            label_weights[0,48:(320-48),48:(320-48)] = tmp_label_weights
+            label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
             self.optimizer.zero_grad()
@@ -638,9 +641,9 @@ class Trainer(object):
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
 
                 if self.use_cuda:
-                    loss = self.criterion(output_prob[0][0].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
-                    loss = self.criterion(output_prob[0][0].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
@@ -655,9 +658,9 @@ class Trainer(object):
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
 
                 if self.use_cuda:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
@@ -674,9 +677,9 @@ class Trainer(object):
                     push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
 
                     if self.use_cuda:
-                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                        loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                     else:
-                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                        loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
 
                     loss = loss.sum()
                     loss.backward()
@@ -695,9 +698,9 @@ class Trainer(object):
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
 
                 if self.use_cuda:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][2].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][2].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
