@@ -453,7 +453,7 @@ class Robot(object):
             while not connected:
                 vrep.simxFinish(-1) # Just in case, close all opened connections
                 self.sim_joint_handles = []
-                self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, False, 5000, 5) # Connect to V-REP on port 19997
+                self.sim_client = vrep.simxStart('127.0.0.1', self.tcp_port, True, False, 5000, 1) # Connect to V-REP on port 19997
                 if self.sim_client == -1:
                     failure_count += 1
                     print('Failed to connect to simulation (V-REP remote API server) on attempt ' + str(failure_count))
