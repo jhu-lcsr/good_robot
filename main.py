@@ -41,6 +41,8 @@ def run_title(args):
         title += 'Trial Reward, '
     else:
         title += 'Two Step Reward, '
+    if args.common_sense:
+        title += 'Common Sense, '
     title += 'Testing' if args.is_testing else 'Training'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
@@ -175,6 +177,7 @@ def main(args):
     disable_situation_removal = args.disable_situation_removal
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
+    common_sense = args.common_sense
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -253,7 +256,8 @@ def main(args):
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
-                      goal_condition_len, place, pretrained, flops, network=neural_network_name)
+                      goal_condition_len, place, pretrained, flops, 
+                      network=neural_network_name, common_sense=common_sense)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -1220,7 +1224,8 @@ if __name__ == '__main__':
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
-    parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,               help='enable skipping grasp actions when the heightmap is zero')
+    parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,  help='enable skipping grasp and push actions when the heightmap is zero')
+    parser.add_argument('--common_sense', dest='common_sense', action='store_true', default=False,                        help='Use common sense heuristics to detect and train on regions which do not contact anything, and will thus not result in task progress.')
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
     parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')

@@ -11,6 +11,7 @@ from utils_torch import CrossEntropyLoss2d
 from models import PixelNet
 from scipy import ndimage
 import matplotlib.pyplot as plt
+import utils
 
 try:
     import ptflops
@@ -25,7 +26,7 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet'):
+                 flops=False, network='efficientnet', common_sense=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -34,6 +35,7 @@ class Trainer(object):
         self.place = place
         self.flops = flops
         self.goal_condition_len = goal_condition_len
+        self.common_sense = common_sense
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -518,6 +520,13 @@ class Trainer(object):
 
     # Compute labels and backpropagate
     def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
+        if self.common_sense:
+            if primitive_action == 'push':
+                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
+            if primitive_action == 'grasp':
+                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+            if primitive_action == 'place':
+                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
 
         if self.method == 'reactive':
 
@@ -531,6 +540,11 @@ class Trainer(object):
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
             tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels)) + fill_value
+            if self.common_sense:
+                # all areas where we won't be able to contact anything will have 
+                # value 0 which should indicate no action should be taken at these locations
+                # TODO(ahundt) double check this is factually correct 
+                tmp_label[contactable_regions < 1] = 1 - contactable_regions
             tmp_label[action_area > 0] = label_value
             label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
@@ -624,11 +638,16 @@ class Trainer(object):
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
             tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label[action_area > 0] = label_value
+            # these are the label values, mostly consisting of zeros, except for where the robot really went which is at best_pix_ind.
             label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
             # Compute label mask
             label_weights = np.zeros(label.shape)
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
+            if self.common_sense:
+                # all areas where we won't be able to contact anything will have 
+                # mask value 1 which allows the label value zero to be applied
+                tmp_label_weights = 1 - contactable_regions
             tmp_label_weights[action_area > 0] = 1
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
