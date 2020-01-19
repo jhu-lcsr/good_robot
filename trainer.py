@@ -30,7 +30,7 @@ class Trainer(object):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
-        self.half_heightmap_diff = (self.buffered_heightmap_pixels - self.heightmap_pixels) / 2
+        self.half_heightmap_diff = int((self.buffered_heightmap_pixels - self.heightmap_pixels) / 2)
         self.method = method
         self.place = place
         self.flops = flops
