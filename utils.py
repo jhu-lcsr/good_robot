@@ -119,7 +119,8 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
     """
     pixels_to_dilate = int(np.ceil((gripper_width + push_length)/heightmap_resolution))
     kernel = np.ones((pixels_to_dilate, pixels_to_dilate), np.uint8)
-    contactable_regions = cv2.dilate(heightmap > min_contact_height, kernel, iterations=1)
+    object_pixels = (heightmap > min_contact_height).astype(np.uint8)
+    contactable_regions = cv2.dilate(object_pixels, kernel, iterations=1)
     return contactable_regions
 
 # Save a 3D point cloud to a binary .ply file
