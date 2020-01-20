@@ -144,10 +144,15 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     upper = np.clip(upper, 0, 1)
     return efficiency, lower, upper
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
-    if place:
-        heights = np.loadtxt(os.path.join(log_dir, 'transitions', 'stack-height.log.txt'))
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True):
+    stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
+    if place is None:
+        place = False
+    if os.path.isfile(stack_height_file):
+        heights = np.loadtxt()
         rewards = None
+        if place is None:
+            place = True
     else:
         rewards = np.loadtxt(os.path.join(log_dir, 'transitions', 'reward-value.log.txt'))
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
@@ -203,11 +208,12 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         trial_successes = np.loadtxt(trial_success_file)
         if max_iter is not None:
             trial_successes = trial_successes[:max_iter]
-        trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
-        plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
-        plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
-                        mult*trial_success_lower, mult*trial_success_upper,
-                        color=colors[3], alpha=alpha)
+        if trial_successes.size > 0:
+            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+            plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
+            plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+                            mult*trial_success_lower, mult*trial_success_upper,
+                            color=colors[3], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
@@ -224,6 +230,10 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
 if __name__ == '__main__':
     window = 500
     max_iter = None
+
+    log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
+    plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
     log_dir = './logs/2020-01-08-17-03-58'
@@ -241,4 +251,4 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-15-15-44-39'
 
     title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
-    plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    # plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
