@@ -519,7 +519,8 @@ class Trainer(object):
 
 
     # Compute labels and backpropagate
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, show_heightmap=False):
+        contactable_regions = None
         if self.common_sense:
             if primitive_action == 'push':
                 contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
@@ -528,6 +529,20 @@ class Trainer(object):
             if primitive_action == 'place':
                 contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
 
+        if show_heightmap:
+            # visualize the common sense function results
+            # show the heightmap
+            f = plt.figure()
+            # f.suptitle(str(trainer.iteration))
+            f.add_subplot(1,3, 1)
+            plt.imshow(depth_heightmap)
+            f.add_subplot(1,3, 2)
+            # f.add_subplot(1,2, 1)
+            if contactable_regions is not None:
+                plt.imshow(contactable_regions)
+                f.add_subplot(1,3, 3)
+            # plt.imshow(stuff_count)
+            plt.show(block=True)
         if self.method == 'reactive':
 
             # Compute fill value
@@ -562,6 +577,7 @@ class Trainer(object):
                 else:
                     loss = self.push_criterion(output_prob[0][0], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value = loss.cpu().data.numpy()[0]
@@ -580,6 +596,7 @@ class Trainer(object):
                 else:
                     loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value += loss.cpu().data.numpy()[0]
@@ -598,6 +615,7 @@ class Trainer(object):
                     else:
                         loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                     loss.backward()
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                     #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                     try:
                         loss_value += loss.cpu().data.numpy()[0]
@@ -619,6 +637,7 @@ class Trainer(object):
                 else:
                     loss = self.place_criterion(output_prob[0][2], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value += loss.cpu().data.numpy()[0]
@@ -648,7 +667,10 @@ class Trainer(object):
                 # all areas where we won't be able to contact anything will have 
                 # mask value 1 which allows the label value zero to be applied
                 tmp_label_weights = 1 - contactable_regions
-            tmp_label_weights[action_area > 0] = 1
+                # The real robot label gets weight equal to the summ of all heuristic labels, or 1
+                tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
+            else:
+                tmp_label_weights[action_area > 0] = 1
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
@@ -663,8 +685,9 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
                     loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.sum()
+                loss = loss.mean()
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value = loss.cpu().data.numpy()[0]
@@ -680,8 +703,9 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
                     loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.sum()
+                loss = loss.mean()
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value = loss.cpu().data.numpy()[0]
@@ -700,8 +724,9 @@ class Trainer(object):
                     else:
                         loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
 
-                    loss = loss.sum()
+                    loss = loss.mean()
                     loss.backward()
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                     #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                     try:
                         loss_value = loss.cpu().data.numpy()[0]
@@ -722,6 +747,7 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][2].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 try:
                     loss_value = loss.cpu().data.numpy()[0]
