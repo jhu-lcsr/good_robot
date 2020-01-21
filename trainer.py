@@ -670,7 +670,9 @@ class Trainer(object):
                 # The real robot label gets weight equal to the summ of all heuristic labels, or 1
                 tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
             else:
-                tmp_label_weights[action_area > 0] = 1
+                # tmp_label_weights[action_area > 0] = 1
+                # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
+                tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
