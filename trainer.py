@@ -293,6 +293,8 @@ class Trainer(object):
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
     def load_sample(self, sample_iteration, logger):
+        """Load the data from disk, and run a forward pass with the current model
+        """
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
         # Load sample RGB-D heightmap
