@@ -972,6 +972,7 @@ def main(args):
                     stack_rate_str = method + '-best-stack-rate'
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
+                    logger.write_to_log('best-iteration', np.array([trainer.iteration]))
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
