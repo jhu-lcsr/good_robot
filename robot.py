@@ -1583,8 +1583,8 @@ class Robot(object):
             grasped_object_position = np.array(grasped_object_position)
 
             # Compute tool orientation from heightmap rotation angle
-            tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-            tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
+            # tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
+            # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
 
             # Avoid collision with floor
             position[2] = max(position[2] + 0.04 + 0.02, workspace_limits[2][0] + 0.02)
@@ -1605,9 +1605,9 @@ class Robot(object):
             #     time.sleep(0.005)
             #     sim_ret,gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, UR5_target_handle, -1, vrep.simx_opmode_blocking)
             # vrep.simxSetObjectOrientation(self.sim_client, UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-               
-            # # not supported in some sim move_to() modes: self.move_to(location_above_place_target, tool_orientation)         
-            self.move_to(location_above_place_target, heightmap_rotation_angle=tool_rotation_angle)
+
+            # # not supported in some sim move_to() modes: self.move_to(location_above_place_target, tool_orientation)
+            self.move_to(location_above_place_target, heightmap_rotation_angle=heightmap_rotation_angle)
 
             # Approach place target
             self.move_to(position, None)
