@@ -1046,7 +1046,7 @@ class Robot(object):
         return execute_success
 
 
-    def move_joints(self, joint_configuration):
+    def move_joints(self, joint_configuration, timeout_seconds=10):
         if self.is_sim:
             if not self.sim_joint_handles:
                 # set all of the joint handles
@@ -1069,10 +1069,15 @@ class Robot(object):
             # Block until robot reaches home state
             state_data = self.get_state()
             actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
+            time_start = time.time()
             while not all([np.abs(actual_joint_positions[j] - joint_configuration[j]) < self.joint_tolerance for j in range(6)]):
                 state_data = self.get_state()
                 actual_joint_positions = self.parse_tcp_state_data(state_data, 'joint_data')
                 time.sleep(0.01)
+                time_snapshot = time.time()
+                if time_snapshot - time_start > timeout_seconds:
+                    print('move_joints() Timeout')
+                    return False
             return True
 
 
