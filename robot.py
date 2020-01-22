@@ -56,7 +56,7 @@ def push_poses(heightmap_rotation_angle, position, workspace_limits, push_orient
         tilt_axis = np.asarray([0,0,np.pi/2])
     # Compute push direction and endpoint (push to right of rotated heightmap)
     # Compute target location (push to the right)
-    push_direction = orientation_and_angle_to_push_direction(heightmap_rotation_angle, push_orientation)
+    push_direction = np.asarray([push_orientation[0]*np.cos(heightmap_rotation_angle) - push_orientation[1]*np.sin(heightmap_rotation_angle), push_orientation[0]*np.sin(heightmap_rotation_angle) + push_orientation[1]*np.cos(heightmap_rotation_angle), 0.0])
     target_x = min(max(position[0] + push_direction[0]*push_length, workspace_limits[0][0]), workspace_limits[0][1])
     target_y = min(max(position[1] + push_direction[1]*push_length, workspace_limits[1][0]), workspace_limits[1][1])
     push_endpoint = np.asarray([target_x, target_y, position[2] + buffer])
@@ -64,8 +64,8 @@ def push_poses(heightmap_rotation_angle, position, workspace_limits, push_orient
 
     # Compute tool orientation from heightmap rotation angle
     tool_rotation_angle = heightmap_rotation_angle/2
-    tool_orientation = orientation_and_angle_to_push_direction(tool_rotation_angle, push_orientation)*np.pi
-    # tool_orientation = np.asarray([push_orientation[0]*np.cos(tool_rotation_angle) - push_orientation[1]*np.sin(tool_rotation_angle), push_orientation[0]*np.sin(tool_rotation_angle) + push_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
+    # tool_orientation = orientation_and_angle_to_push_direction(tool_rotation_angle, push_orientation)*np.pi
+    tool_orientation = np.asarray([push_orientation[0]*np.cos(tool_rotation_angle) - push_orientation[1]*np.sin(tool_rotation_angle), push_orientation[0]*np.sin(tool_rotation_angle) + push_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
     
     tool_orientation_angle = np.linalg.norm(tool_orientation)
     tool_orientation_axis = tool_orientation/tool_orientation_angle
@@ -1367,8 +1367,7 @@ class Robot(object):
             # TODO(ahundt) extra_rot line is brand new and wasn't needed before move_to() became for all motions. Check why, debug/simplify.
             # Compute tool orientation from heightmap rotation angle
             # extra 90 deg gripper rotation to line up push the long way
-            extra_rot = (heightmap_rotation_angle + np.pi/2)
-            tool_rotation_angle = (extra_rot % np.pi) - np.pi/2
+            tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
 
             # Adjust pushing point to be on tip of finger
             position[2] = position[2] + self.push_vertical_offset
@@ -1377,7 +1376,7 @@ class Robot(object):
             position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation = push_poses(heightmap_rotation_angle, position, workspace_limits, 
                                                                                                                     gripper_to_arm_transform=self.tool_tip_to_gripper_center_transform)
             # sim has a different base orientation definition, use that instead
-            tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
+            # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
 
             # Move gripper to location above pushing point
             pushing_point_margin = 0.2
