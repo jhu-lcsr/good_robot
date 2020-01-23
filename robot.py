@@ -60,10 +60,11 @@ def push_poses(heightmap_rotation_angle, position, workspace_limits, push_orient
     target_x = min(max(position[0] + push_direction[0]*push_length, workspace_limits[0][0]), workspace_limits[0][1])
     target_y = min(max(position[1] + push_direction[1]*push_length, workspace_limits[1][0]), workspace_limits[1][1])
     push_endpoint = np.asarray([target_x, target_y, position[2] + buffer])
-    push_direction.shape = (3,1)
+    push_direction.shape = (3, 1)
 
     # Compute tool orientation from heightmap rotation angle
-    # tool_rotation_angle = heightmap_rotation_angle/2
+    # TODO(ahundt) tool_rotation_angle, particularly dividing by 2, may affect (1) sim to real transfer, and (2) common sense checks, especially considering that our real robot gripper is not centered on the tool control point. Verify transforms!
+    tool_rotation_angle = heightmap_rotation_angle/2
     # tool_orientation = orientation_and_angle_to_push_direction(tool_rotation_angle, push_orientation)*np.pi
     tool_orientation = np.asarray([push_orientation[0]*np.cos(tool_rotation_angle) - push_orientation[1]*np.sin(tool_rotation_angle), push_orientation[0]*np.sin(tool_rotation_angle) + push_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
 
@@ -1408,7 +1409,7 @@ class Robot(object):
             # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
             # vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
             # # not supported in some sim move_to() modes self.move_to(tool_position, tool_orientation)
-            self.move_to(up_pos, heightmap_rotation_angle=tool_rotation_angle)
+            self.move_to(up_pos, heightmap_rotation_angle=heightmap_rotation_angle)
 
             # Ensure gripper is closed
             self.close_gripper()
