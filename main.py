@@ -421,9 +421,7 @@ def main(args):
         # will need to reset if something went wrong with stacking
         needed_to_reset = False
         grasp_str = ''
-        successful_trial_count = 0
-        if continue_logging:
-            successful_trial_count = int(np.max(trainer.trial_success_log))
+        successful_trial_count = int(np.max(trainer.trial_success_log)) if continue_logging and len(trainer.trial_success_log) > 0 else 0
         trial_rate = np.inf
         while True:
             if nonlocal_variables['executing_action']:
