@@ -83,7 +83,7 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
@@ -91,6 +91,7 @@ class PixelNet(nn.Module):
         self.upsample_scale = 16
         self.num_rotations = 16
         self.network = network
+        self.align_corners = align_corners
 
         if self.use_vector_block:
             channels_out = 2048
@@ -169,41 +170,39 @@ class PixelNet(nn.Module):
         tiled_goal_condition = None
 
         if is_volatile:
-            torch.set_grad_enabled(False)
             output_prob = []
             interm_feat = []
+            with torch.no_grad():
+                # Apply rotations to images
+                for rotate_idx in range(self.num_rotations):
+                    rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
-            # Apply rotations to images
-            for rotate_idx in range(self.num_rotations):
-                rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+                    # Compute sample grid for rotation BEFORE neural network
+                    interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition, align_corners=self.align_corners)
+                    if self.place:
+                        interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
+                    else:
+                        interm_feat.append([interm_push_feat, interm_grasp_feat])
 
-                # Compute sample grid for rotation BEFORE neural network
-                interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
-                if self.place:
-                    interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
-                else:
-                    interm_feat.append([interm_push_feat, interm_grasp_feat])
+                    # Compute sample grid for rotation AFTER branches
+                    affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
+                    affine_mat_after.shape = (2,3,1)
+                    affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
+                    if self.use_cuda:
+                        flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size(), align_corners=self.align_corners)
+                    else:
+                        flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size(), align_corners=self.align_corners)
 
-                # Compute sample grid for rotation AFTER branches
-                affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
-                affine_mat_after.shape = (2,3,1)
-                affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
-                if self.use_cuda:
-                    flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
-                else:
-                    flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
+                    # Forward pass through branches, undo rotation on output predictions, upsample results
+                    # placenet tests block stacking
+                    if self.place:
+                        output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))])
+                    else:
+                        output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                            nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))])
 
-                # Forward pass through branches, undo rotation on output predictions, upsample results
-                # placenet tests block stacking
-                if self.place:
-                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                                    nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=True))])
-                else:
-                    output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=True))])
-
-            torch.set_grad_enabled(True)
             return output_prob, interm_feat
 
         else:
@@ -216,7 +215,7 @@ class PixelNet(nn.Module):
             rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
             # Compute sample grid for rotation BEFORE branches
-            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
+            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition, align_corners=self.align_corners)
             if self.place:
                 interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
             else:
@@ -227,19 +226,19 @@ class PixelNet(nn.Module):
             affine_mat_after.shape = (2,3,1)
             affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
             if self.use_cuda:
-                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
+                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size(), align_corners=self.align_corners)
             else:
-                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
+                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size(), align_corners=self.align_corners)
             # print('goal_condition: ' + str(goal_condition))
             # Forward pass through branches, undo rotation on output predictions, upsample results
             # placenet tests block stacking
             if self.place:
-                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=True))])
+                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))])
             else:
-                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=True)),
-                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=True).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=True))])
+                output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                     nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))])
             # print('output prob shapes: ' + str(self.output_prob[0][0].shape))
             return output_prob, interm_feat
 
@@ -252,17 +251,17 @@ class PixelNet(nn.Module):
         affine_mat_before.shape = (2,3,1)
         affine_mat_before = torch.from_numpy(affine_mat_before).permute(2,0,1).float()
         if self.use_cuda:
-            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size())
+            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size(), align_corners=self.align_corners)
         else:
-            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad), input_color_data.size())
+            flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad), input_color_data.size(), align_corners=self.align_corners)
 
         # Rotate images clockwise
         if self.use_cuda:
-            rotate_color = F.grid_sample(Variable(input_color_data).cuda(), flow_grid_before, mode='nearest', align_corners=True)
-            rotate_depth = F.grid_sample(Variable(input_depth_data).cuda(), flow_grid_before, mode='nearest', align_corners=True)
+            rotate_color = F.grid_sample(Variable(input_color_data).cuda(), flow_grid_before, mode='nearest', align_corners=self.align_corners)
+            rotate_depth = F.grid_sample(Variable(input_depth_data).cuda(), flow_grid_before, mode='nearest', align_corners=self.align_corners)
         else:
-            rotate_color = F.grid_sample(Variable(input_color_data), flow_grid_before, mode='nearest', align_corners=True)
-            rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest', align_corners=True)
+            rotate_color = F.grid_sample(Variable(input_color_data), flow_grid_before, mode='nearest', align_corners=self.align_corners)
+            rotate_depth = F.grid_sample(Variable(input_depth_data), flow_grid_before, mode='nearest', align_corners=self.align_corners)
 
         # Compute intermediate features
         if efficientnet_pytorch is None or self.network == 'densenet':
