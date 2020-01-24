@@ -1256,7 +1256,7 @@ class Robot(object):
                 # HK: Original Method
                 elif not self.place_task and not self.grasp_color_task:
                     object_positions = np.asarray(self.get_obj_positions())
-                    if not object_positions:
+                    if object_positions.size == 0:
                         # there are no objects in the scene, so the grasp could not be successful
                         return False, False
                     object_positions = object_positions[:,2]
