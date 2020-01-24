@@ -286,13 +286,11 @@ class PixelNet(nn.Module):
 
             # placenet tests block stacking
             if self.place:
-                interm_place_color_feat = interm_grasp_depth_feat
-                interm_place_depth_feat = interm_grasp_color_feat
+                interm_place_color_feat = interm_grasp_color_feat
+                interm_place_depth_feat = interm_grasp_depth_feat
 
         # Combine features, including the goal condition if appropriate
         if goal_condition is None:
-            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
-            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
             interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
             if self.place:
