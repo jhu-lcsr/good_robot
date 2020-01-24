@@ -299,7 +299,7 @@ class Robot(object):
                 self.cam_pose = np.loadtxt('real/robot_base_to_camera_pose.txt', delimiter=' ')
                 self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
             else:
-                print('WARNING: Camera Calibration is not yet available, running calibrate.py '
+                print('WARNING: Camera Calibration is not yet available, running calibrate_ros.py '
                       'will create the required files: real/robot_base_to_camera_pose.txt and real/camera_depth_scale.txt')
                 # Camera calibration
                 self.cam_pose = None
@@ -1256,6 +1256,9 @@ class Robot(object):
                 # HK: Original Method
                 elif not self.place_task and not self.grasp_color_task:
                     object_positions = np.asarray(self.get_obj_positions())
+                    if not object_positions:
+                        # there are no objects in the scene, so the grasp could not be successful
+                        return False, False
                     object_positions = object_positions[:,2]
                     grasped_object_ind = np.argmax(object_positions)
                     grasped_object_handle = self.object_handles[grasped_object_ind]
