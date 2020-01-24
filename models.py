@@ -242,7 +242,7 @@ class PixelNet(nn.Module):
             # print('output prob shapes: ' + str(self.output_prob[0][0].shape))
             return output_prob, interm_feat
 
-    def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True, align_corners=False):
+    def layers_forward(self, rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition=None, requires_grad=True):
         """ Reduces the repetitive forward pass code across multiple model classes. See PixelNet forward() and responsive_net forward().
         """
         interm_place_feat = None
