@@ -579,12 +579,9 @@ class Trainer(object):
                 else:
                     loss = self.push_criterion(output_prob[0][0], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss.cpu().data.numpy()
 
             elif primitive_action == 'grasp':
                 # loss = self.grasp_criterion(output_prob[best_pix_ind[0]][1], Variable(torch.from_numpy(label).long().cuda()))
@@ -598,12 +595,9 @@ class Trainer(object):
                 else:
                     loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
+                loss_value += loss.cpu().data.numpy()
 
                 if symmetric and not self.place:
                     # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
@@ -617,12 +611,9 @@ class Trainer(object):
                     else:
                         loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                     loss.backward()
-                    nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                    # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                     #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                    try:
-                        loss_value += loss.cpu().data.numpy()[0]
-                    except:
-                        loss_value += loss.cpu().data.numpy()
+                    loss_value += loss.cpu().data.numpy()
 
                     loss_value = loss_value/2
 
@@ -639,12 +630,9 @@ class Trainer(object):
                 else:
                     loss = self.place_criterion(output_prob[0][2], Variable(torch.from_numpy(label).long()))
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
+                loss_value += loss.cpu().data.numpy()
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
@@ -672,9 +660,9 @@ class Trainer(object):
                 # The real robot label gets weight equal to the summ of all heuristic labels, or 1
                 tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
             else:
-                # tmp_label_weights[action_area > 0] = 1
+                tmp_label_weights[action_area > 0] = 1
                 # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
-                tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
+                # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
@@ -689,14 +677,11 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
                     loss = self.criterion(output_prob[0][0].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.mean()
+                loss = loss.sum()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss.cpu().data.numpy()
 
             elif primitive_action == 'grasp':
 
@@ -707,14 +692,11 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
                     loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.mean()
+                loss = loss.sum()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss.cpu().data.numpy()
 
                 if symmetric and not self.place:
                     # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
@@ -728,14 +710,11 @@ class Trainer(object):
                     else:
                         loss = self.criterion(output_prob[0][1].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
 
-                    loss = loss.mean()
+                    loss = loss.sum()
                     loss.backward()
-                    nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                    # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                     #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                    try:
-                        loss_value = loss.cpu().data.numpy()[0]
-                    except:
-                        loss_value = loss.cpu().data.numpy()
+                    loss_value = loss.cpu().data.numpy()
 
                     loss_value = loss_value/2
 
@@ -751,12 +730,9 @@ class Trainer(object):
                     loss = self.criterion(output_prob[0][2].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
                 loss = loss.sum()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss.cpu().data.numpy()
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
