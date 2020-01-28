@@ -942,15 +942,6 @@ class Robot(object):
                 if tool_rotation_angle is not None:
                     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
 
-                # move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
-                # move_magnitude = np.linalg.norm(move_direction)
-                # move_step = 0.02*move_direction/move_magnitude
-                # num_move_steps = int(np.floor(move_magnitude/0.02))
-
-                # for step_iter in range(num_move_steps):
-                #     vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0], UR5_target_position[1] + move_step[1], UR5_target_position[2] + move_step[2]),vrep.simx_opmode_blocking)
-                #     sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client,self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
-                # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
                 return True
         else:
             # move the real robot to a position.
@@ -1152,10 +1143,6 @@ class Robot(object):
 
         if self.is_sim:
 
-            # Compute tool orientation from heightmap rotation angle
-            # tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-            # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
-
             # Avoid collision with floor
             position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.04, workspace_limits[2][0] + 0.02)
@@ -1168,32 +1155,6 @@ class Robot(object):
 
             # Compute gripper position and linear movement increments
             tool_position = location_above_grasp_target
-            # sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
-            # move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
-            # move_magnitude = np.linalg.norm(move_direction)
-            # # prevent division by 0, source: https://stackoverflow.com/a/37977222/99379
-            # move_step = 0.05 * np.divide(move_direction, move_magnitude, out=np.zeros_like(move_direction), where=move_magnitude!=0)
-            # move_step = 0.05*move_direction/move_magnitude
-            # print('move direction: ' + str(move_direction))
-            # print('move step: ' + str(move_step))
-            # # TODO(ahundt) 0 steps may still be buggy in certain cases
-            # if move_step[0] == 0:
-            #     num_move_steps = 0
-            # else:
-            #     num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
-
-            # # Compute gripper orientation and rotation increments
-            # sim_ret, gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, vrep.simx_opmode_blocking)
-            # rotation_step = 0.3 if (tool_rotation_angle - gripper_orientation[1] > 0) else -0.3
-            # num_rotation_steps = int(np.floor((tool_rotation_angle - gripper_orientation[1])/rotation_step))
-
-            # # Simultaneously move and rotate gripper
-            # for step_iter in range(max(num_move_steps, num_rotation_steps)):
-            #     vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0]*min(step_iter,num_move_steps), UR5_target_position[1] + move_step[1]*min(step_iter,num_move_steps), UR5_target_position[2] + move_step[2]*min(step_iter,num_move_steps)),vrep.simx_opmode_blocking)
-            #     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter,num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-            # # not supported in some sim move_to() modes self.move_to(tool_position, tool_orientation)
             self.move_to(tool_position, heightmap_rotation_angle=heightmap_rotation_angle)
 
             # Ensure gripper is open
@@ -1220,25 +1181,6 @@ class Robot(object):
             if grasp_success and self.grasp_color_task:
                 color_success = self.check_correct_color_grasped(object_color)
                 print('Correct color was grasped: ' + str(color_success))
-
-            # Move the grasped object elsewhere if place = false
-            # if grasp_success and not self.place_task and self.grasp_color_task:
-            #     object_positions = np.asarray(self.get_obj_positions())
-            #     object_positions = object_positions[:,2]
-            #     grasped_object_ind = np.argmax(object_positions)
-            #     grasped_object_handle = self.object_handles[grasped_object_ind]
-            #     # TODO: HK: check if any block is grasped and put it back at a random place
-            #     color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
-            #     color_index = np.where(color==1)
-            #     vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-            #     if grasped_object_ind == color_index[0]:
-            #         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
-            #         drop_x = (workspace_limits[0][1] - workspace_limits[0][0] - 0.2) * np.random.random_sample() + workspace_limits[0][0] + 0.1
-            #         drop_y = (workspace_limits[1][1] - workspace_limits[1][0] - 0.2) * np.random.random_sample() + workspace_limits[1][0] + 0.1
-            #         object_position = [drop_x, drop_y, 0.15]
-            #         object_orientation = [2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample(), 2*np.pi*np.random.random_sample()]
-            #         vrep.simxSetObjectPosition(self.sim_client, grasped_object_handle, -1, object_position, vrep.simx_opmode_blocking)
-            #         vrep.simxSetObjectOrientation(self.sim_client, grasped_object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
             # HK: Place grasped object at a random place
             if grasp_success:
@@ -1374,44 +1316,6 @@ class Robot(object):
                                                                                                                 gripper_to_arm_transform=self.tool_tip_to_gripper_center_transform)
 
         if self.is_sim:
-            # TODO(ahundt) extra_rot line is brand new and wasn't needed before move_to() became for all motions. Check why, debug/simplify.
-            # Compute tool orientation from heightmap rotation angle
-            # extra 90 deg gripper rotation to line up push the long way
-            # tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
-
-            # # Adjust pushing point to be on tip of finger
-            # position[2] = position[2] + self.push_vertical_offset
-
-            # # compute push direction
-            # position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation = push_poses(heightmap_rotation_angle, position, workspace_limits,
-            #                                                                                                         gripper_to_arm_transform=self.tool_tip_to_gripper_center_transform)
-            # sim has a different base orientation definition, use that instead
-            # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
-
-            # Move gripper to location above pushing point
-            # pushing_point_margin = 0.2
-            # location_above_pushing_point = (position[0], position[1], position[2] + pushing_point_margin)
-
-            # Compute gripper position and linear movement increments
-            # tool_position = location_above_pushing_point
-            # sim_ret, UR5_target_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_target_handle,-1,vrep.simx_opmode_blocking)
-            # move_direction = np.asarray([tool_position[0] - UR5_target_position[0], tool_position[1] - UR5_target_position[1], tool_position[2] - UR5_target_position[2]])
-            # move_magnitude = np.linalg.norm(move_direction)
-            # move_step = 0.05*move_direction/move_magnitude
-            # num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
-
-            # # Compute gripper orientation and rotation increments
-            # sim_ret, gripper_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, vrep.simx_opmode_blocking)
-            # rotation_step = 0.3 if (tool_rotation_angle - gripper_orientation[1] > 0) else -0.3
-            # num_rotation_steps = int(np.floor((tool_rotation_angle - gripper_orientation[1])/rotation_step))
-
-            # # Simultaneously move and rotate gripper
-            # for step_iter in range(max(num_move_steps, num_rotation_steps)):
-            #     vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(UR5_target_position[0] + move_step[0]*min(step_iter,num_move_steps), UR5_target_position[1] + move_step[1]*min(step_iter,num_move_steps), UR5_target_position[2] + move_step[2]*min(step_iter,num_move_steps)),vrep.simx_opmode_blocking)
-            #     vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, gripper_orientation[1] + rotation_step*min(step_iter,num_rotation_steps), np.pi/2), vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectPosition(self.sim_client,self.UR5_target_handle,-1,(tool_position[0],tool_position[1],tool_position[2]),vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectOrientation(self.sim_client, self.UR5_target_handle, -1, (np.pi/2, tool_rotation_angle, np.pi/2), vrep.simx_opmode_blocking)
-            # # not supported in some sim move_to() modes self.move_to(tool_position, tool_orientation)
             self.move_to(up_pos, heightmap_rotation_angle=heightmap_rotation_angle)
 
             # Ensure gripper is closed
@@ -1419,11 +1323,6 @@ class Robot(object):
 
             # Approach pushing point
             self.move_to(position, None)
-
-            # push_length = 0.1
-            # target_x = min(max(position[0] + push_direction[0]*push_length, workspace_limits[0][0]), workspace_limits[0][1])
-            # target_y = min(max(position[1] + push_direction[1]*push_length, workspace_limits[1][0]), workspace_limits[1][1])
-            # push_length = np.sqrt(np.power(target_x-position[0],2)+np.power(target_y-position[1],2))
 
             # Move in pushing direction towards target location, but move a bit more slowly so stuff doesn't go flying
             self.move_to(push_endpoint, None, sim_move_step=0.01)
@@ -1880,7 +1779,6 @@ class Robot(object):
                 return False, idx + 1
         detected_height = min(idx + 2, len(object_color_sequence))
         print('check_stack() current detected stack height: ' + str(detected_height))
-        # TODO(ahundt) add check_stack for real robot
         return goal_success, detected_height
 
     def check_incremental_height(self,input_img, current_stack_goal):
@@ -1960,163 +1858,8 @@ class Robot(object):
         self.move_to(above_bin_waypoint, tool_orientation)
         time.sleep(.1)
         self.go_home(block_until_home=True)
-        # tool_rotation_angle = -np.pi/4
-        # tool_rotation_angle = np.pi
-        # tool_orientation = np.asarray([grasp_orientation[0]*np.cos(tool_rotation_angle) - grasp_orientation[1]*np.sin(tool_rotation_angle), grasp_orientation[0]*np.sin(tool_rotation_angle) + grasp_orientation[1]*np.cos(tool_rotation_angle), 0.0])*np.pi
-        # tool_orientation_angle = np.linalg.norm(tool_orientation)
-        # tool_orientation_axis = tool_orientation/tool_orientation_angle
-        # tool_orientation_rotm = utils.angle2rotm(tool_orientation_angle, tool_orientation_axis, point=None)[:3,:3]
-
-        # tilt_rotm = utils.euler2rotm(np.asarray([-np.pi/4,0,0]))
-        # tilted_tool_orientation_rotm = np.dot(tilt_rotm, tool_orientation_rotm)
-        # tilted_tool_orientation_axis_angle = utils.rotm2angle(tilted_tool_orientation_rotm)
-        # tilted_tool_orientation = tilted_tool_orientation_axis_angle[0]*np.asarray(tilted_tool_orientation_axis_angle[1:4])
-
-        # # Move to box grabbing position
-        # # box_grab_position = [0.5,-0.35,-0.12]
-        # box_grab_position = [0.207,0.163,0.07]
-        # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        # tcp_command = "def process():\n"
-        # tcp_command += " set_digital_out(8,False)\n"
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (box_grab_position[0],box_grab_position[1],box_grab_position[2]+0.1,tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc,self.joint_vel)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_grab_position[0],box_grab_position[1],box_grab_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
-        # tcp_command += " set_digital_out(8,True)\n"
-        # tcp_command += "end\n"
-        # self.tcp_socket.send(str.encode(tcp_command))
-        # self.tcp_socket.close()
-
-        # # Block until robot reaches box grabbing position and gripper fingers have stopped moving
-        # state_data = self.get_state()
-        # tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        # while True:
-        #     state_data = self.get_state()
-        #     new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        #     actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-        #     if tool_analog_input2 < 3.7 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - box_grab_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-        #         break
-        #     tool_analog_input2 = new_tool_analog_input2
-
-        # # Move to box release position
-        # box_release_position = [0.5,0.08,-0.12]
-        # home_position = [0.49,0.11,0.03]
-        # self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.tcp_socket.connect((self.tcp_host_ip, self.tcp_port))
-        # tcp_command = "def process():\n"
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_release_position[0],box_release_position[1],box_release_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_release_position[0],box_release_position[1],box_release_position[2]+0.3,tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.02,self.joint_vel*0.02)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.29)\n" % (box_grab_position[0]-0.05,box_grab_position[1]+0.1,box_grab_position[2]+0.3,tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_grab_position[0]-0.05,box_grab_position[1]+0.1,box_grab_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_grab_position[0],box_grab_position[1],box_grab_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (box_grab_position[0]+0.05,box_grab_position[1],box_grab_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.1,self.joint_vel*0.1)
-        # tcp_command += " set_digital_out(8,False)\n"
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.09)\n" % (box_grab_position[0],box_grab_position[1],box_grab_position[2]+0.1,tilted_tool_orientation[0],tilted_tool_orientation[1],tilted_tool_orientation[2],self.joint_acc,self.joint_vel)
-        # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc,self.joint_vel)
-        # tcp_command += "end\n"
-        # self.tcp_socket.send(str.encode(tcp_command))
-        # self.tcp_socket.close()
-
-        # # Block until robot reaches home position
-        # state_data = self.get_state()
-        # tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        # while True:
-        #     state_data = self.get_state()
-        #     new_tool_analog_input2 = self.parse_tcp_state_data(state_data, 'tool_data')
-        #     actual_tool_pose = self.parse_tcp_state_data(state_data, 'cartesian_info')
-        #     if tool_analog_input2 > 3.0 and (abs(new_tool_analog_input2 - tool_analog_input2) < 0.01) and all([np.abs(actual_tool_pose[j] - home_position[j]) < self.tool_pose_tolerance[j] for j in range(3)]):
-        #         break
-        #     tool_analog_input2 = new_tool_analog_input2
 
     def shutdown(self):
         if self.is_sim:
             vrep.simxStopSimulation(self.sim_client, vrep.simx_opmode_blocking)
             vrep.simxFinish(-1)
-
-        # def place(self, position, orientation, workspace_limits):
-        #     print('Executing: place at (%f, %f, %f)' % (position[0], position[1], position[2]))
-
-        #     # Attempt placing
-        #     position[2] = max(position[2], workspace_limits[2][0])
-        #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-        #     self.move_to([position[0], position[1], position[2] + 0.05], orientation)
-        #     self.tool_acc = 1 # 0.05
-        #     self.tool_vel = 0.02 # 0.02
-        #     self.move_to([position[0], position[1], position[2]], orientation)
-        #     self.open_gripper()
-        #     self.tool_acc = 1 # 0.5
-        #     self.tool_vel = 0.2 # 0.2
-        #     self.move_to([position[0], position[1], position[2] + 0.2], orientation)
-        #     self.close_gripper()
-        #     self.go_home()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# JUNK
-
-# command = "movel(p[%f,%f,%f,%f,%f,%f],0.5,0.2,0,0,a=1.2,v=0.25)\n" % (-0.5,-0.2,0.1,2.0171,2.4084,0)
-
-# import socket
-
-# HOST = "192.168.1.100"
-# PORT = 30002
-# s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-# s.connect((HOST,PORT))
-
-# j0 = 0
-# j1 = -3.1415/2
-# j2 = 3.1415/2
-# j3 = -3.1415/2
-# j4 = -3.1415/2
-# j5 = 0;
-
-# joint_acc = 1.2
-# joint_vel = 0.25
-
-# # command = "movej([%f,%f,%f,%f,%f,%f],a=%f,v=%f)\n" % (j0,j1,j2,j3,j4,j5,joint_acc,joint_vel)
-
-
-
-# #
-
-
-# # True closes
-# command = "set_digital_out(8,True)\n"
-
-# s.send(str.encode(command))
-# data = s.recv(1024)
-
-
-
-# s.close()
-# print("Received",repr(data))
-
-
-
-
-
-# print()
-
-# String.Format ("movej([%f,%f,%f,%f,%f, %f], a={6}, v={7})\n", j0, j1, j2, j3, j4, j5, a, v);
