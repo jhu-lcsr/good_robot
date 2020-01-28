@@ -196,7 +196,7 @@ class Robot(object):
 
             # MODIFY remoteApiConnections.txt
 
-            if tcp_port == 30002:
+            if tcp_port is None or tcp_port == 30002 or tcp_port == 502:
                 print("WARNING: default tcp port changed to 19997 for is_sim")
                 tcp_port = 19997
             self.tcp_port = tcp_port
