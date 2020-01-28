@@ -81,6 +81,15 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
             # (name + '-vectorblock-norm1', nn.BatchNorm1d(channels_out))
         ]))
 
+
+def rot_to_affine_mat(rotate_theta):
+    affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
+    affine_mat_after.shape = (2,3,1)
+    affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
+
+    return affine_mat_after
+
+
 class PixelNet(nn.Module):
 
     def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False): # , snapshot=None
@@ -185,9 +194,7 @@ class PixelNet(nn.Module):
                         interm_feat.append([interm_push_feat, interm_grasp_feat])
 
                     # Compute sample grid for rotation AFTER branches
-                    affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
-                    affine_mat_after.shape = (2,3,1)
-                    affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
+                    affine_mat_after = rot_to_affine_mat(rotate_theta)
                     if self.use_cuda:
                         flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size(), align_corners=self.align_corners)
                     else:
@@ -222,9 +229,7 @@ class PixelNet(nn.Module):
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
-            affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
-            affine_mat_after.shape = (2,3,1)
-            affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
+            affine_mat_after = rot_to_affine_mat(rotate_theta)
             if self.use_cuda:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size(), align_corners=self.align_corners)
             else:
@@ -247,9 +252,7 @@ class PixelNet(nn.Module):
         """
         interm_place_feat = None
         # Compute sample grid for rotation BEFORE neural network
-        affine_mat_before = np.asarray([[np.cos(-rotate_theta), np.sin(-rotate_theta), 0],[-np.sin(-rotate_theta), np.cos(-rotate_theta), 0]])
-        affine_mat_before.shape = (2,3,1)
-        affine_mat_before = torch.from_numpy(affine_mat_before).permute(2,0,1).float()
+        affine_mat_before = rot_to_affine_mat(-rotate_theta)
         if self.use_cuda:
             flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size(), align_corners=self.align_corners)
         else:
