@@ -149,7 +149,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     if place is None:
         place = False
     if os.path.isfile(stack_height_file):
-        heights = np.loadtxt()
+        heights = np.loadtxt(stack_height_file)
         rewards = None
         if place is None:
             place = True
