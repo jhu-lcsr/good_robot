@@ -449,7 +449,13 @@ class reinforcement_net(nn.Module):
                     interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
                     interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
                     interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
-                    interm_feat.append([interm_push_feat, interm_grasp_feat])
+                    part_interm_feat = [interm_push_feat, interm_grasp_feat]
+                    if self.place:
+                        interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                        interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                        interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
+                        part_interm_feat += [interm_place_feat]
+                    interm_feat.append(part_interm_feat)
 
                     # Compute sample grid for rotation AFTER branches
                     affine_mat_after = rot_to_affine_mat(rotate_theta)
@@ -459,8 +465,12 @@ class reinforcement_net(nn.Module):
                         flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
                     # Forward pass through branches, undo rotation on output predictions, upsample results
-                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
-                                        nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+                    part_output_prob = [nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                        nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))]
+                    if self.place:
+                        part_output_prob += [nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))]
+                    # Forward pass through branches, undo rotation on output predictions, upsample results
+                    output_prob.append(part_output_prob)
 
             return output_prob, interm_feat
 
@@ -495,7 +505,13 @@ class reinforcement_net(nn.Module):
             interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
             interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
             interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
-            interm_feat.append([interm_push_feat, interm_grasp_feat])
+            part_interm_feat = [interm_push_feat, interm_grasp_feat]
+            if self.place:
+                interm_place_color_feat = self.place_color_trunk.features(rotate_color)
+                interm_place_depth_feat = self.place_depth_trunk.features(rotate_depth)
+                interm_place_feat = torch.cat((interm_place_color_feat, interm_place_depth_feat), dim=1)
+                part_interm_feat += [interm_place_feat]
+            interm_feat.append(part_interm_feat)
 
             # Compute sample grid for rotation AFTER branches
             affine_mat_after = rot_to_affine_mat(rotate_theta)
@@ -504,7 +520,11 @@ class reinforcement_net(nn.Module):
             else:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
 
+            part_output_prob = [nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners)),
+                                nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))]
+            if self.place:
+                part_output_prob += [nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear', align_corners=self.align_corners).forward(F.grid_sample(self.placenet(interm_place_feat), flow_grid_after, mode='nearest', align_corners=self.align_corners))]
             # Forward pass through branches, undo rotation on output predictions, upsample results
-            output_prob.append()
+            output_prob.append(part_output_prob)
 
             return output_prob, interm_feat
