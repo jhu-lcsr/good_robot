@@ -334,3 +334,177 @@ class PixelNet(nn.Module):
         if self.place:
             # we rename the dictionary names of the grasp weights to place, then load them into the placenet
             self.placenet.load_state_dict(dict(map(lambda t: (t[0].replace('grasp', 'place'), t[1]), self.graspnet.state_dict().items())))
+
+
+class reinforcement_net(nn.Module):
+
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='densenet', use_vector_block=False, pretrained=True, align_corners=False): # , snapshot=None
+        super(reinforcement_net, self).__init__()
+        # super(PixelNet, self).__init__()
+        self.use_cuda = use_cuda
+        self.place = place
+        self.use_vector_block = use_vector_block
+        self.upsample_scale = 16
+        self.num_rotations = 16
+        self.network = network
+        self.align_corners = align_corners
+
+        if self.use_vector_block:
+            channels_out = 2048
+            self.push_vector_block = vector_block('push', goal_condition_len, channels_out=channels_out)
+            self.grasp_vector_block = vector_block('grasp', goal_condition_len, channels_out=channels_out)
+            if place:
+                self.place_vector_block = vector_block('place', goal_condition_len, channels_out=channels_out)
+            # TODO(ahundt) this variable overwrite is confusing, write the code better
+            goal_condition_len = channels_out
+
+        if network == 'densenet' or efficientnet_pytorch is None:
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            self.push_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.push_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            self.grasp_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+
+            # placenet tests block stacking
+            if self.place:
+                self.place_color_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+                self.place_depth_trunk = torchvision.models.densenet.densenet121(pretrained=pretrained)
+            fc_channels = 2048
+            second_fc_channels = 64
+        else:
+            # how many dilations to do at the end of the network
+            num_dilation = 1
+            # Initialize network trunks with DenseNet pre-trained on ImageNet
+            try:
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
+            except:
+                print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                      'instead of the original efficientnet pytorch')
+                num_dilation = 0
+                if pretrained:
+                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                else:
+                    self.image_trunk = EfficientNet.from_name('efficientnet-b0')
+                    self.push_trunk = EfficientNet.from_name('efficientnet-b0')
+            # how much will the dilations affect the upsample step
+            self.upsample_scale = self.upsample_scale / 2 ** num_dilation
+            fc_channels = 1280 * 2
+            second_fc_channels = None
+
+        # Construct network branches for pushing and grasping
+        self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
+        self.graspnet = trunk_net('grasp', fc_channels, second_fc_channels, goal_condition_len, 1)
+        # placenet tests block stacking
+        if place:
+            self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
+
+        # Initialize network weights
+        for m in self.named_modules():
+            #if 'push-' in m[0] or 'grasp-' in m[0]:
+            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
+                if isinstance(m[1], nn.Conv2d):
+                    nn.init.kaiming_normal_(m[1].weight.data)
+                elif isinstance(m[1], nn.BatchNorm2d):
+                    m[1].weight.data.fill_(1)
+                    m[1].bias.data.zero_()
+
+
+    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
+
+        if is_volatile:
+            with torch.no_grad():
+                output_prob = []
+                interm_feat = []
+
+                # Apply rotations to images
+                for rotate_idx in range(self.num_rotations):
+                    rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+
+                    # Compute sample grid for rotation BEFORE neural network
+                    affine_mat_before = rot_to_affine_mat(-rotate_theta)
+                    if self.use_cuda:
+                        flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), input_color_data.size())
+                    else:
+                        flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), input_color_data.size())
+
+                    # Rotate images clockwise
+                    if self.use_cuda:
+                        rotate_color = F.grid_sample(Variable(input_color_data, volatile=True).cuda(), flow_grid_before, mode='nearest')
+                        rotate_depth = F.grid_sample(Variable(input_depth_data, volatile=True).cuda(), flow_grid_before, mode='nearest')
+                    else:
+                        rotate_color = F.grid_sample(Variable(input_color_data, volatile=True), flow_grid_before, mode='nearest')
+                        rotate_depth = F.grid_sample(Variable(input_depth_data, volatile=True), flow_grid_before, mode='nearest')
+
+                    # Compute intermediate features
+                    interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+                    interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+                    interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
+                    interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+                    interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+                    interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+                    interm_feat.append([interm_push_feat, interm_grasp_feat])
+
+                    # Compute sample grid for rotation AFTER branches
+                    affine_mat_after = rot_to_affine_mat(rotate_theta)
+                    if self.use_cuda:
+                        flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
+                    else:
+                        flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
+
+                    # Forward pass through branches, undo rotation on output predictions, upsample results
+                    output_prob.append([nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.pushnet(interm_push_feat), flow_grid_after, mode='nearest')),
+                                        nn.Upsample(scale_factor=16, mode='bilinear').forward(F.grid_sample(self.graspnet(interm_grasp_feat), flow_grid_after, mode='nearest'))])
+
+            return output_prob, interm_feat
+
+        else:
+            output_prob = []
+            interm_feat = []
+
+            # Apply rotations to intermediate features
+            # for rotate_idx in range(self.num_rotations):
+            rotate_idx = specific_rotation
+            rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
+
+            # Compute sample grid for rotation BEFORE branches
+            affine_mat_before = rot_to_affine_mat(-rotate_theta)
+            if self.use_cuda:
+                flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), input_color_data.size())
+            else:
+                flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False), input_color_data.size())
+
+            # Rotate images clockwise
+            if self.use_cuda:
+                rotate_color = F.grid_sample(Variable(input_color_data, requires_grad=False).cuda(), flow_grid_before, mode='nearest')
+                rotate_depth = F.grid_sample(Variable(input_depth_data, requires_grad=False).cuda(), flow_grid_before, mode='nearest')
+            else:
+                rotate_color = F.grid_sample(Variable(input_color_data, requires_grad=False), flow_grid_before, mode='nearest')
+                rotate_depth = F.grid_sample(Variable(input_depth_data, requires_grad=False), flow_grid_before, mode='nearest')
+
+            # Compute intermediate features
+            interm_push_color_feat = self.push_color_trunk.features(rotate_color)
+            interm_push_depth_feat = self.push_depth_trunk.features(rotate_depth)
+            interm_push_feat = torch.cat((interm_push_color_feat, interm_push_depth_feat), dim=1)
+            interm_grasp_color_feat = self.grasp_color_trunk.features(rotate_color)
+            interm_grasp_depth_feat = self.grasp_depth_trunk.features(rotate_depth)
+            interm_grasp_feat = torch.cat((interm_grasp_color_feat, interm_grasp_depth_feat), dim=1)
+            interm_feat.append([interm_push_feat, interm_grasp_feat])
+
+            # Compute sample grid for rotation AFTER branches
+            affine_mat_after = rot_to_affine_mat(rotate_theta)
+            if self.use_cuda:
+                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
+            else:
+                flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size())
+
+            # Forward pass through branches, undo rotation on output predictions, upsample results
+            output_prob.append()
+
+            return output_prob, interm_feat
