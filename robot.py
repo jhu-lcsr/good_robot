@@ -799,7 +799,7 @@ class Robot(object):
         return state_data
 
 
-    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None, legacy_mode=True, sim_move_step=0.02):
+    def move_to(self, tool_position, tool_orientation=None, timeout_seconds=10, heightmap_rotation_angle=None, legacy_mode=True, sim_move_step=0.01):
         """
         legacy_mode: bool, Legacy mode manually increments the gripper position, rather than using simulator motion commands.
         Note to use legacy mode in the simulator you need to go into the simulation and disable the "threaded child script"
