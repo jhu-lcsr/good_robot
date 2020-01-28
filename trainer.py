@@ -558,9 +558,9 @@ class Trainer(object):
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
             tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels)) + fill_value
             if self.common_sense:
-                # all areas where we won't be able to contact anything will have 
+                # all areas where we won't be able to contact anything will have
                 # value 0 which should indicate no action should be taken at these locations
-                # TODO(ahundt) double check this is factually correct 
+                # TODO(ahundt) double check this is factually correct
                 tmp_label[contactable_regions < 1] = 1 - contactable_regions
             tmp_label[action_area > 0] = label_value
             label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
@@ -600,7 +600,7 @@ class Trainer(object):
                 loss_value += loss.cpu().data.numpy()
 
                 if symmetric and not self.place:
-                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
+                    # Since grasping can be symmetric when not placing, depending on the robot kinematics,
                     # train with another forward pass of opposite rotation angle
                     opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
@@ -654,7 +654,7 @@ class Trainer(object):
             label_weights = np.zeros(label.shape)
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             if self.common_sense:
-                # all areas where we won't be able to contact anything will have 
+                # all areas where we won't be able to contact anything will have
                 # mask value 1 which allows the label value zero to be applied
                 tmp_label_weights = 1 - contactable_regions
                 # The real robot label gets weight equal to the summ of all heuristic labels, or 1
@@ -699,7 +699,7 @@ class Trainer(object):
                 loss_value = loss.cpu().data.numpy()
 
                 if symmetric and not self.place:
-                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
+                    # Since grasping can be symmetric when not placing, depending on the robot kinematics,
                     # train with another forward pass of opposite rotation angle
                     opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
