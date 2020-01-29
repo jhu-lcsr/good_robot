@@ -430,6 +430,22 @@ class Trainer(object):
                         place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         if not self.place:
             place_predictions = None
+        if self.common_sense:
+            # Mask pixels we know cannot lead to progress
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
+            # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
+            push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
+            grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            if self.place:
+                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(grasp_place_contactable_regions, push_predictions.shape, subok=True))
+        else:
+            # Mask pixels we know cannot lead to progress
+            push_predictions = np.ma.masked_array(push_predictions)
+            grasp_predictions = np.ma.masked_array(grasp_predictions)
+            if self.place:
+                place_predictions = np.ma.masked_array(place_predictions)
+
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
 
@@ -525,14 +541,14 @@ class Trainer(object):
 
     # Compute labels and backpropagate
     def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, show_heightmap=False):
-        contactable_regions = None
-        if self.common_sense:
-            if primitive_action == 'push':
-                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
-            if primitive_action == 'grasp':
-                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
-            if primitive_action == 'place':
-                contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+        # contactable_regions = None
+        # if self.common_sense:
+        #     if primitive_action == 'push':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
+        #     if primitive_action == 'grasp':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+        #     if primitive_action == 'place':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
 
         if show_heightmap:
             # visualize the common sense function results
@@ -543,9 +559,9 @@ class Trainer(object):
             plt.imshow(depth_heightmap)
             f.add_subplot(1,3, 2)
             # f.add_subplot(1,2, 1)
-            if contactable_regions is not None:
-                plt.imshow(contactable_regions)
-                f.add_subplot(1,3, 3)
+            # if contactable_regions is not None:
+            #     plt.imshow(contactable_regions)
+            #     f.add_subplot(1,3, 3)
             # plt.imshow(stuff_count)
             plt.show(block=True)
         if self.method == 'reactive':
@@ -560,11 +576,11 @@ class Trainer(object):
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
             tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels)) + fill_value
-            if self.common_sense:
-                # all areas where we won't be able to contact anything will have
-                # value 0 which should indicate no action should be taken at these locations
-                # TODO(ahundt) double check this is factually correct
-                tmp_label[contactable_regions < 1] = 1 - contactable_regions
+            # if self.common_sense:
+            #     # all areas where we won't be able to contact anything will have
+            #     # value 0 which should indicate no action should be taken at these locations
+            #     # TODO(ahundt) double check this is factually correct
+            #     tmp_label[contactable_regions < 1] = 1 - contactable_regions
             tmp_label[action_area > 0] = label_value
             label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
@@ -656,16 +672,17 @@ class Trainer(object):
             # Compute label mask
             label_weights = np.zeros(label.shape)
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
-            if self.common_sense:
-                # all areas where we won't be able to contact anything will have
-                # mask value 1 which allows the label value zero to be applied
-                tmp_label_weights = 1 - contactable_regions
-                # The real robot label gets weight equal to the summ of all heuristic labels, or 1
-                tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
-            else:
-                tmp_label_weights[action_area > 0] = 1
-                # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
-                # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
+            tmp_label_weights[action_area > 0] = 1
+            # if self.common_sense:
+            #     # all areas where we won't be able to contact anything will have
+            #     # mask value 1 which allows the label value zero to be applied
+            #     tmp_label_weights = 1 - contactable_regions
+            #     # The real robot label gets weight equal to the summ of all heuristic labels, or 1
+            #     tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
+            # else:
+            #     tmp_label_weights[action_area > 0] = 1
+            #     # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
+            #     # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
@@ -745,6 +762,8 @@ class Trainer(object):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
+        # predictions are a masked arrray, so masked regions have the fill value 0
+        predictions = predictions.filled(0.0)
         for canvas_row in range(int(num_rotations/4)):
             tmp_row_canvas = None
             for canvas_col in range(4):

@@ -427,10 +427,10 @@ def main(args):
             if nonlocal_variables['executing_action']:
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
-                best_push_conf = np.max(push_predictions)
-                best_grasp_conf = np.max(grasp_predictions)
+                best_push_conf = np.ma.max(push_predictions)
+                best_grasp_conf = np.ma.max(grasp_predictions)
                 if place:
-                    best_place_conf = np.max(place_predictions)
+                    best_place_conf = np.ma.max(place_predictions)
                     print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
@@ -462,18 +462,17 @@ def main(args):
                 trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 logger.write_to_log('trial', trainer.trial_log)
 
-
                 # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
                 each_action_max_coordinate = {
-                    'push': np.unravel_index(np.argmax(push_predictions), push_predictions.shape), # push, index 0
-                    'grasp': np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape),
+                    'push': np.unravel_index(np.ma.argmax(push_predictions), push_predictions.shape), # push, index 0
+                    'grasp': np.unravel_index(np.ma.argmax(grasp_predictions), grasp_predictions.shape),
                 }
                 each_action_predicted_value = {
                     'push': push_predictions[each_action_max_coordinate['push']], # push, index 0
                     'grasp': grasp_predictions[each_action_max_coordinate['grasp']],
                 }
                 if place:
-                    each_action_max_coordinate['place'] = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
+                    each_action_max_coordinate['place'] = np.unravel_index(np.ma.argmax(place_predictions), place_predictions.shape)
                     each_action_predicted_value['place'] = place_predictions[each_action_max_coordinate['place']]
                 # we will actually execute the best pixel index of the selected action
                 nonlocal_variables['best_pix_ind'] = each_action_max_coordinate[nonlocal_variables['primitive_action']]
@@ -1077,6 +1076,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
     color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose,
                                                            workspace_limits, heightmap_resolution, background_heightmap=robot.background_heightmap)
+    # TODO(ahundt) switch to masked array, then only have a regular heightmap
     valid_depth_heightmap = depth_heightmap.copy()
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
@@ -1182,13 +1182,13 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                          reward_to_backprop, goal_condition=exp_goal_condition)
         # Recompute prediction value and label for replay buffer
         if sample_primitive_action == 'push':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_push_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [np.ma.max(sample_push_predictions)]
             # trainer.predicted_value_log[sample_iteration] = [sample_push_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'grasp':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_grasp_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [np.ma.max(sample_grasp_predictions)]
             # trainer.predicted_value_log[sample_iteration] = [sample_grasp_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
         elif sample_primitive_action == 'place':
-            trainer.predicted_value_log[sample_iteration] = [np.max(sample_place_predictions)]
+            trainer.predicted_value_log[sample_iteration] = [np.ma.max(sample_place_predictions)]
             # trainer.predicted_value_log[sample_iteration] = [sample_place_predictions[sample_best_pix_ind[0], sample_best_pix_ind[1], sample_best_pix_ind[2]]]
 
         if update_label_value_log:
