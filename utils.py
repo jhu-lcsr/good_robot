@@ -7,6 +7,10 @@ from scipy import ndimage
 import datetime
 import os
 
+# to convert action names to the corresponding ID number and vice-versa
+ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
+ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
+
 
 def mkdir_p(path):
     """Create the specified path on the filesystem like the `mkdir -p` command

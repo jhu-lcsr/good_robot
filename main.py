@@ -16,11 +16,9 @@ from robot import Robot
 from trainer import Trainer
 from logger import Logger
 import utils
+from utils import ACTION_TO_ID
+from utils import ID_TO_ACTION
 import plot
-
-# to convert action names to the corresponding ID number and vice-versa
-ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
-ID_TO_ACTION = {0: 'push', 1: 'grasp', 2: 'place'}
 
 
 def run_title(args):
