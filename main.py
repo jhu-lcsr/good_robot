@@ -257,13 +257,13 @@ def main(args):
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
-                      goal_condition_len, place, pretrained, flops, 
+                      goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
         trainer.model.transfer_grasp_to_place()
-    
+
     # Initialize data logger
     title, dir_name = run_title(args)
     logger = Logger(continue_logging, logging_directory, args=args, dir_name=dir_name)
@@ -582,8 +582,8 @@ def main(args):
                     if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
-                    
-                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or 
+
+                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or
                             valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
                         # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
@@ -591,7 +591,7 @@ def main(args):
                     else:
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    # Get image after executing grasp action. 
+                    # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
                     if place:
@@ -725,7 +725,7 @@ def main(args):
             push_str = ''
             if not push_may_contact_something:
                 push_str += 'Predicting push action failure, heuristics determined '
-                push_str += 'push at height ' + str(safe_z_position) 
+                push_str += 'push at height ' + str(safe_z_position)
                 push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
                 print(push_str)
 
@@ -1075,7 +1075,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     color_img, depth_img = robot.get_camera_data()
     depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
     # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose, 
+    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose,
                                                            workspace_limits, heightmap_resolution, background_heightmap=robot.background_heightmap)
     valid_depth_heightmap = depth_heightmap.copy()
     valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
