@@ -804,7 +804,7 @@ def main(args):
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
             num_trials = trainer.num_trials()
-            pg_trial_success_count = np.max(trainer.trial_success_log)
+            pg_trial_success_count = np.max(trainer.trial_success_log, initial=0)
             for i in range(len(trainer.trial_success_log), num_trials):
                 # previous trials were ended early
                 trainer.trial_success_log.append([int(pg_trial_success_count)])
