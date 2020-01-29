@@ -114,13 +114,22 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
 
     return color_heightmap, depth_heightmap
 
-def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.12, min_contact_height=0.01, push_length=0.0):
+def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.01, push_length=0.0, z_buffer=0.005):
     """ Get heuristic scores for the grasp Q value at various pixels. 0 means our model confidently indicates no progress will be made, 1 means progress may be possible.
     """
     pixels_to_dilate = int(np.ceil((gripper_width + push_length)/heightmap_resolution))
     kernel = np.ones((pixels_to_dilate, pixels_to_dilate), np.uint8)
     object_pixels = (heightmap > min_contact_height).astype(np.uint8)
     contactable_regions = cv2.dilate(object_pixels, kernel, iterations=1)
+    if push_length > 0.0:
+        # For push, skip regions where the gripper would be too high
+        pixels_to_dilate = int(np.ceil(gripper_width/heightmap_resolution))
+        kernel = np.ones((pixels_to_dilate, pixels_to_dilate), np.uint8)
+        push_too_high_pixels = (heightmap > (np.max(heightmap) - z_buffer)).astype(np.uint8)
+        # set all the pixels where the push would be too high to zero,
+        # meaning it is not an action which would contact any object
+        contactable_regions[push_too_high_pixels] = 0.0
+
     return contactable_regions
 
 # Save a 3D point cloud to a binary .ply file
