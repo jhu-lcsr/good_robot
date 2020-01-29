@@ -802,6 +802,16 @@ def main(args):
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
+        if not place and stuff_sum < empty_threshold:
+            print('Pushing And Grasping Trial Successful!')
+            num_trials = trainer.num_trials()
+            pg_trial_success_count = np.max(trainer.trial_success_log)
+            for i in range(len(trainer.trial_success_log), num_trials):
+                # previous trials were ended early
+                trainer.trial_success_log.append([int(pg_trial_success_count)])
+            trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
+            nonlocal_variables['trial_complete'] = True
+
         if stuff_sum < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
