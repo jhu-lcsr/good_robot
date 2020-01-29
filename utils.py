@@ -127,7 +127,7 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
         push_too_high_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
-        contactable_regions[push_too_high_pixels] = 0.0
+        contactable_regions[push_too_high_pixels] = 0
 
     return contactable_regions
 
