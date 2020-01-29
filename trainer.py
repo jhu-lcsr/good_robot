@@ -440,7 +440,7 @@ class Trainer(object):
             grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
             if self.place:
-                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(grasp_place_contactable_regions, push_predictions.shape, subok=True))
+                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
