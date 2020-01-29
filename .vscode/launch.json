@@ -98,6 +98,24 @@
             "args": ["--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions"]
         },
         {
+            "name": "main.py: Sim Push and Grasp Densenet (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--tcp_port", "19997", "--nn", "densenet"]
+        },
+        {
+            "name": "main.py: RESUME Sim Push and Grasp Densenet (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--tcp_port", "19997", "--nn", "densenet", "--resume", "./logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training"]
+        },
+        {
             "name": "main.py: Sim Push and Grasp (External Terminal)",
             "type": "python",
             "request": "launch",
@@ -107,13 +125,22 @@
             "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--tcp_port", "19997"]
         },
         {
+            "name": "main.py: RESUME Sim Push and Grasp (External Terminal)",
+            "type": "python",
+            "request": "launch",
+            "pythonPath": "/usr/bin/python3",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/toys", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--tcp_port", "19997", "--resume", "./logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training"]
+        },
+        {
             "name": "main.py: Sim Stack check_z_height (External Terminal)",
             "type": "python",
             "request": "launch",
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--future_reward_discount", "0.65"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19990", "--place", "--future_reward_discount", "0.65"]
         },
         {
             "name": "main.py: RESUME Sim Stack check_z_height (External Terminal)",
