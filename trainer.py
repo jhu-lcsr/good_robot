@@ -694,7 +694,7 @@ class Trainer(object):
             # Do forward pass with specified rotation (to save gradients)
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
             if self.use_cuda:
-                loss = self.criterion(output_prob[0][action_id]].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
             else:
                 loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
             loss = loss.sum()
