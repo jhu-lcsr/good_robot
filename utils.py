@@ -118,7 +118,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
 
     return color_heightmap, depth_heightmap
 
-def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.01, push_length=0.0, z_buffer=0.005):
+def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.01, push_length=0.0, z_buffer=0.01):
     """ Get heuristic scores for the grasp Q value at various pixels. 0 means our model confidently indicates no progress will be made, 1 means progress may be possible.
     """
     pixels_to_dilate = int(np.ceil((gripper_width + push_length)/heightmap_resolution))
