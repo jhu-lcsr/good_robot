@@ -457,8 +457,9 @@ def main(args):
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
-                trainer.trial_log.append([nonlocal_variables['stack'].trial])
-                logger.write_to_log('trial', trainer.trial_log)
+                # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
+                # trainer.trial_log.append([nonlocal_variables['stack'].trial])
+                # logger.write_to_log('trial', trainer.trial_log)
 
                 # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
                 each_action_max_coordinate = {
@@ -762,6 +763,8 @@ def main(args):
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
+        # Record the current trial number
+        trainer.trial_log.append([trainer.num_trials()])
 
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
@@ -947,6 +950,7 @@ def main(args):
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
+                logger.write_to_log('trial', trainer.trial_log)
                 if trainer.iteration > 1000:
                     plot.plot_it(logger.base_directory, title, place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
