@@ -19,6 +19,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 import plot
+import json
 
 
 def run_title(args):
@@ -268,17 +269,6 @@ def main(args):
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
-    # Find last executed iteration of pre-loaded log, and load execution info and RL variables
-    if continue_logging:
-        trainer.preload(logger.transitions_directory)
-        num_trials = trainer.end_trial()
-    else:
-        num_trials = 0
-
-    # Initialize variables for heuristic bootstrapping and exploration probability
-    no_change_count = [2, 2] if not is_testing else [0, 0]
-    explore_prob = 0.5 if not is_testing else 0.0
-
     # Quick hack for nonlocal memory between threads in Python 2
     nonlocal_variables = {'executing_action': False,
                           'primitive_action': None,
@@ -295,6 +285,23 @@ def main(args):
                           'trial_complete': False,
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1}
+
+    # Find last executed iteration of pre-loaded log, and load execution info and RL variables
+    if continue_logging:
+        trainer.preload(logger.transitions_directory)
+
+        # this with block is skipped if the file doesn't exist
+        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json')
+        if os.path.exists(nonlocal_vars_filename):
+            nonlocal_vars = json.load(nonlocal_vars_filename)
+
+        num_trials = trainer.end_trial()
+    else:
+        num_trials = 0
+
+    # Initialize variables for heuristic bootstrapping and exploration probability
+    no_change_count = [2, 2] if not is_testing else [0, 0]
+    explore_prob = 0.5 if not is_testing else 0.0
 
     if check_z_height:
         nonlocal_variables['stack_height'] = 0.0
@@ -970,13 +977,16 @@ def main(args):
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
 
+            # latest model and best model are stored
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.model, method)
+                    json.dump(nonlocal_variables, os.path.join(logging_directory, 'data', 'nonlocal_vars.json')
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
+
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
                     best_stack_rate = nonlocal_variables['stack_rate']
@@ -984,6 +994,8 @@ def main(args):
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
+                    json.dump(nonlocal_variables, os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'))
+
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
