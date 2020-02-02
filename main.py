@@ -291,9 +291,10 @@ def main(args):
         trainer.preload(logger.transitions_directory)
 
         # this with block is skipped if the file doesn't exist
-        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json')
+        nonlocal_vars_filename = os.path.join(logging_directory, 'data', 'nonlocal_vars.json')
         if os.path.exists(nonlocal_vars_filename):
-            nonlocal_vars = json.load(nonlocal_vars_filename)
+            with open(nonlocal_vars_filename, 'r') as f:
+                nonlocal_vars = json.load(f)
 
         num_trials = trainer.end_trial()
     else:
@@ -983,7 +984,8 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.model, method)
-                    json.dump(nonlocal_variables, os.path.join(logging_directory, 'data', 'nonlocal_vars.json')
+                    with open(os.path.join(logging_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
+                        json.dump(nonlocal_variables, f)
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
@@ -994,7 +996,8 @@ def main(args):
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
-                    json.dump(nonlocal_variables, os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'))
+                    with open(os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
+                        json.dump(nonlocal_variables, f)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
