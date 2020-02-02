@@ -294,7 +294,11 @@ def main(args):
         nonlocal_vars_filename = os.path.join(logging_directory, 'data', 'nonlocal_vars.json')
         if os.path.exists(nonlocal_vars_filename):
             with open(nonlocal_vars_filename, 'r') as f:
-                nonlocal_vars = json.load(f)
+                nonlocals_to_load = json.load(f)
+
+                # in case not all nonlocal values were saved, only set what was saved
+                for k, v in nonlocals_to_load.items():
+                    nonlocal_variables[k] = v
 
         num_trials = trainer.end_trial()
     else:
@@ -985,7 +989,14 @@ def main(args):
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.model, method)
                     with open(os.path.join(logging_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
-                        json.dump(nonlocal_variables, f)
+                        nonlocals_to_save = nonlocal_variables.copy()
+
+                        for k,v in nonlocals_to_save.items():
+                            if not utils.is_jsonable(v):
+                                nonlocals_to_save.pop(k)
+
+                        json.dump(nonlocals_to_save, f)
+
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
@@ -996,8 +1007,16 @@ def main(args):
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
+
                     with open(os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
-                        json.dump(nonlocal_variables, f)
+                        nonlocals_to_save = nonlocal_variables.copy()
+
+                        for k,v in nonlocals_to_save.items():
+                            if not utils.is_jsonable(v):
+                                nonlocals_to_save.pop(k)
+
+                        json.dump(nonlocals_to_save, f)
+
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
