@@ -965,10 +965,20 @@ def main(args):
 
             # Do sampling for experience replay
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+                # Choose if experience replay should be trained on a 
+                # historical successful or failed action
+                if prev_primitive_action == 'push':
+                    train_on_successful_experience = not change_detected
+                elif prev_primitive_action == 'grasp':
+                    train_on_successful_experience = not prev_grasp_success
+                elif prev_primitive_action == 'place':
+                    train_on_successful_experience = not prev_push_success
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, 
+                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward, 
+                                  train_on_successful_experience=train_on_successful_experience)
 
             # Save model snapshot
             if not is_testing:
@@ -991,8 +1001,12 @@ def main(args):
         num_problems_detected = 0
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+                # flip between training success and failure
+                train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
+                experience_replay(method, prev_primitive_action, train_on_successful_experience, trainer, 
+                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
+                                  trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
@@ -1088,7 +1102,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
-def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.05, trial_reward=False):
+def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.05, trial_reward=False, train_on_successful_experience=None):
     # Here we will try to sample a reward value from the same action as the current one
     # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
     # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
@@ -1101,28 +1115,29 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         max_iteration = trainer.iteration
     # executed_action_log includes the action, push grasp or place, and the best pixel index
     actions = np.asarray(trainer.executed_action_log)[1:max_iteration, 0]
-    prev_success = np.array(bool(prev_reward_value))
 
     # Get samples of the same primitive but with different success results
     if np.random.random(1) < all_history_prob:
         # Sample all of history every one out of n times.
         sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
-    elif sample_primitive_action == 'push':
-        # sample_primitive_action_id = 0
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.change_detected_log)[1:max_iteration, 0] != prev_success,
-                                                actions == sample_primitive_action_id))
-    elif sample_primitive_action == 'grasp':
-        # sample_primitive_action_id = 1
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.grasp_success_log)[1:max_iteration, 0] != prev_success,
-                                                actions == sample_primitive_action_id))
-    elif sample_primitive_action == 'place':
-        sample_ind = np.argwhere(np.logical_and(np.asarray(trainer.partial_stack_success_log)[1:max_iteration, 0] != prev_success,
-                                                actions == sample_primitive_action_id))
     else:
-        raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
+        # Sample from the current specific action
+        if sample_primitive_action == 'push':
+            # sample_primitive_action_id = 0
+            log_to_compare = np.asarray(trainer.change_detected_log)
+        elif sample_primitive_action == 'grasp':
+            # sample_primitive_action_id = 1
+            log_to_compare = np.asarray(trainer.grasp_success_log)
+        elif sample_primitive_action == 'place':
+            log_to_compare = np.asarray(trainer.partial_stack_success_log)
+        else:
+            raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
+
+        sample_ind = np.argwhere(np.logical_and(log_to_compare[1:max_iteration, 0] == train_on_successful_experience,
+                                                actions == sample_primitive_action_id))
 
     if sample_ind.size == 0 and prev_reward_value is not None and max_iteration > 2:
-        print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(not prev_success) + ', so sampling from the whole history.')
+        print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(train_on_successful_experience) + ', so sampling from the whole history.')
         sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
 
     if sample_ind.size > 0:
