@@ -326,6 +326,7 @@ def main(args):
         nonlocal_variables['place_success'] = False
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
+        nonlocal_variables['partial_stack_success'] = False
 
     def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
