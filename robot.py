@@ -6,6 +6,7 @@ import os
 import numpy as np
 import itertools
 import utils
+import traceback
 from simulation import vrep
 from scipy import ndimage, misc
 try:
@@ -805,7 +806,11 @@ class Robot(object):
         Note to use legacy mode in the simulator you need to go into the simulation and disable the "threaded child script"
         associated with the object UR5_position_goal_target.
         sim_move_step: How far the simulated robot should mobe per time step, very large is 0.05, small is 0.01, we use 0.02 at the time of writing
-        """
+        """ 
+        if np.isnan(tool_position).any():
+            print('ERROR: robot.move_to() NaN encountered in goal tool_position, skipping action. Traceback of code location:')
+            traceback.print_stack()
+            return False
 
         if self.is_sim:
 
