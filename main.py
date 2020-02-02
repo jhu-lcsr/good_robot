@@ -286,6 +286,9 @@ def main(args):
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1}
 
+    always_default_nonlocals = ['executing_action',
+                                'primitive_action']
+
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
         trainer.preload(logger.transitions_directory)
@@ -298,7 +301,8 @@ def main(args):
 
                 # in case not all nonlocal values were saved, only set what was saved
                 for k, v in nonlocals_to_load.items():
-                    nonlocal_variables[k] = v
+                    if k not in always_default_nonlocals:
+                        nonlocal_variables[k] = v
 
         num_trials = trainer.end_trial()
     else:
@@ -988,13 +992,18 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 if trainer.iteration % 50 == 0:
                     logger.save_model(trainer.model, method)
+
+                    nonlocals_to_save = nonlocal_variables.copy()
+                    entries_to_pop = always_default_nonlocals.copy()
+
+                    for k, v in nonlocals_to_save.items():
+                        if not utils.is_jsonable(v):
+                            entries_to_pop.append(k)
+
+                    for k in entries_to_pop:
+                        nonlocals_to_save.pop(k)
+
                     with open(os.path.join(logging_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
-                        nonlocals_to_save = nonlocal_variables.copy()
-
-                        for k,v in nonlocals_to_save.items():
-                            if not utils.is_jsonable(v):
-                                nonlocals_to_save.pop(k)
-
                         json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
@@ -1008,15 +1017,18 @@ def main(args):
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
 
+                    nonlocals_to_save = nonlocal_variables.copy()
+                    entries_to_pop = always_default_nonlocals.copy()
+
+                    for k, v in nonlocals_to_save.items():
+                        if not utils.is_jsonable(v):
+                            entries_to_pop.append(k)
+
+                    for k in entries_to_pop:
+                        nonlocals_to_save.pop(k)
+
                     with open(os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
-                        nonlocals_to_save = nonlocal_variables.copy()
-
-                        for k,v in nonlocals_to_save.items():
-                            if not utils.is_jsonable(v):
-                                nonlocals_to_save.pop(k)
-
                         json.dump(nonlocals_to_save, f)
-
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
