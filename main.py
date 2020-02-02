@@ -806,7 +806,7 @@ def main(args):
             print('Pushing And Grasping Trial Successful!')
             num_trials = trainer.num_trials()
             pg_trial_success_count = np.max(trainer.trial_success_log, initial=0)
-            for i in range(len(trainer.trial_success_log), num_trials):
+            for i in range(len(trainer.trial_success_log), trainer.iteration):
                 # previous trials were ended early
                 trainer.trial_success_log.append([int(pg_trial_success_count)])
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
