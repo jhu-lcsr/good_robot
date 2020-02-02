@@ -286,6 +286,7 @@ def main(args):
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1}
 
+    # Do not save these nonlocal_variables or load them when resuming a run. They will be initialized to their default values
     always_default_nonlocals = ['executing_action',
                                 'primitive_action']
 
@@ -294,7 +295,7 @@ def main(args):
         trainer.preload(logger.transitions_directory)
 
         # this with block is skipped if the file doesn't exist
-        nonlocal_vars_filename = os.path.join(logging_directory, 'data', 'nonlocal_vars.json')
+        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json')
         if os.path.exists(nonlocal_vars_filename):
             with open(nonlocal_vars_filename, 'r') as f:
                 nonlocals_to_load = json.load(f)
@@ -420,6 +421,8 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+        last_iteration_saved = -1  # used to prevent redundant saving
+
         action_count = 0
         grasp_count = 0
         successful_grasp_count = 0
@@ -437,6 +440,35 @@ def main(args):
         grasp_str = ''
         successful_trial_count = int(np.max(trainer.trial_success_log)) if continue_logging and len(trainer.trial_success_log) > 0 else 0
         trial_rate = np.inf
+
+        # when resuming a previous run, load variables from last saved iteration
+        if continue_logging:
+            process_vars = None
+            resume_var_values_path = os.path.join(logger.base_directory, 'data', 'process_action_var_values.json')
+            if os.path.exists(resume_var_values_path):
+                with open(resume_var_values_path, 'r') as f:
+                    process_vars = json.load(f)
+
+                action_count = process_vars['action_count']
+                grasp_count = process_vars['grasp_count']
+                successful_grasp_count = process_vars['successful_grasp_count']
+                successful_color_grasp_count = process_vars['successful_color_grasp_count']
+                place_count = process_vars['place_count']
+                place_rate = process_vars['place_rate']
+                partial_stack_count = process_vars['partial_stack_count']
+                partial_stack_rate = process_vars['partial_stack_rate']
+                stack_count = process_vars['stack_count']
+                stack_rate = process_vars['stack_rate']
+                needed_to_reset = process_vars['needed_to_reset']
+                grasp_str = process_vars['grasp_str']
+                successful_trial_count = process_vars['successful_trial_count']
+                trial_rate = process_vars['trial_rate']
+
+            else:
+                print("WARNING: missing process_action_var_values.json while resuming. Default values used")
+
+
+
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -703,6 +735,34 @@ def main(args):
                     nonlocal_variables['prev_stack_height'] = 1
 
                 nonlocal_variables['executing_action'] = False
+
+            # save this thread's variables every time the model is saved
+            if (trainer.iteration % args.save_interval == 0):
+
+                if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
+                    last_iteration_saved = trainer.iteration
+
+                    # create dict of all variables and save a json file
+                    process_vars = {}
+                    process_vars['action_count'] = action_count
+                    process_vars['grasp_count'] = grasp_count
+                    process_vars['successful_grasp_count'] = successful_grasp_count
+                    process_vars['successful_color_grasp_count'] = successful_color_grasp_count
+                    process_vars['place_count'] = place_count
+                    process_vars['place_rate'] = place_rate
+                    process_vars['partial_stack_count'] = partial_stack_count
+                    process_vars['partial_stack_rate'] = partial_stack_rate
+                    process_vars['stack_count'] = stack_count
+                    process_vars['stack_rate'] = stack_rate
+                    process_vars['needed_to_reset'] = needed_to_reset
+                    process_vars['grasp_str'] = grasp_str
+                    process_vars['successful_trial_count'] = successful_trial_count
+                    process_vars['trial_rate'] = trial_rate
+
+                    with open(os.path.join(logger.base_directory, 'data', 'process_action_var_values.json'), 'w') as f:
+                            json.dump(process_vars, f)
+
+
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
@@ -990,12 +1050,14 @@ def main(args):
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
-                if trainer.iteration % 50 == 0:
+                if trainer.iteration % args.save_interval == 0: # saves once every save_interval times
                     logger.save_model(trainer.model, method)
 
+                    # copy nonlocal_variable values and discard those which should be default when resuming.
                     nonlocals_to_save = nonlocal_variables.copy()
                     entries_to_pop = always_default_nonlocals.copy()
 
+                    # save all entries which are JSON serializable only. Otherwise don't save
                     for k, v in nonlocals_to_save.items():
                         if not utils.is_jsonable(v):
                             entries_to_pop.append(k)
@@ -1003,7 +1065,8 @@ def main(args):
                     for k in entries_to_pop:
                         nonlocals_to_save.pop(k)
 
-                    with open(os.path.join(logging_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
+                    print('################### LOGGING DIR', logger.base_directory)
+                    with open(os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
                         json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
@@ -1017,9 +1080,11 @@ def main(args):
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
 
+                    # copy nonlocal_variable values and discard those which should be default when resuming.
                     nonlocals_to_save = nonlocal_variables.copy()
                     entries_to_pop = always_default_nonlocals.copy()
 
+                    # save all entries which are JSON serializable only. Otherwise don't save
                     for k, v in nonlocals_to_save.items():
                         if not utils.is_jsonable(v):
                             entries_to_pop.append(k)
@@ -1027,7 +1092,7 @@ def main(args):
                     for k in entries_to_pop:
                         nonlocals_to_save.pop(k)
 
-                    with open(os.path.join(logging_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
+                    with open(os.path.join(logger.base_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
                         json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
@@ -1259,7 +1324,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as TCP client (UR5)')
-    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                          help='port to robot arm as TCP client (UR5)')
+    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as real-time client (UR5)')
     parser.add_argument('--rtc_port', dest='rtc_port', type=int, action='store', default=30003,                           help='port to robot arm as real-time client (UR5)')
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
@@ -1304,9 +1369,10 @@ if __name__ == '__main__':
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
-    parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
+    parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
+    parser.add_argument('--save_interval', dest='save_interval', action='store', type=int, default=50,                              help='specify save frequency (save every x iterations)')
 
     # Run main program with specified arguments
     args = parser.parse_args()
