@@ -301,6 +301,7 @@ def main(args):
         nonlocal_variables['stack_height'] = 0.0
         nonlocal_variables['prev_stack_height'] = 0.0
     best_stack_rate = np.inf
+    prev_grasp_success = False
 
     if check_z_height:
         is_goal_conditioned = False
@@ -815,7 +816,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
-        if stuff_sum < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or (is_sim and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -897,27 +898,7 @@ def main(args):
         if 'prev_color_img' in locals():
 
             # Detect changes
-            depth_diff = abs(depth_heightmap - prev_depth_heightmap)
-            depth_diff[np.isnan(depth_diff)] = 0
-            depth_diff[depth_diff > 0.3] = 0
-            depth_diff[depth_diff < 0.01] = 0
-            depth_diff[depth_diff > 0] = 1
-            # NOTE: original VPG change_threshold was 300
-            change_threshold = 300
-            change_value = np.sum(depth_diff)
-            change_detected = change_value > change_threshold or prev_grasp_success
-            print('Change detected: %r (value: %d)' % (change_detected, change_value))
-
-            if change_detected:
-                if prev_primitive_action == 'push':
-                    no_change_count[0] = 0
-                elif prev_primitive_action == 'grasp':
-                    no_change_count[1] = 0
-            else:
-                if prev_primitive_action == 'push':
-                    no_change_count[0] += 1
-                elif prev_primitive_action == 'grasp':
-                    no_change_count[1] += 1
+            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, no_change_count)
 
             if no_height_reward:
                 # used to assess the value of the reward multiplier
@@ -1106,6 +1087,32 @@ def main(args):
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
         print('Trainer iteration: %f' % (trainer.iteration))
+
+def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
+    """ Detect changes
+    
+    # NOTE: original VPG change_threshold was 300
+    """
+    depth_diff = abs(depth_heightmap - prev_depth_heightmap)
+    depth_diff[np.isnan(depth_diff)] = 0
+    depth_diff[depth_diff > 0.3] = 0
+    depth_diff[depth_diff < 0.01] = 0
+    depth_diff[depth_diff > 0] = 1
+    change_value = np.sum(depth_diff)
+    change_detected = change_value > change_threshold or prev_grasp_success
+    print('Change detected: %r (value: %d)' % (change_detected, change_value))
+
+    if change_detected:
+        if prev_primitive_action == 'push':
+            no_change_count[0] = 0
+        elif prev_primitive_action == 'grasp' or prev_primitive_action == 'place':
+            no_change_count[1] = 0
+    else:
+        if prev_primitive_action == 'push':
+            no_change_count[0] += 1
+        elif prev_primitive_action == 'grasp':
+            no_change_count[1] += 1
+    return change_detected, no_change_count
 
 def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
