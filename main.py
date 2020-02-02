@@ -19,6 +19,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 import plot
+import copy
 
 
 def run_title(args):
@@ -1056,23 +1057,23 @@ def main(args):
         prev_color_heightmap = color_heightmap.copy()
         prev_depth_heightmap = depth_heightmap.copy()
         prev_valid_depth_heightmap = valid_depth_heightmap.copy()
-        prev_push_success = nonlocal_variables['push_success']
-        prev_grasp_success = nonlocal_variables['grasp_success']
-        prev_primitive_action = nonlocal_variables['primitive_action']
-        prev_place_success = nonlocal_variables['place_success']
-        prev_partial_stack_success = nonlocal_variables['partial_stack_success']
+        prev_push_success = copy.deepcopy(nonlocal_variables['push_success'])
+        prev_grasp_success = copy.deepcopy(nonlocal_variables['grasp_success'])
+        prev_primitive_action = copy.deepcopy(nonlocal_variables['primitive_action'])
+        prev_place_success = copy.deepcopy(nonlocal_variables['place_success'])
+        prev_partial_stack_success = copy.deepcopy(nonlocal_variables['partial_stack_success'])
         # stack_height will just always be 1 if we are not actually stacking
-        prev_stack_height = nonlocal_variables['stack_height']
-        nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
+        prev_stack_height = copy.deepcopy(nonlocal_variables['stack_height'])
+        nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_place_predictions = place_predictions
-        prev_best_pix_ind = nonlocal_variables['best_pix_ind']
+        prev_best_pix_ind = copy.deepcopy(nonlocal_variables['best_pix_ind'])
         # TODO(ahundt) BUG We almost certainly need to copy nonlocal_variables['stack']
-        prev_stack = nonlocal_variables['stack']
-        prev_goal_condition = goal_condition
+        prev_stack = copy.deepcopy(nonlocal_variables['stack'])
+        prev_goal_condition = copy.deepcopy(goal_condition)
         if grasp_color_task:
-            prev_color_success = nonlocal_variables['grasp_color_success']
+            prev_color_success = copy.deepcopy(nonlocal_variables['grasp_color_success'])
             if nonlocal_variables['grasp_success'] and nonlocal_variables['grasp_color_success']:
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
