@@ -965,7 +965,7 @@ def main(args):
 
             # Do sampling for experience replay
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
-                # Choose if experience replay should be trained on a 
+                # Choose if experience replay should be trained on a
                 # historical successful or failed action
                 if prev_primitive_action == 'push':
                     train_on_successful_experience = not change_detected
@@ -976,8 +976,8 @@ def main(args):
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, 
-                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward, 
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
+                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
                                   train_on_successful_experience=train_on_successful_experience)
 
             # Save model snapshot
@@ -1004,8 +1004,8 @@ def main(args):
                 # flip between training success and failure
                 train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, train_on_successful_experience, trainer, 
-                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
+                experience_replay(method, prev_primitive_action, train_on_successful_experience, trainer,
+                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition,
                                   trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
