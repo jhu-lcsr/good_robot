@@ -125,13 +125,18 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
     kernel = np.ones((pixels_to_dilate, pixels_to_dilate), np.uint8)
     object_pixels = (heightmap > min_contact_height).astype(np.uint8)
     contactable_regions = cv2.dilate(object_pixels, kernel, iterations=1)
+
     if push_length > 0.0:
         # For push, skip regions where the gripper would be too high
         reigonal_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
-        push_too_high_pixels = np.nonzero(heightmap > (reigonal_maximums - z_buffer))
+        block_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
-        contactable_regions[push_too_high_pixels] = 0
+        # the blocks and the gripper width around them are set to zero.
+        gripper_width_pixels_to_dilate = int(np.ceil((gripper_width)/heightmap_resolution))
+        kernel = np.ones((gripper_width_pixels_to_dilate, gripper_width_pixels_to_dilate), np.uint8)
+        push_too_high_pixels = cv2.dilate(block_pixels, kernel, iterations=1)
+        contactable_regions[np.nonzero(push_too_high_pixels)] = 0
 
     return contactable_regions
 
