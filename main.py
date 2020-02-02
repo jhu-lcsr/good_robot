@@ -400,7 +400,7 @@ def main(args):
                 if check_row:
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
-                    nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
+                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
