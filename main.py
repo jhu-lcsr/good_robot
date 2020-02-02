@@ -1006,7 +1006,7 @@ def main(args):
                 # flip between training success and failure
                 train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, train_on_successful_experience, trainer, 
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, 
                                   grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
                                   trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
