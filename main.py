@@ -677,16 +677,17 @@ def main(args):
                           '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
                           ' current_height: ' + str(nonlocal_variables['stack_height']))
 
-                if check_z_height and nonlocal_variables['trial_complete']:
-                    # Zero out the height because the trial is done.
-                    # Note these lines must be after the logging of these variables is complete.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
-                elif nonlocal_variables['trial_complete']:
-                    # Set back to the minimum stack height because the trial is done.
-                    # Note these lines must be after the logging of these variables is complete.
-                    nonlocal_variables['stack_height'] = 1
-                    nonlocal_variables['prev_stack_height'] = 1
+                # if check_z_height and nonlocal_variables['trial_complete']:
+                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
+                #     # Zero out the height because the trial is done.
+                #     # Note these lines must be after the logging of these variables is complete.
+                #     nonlocal_variables['stack_height'] = 0.0
+                #     nonlocal_variables['prev_stack_height'] = 0.0
+                # elif nonlocal_variables['trial_complete']:
+                #     # Set back to the minimum stack height because the trial is done.
+                #     # Note these lines must be after the logging of these variables is complete.
+                #     nonlocal_variables['stack_height'] = 1
+                #     nonlocal_variables['prev_stack_height'] = 1
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -885,8 +886,12 @@ def main(args):
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
-            # Execute best primitive action on robot in another thread
-            nonlocal_variables['executing_action'] = True
+            if not nonlocal_variables['finalize_prev_trial_log']:
+                # Execute best primitive action on robot in another thread
+                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD, 
+                # unless it is a new trial, then we will wait a moment to do final 
+                # logging before starting the next action
+                nonlocal_variables['executing_action'] = True
 
         # Run training iteration in current thread (aka training thread)
         if 'prev_color_img' in locals():
@@ -957,6 +962,21 @@ def main(args):
                     plot.plot_it(logger.base_directory, title, place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
+                # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
+                if check_z_height:
+                    # TODO(ahundt) BUG THIS A NEW LOCATION BUT WE MUST BE SURE WE ARE NOT MESSING UP TRIAL REWARDS
+                    # Zero out the height because the trial is done.
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 1.0
+                    nonlocal_variables['prev_stack_height'] = 1.0
+                else:
+                    # Set back to the minimum stack height because the trial is done.
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 1
+                    nonlocal_variables['prev_stack_height'] = 1
+                # Start executing the action for the new trial
+                nonlocal_variables['executing_action'] = True
+
             # Backpropagate
             if not disable_two_step_backprop:
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -1003,8 +1023,8 @@ def main(args):
         num_problems_detected = 0
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
-                # flip between training success and failure
-                train_on_successful_experience = not train_on_successful_experience
+                # flip between training success and failure, disabled because it appears to slow training down
+                # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, 
                                   grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
