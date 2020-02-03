@@ -19,6 +19,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 import plot
+import copy
 
 
 def run_title(args):
@@ -300,6 +301,7 @@ def main(args):
         nonlocal_variables['stack_height'] = 0.0
         nonlocal_variables['prev_stack_height'] = 0.0
     best_stack_rate = np.inf
+    prev_grasp_success = False
 
     if check_z_height:
         is_goal_conditioned = False
@@ -326,6 +328,7 @@ def main(args):
         nonlocal_variables['place_success'] = False
         nonlocal_variables['grasp_color_success'] = False
         nonlocal_variables['place_color_success'] = False
+        nonlocal_variables['partial_stack_success'] = False
 
     def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
@@ -398,7 +401,7 @@ def main(args):
                 if check_row:
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
-                    nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
+                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions
@@ -675,16 +678,17 @@ def main(args):
                           '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
                           ' current_height: ' + str(nonlocal_variables['stack_height']))
 
-                if check_z_height and nonlocal_variables['trial_complete']:
-                    # Zero out the height because the trial is done.
-                    # Note these lines must be after the logging of these variables is complete.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
-                elif nonlocal_variables['trial_complete']:
-                    # Set back to the minimum stack height because the trial is done.
-                    # Note these lines must be after the logging of these variables is complete.
-                    nonlocal_variables['stack_height'] = 1
-                    nonlocal_variables['prev_stack_height'] = 1
+                # if check_z_height and nonlocal_variables['trial_complete']:
+                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
+                #     # Zero out the height because the trial is done.
+                #     # Note these lines must be after the logging of these variables is complete.
+                #     nonlocal_variables['stack_height'] = 0.0
+                #     nonlocal_variables['prev_stack_height'] = 0.0
+                # elif nonlocal_variables['trial_complete']:
+                #     # Set back to the minimum stack height because the trial is done.
+                #     # Note these lines must be after the logging of these variables is complete.
+                #     nonlocal_variables['stack_height'] = 1
+                #     nonlocal_variables['prev_stack_height'] = 1
 
                 nonlocal_variables['executing_action'] = False
             # TODO(ahundt) this should really be using proper threading and locking algorithms
@@ -812,7 +816,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
-        if stuff_sum < empty_threshold or (is_sim and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or (is_sim and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -883,34 +887,18 @@ def main(args):
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
                 color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
-            # Execute best primitive action on robot in another thread
-            nonlocal_variables['executing_action'] = True
+            if not nonlocal_variables['finalize_prev_trial_log']:
+                # Execute best primitive action on robot in another thread
+                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD, 
+                # unless it is a new trial, then we will wait a moment to do final 
+                # logging before starting the next action
+                nonlocal_variables['executing_action'] = True
 
         # Run training iteration in current thread (aka training thread)
         if 'prev_color_img' in locals():
 
             # Detect changes
-            depth_diff = abs(depth_heightmap - prev_depth_heightmap)
-            depth_diff[np.isnan(depth_diff)] = 0
-            depth_diff[depth_diff > 0.3] = 0
-            depth_diff[depth_diff < 0.01] = 0
-            depth_diff[depth_diff > 0] = 1
-            # NOTE: original VPG change_threshold was 300
-            change_threshold = 300
-            change_value = np.sum(depth_diff)
-            change_detected = change_value > change_threshold or prev_grasp_success
-            print('Change detected: %r (value: %d)' % (change_detected, change_value))
-
-            if change_detected:
-                if prev_primitive_action == 'push':
-                    no_change_count[0] = 0
-                elif prev_primitive_action == 'grasp':
-                    no_change_count[1] = 0
-            else:
-                if prev_primitive_action == 'push':
-                    no_change_count[0] += 1
-                elif prev_primitive_action == 'grasp':
-                    no_change_count[1] += 1
+            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, no_change_count)
 
             if no_height_reward:
                 # used to assess the value of the reward multiplier
@@ -954,6 +942,21 @@ def main(args):
                 if trainer.iteration > 1000:
                     plot.plot_it(logger.base_directory, title, place=place)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
+
+                # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
+                if check_z_height:
+                    # TODO(ahundt) BUG THIS A NEW LOCATION BUT WE MUST BE SURE WE ARE NOT MESSING UP TRIAL REWARDS
+                    # Zero out the height because the trial is done.
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 1.0
+                    nonlocal_variables['prev_stack_height'] = 1.0
+                else:
+                    # Set back to the minimum stack height because the trial is done.
+                    # Note these lines must be after the logging of these variables is complete.
+                    nonlocal_variables['stack_height'] = 1
+                    nonlocal_variables['prev_stack_height'] = 1
+                # Start executing the action for the new trial
+                nonlocal_variables['executing_action'] = True
 
             # Backpropagate
             if not disable_two_step_backprop:
@@ -1001,11 +1004,11 @@ def main(args):
         num_problems_detected = 0
         while nonlocal_variables['executing_action']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
-                # flip between training success and failure
-                train_on_successful_experience = not train_on_successful_experience
+                # flip between training success and failure, disabled because it appears to slow training down
+                # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, train_on_successful_experience, trainer,
-                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition,
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, 
+                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
                                   trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
@@ -1055,23 +1058,23 @@ def main(args):
         prev_color_heightmap = color_heightmap.copy()
         prev_depth_heightmap = depth_heightmap.copy()
         prev_valid_depth_heightmap = valid_depth_heightmap.copy()
-        prev_push_success = nonlocal_variables['push_success']
-        prev_grasp_success = nonlocal_variables['grasp_success']
-        prev_primitive_action = nonlocal_variables['primitive_action']
-        prev_place_success = nonlocal_variables['place_success']
-        prev_partial_stack_success = nonlocal_variables['partial_stack_success']
+        prev_push_success = copy.deepcopy(nonlocal_variables['push_success'])
+        prev_grasp_success = copy.deepcopy(nonlocal_variables['grasp_success'])
+        prev_primitive_action = copy.deepcopy(nonlocal_variables['primitive_action'])
+        prev_place_success = copy.deepcopy(nonlocal_variables['place_success'])
+        prev_partial_stack_success = copy.deepcopy(nonlocal_variables['partial_stack_success'])
         # stack_height will just always be 1 if we are not actually stacking
-        prev_stack_height = nonlocal_variables['stack_height']
-        nonlocal_variables['prev_stack_height'] = nonlocal_variables['stack_height']
+        prev_stack_height = copy.deepcopy(nonlocal_variables['stack_height'])
+        nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         prev_push_predictions = push_predictions.copy()
         prev_grasp_predictions = grasp_predictions.copy()
         prev_place_predictions = place_predictions
-        prev_best_pix_ind = nonlocal_variables['best_pix_ind']
+        prev_best_pix_ind = copy.deepcopy(nonlocal_variables['best_pix_ind'])
         # TODO(ahundt) BUG We almost certainly need to copy nonlocal_variables['stack']
-        prev_stack = nonlocal_variables['stack']
-        prev_goal_condition = goal_condition
+        prev_stack = copy.deepcopy(nonlocal_variables['stack'])
+        prev_goal_condition = copy.deepcopy(goal_condition)
         if grasp_color_task:
-            prev_color_success = nonlocal_variables['grasp_color_success']
+            prev_color_success = copy.deepcopy(nonlocal_variables['grasp_color_success'])
             if nonlocal_variables['grasp_success'] and nonlocal_variables['grasp_color_success']:
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
@@ -1084,6 +1087,32 @@ def main(args):
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
         print('Trainer iteration: %f' % (trainer.iteration))
+
+def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
+    """ Detect changes
+    
+    # NOTE: original VPG change_threshold was 300
+    """
+    depth_diff = abs(depth_heightmap - prev_depth_heightmap)
+    depth_diff[np.isnan(depth_diff)] = 0
+    depth_diff[depth_diff > 0.3] = 0
+    depth_diff[depth_diff < 0.01] = 0
+    depth_diff[depth_diff > 0] = 1
+    change_value = np.sum(depth_diff)
+    change_detected = change_value > change_threshold or prev_grasp_success
+    print('Change detected: %r (value: %d)' % (change_detected, change_value))
+
+    if change_detected:
+        if prev_primitive_action == 'push':
+            no_change_count[0] = 0
+        elif prev_primitive_action == 'grasp' or prev_primitive_action == 'place':
+            no_change_count[1] = 0
+    else:
+        if prev_primitive_action == 'push':
+            no_change_count[0] += 1
+        elif prev_primitive_action == 'grasp':
+            no_change_count[1] += 1
+    return change_detected, no_change_count
 
 def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
