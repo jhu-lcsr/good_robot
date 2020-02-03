@@ -9,8 +9,12 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from utils_torch import CrossEntropyLoss2d
 from models import PixelNet
+from models import reinforcement_net
 from scipy import ndimage
 import matplotlib.pyplot as plt
+import utils
+from utils import ACTION_TO_ID
+from utils import ID_TO_ACTION
 
 try:
     import ptflops
@@ -25,12 +29,16 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet'):
+                 flops=False, network='efficientnet', common_sense=False):
 
+        self.heightmap_pixels = 224
+        self.buffered_heightmap_pixels = 320
+        self.half_heightmap_diff = int((self.buffered_heightmap_pixels - self.heightmap_pixels) / 2)
         self.method = method
         self.place = place
         self.flops = flops
         self.goal_condition_len = goal_condition_len
+        self.common_sense = common_sense
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -59,7 +67,8 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -89,7 +98,8 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -288,6 +298,8 @@ class Trainer(object):
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
     def load_sample(self, sample_iteration, logger):
+        """Load the data from disk, and run a forward pass with the current model
+        """
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
         # Load sample RGB-D heightmap
@@ -420,6 +432,22 @@ class Trainer(object):
                         place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         if not self.place:
             place_predictions = None
+        if self.common_sense:
+            # Mask pixels we know cannot lead to progress
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.02, push_length=0.1)
+            # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
+            push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
+            grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            if self.place:
+                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+        else:
+            # Mask pixels we know cannot lead to progress
+            push_predictions = np.ma.masked_array(push_predictions)
+            grasp_predictions = np.ma.masked_array(grasp_predictions)
+            if self.place:
+                place_predictions = np.ma.masked_array(place_predictions)
+
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
 
@@ -513,23 +541,51 @@ class Trainer(object):
             return expected_reward, current_reward
 
 
-    # Compute labels and backpropagate
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
-
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, show_heightmap=False):
+        """ Compute labels and backpropagate
+        """
+        # contactable_regions = None
+        # if self.common_sense:
+        #     if primitive_action == 'push':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
+        #     if primitive_action == 'grasp':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+        #     if primitive_action == 'place':
+        #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
+        action_id = ACTION_TO_ID[primitive_action]
+        if show_heightmap:
+            # visualize the common sense function results
+            # show the heightmap
+            f = plt.figure()
+            # f.suptitle(str(trainer.iteration))
+            f.add_subplot(1,3, 1)
+            plt.imshow(depth_heightmap)
+            f.add_subplot(1,3, 2)
+            # f.add_subplot(1,2, 1)
+            # if contactable_regions is not None:
+            #     plt.imshow(contactable_regions)
+            #     f.add_subplot(1,3, 3)
+            # plt.imshow(stuff_count)
+            plt.show(block=True)
         if self.method == 'reactive':
 
             # Compute fill value
             fill_value = 2
 
             # Compute labels
-            label = np.zeros((1,320,320)) + fill_value
-            action_area = np.zeros((224,224))
+            label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels)) + fill_value
+            action_area = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             action_area[best_pix_ind[1]][best_pix_ind[2]] = 1
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
-            tmp_label = np.zeros((224,224)) + fill_value
+            tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels)) + fill_value
+            # if self.common_sense:
+            #     # all areas where we won't be able to contact anything will have
+            #     # value 0 which should indicate no action should be taken at these locations
+            #     # TODO(ahundt) double check this is factually correct
+            #     tmp_label[contactable_regions < 1] = 1 - contactable_regions
             tmp_label[action_area > 0] = label_value
-            label[0,48:(320-48),48:(320-48)] = tmp_label
+            label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
             # Compute loss and backward pass
             self.optimizer.zero_grad()
@@ -545,11 +601,9 @@ class Trainer(object):
                 else:
                     loss = self.push_criterion(output_prob[0][0], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss.cpu().data.numpy()
 
             elif primitive_action == 'grasp':
                 # loss = self.grasp_criterion(output_prob[best_pix_ind[0]][1], Variable(torch.from_numpy(label).long().cuda()))
@@ -563,14 +617,12 @@ class Trainer(object):
                 else:
                     loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
+                loss_value += loss.cpu().data.numpy()
 
                 if symmetric and not self.place:
-                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
+                    # Since grasping can be symmetric when not placing, depending on the robot kinematics,
                     # train with another forward pass of opposite rotation angle
                     opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
@@ -581,11 +633,9 @@ class Trainer(object):
                     else:
                         loss = self.grasp_criterion(output_prob[0][1], Variable(torch.from_numpy(label).long()))
                     loss.backward()
+                    # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                     #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                    try:
-                        loss_value += loss.cpu().data.numpy()[0]
-                    except:
-                        loss_value += loss.cpu().data.numpy()
+                    loss_value += loss.cpu().data.numpy()
 
                     loss_value = loss_value/2
 
@@ -602,11 +652,9 @@ class Trainer(object):
                 else:
                     loss = self.place_criterion(output_prob[0][2], Variable(torch.from_numpy(label).long()))
                 loss.backward()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value += loss.cpu().data.numpy()[0]
-                except:
-                    loss_value += loss.cpu().data.numpy()
+                loss_value += loss.cpu().data.numpy()
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
@@ -614,97 +662,64 @@ class Trainer(object):
         elif self.method == 'reinforcement':
 
             # Compute labels
-            label = np.zeros((1,320,320))
-            action_area = np.zeros((224,224))
+            label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))
+            action_area = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             action_area[best_pix_ind[1]][best_pix_ind[2]] = 1
             # blur_kernel = np.ones((5,5),np.float32)/25
             # action_area = cv2.filter2D(action_area, -1, blur_kernel)
-            tmp_label = np.zeros((224,224))
+            tmp_label = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label[action_area > 0] = label_value
-            label[0,48:(320-48),48:(320-48)] = tmp_label
+            # these are the label values, mostly consisting of zeros, except for where the robot really went which is at best_pix_ind.
+            label[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label
 
             # Compute label mask
             label_weights = np.zeros(label.shape)
-            tmp_label_weights = np.zeros((224,224))
+            tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label_weights[action_area > 0] = 1
-            label_weights[0,48:(320-48),48:(320-48)] = tmp_label_weights
+            # if self.common_sense:
+            #     # all areas where we won't be able to contact anything will have
+            #     # mask value 1 which allows the label value zero to be applied
+            #     tmp_label_weights = 1 - contactable_regions
+            #     # The real robot label gets weight equal to the summ of all heuristic labels, or 1
+            #     tmp_label_weights[action_area > 0] = max(np.sum(tmp_label_weights), 1)
+            # else:
+            #     tmp_label_weights[action_area > 0] = 1
+            #     # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
+            #     # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
+            label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             # Compute loss and backward pass
             self.optimizer.zero_grad()
             loss_value = 0
-            if primitive_action == 'push':
+            # Do forward pass with specified rotation (to save gradients)
+            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+            if self.use_cuda:
+                loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+            else:
+                loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+            loss = loss.sum()
+            loss.backward()
+            # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+            loss_value = loss.cpu().data.numpy()
 
-                # Do forward pass with specified rotation (to save gradients)
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+            if symmetric and primitive_action == 'grasp' and not self.place:
+                # Since grasping can be symmetric when not placing, depending on the robot kinematics,
+                # train with another forward pass of opposite rotation angle
+                opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
 
-                if self.use_cuda:
-                    loss = self.criterion(output_prob[0][0].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
-                else:
-                    loss = self.criterion(output_prob[0][0].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.sum()
-                loss.backward()
-                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
-
-            elif primitive_action == 'grasp':
-
-                # Do forward pass with specified rotation (to save gradients)
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
 
                 if self.use_cuda:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
                 else:
-                    loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+                    loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
+
                 loss = loss.sum()
                 loss.backward()
-                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                # nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+                loss_value = loss.cpu().data.numpy()
 
-                if symmetric and not self.place:
-                    # Since grasping can be symmetric when not placing, depending on the robot kinematics, 
-                    # train with another forward pass of opposite rotation angle
-                    opposite_rotate_idx = (best_pix_ind[0] + self.model.num_rotations/2) % self.model.num_rotations
-
-                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=opposite_rotate_idx, goal_condition=goal_condition)
-
-                    if self.use_cuda:
-                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
-                    else:
-                        loss = self.criterion(output_prob[0][1].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-
-                    loss = loss.sum()
-                    loss.backward()
-                    #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                    try:
-                        loss_value = loss.cpu().data.numpy()[0]
-                    except:
-                        loss_value = loss.cpu().data.numpy()
-
-                    loss_value = loss_value/2
-
-
-            elif primitive_action == 'place':
-                # Note that placing is definitely not symmetric, because an off-center grasp will lead to two different oriented place actions.
-                # Do forward pass with specified rotation (to save gradients)
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
-
-                if self.use_cuda:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
-                else:
-                    loss = self.criterion(output_prob[0][2].view(1,320,320), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
-                loss = loss.sum()
-                loss.backward()
-                #loss_value = loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
-                try:
-                    loss_value = loss.cpu().data.numpy()[0]
-                except:
-                    loss_value = loss.cpu().data.numpy()
+                loss_value = loss_value/2
 
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
@@ -714,6 +729,8 @@ class Trainer(object):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
+        # predictions are a masked arrray, so masked regions have the fill value 0
+        predictions = predictions.filled(0.0)
         for canvas_row in range(int(num_rotations/4)):
             tmp_row_canvas = None
             for canvas_col in range(4):

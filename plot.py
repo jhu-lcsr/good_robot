@@ -144,10 +144,15 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     upper = np.clip(upper, 0, 1)
     return efficiency, lower, upper
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=False, rasterized=True):
-    if place:
-        heights = np.loadtxt(os.path.join(log_dir, 'transitions', 'stack-height.log.txt'))
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True):
+    stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
+    if place is None:
+        place = False
+    if os.path.isfile(stack_height_file):
+        heights = np.loadtxt(stack_height_file)
         rewards = None
+        if place is None:
+            place = True
     else:
         rewards = np.loadtxt(os.path.join(log_dir, 'transitions', 'reward-value.log.txt'))
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
@@ -167,6 +172,10 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     else:
         # old versions of logged code don't have the grasp-success.log.txt file, data must be extracted from rewards.
         grasp_rewards = rewards
+
+    # trial_reward_file = os.path.join(log_dir, 'transitions', 'trial-reward-value.log.txt')
+    # if os.path.isfile(trial_reward_file):
+    #     grasp_rewards = np.loadtxt(trial_reward_file)
 
     grasp_rate, grasp_lower, grasp_upper = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
     if place:
@@ -203,11 +212,12 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         trial_successes = np.loadtxt(trial_success_file)
         if max_iter is not None:
             trial_successes = trial_successes[:max_iter]
-        trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
-        plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
-        plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
-                        mult*trial_success_lower, mult*trial_success_upper,
-                        color=colors[3], alpha=alpha)
+        if trial_successes.size > 0:
+            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+            plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
+            plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+                            mult*trial_success_lower, mult*trial_success_upper,
+                            color=colors[3], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
@@ -224,6 +234,10 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
 if __name__ == '__main__':
     window = 500
     max_iter = None
+
+    log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
+    plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
     log_dir = './logs/2020-01-08-17-03-58'
@@ -241,4 +255,44 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-15-15-44-39'
 
     title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
+    # plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    # this is a solid but slow training trial_reward grasp and push run without symmetry
+    # title = 'Push and Grasp, Trial Reward, No Symmetry, Training'
+    # log_dir = './logs/2020-01-06-19-15-55'
+    # plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
+    run = 2
+    if run == 0:
+        title = 'Rows, Trial Reward 0.5, No Symmetry, Training'
+        # log_dir = './logs/2020-01-07-17-53-42' # some progress, not complete
+        # log_dir = './logs/2020-01-08-17-08-57' # run killed early
+        log_dir = './logs/2020-01-09-12-54-53'
+        # Training iteration: 22769
+        # Current count of pixels with stuff: 2513.0 threshold below which the scene is considered empty: 1200
+        # WARNING variable mismatch num_trials + 1: 3118 nonlocal_variables[stack].trial: 3359
+        # Change detected: True (value: 2799)
+        # Primitive confidence scores: 4.359684 (push), 2.701111 (grasp), 4.351819 (place)
+        # Strategy: exploit (exploration probability: 0.100000)
+        # Action: push at (1, 99, 10)
+        # Real Robot push at (-0.704000, -0.026000, 0.000994) angle: 0.392699
+        # Trainer.get_label_value(): Current reward: 0.750000 Current reward multiplier: 1.000000 Predicted Future reward: 4.402410 Expected reward: 0.750000 + 0.500000 x 4.402410 = 2.951205
+        # Trial logging complete: 3117 --------------------------------------------------------------
+        # Training loss: 0.897331
+        # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
+        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+
+    if run == 1:
+        title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
+        # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
+        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-11-19-54-58
+        log_dir = './logs/2020-01-11-19-54-58'
+        # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
+        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+
+    if run == 2:
+        title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
+        # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
+        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-42-46
+        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-45-22
+        log_dir = './logs/2020-01-12-17-45-22'
+        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
