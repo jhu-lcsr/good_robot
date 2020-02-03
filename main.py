@@ -889,8 +889,8 @@ def main(args):
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
-                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD, 
-                # unless it is a new trial, then we will wait a moment to do final 
+                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD,
+                # unless it is a new trial, then we will wait a moment to do final
                 # logging before starting the next action
                 nonlocal_variables['executing_action'] = True
 
@@ -898,7 +898,7 @@ def main(args):
         if 'prev_color_img' in locals():
 
             # Detect changes
-            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, no_change_count)
+            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count)
 
             if no_height_reward:
                 # used to assess the value of the reward multiplier
@@ -1007,8 +1007,8 @@ def main(args):
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, 
-                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
+                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition,
                                   trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
@@ -1090,7 +1090,7 @@ def main(args):
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
     """ Detect changes
-    
+
     # NOTE: original VPG change_threshold was 300
     """
     depth_diff = abs(depth_heightmap - prev_depth_heightmap)
