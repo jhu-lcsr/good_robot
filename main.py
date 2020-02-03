@@ -30,11 +30,12 @@ def run_title(args):
     """
     title = ''
     title += 'Sim ' if args.is_sim else 'Real '
-    if args.place:
-        title += 'Stack, '
+
     if args.check_row:
         title += 'Rows, '
-    if not args.place and not args.check_row:
+    elif args.place:
+        title += 'Stack, '
+    elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
     if args.trial_reward:
         title += 'Trial Reward, '
