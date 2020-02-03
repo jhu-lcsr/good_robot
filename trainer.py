@@ -279,7 +279,7 @@ class Trainer(object):
                 current_reward = self.reward_value_log[i][0]
                 if future_r is None:
                     # Give the final time step its own reward twice.
-                    future_r = current_reward
+                    future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
                 if current_reward > 0:
                     # If a nonzero score was received, the reward propagates
                     future_r = current_reward + self.future_reward_discount * future_r
