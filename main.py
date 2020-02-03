@@ -736,8 +736,8 @@ def main(args):
 
                 nonlocal_variables['executing_action'] = False
 
-            # save this thread's variables every time the model is saved
-            if (trainer.iteration % args.save_interval == 0):
+            # save this thread's variables every time the trial is completed (model is also saved at this time)
+            if nonlocal_variables['trial_complete']:
 
                 if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
                     last_iteration_saved = trainer.iteration
@@ -1050,7 +1050,7 @@ def main(args):
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
-                if trainer.iteration % args.save_interval == 0: # saves once every save_interval times
+                if nonlocal_variables['trial_complete']:  # saves once every time a trial is completed
                     logger.save_model(trainer.model, method)
 
                     # copy nonlocal_variable values and discard those which should be default when resuming.
@@ -1372,7 +1372,6 @@ if __name__ == '__main__':
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
-    parser.add_argument('--save_interval', dest='save_interval', action='store', type=int, default=50,                              help='specify save frequency (save every x iterations)')
 
     # Run main program with specified arguments
     args = parser.parse_args()
