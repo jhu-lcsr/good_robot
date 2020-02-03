@@ -806,7 +806,7 @@ class Robot(object):
         Note to use legacy mode in the simulator you need to go into the simulation and disable the "threaded child script"
         associated with the object UR5_position_goal_target.
         sim_move_step: How far the simulated robot should mobe per time step, very large is 0.05, small is 0.01, we use 0.02 at the time of writing
-        """ 
+        """
         if np.isnan(tool_position).any():
             print('ERROR: robot.move_to() NaN encountered in goal tool_position, skipping action. Traceback of code location:')
             traceback.print_stack()
@@ -928,7 +928,9 @@ class Robot(object):
                 move_magnitude = np.linalg.norm(move_direction)
                 # prevent division by 0, source: https://stackoverflow.com/a/37977222/99379
                 move_step = sim_move_step * np.divide(move_direction, move_magnitude, out=np.zeros_like(move_direction), where=move_magnitude!=0)
-                num_move_steps = int(np.floor(move_direction[0]/move_step[0]))
+
+                num_move_steps = np.divide(move_direction, move_step, out=np.zeros_like(move_direction), where=move_step!=0)
+                num_move_steps = int(np.max(np.floor(num_move_steps)))
 
                 num_rotation_steps = 1
                 if tool_rotation_angle is not None:
