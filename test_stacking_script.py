@@ -8,13 +8,9 @@ import numpy as np
 import scipy as sc
 import cv2
 from collections import namedtuple
-import torch
-from torch.autograd import Variable
 from robot import Robot
-from trainer import Trainer
-from logger import Logger
 import utils
-from main import StackSequence
+from utils import StackSequence
 
 
 ############### Testing Block Stacking #######
@@ -56,7 +52,7 @@ grasp_color_task = False
 # are we doing a stack even if we don't care about colors
 place_task = True
 # place in rows instead of stacks
-check_row = True
+check_row = False
 # if placing in rows, how far apart to set the blocks?
 separation = 0.055
 distance_threshold = 0.08

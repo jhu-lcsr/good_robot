@@ -20,6 +20,7 @@ from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 import plot
 import copy
+from utils import StackSequence
 
 
 def run_title(args):
@@ -47,82 +48,6 @@ def run_title(args):
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
     return title, dirname
-
-# killeen: this is defining the goal
-class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
-        """ Oracle to choose a sequence of specific color objects to interact with.
-
-        Generates one hot encodings for a list of objects of the specified length.
-        Can be used for stacking or simply grasping specific objects.
-
-        # Member Variables
-
-        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
-        is_goal_conditioned_task: do we care about which specific object we are using
-        object_color_sequence: to get the full order of the current stack goal.
-
-        """
-        self.num_obj = num_obj
-        self.is_goal_conditioned_task = is_goal_conditioned_task
-        self.trial = trial
-        self.reset_sequence()
-        self.total_steps = total_steps
-
-    def reset_sequence(self):
-        """ Generate a new sequence of specific objects to interact with.
-        """
-        if self.is_goal_conditioned_task:
-            # 3 is currently the red block
-            # object_color_index = 3
-            self.object_color_index = 0
-
-            # Choose a random sequence to stack
-            self.object_color_sequence = np.random.permutation(self.num_obj)
-            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
-            self.object_color_one_hot_encodings = []
-            for color in self.object_color_sequence:
-                object_color_one_hot_encoding = np.zeros((self.num_obj))
-                object_color_one_hot_encoding[color] = 1.0
-                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
-        else:
-            self.object_color_index = None
-            self.object_color_one_hot_encodings = None
-            self.object_color_sequence = None
-        self.trial += 1
-
-    def current_one_hot(self):
-        """ Return the one hot encoding for the current specific object.
-        """
-        return self.object_color_one_hot_encodings[self.object_color_index]
-
-    def sequence_one_hot(self):
-        """ Return the one hot encoding for the entire stack sequence.
-        """
-        return np.concatenate(self.object_color_one_hot_encodings)
-
-    def current_sequence_progress(self):
-        """ How much of the current stacking sequence we have completed.
-
-        For example, if the sequence should be [0, 1, 3, 2].
-        At initialization this will return [0].
-        After one next() calls it will return [0, 1].
-        After two next() calls it will return [0, 1, 3].
-        After three next() calls it will return [0, 1, 3, 2].
-        After four next() calls a new sequence will be generated and it will return one element again.
-        """
-        if self.is_goal_conditioned_task:
-            return self.object_color_sequence[:self.object_color_index+1]
-        else:
-            return None
-
-    def next(self):
-        self.total_steps += 1
-        if self.is_goal_conditioned_task:
-            self.object_color_index += 1
-            if not self.object_color_index < self.num_obj:
-                self.reset_sequence()
-
 
 def main(args):
     # TODO(ahundt) move main and process_actions() to a class?
@@ -889,8 +814,8 @@ def main(args):
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
-                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD, 
-                # unless it is a new trial, then we will wait a moment to do final 
+                # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD,
+                # unless it is a new trial, then we will wait a moment to do final
                 # logging before starting the next action
                 nonlocal_variables['executing_action'] = True
 
@@ -968,7 +893,7 @@ def main(args):
 
             # Do sampling for experience replay
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
-                # Choose if experience replay should be trained on a 
+                # Choose if experience replay should be trained on a
                 # historical successful or failed action
                 if prev_primitive_action == 'push':
                     train_on_successful_experience = not change_detected
@@ -979,8 +904,8 @@ def main(args):
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, 
-                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward, 
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
+                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
                                   train_on_successful_experience=train_on_successful_experience)
 
             # Save model snapshot
@@ -1007,8 +932,8 @@ def main(args):
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, 
-                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition, 
+                experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
+                                  grasp_color_task, logger, nonlocal_variables, place, goal_condition,
                                   trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
@@ -1090,7 +1015,7 @@ def main(args):
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
     """ Detect changes
-    
+
     # NOTE: original VPG change_threshold was 300
     """
     depth_diff = abs(depth_heightmap - prev_depth_heightmap)
