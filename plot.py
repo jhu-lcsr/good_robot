@@ -3,8 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
+import utils
 
-def get_trial_success_rate(trials, trial_successes, window=200):
+def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_success_index=True):
     """Evaluate moving window of grasp success rate
     trials: Nx1 array of the current total trial count at that action
     trial_successes: Nx1 array of the current total successful trial count at the time of that action
@@ -14,6 +15,9 @@ def get_trial_success_rate(trials, trial_successes, window=200):
     success_rate = np.zeros(length - 1)
     lower = np.zeros_like(success_rate)
     upper = np.zeros_like(success_rate)
+    if hotfix_trial_success_index:
+        # TODO(ahundt) currently the trial success values are inserted too early in the array. Fix then set hotfix param above to false
+        trial_successes = np.insert(trial_successes, [0.0]*2, 0)
     for i in range(length - 1):
         start = max(i - window, 0)
         # get the number of trials that have passed starting with 0 at 
@@ -24,12 +28,15 @@ def get_trial_success_rate(trials, trial_successes, window=200):
         # the beginning of the trial window, by subtracting the 
         # min successful trial count in the window from the current
         success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
-        success_rate[i] = np.max(success_window) / np.max(trial_window)
+        success_window_max = np.max(success_window)
+        trial_window_max = np.max(trial_window)
+        success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
+    # success_rate = np.clip(success_rate, 0, 1)
     return success_rate, lower, upper
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
@@ -146,8 +153,6 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
 
 def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True):
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
-    if place is None:
-        place = False
     if os.path.isfile(stack_height_file):
         heights = np.loadtxt(stack_height_file)
         rewards = None
@@ -155,8 +160,11 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
             place = True
     else:
         rewards = np.loadtxt(os.path.join(log_dir, 'transitions', 'reward-value.log.txt'))
+        if place is None:
+            place = False
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
-    trials = np.loadtxt(os.path.join(log_dir, 'transitions', 'trial.log.txt'))
+    trials = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
+    trials = np.array(utils.clearance_log_to_trial_count(trials)).astype(np.int)
 
     if max_iter is not None:
         if place:
@@ -225,18 +233,24 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.title(title)
     plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot.png'
-    print('saving plot: ' + save_file)
-    plt.savefig(save_file)
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot'
+    print('saving plot: ' + save_file + '.png')
+    plt.savefig(save_file + '.png', dpi=300, optimize=True)
+    # plt.savefig(save_file + '.pdf')
     
 
 
 if __name__ == '__main__':
-    window = 500
+    window = 1000
     max_iter = None
 
     log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
-    plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
+    log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04
+    log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
     
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
