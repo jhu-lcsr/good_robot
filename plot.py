@@ -36,7 +36,10 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
-    # success_rate = np.clip(success_rate, 0, 1)
+    if np.any(success_rate > 1.0):
+        print('WARNING: BUG DETECTED Clipping Success Rate to be within 0 to 1 range, you should look at the raw log data, '
+              'fix the bug in the original code, and preprocess the raw data to correct this error.')
+        success_rate = np.clip(success_rate, 0, 1)
     return success_rate, lower, upper
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
