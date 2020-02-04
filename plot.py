@@ -20,12 +20,12 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         trial_successes = np.insert(trial_successes, [0]*3, 0)
     for i in range(length - 1):
         start = max(i - window, 0)
-        # get the number of trials that have passed starting with 0 at 
-        # the beginning of the trial window, by subtracting the 
+        # get the number of trials that have passed starting with 0 at
+        # the beginning of the trial window, by subtracting the
         # min trial count in the window from the current
         trial_window = trials[start:i+1] - np.min(trials[start:i+1])
-        # get the number of successful trials that have passed starting with 0 at 
-        # the beginning of the trial window, by subtracting the 
+        # get the number of successful trials that have passed starting with 0 at
+        # the beginning of the trial window, by subtracting the
         # min successful trial count in the window from the current
         success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
         success_window_max = np.max(success_window)
@@ -216,7 +216,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
-    
+
     # Plot the rate and variance of trial successes
     trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
     if os.path.isfile(trial_success_file):
@@ -240,7 +240,8 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file + '.png')
     plt.savefig(save_file + '.png', dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
-    
+
+
 
 
 if __name__ == '__main__':
