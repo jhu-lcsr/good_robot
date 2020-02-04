@@ -17,7 +17,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
     upper = np.zeros_like(success_rate)
     if hotfix_trial_success_index:
         # TODO(ahundt) currently the trial success values are inserted too early in the array. Fix then set hotfix param above to false
-        trial_successes = np.insert(trial_successes, [0.0]*2, 0)
+        trial_successes = np.insert(trial_successes, [0]*3, 0)
     for i in range(length - 1):
         start = max(i - window, 0)
         # get the number of trials that have passed starting with 0 at 
