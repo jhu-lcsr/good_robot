@@ -5,6 +5,19 @@ from matplotlib.ticker import PercentFormatter
 from glob import glob
 import utils
 
+
+def best_success_rate(success_rate, window, title):
+    # Print the best success rate ever
+    if success_rate.shape[0] > window:
+        best = np.max(success_rate[window:])
+        print('Max ' + title + ': ' + str(best) +
+              ', at action iteration: ' + str(np.argmax(success_rate[window:])) +
+              '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
+        return best
+    else:
+        return 0.0
+
+
 def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_success_index=True):
     """Evaluate moving window of grasp success rate
     trials: Nx1 array of the current total trial count at that action
@@ -20,12 +33,12 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         trial_successes = np.insert(trial_successes, [0]*3, 0)
     for i in range(length - 1):
         start = max(i - window, 0)
-        # get the number of trials that have passed starting with 0 at 
-        # the beginning of the trial window, by subtracting the 
+        # get the number of trials that have passed starting with 0 at
+        # the beginning of the trial window, by subtracting the
         # min trial count in the window from the current
         trial_window = trials[start:i+1] - np.min(trials[start:i+1])
-        # get the number of successful trials that have passed starting with 0 at 
-        # the beginning of the trial window, by subtracting the 
+        # get the number of successful trials that have passed starting with 0 at
+        # the beginning of the trial window, by subtracting the
         # min successful trial count in the window from the current
         success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
         success_window_max = np.max(success_window)
@@ -36,7 +49,14 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
-    # success_rate = np.clip(success_rate, 0, 1)
+    if np.any(success_rate > 1.0):
+        print('WARNING: BUG DETECTED Clipping Success Rate to be within 0 to 1 range. '
+              'The max is ' + str(np.max(success_rate)) + ' at index ' + str(np.argmax(success_rate)) +
+              ' but the largest valid value is 1.0. You should look at the raw log data, '
+              'fix the bug in the original code, and preprocess the raw data to correct this error.')
+        success_rate = np.clip(success_rate, 0, 1)
+    # Print the best success rate ever, excluding actions before the initial window
+    best_success_rate(success_rate, window, 'trial success rate')
     return success_rate, lower, upper
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
@@ -63,7 +83,10 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
+    # Print the best success rate ever, excluding actions before the initial window
+    best_success_rate(success_rate, window, 'grasp success rate')
     return success_rate, lower, upper
+
 
 def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
     """
@@ -101,7 +124,10 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
+    # Print the best success rate ever, excluding actions before the initial window
+    best_success_rate(success_rate, window, 'place success rate')
     return success_rate, lower, upper
+
 
 def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
     """Calculate the running action efficiency from successful trials.
@@ -127,7 +153,10 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
         upper[i] = efficiency[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
+    # Print the best success rate ever, excluding actions before the initial window
+    best_success_rate(efficiency, window, 'action efficiency')
     return efficiency, lower, upper
+
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
     """Get grasp efficiency from when the trial count increases.
@@ -149,6 +178,8 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
         upper[i] = efficiency[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
+    # Print the best success rate ever, excluding actions before the initial window
+    best_success_rate(efficiency, window, 'grasp action efficiency')
     return efficiency, lower, upper
 
 def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True):
@@ -213,7 +244,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
-    
+
     # Plot the rate and variance of trial successes
     trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
     if os.path.isfile(trial_success_file):
@@ -237,7 +268,8 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file + '.png')
     plt.savefig(save_file + '.png', dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
-    
+
+
 
 
 if __name__ == '__main__':
@@ -250,8 +282,13 @@ if __name__ == '__main__':
     # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
     # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04
     log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
-    plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
-    
+    # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
+
+    log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    log_dir = './logs/2020-01-22-22-50-00_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    log_dir = './logs/2020-02-03-17-35-43_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+
     # log_dir = './logs/2019-12-31-20-17-06'
     # log_dir = './logs/2020-01-01-14-55-17'
     log_dir = './logs/2020-01-08-17-03-58'
