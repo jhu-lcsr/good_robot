@@ -1152,7 +1152,7 @@ class Robot(object):
         if object_positions.shape[0] == 0:
             return False
         else:
-            is_near_gripper = np.linalg.norm(object_positions, axis=1) > distance_threshold
+            is_near_gripper = np.linalg.norm(object_positions, axis=1) < distance_threshold
             # get_object_handles_near_gripper
             if put_inside_workspace:
                 object_handles_near_gripper = np.array(self.object_handles)[is_near_gripper]
@@ -1230,7 +1230,7 @@ class Robot(object):
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             # position[2] += self.gripper_ee_offset - 0.01
-            position[2] -= 0.01
+            position[2] -= 0.03
             # Compute tool orientation from heightmap rotation angle
             grasp_orientation = [1.0,0.0]
             if heightmap_rotation_angle > np.pi:
