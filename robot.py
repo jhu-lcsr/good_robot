@@ -543,12 +543,12 @@ class Robot(object):
     #         vrep.simxFinish(self.sim_client)
 
 
-    def get_obj_positions(self):
+    def get_obj_positions(self, relative_to_handle=-1):
         if not self.is_sim:
             raise NotImplementedError('get_obj_positions() only supported in simulation, if you are training stacking try specifying --check_z_height')
         obj_positions = []
         for object_handle in self.object_handles:
-            sim_ret, object_position = vrep.simxGetObjectPosition(self.sim_client, object_handle, -1, vrep.simx_opmode_blocking)
+            sim_ret, object_position = vrep.simxGetObjectPosition(self.sim_client, object_handle, relative_to_handle, vrep.simx_opmode_blocking)
             obj_positions.append(object_position)
 
         return obj_positions
@@ -1138,6 +1138,34 @@ class Robot(object):
         grasped_object_handle = self.object_handles[grasped_object_ind]
         return grasped_object_ind, grasped_object_handle
 
+
+    def reposition_objects_near_gripper(self, distance_threshold=0.07, put_inside_workspace=True):
+        """ Simulation only function to detect objects near the gripper.
+
+            put_inside_workspace: True will select a random position inside workspace, false will select a specific position outside the workspace
+
+            # Returns
+
+            True if there are objects in the scene, False otherwise.
+        """
+        object_positions = np.asarray(self.get_obj_positions(self.UR5_tip_handle))
+        if object_positions.shape[0] == 0:
+            return False
+        else:
+            is_near_gripper = np.linalg.norm(object_positions, axis=1) > distance_threshold
+            # get_object_handles_near_gripper
+            if put_inside_workspace:
+                object_handles_near_gripper = np.array(self.object_handles)[is_near_gripper]
+                for handle in object_handles_near_gripper:
+                    self.reposition_object_randomly(handle)
+            else:
+                for i, is_near in enumerate(is_near_gripper):
+                    # set all objects near the gripper to a coordinated position
+                    if is_near:
+                        vrep.simxSetObjectPosition(self.sim_client,self.object_handles[i],-1,(-0.5, 0.5 + 0.05*float(i), 0.1),vrep.simx_opmode_blocking)
+            return True
+
+
     # Primitives ----------------------------------------------------------
 
     def grasp(self, position, heightmap_rotation_angle, object_color=None, workspace_limits=None, go_home=True):
@@ -1193,30 +1221,12 @@ class Robot(object):
             if grasp_success:
                 if self.place_task:
                     return grasp_success, color_success
-                if not self.place_task and object_color is not None:
-                    high_obj_list_index, high_obj_handle = self.get_highest_object_list_index_and_handle()
-                    self.reposition_object_randomly(high_obj_handle)
-                    # TODO: HK: check if any block is grasped and put it back at a random place
-                    # color = np.array([0, 0, 0, 0, 0,  0,1, 0, 0, 0]) # red block
-                    # color_index = np.where(color==1)
-                    # vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-                    #     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]])
-
-                # HK: Original Method
-                elif not self.place_task and not self.grasp_color_task:
-                    object_positions = np.asarray(self.get_obj_positions())
-                    if object_positions.size == 0:
+                else:
+                    # we are pushing and grasping, so move the objects outside the workspace
+                    objects_anywhere_in_scene = self.reposition_objects_near_gripper(put_inside_workspace=False)
+                    if not objects_anywhere_in_scene:
                         # there are no objects in the scene, so the grasp could not be successful
                         return False, False
-                    object_positions = object_positions[:,2]
-                    grasped_object_ind = np.argmax(object_positions)
-                    grasped_object_handle = self.object_handles[grasped_object_ind]
-                    vrep.simxSetObjectPosition(self.sim_client,grasped_object_handle,-1,(-0.5, 0.5 + 0.05*float(grasped_object_ind), 0.1),vrep.simx_opmode_blocking)
-                else:
-                    raise NotImplementedError(
-                        'grasp() call specified a task which does not match color specific stacking or grasp+pushing... '
-                        'this is a bug or is not yet implemented, you will need to make a code change or run the program with different settings.')
-
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             # position[2] += self.gripper_ee_offset - 0.01
@@ -1340,6 +1350,12 @@ class Robot(object):
             # move to the simulator home position
             if go_home:
                 push_success = self.go_home()
+
+            # Work around a simulator bug where objects will be stuck to the gripper
+            objects_anywhere_in_scene = self.reposition_objects_near_gripper(put_inside_workspace=True)
+            if not objects_anywhere_in_scene:
+                # there are no objects in the scene, so the push could not be successful
+                return False
 
             return push_success
 
@@ -1545,6 +1561,12 @@ class Robot(object):
             print('goal_position: ' + str(position[2]) + ' goal_position_margin: ' + str(position[2] + place_location_margin))
             place_success = has_moved and near_goal
             print('has_moved: ' + str(has_moved) + ' near_goal: ' + str(near_goal) + ' place_success: ' + str(place_success))
+
+            # Work around a simulator bug where objects will be stuck to the gripper
+            objects_anywhere_in_scene = self.reposition_objects_near_gripper(put_inside_workspace=True)
+            if not objects_anywhere_in_scene:
+                # there are no objects in the scene, so the place could not be successful
+                return False
             return place_success
             #if abs(current_obj_z_location - position[2]) < 0.009:
             # if ((current_obj_z_location+distance_threshold/2) >= position[2]) and ((current_obj_z_location+distance_threshold/2) < (position[2]+distance_threshold)):
