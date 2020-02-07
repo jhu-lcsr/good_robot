@@ -139,6 +139,7 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     """
     # a stack is considered successful when the height is >= 4 blocks tall (~20cm)
     # success = np.rint(stack_height) == max_height
+    # TODO(ahundt) it may be better to drop this function and modify get_trial_success_rate() to calculate: max(trial_successes)-min(trial_successes)/(window/ideal_actions_per_trial)
     success = stack_height >= max_height
     efficiency = np.zeros_like(stack_height, np.float64)
     lower = np.zeros_like(efficiency)
