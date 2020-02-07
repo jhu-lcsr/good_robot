@@ -18,6 +18,7 @@ from logger import Logger
 import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
+from utils_torch import action_space_argmax
 import plot
 import copy
 
@@ -466,20 +467,7 @@ def main(args):
                 # logger.write_to_log('trial', trainer.trial_log)
 
                 # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                each_action_max_coordinate = {
-                    'push': np.unravel_index(np.ma.argmax(push_predictions), push_predictions.shape), # push, index 0
-                    'grasp': np.unravel_index(np.ma.argmax(grasp_predictions), grasp_predictions.shape),
-                }
-                each_action_predicted_value = {
-                    'push': push_predictions[each_action_max_coordinate['push']], # push, index 0
-                    'grasp': grasp_predictions[each_action_max_coordinate['grasp']],
-                }
-                if place:
-                    each_action_max_coordinate['place'] = np.unravel_index(np.ma.argmax(place_predictions), place_predictions.shape)
-                    each_action_predicted_value['place'] = place_predictions[each_action_max_coordinate['place']]
-                # we will actually execute the best pixel index of the selected action
-                nonlocal_variables['best_pix_ind'] = each_action_max_coordinate[nonlocal_variables['primitive_action']]
-                predicted_value = each_action_predicted_value[nonlocal_variables['primitive_action']]
+                nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
