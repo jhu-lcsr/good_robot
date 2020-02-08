@@ -34,6 +34,26 @@ def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
     return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
+def clearance_log_to_trial_count(clearance_log):
+    """ Convert clearance log list of end indices to a list of the current trial number at each iteration.
+
+    # Returns
+
+    List of lists of the current trial index.
+    ex: [[0], [0], [0], [1], [1]]
+    """
+    if not len(clearance_log):
+        return []
+    clearance_log = np.squeeze(clearance_log).astype(np.int)
+    # Make a list of the right length containing all zeros
+    trial_count = []
+    prev_trial_end_index = 0
+    for trial_num, trial_end_index in enumerate(clearance_log):
+        trial_count += [[trial_num]] * int(trial_end_index - prev_trial_end_index)
+        prev_trial_end_index = trial_end_index
+    return trial_count
+
+
 def get_pointcloud(color_img, depth_img, camera_intrinsics):
 
     # Get depth image size
