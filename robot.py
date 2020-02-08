@@ -260,14 +260,14 @@ class Robot(object):
 
 
             # Default joint speed configuration
-            self.joint_acc = 5.0 # Safe: 1.4  Fast: 8
-            self.joint_vel = 3.0 # Safe: 1.05  Fast: 3
+            self.joint_acc = 4.0 # Safe: 1.4  Fast: 8
+            self.joint_vel = 2.0 # Safe: 1.05  Fast: 3
 
             # Joint tolerance for blocking calls
             self.joint_tolerance = 0.01
 
             # Default tool speed configuration
-            self.tool_acc = 1.2 # Safe: 0.5 Fast: 1.2
+            self.tool_acc = 1.0 # Safe: 0.5 Fast: 1.2
             self.tool_vel = 0.5 # Safe: 0.2 Fast: 0.5
             self.move_sleep = 1.0 # Safe: 2.0 Fast: 1.0
 
@@ -296,7 +296,7 @@ class Robot(object):
             self.cam_intrinsics = self.camera.intrinsics
 
             # Load camera pose (from running calibrate.py), intrinsics and depth scale
-            if os.path.isfile('real/robot_base_to_camera_pose.txt') and os.path.isfile('real/camera_depth_scale.txt'):
+            if not calibrate and os.path.isfile('real/robot_base_to_camera_pose.txt') and os.path.isfile('real/camera_depth_scale.txt'):
                 self.cam_pose = np.loadtxt('real/robot_base_to_camera_pose.txt', delimiter=' ')
                 self.cam_depth_scale = np.loadtxt('real/camera_depth_scale.txt', delimiter=' ')
             else:
@@ -308,7 +308,7 @@ class Robot(object):
 
             # Get the transform to the gripper center, this is necessary when the robot control
             # poses differs from where the gripper center is, so a transform applying a correction is needed.
-            if os.path.isfile('real/tool_tip_to_ar_tag_transform.txt'):
+            if not calibrate and os.path.isfile('real/tool_tip_to_ar_tag_transform.txt'):
                 self.tool_tip_to_gripper_center_transform = np.loadtxt('real/tool_tip_to_ar_tag_transform.txt', delimiter=' ')
 
             if os.path.isfile('real/background_heightmap.depth.png'):
@@ -317,6 +317,8 @@ class Robot(object):
                  # see logger.py save_heightmaps() and trainer.py load_sample()
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
+                # TODO(ahundt) HACK- DO NOT COMMIT THE NEXT LINE!!!!! REMOVE THIS HACK, COLLECT HEIGHTMAP AGAIN
+                self.background_heightmap += 0.01
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
