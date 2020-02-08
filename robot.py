@@ -107,7 +107,7 @@ class Robot(object):
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False):
+                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -230,6 +230,14 @@ class Robot(object):
             # Add objects to simulation environment
             self.add_objects()
 
+            self.unstack = unstack
+
+            if self.unstack:
+                print("Reset method is UNSTACK")
+            else:
+                print("Reset method is SIMULATOR")
+
+
 
         # If in real-settings...
         else:
@@ -321,6 +329,11 @@ class Robot(object):
                  # see logger.py save_heightmaps() and trainer.py load_sample()
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
+
+            # real robot must use unstacking
+            self.unstack = True
+            print("Reset method is UNSTACK")
+
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
@@ -572,33 +585,9 @@ class Robot(object):
         return obj_positions, obj_orientations
 
 
-    def reposition_objects(self, workspace_limits=None, unstack=True):
-        if unstack:
-            self.unstack()
-        else:
-            if self.is_sim:
-                # Move gripper out of the way to the home position
-                success = self.go_home()
-                if not success:
-                    return success
-                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-                # time.sleep(1)
-
-                for object_handle in self.object_handles:
-
-                    # Drop object at random x,y location and random orientation in robot workspace
-                    self.reposition_object_randomly(object_handle)
-                    time.sleep(0.5)
-                # an extra half second so things settle down
-                time.sleep(0.5)
-                return True
-
-            # TODO(ahundt) add real robot support for reposition_objects
-
-    # grasp blocks from previously placed positions and place them in a random position.
-    def unstack(self):
-        if self.is_sim:
+    def reposition_objects(self, workspace_limits=None):
+        # grasp blocks from previously placed positions and place them in a random position.
+        if self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
@@ -632,6 +621,26 @@ class Robot(object):
                 self.place(rand_position, rand_angle)
 
                 self.place_pose_history = []  # clear place position history
+        else:
+            if self.is_sim:
+                # Move gripper out of the way to the home position
+                success = self.go_home()
+                if not success:
+                    return success
+                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+                # time.sleep(1)
+
+                for object_handle in self.object_handles:
+
+                    # Drop object at random x,y location and random orientation in robot workspace
+                    self.reposition_object_randomly(object_handle)
+                    time.sleep(0.5)
+                # an extra half second so things settle down
+                time.sleep(0.5)
+                return True
+
+            # TODO(ahundt) add real robot support for reposition_objects
 
     def get_camera_data(self):
 

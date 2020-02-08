@@ -106,6 +106,7 @@ def main(args):
     common_sense = args.common_sense
     disable_two_step_backprop = args.disable_two_step_backprop
 
+
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
@@ -130,6 +131,8 @@ def main(args):
     else:
         preset_files = None
         test_preset_file = None
+
+    unstack = args.unstack
 
     # ------ Pre-loading and logging options ------
     if args.resume == 'last':
@@ -178,7 +181,7 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task)
+                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task, unstack=unstack)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -1207,6 +1210,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
+    parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly warping them')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
