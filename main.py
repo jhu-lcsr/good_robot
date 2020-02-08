@@ -297,7 +297,7 @@ def main(args):
         trainer.preload(logger.transitions_directory)
 
 
-        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json')
+        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'variables', 'nonlocal_vars_%d.json' % (trainer.iteration))
         if os.path.exists(nonlocal_vars_filename):
             with open(nonlocal_vars_filename, 'r') as f:
                 nonlocals_to_load = json.load(f)
@@ -308,9 +308,11 @@ def main(args):
                         if k in nonlocal_variables:  # ignore any additional saved data
                             nonlocal_variables[k] = v
         else:
-            print('WARNING: Missing /data/nonlocal_vars.json on resume. Default values initialized. May cause log inconsistencies')
+            print('WARNING: Missing /data/variables/nonlocal_vars_%d.json on resume. Default values initialized. May cause log inconsistencies' % (trainer.iteration))
 
         num_trials = trainer.end_trial()
+
+        # trainer.iteration += 1  # Begin next trial after loading
 
     else:
         num_trials = 0
@@ -447,10 +449,10 @@ def main(args):
         successful_trial_count = int(np.max(trainer.trial_success_log)) if continue_logging and len(trainer.trial_success_log) > 0 else 0
         trial_rate = np.inf
 
-        # when resuming a previous run, load variables from last saved iteration
+        # when resuming a previous run, load variables saved from previous run
         if continue_logging:
             process_vars = None
-            resume_var_values_path = os.path.join(logger.base_directory, 'data', 'process_action_var_values.json')
+            resume_var_values_path = os.path.join(logger.base_directory, 'data', 'variables','process_action_var_values_%d.json' % (trainer.iteration))
             if os.path.exists(resume_var_values_path):
                 with open(resume_var_values_path, 'r') as f:
                     process_vars = json.load(f)
@@ -471,7 +473,7 @@ def main(args):
                 trial_rate = process_vars['trial_rate']
 
             else:
-                print("WARNING: Missing /data/process_action_var_values.json on resume. Default values initialized. May cause log inconsistencies")
+                print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
         while True:
             if nonlocal_variables['executing_action']:
@@ -740,10 +742,10 @@ def main(args):
 
                 nonlocal_variables['executing_action'] = False
 
-            # save this thread's variables every time the trial is completed (model is also saved at this time)
-            if nonlocal_variables['trial_complete']:
+            # save this thread's variables every time the log and model are saved
+            if nonlocal_variables['finalize_prev_trial_log']:
 
-                # trial_complete gets set to false before all data is saved in the rest of the loop.
+                # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
                 # This flag is used so as to not break anything by messing with trial_complete
                 nonlocal_variables['save_state_this_iteration'] = True
 
@@ -769,7 +771,10 @@ def main(args):
 
                     process_vars['IterationSaved'] = trainer.iteration  # Not loaded during resume. Just saved for debugging.
 
-                    with open(os.path.join(logger.base_directory, 'data', 'process_action_var_values.json'), 'w') as f:
+                    save_location = os.path.join(logger.base_directory, 'data', 'variables')
+                    if not os.path.exists(save_location):
+                        os.mkdir(save_location)
+                    with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
                             json.dump(process_vars, f)
 
 
@@ -1031,6 +1036,7 @@ def main(args):
                 logger.write_to_log('place-success', trainer.place_success_log)
             if nonlocal_variables['finalize_prev_trial_log']:
                 # Do final logging from the previous trial and previous complete iteration
+                print("######################################################### LOGGING")
                 nonlocal_variables['finalize_prev_trial_log'] = False
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
@@ -1059,7 +1065,6 @@ def main(args):
             # latest model and best model are stored
             # Save model snapshot
             if not is_testing:
-                print("\n############### NONLOCAL SAVE BLOCK #######################\n", nonlocal_variables['trial_complete'])
                 logger.save_backup_model(trainer.model, method)
                 if nonlocal_variables['save_state_this_iteration']:  # saves once every time a trial is completed
                     nonlocal_variables['save_state_this_iteration'] = False
@@ -1081,8 +1086,12 @@ def main(args):
 
                     nonlocals_to_save['IterationSaved'] = trainer.iteration
 
+                    # save nonlocal_variables for resuming later
                     print('################### LOGGING DIR', logger.base_directory)
-                    with open(os.path.join(logger.base_directory, 'data', 'nonlocal_vars.json'), 'w') as f:
+                    save_location = os.path.join(logger.base_directory, 'data', 'variables')
+                    if not os.path.exists(save_location):
+                        os.makedirs(save_location)
+                    with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
                         json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
@@ -1096,20 +1105,20 @@ def main(args):
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
 
-                    # copy nonlocal_variable values and discard those which should be default when resuming.
-                    nonlocals_to_save = nonlocal_variables.copy()
-                    entries_to_pop = always_default_nonlocals.copy()
+                    # # copy nonlocal_variable values and discard those which should be default when resuming.
+                    # nonlocals_to_save = nonlocal_variables.copy()
+                    # entries_to_pop = always_default_nonlocals.copy()
 
-                    # save all entries which are JSON serializable only. Otherwise don't save
-                    for k, v in nonlocals_to_save.items():
-                        if not utils.is_jsonable(v):
-                            entries_to_pop.append(k)
+                    # # save all entries which are JSON serializable only. Otherwise don't save
+                    # for k, v in nonlocals_to_save.items():
+                    #     if not utils.is_jsonable(v):
+                    #         entries_to_pop.append(k)
 
-                    for k in entries_to_pop:
-                        nonlocals_to_save.pop(k)
+                    # for k in entries_to_pop:
+                    #     nonlocals_to_save.pop(k)
 
-                    with open(os.path.join(logger.base_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
-                        json.dump(nonlocals_to_save, f)
+                    # with open(os.path.join(logger.base_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
+                    #     json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1192,11 +1201,12 @@ def main(args):
         else:
             prev_color_success = None
 
-        trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
-        print('Trainer iteration: %f' % (trainer.iteration))
+        print('Trainer iteration: %d complete' % int(trainer.iteration))
+        trainer.iteration += 1
+
 
 def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image

@@ -168,7 +168,7 @@ class Trainer(object):
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
         kwargs = {'delimiter': ' ', 'ndmin': 2}
-        self.iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0] - 1)
+        self.iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0])
         self.executed_action_log = np.loadtxt(os.path.join(transitions_directory, 'executed-action.log.txt'), **kwargs)
         self.executed_action_log = self.executed_action_log[0:self.iteration, :]
         self.executed_action_log = self.executed_action_log.tolist()
