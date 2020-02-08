@@ -259,7 +259,8 @@ def main(args):
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
-                      network=neural_network_name, common_sense=common_sense)
+                      network=neural_network_name, common_sense=common_sense,
+                      show_heightmap=show_heightmap)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
