@@ -287,14 +287,23 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
+
+    #############################################################
+    # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation. 
+    # It can basically complete trials 100% of the time within 400 actions!
+    plot_it('./logs/2020-02-07-14-43-44_Sim-Push-and-Grasp-Trial-Reward-Common-Sense-Training','Sim Push and Grasp, SPOT Reward, Common Sense, Training', window=200, max_iter=2500)
     # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
-    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04
+    #############################################################
+    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04, on costar workstation
     log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
     # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    #############################################################
 
     log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
     log_dir = './logs/2020-01-22-22-50-00_Sim-Push-and-Grasp-Two-Step-Reward-Training'
     log_dir = './logs/2020-02-03-17-35-43_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    log_dir = './logs/2020-02-06-14-41-48_Sim-Stack-Trial-Reward-Common-Sense-Training'
     plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
 
     # log_dir = './logs/2019-12-31-20-17-06'
