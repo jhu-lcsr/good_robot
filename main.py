@@ -39,7 +39,7 @@ def run_title(args):
     elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
     if args.trial_reward:
-        title += 'Trial Reward, '
+        title += 'SPOT Trial Reward, '
     else:
         title += 'Two Step Reward, '
     if args.common_sense:
