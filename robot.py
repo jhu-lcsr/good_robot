@@ -592,6 +592,7 @@ class Robot(object):
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
+            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
             for pose in place_pose_history:
                 x, y, z, angle = pose
 
