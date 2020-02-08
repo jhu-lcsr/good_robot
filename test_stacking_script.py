@@ -107,6 +107,14 @@ for stack in range(num_stacks):
         else:
             block_positions = robot.get_obj_positions_and_orientations()[0]
             primitive_position = block_positions[base_block_to_place]
+
+            # place height should be on the top of the stack. otherwise the sim freaks out
+            stack_z_height = 0
+            for block_pos in block_positions:
+                if block_pos[2] > stack_z_height and block_pos[2] < workspace_limits[2][1]:
+                    stack_z_height = block_pos[2]
+            primitive_position[2] = stack_z_height
+
         place = robot.place(primitive_position, theta + np.pi / 2)
         print('place ' + str(i) + ' : ' + str(place))
         # check if we don't care about color
