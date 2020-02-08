@@ -7,6 +7,7 @@ import cv2
 from robot import Robot
 import threading
 import os
+import utils
 
 class HumanControlOfRobot(object):
     """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
@@ -243,8 +244,10 @@ class HumanControlOfRobot(object):
                 self.print_state_count += 1
                 state_data = self.robot.get_state()
                 actual_tool_pose = self.robot.parse_tcp_state_data(state_data, 'cartesian_info')
+                robot_state = 'UR5 axis/angle cart_pose format: ' + str(actual_tool_pose)
+                actual_tool_pose = utils.axis_angle_and_translation_to_rigid_transformation(actual_tool_pose[:3], actual_tool_pose[3:])
                 joint_position = self.robot.parse_tcp_state_data(state_data, 'joint_data')
-                robot_state = 'cart_pose: ' + str(actual_tool_pose) + ' joint pos: ' + str(joint_position)
+                robot_state += ' joint pos: ' + str(joint_position) + ' homogeneous cart_pose: ' + str(actual_tool_pose)
                 print(str(self.print_state_count) + ' ' + robot_state)
         elif key == ord('c'):
             self.stop = True
