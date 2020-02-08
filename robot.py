@@ -1912,6 +1912,11 @@ class Robot(object):
         return goal_success, max_z, needed_to_reset
 
     def restart_real(self):
+        # reset objects for stacking
+        if self.place:
+            return self.reposition_objects()
+
+        # reset objects for pushing and grasping
         # position just over the box to dump
         # [0.2035772  0.14621875 0.07735696]
         # Compute tool orientation from heightmap rotation angle
