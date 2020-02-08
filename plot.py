@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
 import utils
+import scipy
 
 
 def best_success_rate(success_rate, window, title):
@@ -44,17 +45,21 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         success_window_max = np.max(success_window)
         trial_window_max = np.max(trial_window)
         success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
+    
+    # TODO(ahundt) fix the discontinuities in the log from writing the success count at a slightly different time, remove median filter workaround
+    if np.any(success_rate > 1.0):
+        print('WARNING: BUG DETECTED, applying median filter to compensate for trial success time step offsets. '
+              'The max is ' + str(np.max(success_rate)) + ' at index ' + str(np.argmax(success_rate)) +
+              ' but the largest valid value is 1.0. You should look at the raw log data, '
+              'fix the bug in the original code, and preprocess the raw data to correct this error.')
+        # success_rate = np.clip(success_rate, 0, 1)
+    success_rate = scipy.ndimage.median_filter(success_rate, 7)
+    for i in range(length - 1):        
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
-    if np.any(success_rate > 1.0):
-        print('WARNING: BUG DETECTED Clipping Success Rate to be within 0 to 1 range. '
-              'The max is ' + str(np.max(success_rate)) + ' at index ' + str(np.argmax(success_rate)) +
-              ' but the largest valid value is 1.0. You should look at the raw log data, '
-              'fix the bug in the original code, and preprocess the raw data to correct this error.')
-        success_rate = np.clip(success_rate, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
     best_success_rate(success_rate, window, 'trial success rate')
     return success_rate, lower, upper
@@ -165,10 +170,11 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
 
     """
     grasps = actions[:, 0] == 1
-    efficiency = np.zeros_like(rewards, np.float64)
+    length = np.min([rewards.shape[0], actions.shape[0]])
+    efficiency = np.zeros(length, np.float64)
     lower = np.zeros_like(efficiency)
     upper = np.zeros_like(efficiency)
-    for i in range(efficiency.shape[0]):
+    for i in range(1, length):
         start = max(i - window, 0)
         window_size = np.array(min(i+1, window), np.float64)
         successful = rewards[start: i+1] > reward_threshold
@@ -281,14 +287,23 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
+
+    #############################################################
+    # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation. 
+    # It can basically complete trials 100% of the time within 400 actions!
+    plot_it('./logs/2020-02-07-14-43-44_Sim-Push-and-Grasp-Trial-Reward-Common-Sense-Training','Sim Push and Grasp, SPOT Reward, Common Sense, Training', window=200, max_iter=2500)
     # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
-    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04
+    #############################################################
+    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04, on costar workstation
     log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
     # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    #############################################################
 
     log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
     log_dir = './logs/2020-01-22-22-50-00_Sim-Push-and-Grasp-Two-Step-Reward-Training'
     log_dir = './logs/2020-02-03-17-35-43_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    log_dir = './logs/2020-02-06-14-41-48_Sim-Stack-Trial-Reward-Common-Sense-Training'
     plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
 
     # log_dir = './logs/2019-12-31-20-17-06'
