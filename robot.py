@@ -127,6 +127,7 @@ class Robot(object):
                 # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
                 workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.workspace_limits = workspace_limits
+        self.heightmap_resolution = 0.002
         self.place_task = place
         self.grasp_color_task = grasp_color_task
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
@@ -134,6 +135,9 @@ class Robot(object):
         # self.gripper_ee_offset = 0.15
         self.background_heightmap = None
         self.tool_tip_to_gripper_center_transform = None
+
+        # list of place position attempts
+        self.place_pose_history = []
 
         # HK: If grasping specific block color...
         #
@@ -568,28 +572,66 @@ class Robot(object):
         return obj_positions, obj_orientations
 
 
-    def reposition_objects(self, workspace_limits=None):
+    def reposition_objects(self, workspace_limits=None, unstack=True):
+        if unstack:
+            self.unstack()
+        else:
+            if self.is_sim:
+                # Move gripper out of the way to the home position
+                success = self.go_home()
+                if not success:
+                    return success
+                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+                # time.sleep(1)
 
-        if self.is_sim:
-            # Move gripper out of the way to the home position
-            success = self.go_home()
-            if not success:
-                return success
-            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-            # time.sleep(1)
+                for object_handle in self.object_handles:
 
-            for object_handle in self.object_handles:
-
-                # Drop object at random x,y location and random orientation in robot workspace
-                self.reposition_object_randomly(object_handle)
+                    # Drop object at random x,y location and random orientation in robot workspace
+                    self.reposition_object_randomly(object_handle)
+                    time.sleep(0.5)
+                # an extra half second so things settle down
                 time.sleep(0.5)
-            # an extra half second so things settle down
-            time.sleep(0.5)
-            return True
+                return True
 
-        # TODO(ahundt) add real robot support for reposition_objects
+            # TODO(ahundt) add real robot support for reposition_objects
 
+    # grasp blocks from previously placed positions and place them in a random position.
+    def unstack(self):
+        if self.is_sim:
+            print("------- UNSTACKING --------")
+            place_pose_history = self.place_pose_history.copy()
+            place_pose_history.reverse()
+
+            for pose in place_pose_history:
+                x, y, z, angle = pose
+
+                color_img, depth_img = self.get_camera_data()
+                depth_img = depth_img * self.cam_depth_scale
+
+                color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, self.cam_intrinsics, self.cam_pose, self.workspace_limits, self.heightmap_resolution)
+                valid_depth_heightmap = depth_heightmap.copy()
+                valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0  # required otherwise max_z is always NaN
+                _, max_z, _ = self.check_z_height(valid_depth_heightmap)
+
+                # divide by 20 because check_z_height multiplies the actual heighy by 20
+                stack_z_height = max_z / 20
+
+                # otherwise gripper grasps too low
+                offset = 0.01
+
+                if stack_z_height + offset < self.workspace_limits[2][1]:
+                    z = stack_z_height + offset
+
+                self.grasp([x, y, z], angle)
+
+                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                rand_position[2] = 0.1  # release blocks from a height just about 2 blocks high
+                rand_angle = rand_orientation[0]
+
+                self.place(rand_position, rand_angle)
+
+                self.place_pose_history = []  # clear place position history
 
     def get_camera_data(self):
 
@@ -1477,7 +1519,13 @@ class Robot(object):
         """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
-        print('Executing: Place at (%f, %f, %f) angle: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
+
+        place_pose = (position[0], position[1], position[2], heightmap_rotation_angle)
+        print('Executing: Place at (%f, %f, %f) angle: %f' % place_pose)
+
+        self.place_pose_history.append(place_pose)
+        while len(self.place_pose_history) > 4:  # only store x most recent place attempts
+            self.place_pose_history.pop(0)
 
         if self.is_sim:
 
