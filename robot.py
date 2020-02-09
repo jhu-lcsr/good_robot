@@ -600,23 +600,25 @@ class Robot(object):
 
                 stack_z_height = max_z
 
-                offset = 0.0
                 if self.is_sim:
-                    # otherwise gripper grasps too low
+                    # otherwise simulated gripper grasps too low
                     offset = 0.01
 
-                if stack_z_height + offset < self.workspace_limits[2][1]:
-                    z = stack_z_height + offset
+                    if stack_z_height + offset < self.workspace_limits[2][1]:
+                        z = stack_z_height + offset
+                else:
+                    # otherwise real gripper grasps too high
+                    z -= 0.05
 
-                self.grasp([x, y, z], angle)
+                grasp_success, color_success = self.grasp([x, y, z], angle)
+                if grasp_success:
+                    _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                    rand_position[2] = 0.05  # height from which to release blocks (0.05 m per block)
+                    rand_angle = rand_orientation[0]
 
-                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                rand_position[2] = 0.1  # release blocks from a height just about 2 blocks high
-                rand_angle = rand_orientation[0]
+                    self.place(rand_position, rand_angle)
 
-                self.place(rand_position, rand_angle)
-
-                self.place_pose_history = []  # clear place position history
+            self.place_pose_history = []  # clear place position history
         else:
             if self.is_sim:
                 # Move gripper out of the way to the home position
