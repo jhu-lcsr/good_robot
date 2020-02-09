@@ -1444,7 +1444,7 @@ class Robot(object):
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
             if go_home:
-                push_success = self.block_until_home()
+                push_success = self.go_home(block_until_home=True)
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
