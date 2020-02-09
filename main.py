@@ -74,6 +74,9 @@ def main(args):
         # [ 0.73409861 -0.45199446 -0.00229499]
         # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        if args.place:
+            # The object sets differ for stacking, so add a bit to min z.
+            workspace_limits[2][0] += 0.02
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
