@@ -287,7 +287,8 @@ def main(args):
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False}
 
-    # Do not save these nonlocal_variables or load them when resuming a run. They will be initialized to their default values
+    # Ignore these nonlocal_variables when saving/loading and resuming a run.
+    # They will always be initialized to their default values
     always_default_nonlocals = ['executing_action',
                                 'primitive_action',
                                 'save_state_this_iteration']
@@ -296,19 +297,19 @@ def main(args):
     if continue_logging:
         trainer.preload(logger.transitions_directory)
 
-
+        # when resuming, load nonlocal_variables from previous point the the log was finalized in the run
         nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'variables', 'nonlocal_vars_%d.json' % (trainer.iteration))
         if os.path.exists(nonlocal_vars_filename):
             with open(nonlocal_vars_filename, 'r') as f:
                 nonlocals_to_load = json.load(f)
 
-                # in case not all nonlocal values were saved, only set what was saved
+                # copy loaded values to nonlocals
                 for k, v in nonlocals_to_load.items():
                     if k not in always_default_nonlocals:
-                        if k in nonlocal_variables:  # ignore any additional saved data
+                        if k in nonlocal_variables:  # ignore any entries in the saved data which aren't in nonlocal_variables
                             nonlocal_variables[k] = v
         else:
-            print('WARNING: Missing /data/variables/nonlocal_vars_%d.json on resume. Default values initialized. May cause log inconsistencies' % (trainer.iteration))
+            print('WARNING: Missing /data/variables/nonlocal_vars_%d.json on resume. Default values initialized. Inconsistencies' % (trainer.iteration))
 
         num_trials = trainer.end_trial()
 
@@ -429,8 +430,7 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
-        last_iteration_saved = -1  # used to prevent redundant saving
-
+        last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
         successful_grasp_count = 0
@@ -744,9 +744,9 @@ def main(args):
 
             # save this thread's variables every time the log and model are saved
             if nonlocal_variables['finalize_prev_trial_log']:
-
                 # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
-                # This flag is used so as to not break anything by messing with trial_complete
+                # This flag is used to save variables in the other thread without
+                # breaking anything by messing with finalize_prev_trial_log
                 nonlocal_variables['save_state_this_iteration'] = True
 
                 if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
@@ -769,14 +769,11 @@ def main(args):
                     process_vars['successful_trial_count'] = successful_trial_count
                     process_vars['trial_rate'] = trial_rate
 
-                    process_vars['IterationSaved'] = trainer.iteration  # Not loaded during resume. Just saved for debugging.
-
                     save_location = os.path.join(logger.base_directory, 'data', 'variables')
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
                             json.dump(process_vars, f)
-
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -1036,7 +1033,6 @@ def main(args):
                 logger.write_to_log('place-success', trainer.place_success_log)
             if nonlocal_variables['finalize_prev_trial_log']:
                 # Do final logging from the previous trial and previous complete iteration
-                print("######################################################### LOGGING")
                 nonlocal_variables['finalize_prev_trial_log'] = False
                 trainer.trial_reward_value_log_update()
                 logger.write_to_log('trial-reward-value', trainer.trial_reward_value_log)
@@ -1062,17 +1058,16 @@ def main(args):
                 # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, trial_reward=trial_reward)
 
-            # latest model and best model are stored
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
-                if nonlocal_variables['save_state_this_iteration']:  # saves once every time a trial is completed
+                 # saves once every logs are finalized
+                if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
-                    print("\n############### TRIAL COMPLETE BLOCK #######################\n")
 
                     logger.save_model(trainer.model, method)
 
-                    # copy nonlocal_variable values and discard those which should be default when resuming.
+                    # copy nonlocal_variable values and discard those which shouldn't be saved
                     nonlocals_to_save = nonlocal_variables.copy()
                     entries_to_pop = always_default_nonlocals.copy()
 
@@ -1084,10 +1079,7 @@ def main(args):
                     for k in entries_to_pop:
                         nonlocals_to_save.pop(k)
 
-                    nonlocals_to_save['IterationSaved'] = trainer.iteration
-
                     # save nonlocal_variables for resuming later
-                    print('################### LOGGING DIR', logger.base_directory)
                     save_location = os.path.join(logger.base_directory, 'data', 'variables')
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
@@ -1104,21 +1096,6 @@ def main(args):
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
-
-                    # # copy nonlocal_variable values and discard those which should be default when resuming.
-                    # nonlocals_to_save = nonlocal_variables.copy()
-                    # entries_to_pop = always_default_nonlocals.copy()
-
-                    # # save all entries which are JSON serializable only. Otherwise don't save
-                    # for k, v in nonlocals_to_save.items():
-                    #     if not utils.is_jsonable(v):
-                    #         entries_to_pop.append(k)
-
-                    # for k in entries_to_pop:
-                    #     nonlocals_to_save.pop(k)
-
-                    # with open(os.path.join(logger.base_directory, 'data', 'best_nonlocal_vars.json'), 'w') as f:
-                    #     json.dump(nonlocals_to_save, f)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
