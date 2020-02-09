@@ -591,25 +591,21 @@ class Robot(object):
             for pose in place_pose_history:
                 x, y, z, angle = pose
 
-                color_img, depth_img = self.get_camera_data()
-                depth_img = depth_img * self.cam_depth_scale
-
-                color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, self.cam_intrinsics, self.cam_pose, self.workspace_limits, self.heightmap_resolution)
-                valid_depth_heightmap = depth_heightmap.copy()
-                valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0  # required otherwise max_z is always NaN
-                _, max_z, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1.0)
-
-                stack_z_height = max_z
+                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
                 if self.is_sim:
                     # otherwise simulated gripper grasps too low
                     offset = 0.01
 
-                    if stack_z_height + offset < self.workspace_limits[2][1]:
-                        z = stack_z_height + offset
+                    if max_z_height + offset < self.workspace_limits[2][1]:
+                        z = max_z_height + offset
                 else:
+                    offset = 0.05
                     # otherwise real gripper grasps too high
-                    z -= 0.05
+
+                    if max_z_height - offset > self.workspace_limits[2][0]:
+                        z = max_z_height - offset
+
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
@@ -618,8 +614,6 @@ class Robot(object):
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle)
-
-                self.place(rand_position, rand_angle)
 
             self.place_pose_history = []  # clear place position history
             print("------- UNSTACKING COMPLETE --------")
@@ -645,7 +639,12 @@ class Robot(object):
 
             # TODO(ahundt) add real robot support for reposition_objects
 
-    def get_camera_data(self):
+    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        if heightmap_resolution is None:
+            heightmap_resolution = self.heightmap_resolution
 
         if self.is_sim:
             sim_ret = None
@@ -672,12 +671,46 @@ class Robot(object):
             depth_img = depth_img * (zFar - zNear) + zNear
 
         else:
+            # prevent camera from taking a picture while the robot is still in the frame.
+            if go_home:
+                self.go_home(block_until_home=True)
+
             # Get color and depth image from ROS service
             color_img, depth_img = self.camera.get_data()
             depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
             # color_img = self.camera.color_data.copy()
             # depth_img = self.camera.depth_data.copy()
 
+        if return_heightmaps:
+            # this allows the error to print only once, so it doesn't spam the console.
+            print_error = 0
+
+            max_z_height = np.inf
+            while max_z_height > z_height_retake_threshold:
+                scaled_depth_img = depth_img * self.cam_depth_scale  # Apply depth scale from calibration
+                color_heightmap, depth_heightmap = utils.get_heightmap(color_img, scaled_depth_img, self.cam_intrinsics, self.cam_pose,
+                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap)
+                # TODO(ahundt) switch to masked array, then only have a regular heightmap
+                valid_depth_heightmap = depth_heightmap.copy()
+                valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
+
+                _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
+
+                if max_z_height > z_height_retake_threshold:
+                    if print_error == 3:
+                        print("ERROR: depth_heightmap value too high. max_z_height: ", max_z_height)
+
+                    # Get color and depth image from ROS service
+                    color_img, depth_img = self.camera.get_data()
+                    depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
+
+                    print_error += 1
+                    time.sleep(0.1)
+
+
+            return valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img
+
+        # if not return_depthmaps, return just raw images
         return color_img, depth_img
 
 
