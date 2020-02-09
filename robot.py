@@ -587,7 +587,7 @@ class Robot(object):
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
-            holding_object = self.close_gripper():
+            holding_object = not(self.close_gripper())
             # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
             if holding_object:
                 _, _, rand_position, rand_orientation = self.generate_random_object_pose()
