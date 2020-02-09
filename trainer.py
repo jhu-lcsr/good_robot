@@ -436,7 +436,7 @@ class Trainer(object):
             place_predictions = None
         if self.common_sense:
             # Mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.02, push_length=0.1)
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
             grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
