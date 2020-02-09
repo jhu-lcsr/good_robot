@@ -1676,6 +1676,8 @@ class Robot(object):
             move_to_result = self.move_to(up_pos)
             # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
             if go_home:
+                # TODO(ahundt) confirm redundant go_home works around some cases where the robot fails to reach the destination
+                self.go_home(block_until_home=True)
                 return self.go_home(block_until_home=True)
             else:
                 return move_to_result
