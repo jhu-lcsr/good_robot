@@ -1224,11 +1224,11 @@ class Robot(object):
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
         print('Executing: grasp at (%f, %f, %f) orientation: %f' % (position[0], position[1], position[2], heightmap_rotation_angle))
+        position = np.asarray(position).copy()
 
         if self.is_sim:
 
             # Avoid collision with floor
-            position = np.asarray(position).copy()
             position[2] = max(position[2] - 0.04, workspace_limits[2][0] + 0.02)
 
             # Move gripper to location above grasp target, this is the pre-grasp and post-grasp height
@@ -1279,7 +1279,7 @@ class Robot(object):
         else:
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             # position[2] += self.gripper_ee_offset - 0.01
-            position[2] -= 0.02
+            position[2] -= 0.04
             # Compute tool orientation from heightmap rotation angle
             grasp_orientation = [1.0,0.0]
             if heightmap_rotation_angle > np.pi:
@@ -1292,8 +1292,6 @@ class Robot(object):
             tilted_tool_orientation = tool_orientation
 
             # Attempt grasp
-            position = np.asarray(position).copy()
-
             # find position halfway between the current and final.
             print("Grasp position before applying workspace bounds: " + str(position))
             position[2] = max(position[2], workspace_limits[2][0] + 0.04)
@@ -1446,6 +1444,8 @@ class Robot(object):
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
             if go_home:
+                self.block_until_home()
+                # Redundant go home is applied in case the first move operation fails.
                 push_success = self.go_home(block_until_home=True)
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
