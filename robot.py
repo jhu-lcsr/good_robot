@@ -129,6 +129,7 @@ class Robot(object):
         self.workspace_limits = workspace_limits
         self.heightmap_resolution = 0.002
         self.place_task = place
+        self.unstack = unstack
         self.grasp_color_task = grasp_color_task
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
@@ -230,15 +231,6 @@ class Robot(object):
             # Add objects to simulation environment
             self.add_objects()
 
-            self.unstack = unstack
-
-            if self.unstack:
-                print("Reset method is UNSTACK")
-            else:
-                print("Reset method is SIMULATOR")
-
-
-
         # If in real-settings...
         else:
             # Tool pose tolerance for blocking calls, [x, y, z, roll, pitch, yaw]
@@ -331,8 +323,8 @@ class Robot(object):
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
 
             # real robot must use unstacking
-            self.unstack = True
-            print("Reset method is UNSTACK")
+            if self.place:
+                self.unstack = True
 
 
     def load_preset_case(self, test_preset_file=None):
