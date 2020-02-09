@@ -40,7 +40,7 @@ def run_title(args):
     elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
     if args.trial_reward:
-        title += 'Trial Reward, '
+        title += 'SPOT Trial Reward, '
     else:
         title += 'Two Step Reward, '
     if args.common_sense:
@@ -74,6 +74,9 @@ def main(args):
         # [ 0.73409861 -0.45199446 -0.00229499]
         # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        if args.place:
+            # The object sets differ for stacking, so add a bit to min z.
+            workspace_limits[2][0] += 0.02
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -95,6 +98,7 @@ def main(args):
     check_row = args.check_row
     check_z_height = args.check_z_height
     check_z_height_goal = args.check_z_height_goal
+    check_z_height_max = args.check_z_height_max
     pretrained = not args.random_weights
     max_iter = args.max_iter
     no_height_reward = args.no_height_reward
@@ -191,7 +195,8 @@ def main(args):
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
-                      network=neural_network_name, common_sense=common_sense)
+                      network=neural_network_name, common_sense=common_sense,
+                      show_heightmap=show_heightmap)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -490,7 +495,7 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
-                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
@@ -515,7 +520,7 @@ def main(args):
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -550,7 +555,7 @@ def main(args):
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
@@ -1210,6 +1215,7 @@ if __name__ == '__main__':
     parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
+    parser.add_argument('--check_z_height_max', dest='check_z_height_goal', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. ')
 
     # -------------- Testing options --------------

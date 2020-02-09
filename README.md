@@ -246,7 +246,7 @@ You will need to generate and load a calibration yaml file which goes in a locat
 
 #### Calibrating Camera Extrinsics
 
-1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 70mm tags with the original design (dictionary 16), so it can fit in the gripper. Make sure the ArUco dictionary id in the launch files is correct. Attach the ArUco Tag on the robot.
+1. Print an [ArUco Tag](http://chev.me/arucogen/), we use 70mm tags with the 4x4 design (dictionary 1), so it can fit in the gripper. Make sure the ArUco dictionary id in the launch files is correct. Attach the ArUco Tag on the robot.
 
 2. Edit the fiducials ROS package [aruco_detect.launch](https://github.com/UbiquityRobotics/fiducials/blob/kinetic-devel/aruco_detect/launch/aruco_detect.launch) file in `~/ros_catkin_ws/src/fiducials/aruco_detect/launch/aruco_detect.launch` from the [fiducials github repository](https://github.com/UbiquityRobotics/fiducials) you cloned earlier, see [the fiducials wiki for reference](http://wiki.ros.org/fiducials). Modify the launch file in [fiducials/aruco to detect your markers and receive images from your sensor. Here is our configuration:
 
@@ -259,8 +259,8 @@ You will need to generate and load a calibration yaml file which goes in a locat
   <arg name="camera" default="/camera/rgb"/>
   <arg name="image" default="image_rect_color"/>
   <arg name="transport" default="compressed"/>
-  <arg name="fiducial_len" default="0.1"/>
-  <arg name="dictionary" default="16"/>
+  <arg name="fiducial_len" default="0.07"/>
+  <arg name="dictionary" default="1"/>
   <arg name="do_pose_estimation" default="true"/>
   <arg name="ignore_fiducials" default="" />
   <arg name="fiducial_len_override" default="" />

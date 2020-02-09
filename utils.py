@@ -121,6 +121,12 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
+        if np.any(depth_heightmap < 0.0):
+            print('WARNING: get_heightmap() depth_heightmap contains values of height < 0, '
+                  'saved depth heightmap png files may be invalid!'
+                  'See README.md for instructions to collect the depth heightmap again.'
+                  'Clipping the minimum to 0 for now.')
+            depth_heightmap = np.clip(depth_heightmap, 0, None)
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
@@ -138,7 +144,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
 
     return color_heightmap, depth_heightmap
 
-def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.01, push_length=0.0, z_buffer=0.01):
+def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.02, push_length=0.0, z_buffer=0.01):
     """ Get heuristic scores for the grasp Q value at various pixels. 0 means our model confidently indicates no progress will be made, 1 means progress may be possible.
     """
     pixels_to_dilate = int(np.ceil((gripper_width + push_length)/heightmap_resolution))

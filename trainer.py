@@ -30,7 +30,7 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet', common_sense=False):
+                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -40,6 +40,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
+        self.show_heightmap = show_heightmap
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -435,13 +436,27 @@ class Trainer(object):
             place_predictions = None
         if self.common_sense:
             # Mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.02, push_length=0.1)
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
             grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            if self.show_heightmap:
+                # visualize the common sense function results
+                # show the heightmap
+                f = plt.figure()
+                # f.suptitle(str(trainer.iteration))
+                f.add_subplot(1,4, 1)
+                plt.imshow(grasp_place_contactable_regions)
+                f.add_subplot(1,4, 2)
+                plt.imshow(push_contactable_regions)
+                f.add_subplot(1,4, 3)
+                plt.imshow(depth_heightmap)
+                f.add_subplot(1,4, 4)
+                plt.imshow(color_heightmap)
+                plt.show(block=True)
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
@@ -542,7 +557,7 @@ class Trainer(object):
             return expected_reward, current_reward
 
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, show_heightmap=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -554,7 +569,7 @@ class Trainer(object):
         #     if primitive_action == 'place':
         #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
         action_id = ACTION_TO_ID[primitive_action]
-        if show_heightmap:
+        if self.show_heightmap:
             # visualize the common sense function results
             # show the heightmap
             f = plt.figure()
