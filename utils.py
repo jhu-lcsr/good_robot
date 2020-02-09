@@ -600,3 +600,78 @@ def polyfit(*args, **kwargs):
         warnings.simplefilter('ignore', np.RankWarning)
         out = np.polyfit(*args, **kwargs)
     return out
+
+# killeen: this is defining the goal
+class StackSequence(object):
+    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
+        """ Oracle to choose a sequence of specific color objects to interact with.
+
+        Generates one hot encodings for a list of objects of the specified length.
+        Can be used for stacking or simply grasping specific objects.
+
+        # Member Variables
+
+        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
+        is_goal_conditioned_task: do we care about which specific object we are using
+        object_color_sequence: to get the full order of the current stack goal.
+
+        """
+        self.num_obj = num_obj
+        self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.trial = trial
+        self.reset_sequence()
+        self.total_steps = total_steps
+
+    def reset_sequence(self):
+        """ Generate a new sequence of specific objects to interact with.
+        """
+        if self.is_goal_conditioned_task:
+            # 3 is currently the red block
+            # object_color_index = 3
+            self.object_color_index = 0
+
+            # Choose a random sequence to stack
+            self.object_color_sequence = np.random.permutation(self.num_obj)
+            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
+            self.object_color_one_hot_encodings = []
+            for color in self.object_color_sequence:
+                object_color_one_hot_encoding = np.zeros((self.num_obj))
+                object_color_one_hot_encoding[color] = 1.0
+                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
+        else:
+            self.object_color_index = None
+            self.object_color_one_hot_encodings = None
+            self.object_color_sequence = None
+        self.trial += 1
+
+    def current_one_hot(self):
+        """ Return the one hot encoding for the current specific object.
+        """
+        return self.object_color_one_hot_encodings[self.object_color_index]
+
+    def sequence_one_hot(self):
+        """ Return the one hot encoding for the entire stack sequence.
+        """
+        return np.concatenate(self.object_color_one_hot_encodings)
+
+    def current_sequence_progress(self):
+        """ How much of the current stacking sequence we have completed.
+
+        For example, if the sequence should be [0, 1, 3, 2].
+        At initialization this will return [0].
+        After one next() calls it will return [0, 1].
+        After two next() calls it will return [0, 1, 3].
+        After three next() calls it will return [0, 1, 3, 2].
+        After four next() calls a new sequence will be generated and it will return one element again.
+        """
+        if self.is_goal_conditioned_task:
+            return self.object_color_sequence[:self.object_color_index+1]
+        else:
+            return None
+
+    def next(self):
+        self.total_steps += 1
+        if self.is_goal_conditioned_task:
+            self.object_color_index += 1
+            if not self.object_color_index < self.num_obj:
+                self.reset_sequence()

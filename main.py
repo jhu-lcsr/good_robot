@@ -21,6 +21,7 @@ from utils import ID_TO_ACTION
 from utils_torch import action_space_argmax
 import plot
 import copy
+from utils import StackSequence
 
 
 def run_title(args):
@@ -49,82 +50,6 @@ def run_title(args):
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
     return title, dirname
-
-# killeen: this is defining the goal
-class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
-        """ Oracle to choose a sequence of specific color objects to interact with.
-
-        Generates one hot encodings for a list of objects of the specified length.
-        Can be used for stacking or simply grasping specific objects.
-
-        # Member Variables
-
-        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
-        is_goal_conditioned_task: do we care about which specific object we are using
-        object_color_sequence: to get the full order of the current stack goal.
-
-        """
-        self.num_obj = num_obj
-        self.is_goal_conditioned_task = is_goal_conditioned_task
-        self.trial = trial
-        self.reset_sequence()
-        self.total_steps = total_steps
-
-    def reset_sequence(self):
-        """ Generate a new sequence of specific objects to interact with.
-        """
-        if self.is_goal_conditioned_task:
-            # 3 is currently the red block
-            # object_color_index = 3
-            self.object_color_index = 0
-
-            # Choose a random sequence to stack
-            self.object_color_sequence = np.random.permutation(self.num_obj)
-            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
-            self.object_color_one_hot_encodings = []
-            for color in self.object_color_sequence:
-                object_color_one_hot_encoding = np.zeros((self.num_obj))
-                object_color_one_hot_encoding[color] = 1.0
-                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
-        else:
-            self.object_color_index = None
-            self.object_color_one_hot_encodings = None
-            self.object_color_sequence = None
-        self.trial += 1
-
-    def current_one_hot(self):
-        """ Return the one hot encoding for the current specific object.
-        """
-        return self.object_color_one_hot_encodings[self.object_color_index]
-
-    def sequence_one_hot(self):
-        """ Return the one hot encoding for the entire stack sequence.
-        """
-        return np.concatenate(self.object_color_one_hot_encodings)
-
-    def current_sequence_progress(self):
-        """ How much of the current stacking sequence we have completed.
-
-        For example, if the sequence should be [0, 1, 3, 2].
-        At initialization this will return [0].
-        After one next() calls it will return [0, 1].
-        After two next() calls it will return [0, 1, 3].
-        After three next() calls it will return [0, 1, 3, 2].
-        After four next() calls a new sequence will be generated and it will return one element again.
-        """
-        if self.is_goal_conditioned_task:
-            return self.object_color_sequence[:self.object_color_index+1]
-        else:
-            return None
-
-    def next(self):
-        self.total_steps += 1
-        if self.is_goal_conditioned_task:
-            self.object_color_index += 1
-            if not self.object_color_index < self.num_obj:
-                self.reset_sequence()
-
 
 def main(args):
     # TODO(ahundt) move main and process_actions() to a class?
@@ -181,6 +106,7 @@ def main(args):
     common_sense = args.common_sense
     disable_two_step_backprop = args.disable_two_step_backprop
 
+
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
@@ -205,6 +131,12 @@ def main(args):
     else:
         preset_files = None
         test_preset_file = None
+
+    unstack = args.unstack
+    if args.place and not args.is_sim:
+        unstack = True
+        args.unstack = True
+        print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
     if args.resume == 'last':
@@ -253,7 +185,7 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task)
+                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task, unstack=unstack)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -1002,9 +934,9 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 25:
+            if int(time_elapsed) > 60:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
-                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 25 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 if is_sim:
                     robot.check_sim()
@@ -1282,6 +1214,7 @@ if __name__ == '__main__':
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
+    parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly setting their positions. Only applies when --place is set')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
