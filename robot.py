@@ -1091,7 +1091,7 @@ class Robot(object):
         return execute_success
 
 
-    def move_joints(self, joint_configuration, timeout_seconds=10):
+    def move_joints(self, joint_configuration, timeout_seconds=7):
         if self.is_sim:
             if not self.sim_joint_handles:
                 # set all of the joint handles
@@ -1475,7 +1475,7 @@ class Robot(object):
             joint_positions += [position]
         return joint_positions
 
-    def block_until_home(self, timeout_seconds=10):
+    def block_until_home(self, timeout_seconds=7):
 
         if self.is_sim:
             raise NotImplementedError
@@ -1493,7 +1493,7 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-    def block_until_cartesian_position(self, position, timeout_seconds=10):
+    def block_until_cartesian_position(self, position, timeout_seconds=7):
         """Block the real program until it reaches a specified cartesian pose or the timeout in seconds.
         """
         if self.is_sim:
@@ -1514,7 +1514,7 @@ class Robot(object):
                 return False
             tool_analog_input2 = new_tool_analog_input2
 
-    def block_until_joint_position(self, position, timeout_seconds=10):
+    def block_until_joint_position(self, position, timeout_seconds=7):
 
         if self.is_sim:
             raise NotImplementedError
