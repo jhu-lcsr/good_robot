@@ -580,12 +580,21 @@ class Robot(object):
         return obj_positions, obj_orientations
 
 
-    def reposition_objects(self, workspace_limits=None):
+    def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
+
+            holding_object = self.close_gripper():
+            # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
+            if holding_object:
+                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
+                rand_angle = rand_orientation[0]
+
+                self.place(rand_position, rand_angle, save_history=False)
 
             # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
             for pose in place_pose_history:
@@ -610,10 +619,10 @@ class Robot(object):
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                    rand_position[2] = 0.05  # height from which to release blocks (0.05 m per block)
+                    rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
-                    self.place(rand_position, rand_angle)
+                    self.place(rand_position, rand_angle, save_history=False)
 
             self.place_pose_history = []  # clear place position history
             print("------- UNSTACKING COMPLETE --------")
@@ -1573,7 +1582,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1584,9 +1593,10 @@ class Robot(object):
         place_pose = (position[0], position[1], position[2], heightmap_rotation_angle)
         print('Executing: Place at (%f, %f, %f) angle: %f' % place_pose)
 
-        self.place_pose_history.append(place_pose)
-        while len(self.place_pose_history) > self.place_pose_history_limit:  # only store x most recent place attempts
-            self.place_pose_history.pop(0)
+        if save_history:
+            self.place_pose_history.append(place_pose)
+            while len(self.place_pose_history) > self.place_pose_history_limit:  # only store x most recent place attempts
+                self.place_pose_history.pop(0)
 
         if self.is_sim:
 
