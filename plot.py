@@ -12,7 +12,7 @@ def best_success_rate(success_rate, window, title):
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
         print('Max ' + title + ': ' + str(best) +
-              ', at action iteration: ' + str(np.argmax(success_rate[window:])) +
+              ', at action iteration: ' + str(np.argmax(success_rate[window:]) + window) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
         return best
     else:
