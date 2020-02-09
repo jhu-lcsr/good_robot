@@ -107,7 +107,7 @@ class Robot(object):
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False):
+                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -127,9 +127,10 @@ class Robot(object):
                 # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
                 workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.workspace_limits = workspace_limits
-        self.heightmap_resolution = 0.002
+        self.heightmap_resolution = heightmap_resolution
         self.place_task = place
         self.unstack = unstack
+        self.place_pose_history_limit = 6
         self.grasp_color_task = grasp_color_task
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
@@ -1551,7 +1552,7 @@ class Robot(object):
         print('Executing: Place at (%f, %f, %f) angle: %f' % place_pose)
 
         self.place_pose_history.append(place_pose)
-        while len(self.place_pose_history) > 4:  # only store x most recent place attempts
+        while len(self.place_pose_history) > self.place_pose_history_limit:  # only store x most recent place attempts
             self.place_pose_history.pop(0)
 
         if self.is_sim:
