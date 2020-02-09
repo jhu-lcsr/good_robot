@@ -600,8 +600,10 @@ class Robot(object):
 
                 stack_z_height = max_z
 
-                # otherwise gripper grasps too low
-                offset = 0.01
+                offset = 0.0
+                if self.is_sim:
+                    # otherwise gripper grasps too low
+                    offset = 0.01
 
                 if stack_z_height + offset < self.workspace_limits[2][1]:
                     z = stack_z_height + offset
