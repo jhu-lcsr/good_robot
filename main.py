@@ -494,7 +494,7 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
-                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
@@ -519,7 +519,7 @@ def main(args):
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -554,7 +554,7 @@ def main(args):
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, save_image=False)
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
                         partial_stack_count += 1
