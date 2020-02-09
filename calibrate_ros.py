@@ -46,7 +46,9 @@ class Calibrate:
             save_dir=None, workspace_limits=None, calib_point_num=30):
         
         if workspace_limits is None:
-            self.workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
+            # self.workspace_limits = np.asarray([[0.5, 0.75], [-0.3, 0.1], [0.17, 0.3]]) # Real Good Robot
+                    # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
+            self.workspace_limits = np.asarray([[0.5, 0.724], [-0.35, 0.05], [0.3, 0.6]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 
         self.calib_point_num = calib_point_num
 
@@ -146,6 +148,9 @@ class Calibrate:
         self.robot.joint_vel = 0.4
         self.robot.tool_acc = 0.4
         self.robot.tool_vel = 0.4
+
+        # Close gripper to grasp the block for calibration
+        self.robot.close_gripper()
 
         robot_poses = []
         marker_poses = []
@@ -279,9 +284,12 @@ class Calibrate:
                 marker_poses.append(markerpose)
         return robot_poses, marker_poses 
 
-    
+
 if __name__ == "__main__":
-    calib = Calibrate(save_dir='/home/costar/src/real_good_robot/calibration_2019_01_09')
-    calib.test()
+    # calib = Calibrate(save_dir='/home/costar/src/real_good_robot/calibration_2020_02_07')
+    # calib.test()
     # calib.collect_data()
-    # calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_1206')
+    # calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_2020_02_07')
+    calib = Calibrate(save_dir='/home/costar/src/real_good_robot/2020-02-07-12-58-25_calibration')
+    calib.collect_data()
+    calib.calibrate(load_dir='/home/costar/src/real_good_robot/2020-02-07-12-58-25_calibration')
