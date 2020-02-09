@@ -190,7 +190,21 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     best_success_rate(efficiency, window, 'grasp action efficiency')
     return efficiency, lower, upper
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True):
+
+def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, over_height_threshold=6.0):
+    # length = min([heights.shape[0], trial.shape[0], trial_success.shape[0]])
+    actions_with_height_noise = heights > over_height_threshold
+    new_clearance = []
+    for trial_it in clearance:
+        recent_actions = actions_with_height_noise[int(trial_it) - 3:int(trial_it)]
+        if not np.any(recent_actions):
+            new_clearance += [trial_it]
+    trial = np.array(utils.clearance_log_to_trial_count(new_clearance)).astype(np.int)
+    heights[actions_with_height_noise] = 1.0
+    return heights, trial, trial_success, clearance
+
+
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, apply_real_robot_speckle_noise_hotfix=False):
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
         heights = np.loadtxt(stack_height_file)
@@ -220,6 +234,25 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         # old versions of logged code don't have the grasp-success.log.txt file, data must be extracted from rewards.
         grasp_rewards = rewards
 
+    # create and clear the figure
+    fig = plt.figure()
+    if clear_figure:
+        fig.clf()
+    # Plot the rate and variance of trial successes
+    trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
+    if os.path.isfile(trial_success_file):
+        trial_successes = np.loadtxt(trial_success_file)
+        if max_iter is not None:
+            trial_successes = trial_successes[:max_iter]
+        if apply_real_robot_speckle_noise_hotfix:
+            clearance = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
+            heights, trials, trial_successes, clearance = real_robot_speckle_noise_hotfix(heights, trials, trial_successes, clearance)
+        if trial_successes.size > 0:
+            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+            plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
+            plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+                            mult*trial_success_lower, mult*trial_success_upper,
+                            color=colors[3], alpha=alpha)
     # trial_reward_file = os.path.join(log_dir, 'transitions', 'trial-reward-value.log.txt')
     # if os.path.isfile(trial_reward_file):
     #     grasp_rewards = np.loadtxt(trial_reward_file)
@@ -234,9 +267,6 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     else:
         eff, eff_lower, eff_upper = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
 
-    # create and clear the figure
-    fig = plt.figure()
-    fig.clf()
     plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
     if place:
         plt.plot(mult*place_rate, color=colors[1], label='Place Success Rate')
@@ -252,19 +282,6 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.fill_between(np.arange(1, eff.shape[0]+1),
                      mult*eff_lower, mult*eff_upper,
                      color=colors[2], alpha=alpha)
-
-    # Plot the rate and variance of trial successes
-    trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
-    if os.path.isfile(trial_success_file):
-        trial_successes = np.loadtxt(trial_success_file)
-        if max_iter is not None:
-            trial_successes = trial_successes[:max_iter]
-        if trial_successes.size > 0:
-            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
-            plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
-            plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
-                            mult*trial_success_lower, mult*trial_success_upper,
-                            color=colors[3], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
@@ -287,7 +304,13 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
-
+    #############################################################
+    # REAL ROBOT STACKING run 
+    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=None, apply_real_robot_speckle_noise_hotfix=True)
+    # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
+    # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
+    # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)
+    # Max action efficiency: 0.3, at action iteration: 37. (total of 751 actions, max excludes first 200 actions)
     #############################################################
     # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation. 
     # It can basically complete trials 100% of the time within 400 actions!
@@ -297,7 +320,7 @@ if __name__ == '__main__':
     # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04, on costar workstation
     log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
     # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
-    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=4000)
     #############################################################
 
     log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
