@@ -618,7 +618,11 @@ class Robot(object):
 
                     self.place(rand_position, rand_angle)
 
+                self.place(rand_position, rand_angle)
+
             self.place_pose_history = []  # clear place position history
+            print("------- UNSTACKING COMPLETE --------")
+
         else:
             if self.is_sim:
                 # Move gripper out of the way to the home position
