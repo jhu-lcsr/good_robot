@@ -1345,7 +1345,7 @@ class Robot(object):
                 self.open_gripper(nonblocking=True)
 
             if go_home:
-                self.go_home()
+                self.go_home(block_until_home=True)
             else:
                 # go back to the grasp up pos
                 self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
