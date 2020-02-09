@@ -8,13 +8,9 @@ import numpy as np
 import scipy as sc
 import cv2
 from collections import namedtuple
-import torch
-from torch.autograd import Variable
 from robot import Robot
-from trainer import Trainer
-from logger import Logger
 import utils
-from main import StackSequence
+from utils import StackSequence
 
 
 ############### Testing Block Stacking #######
@@ -56,7 +52,7 @@ grasp_color_task = False
 # are we doing a stack even if we don't care about colors
 place_task = True
 # place in rows instead of stacks
-check_row = True
+check_row = False
 # if placing in rows, how far apart to set the blocks?
 separation = 0.055
 distance_threshold = 0.08
@@ -111,6 +107,14 @@ for stack in range(num_stacks):
         else:
             block_positions = robot.get_obj_positions_and_orientations()[0]
             primitive_position = block_positions[base_block_to_place]
+
+            # place height should be on the top of the stack. otherwise the sim freaks out
+            stack_z_height = 0
+            for block_pos in block_positions:
+                if block_pos[2] > stack_z_height and block_pos[2] < workspace_limits[2][1]:
+                    stack_z_height = block_pos[2]
+            primitive_position[2] = stack_z_height
+
         place = robot.place(primitive_position, theta + np.pi / 2)
         print('place ' + str(i) + ' : ' + str(place))
         # check if we don't care about color
