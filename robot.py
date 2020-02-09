@@ -594,10 +594,9 @@ class Robot(object):
                 color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, self.cam_intrinsics, self.cam_pose, self.workspace_limits, self.heightmap_resolution)
                 valid_depth_heightmap = depth_heightmap.copy()
                 valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0  # required otherwise max_z is always NaN
-                _, max_z, _ = self.check_z_height(valid_depth_heightmap)
+                _, max_z, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1.0)
 
-                # divide by 20 because check_z_height multiplies the actual heighy by 20
-                stack_z_height = max_z / 20
+                stack_z_height = max_z
 
                 # otherwise gripper grasps too low
                 offset = 0.01
