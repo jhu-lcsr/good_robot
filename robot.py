@@ -321,8 +321,8 @@ class Robot(object):
                  # see logger.py save_heightmaps() and trainer.py load_sample()
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
-                # TODO(ahundt) HACK- DO NOT COMMIT THE NEXT LINE!!!!! REMOVE THIS HACK, COLLECT HEIGHTMAP AGAIN
-                self.background_heightmap += 0.01
+                # TODO(ahundt) HACK REMOVE background_heightmap subtraction, COLLECT HEIGHTMAP AGAIN, SEE README.md for instructions
+                self.background_heightmap -= 0.03
 
             # real robot must use unstacking
             if self.place:
