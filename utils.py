@@ -35,6 +35,26 @@ def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
     return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
+def clearance_log_to_trial_count(clearance_log):
+    """ Convert clearance log list of end indices to a list of the current trial number at each iteration.
+
+    # Returns
+
+    List of lists of the current trial index.
+    ex: [[0], [0], [0], [1], [1]]
+    """
+    if not len(clearance_log):
+        return []
+    clearance_log = np.squeeze(clearance_log).astype(np.int)
+    # Make a list of the right length containing all zeros
+    trial_count = []
+    prev_trial_end_index = 0
+    for trial_num, trial_end_index in enumerate(clearance_log):
+        trial_count += [[trial_num]] * int(trial_end_index - prev_trial_end_index)
+        prev_trial_end_index = trial_end_index
+    return trial_count
+
+
 def get_pointcloud(color_img, depth_img, camera_intrinsics):
 
     # Get depth image size
@@ -102,6 +122,12 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
+        if np.any(depth_heightmap < 0.0):
+            print('WARNING: get_heightmap() depth_heightmap contains values of height < 0, '
+                  'saved depth heightmap png files may be invalid!'
+                  'See README.md for instructions to collect the depth heightmap again.'
+                  'Clipping the minimum to 0 for now.')
+            depth_heightmap = np.clip(depth_heightmap, 0, None)
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
@@ -119,20 +145,25 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
 
     return color_heightmap, depth_heightmap
 
-def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.01, push_length=0.0, z_buffer=0.01):
+def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002, gripper_width=0.06, min_contact_height=0.02, push_length=0.0, z_buffer=0.01):
     """ Get heuristic scores for the grasp Q value at various pixels. 0 means our model confidently indicates no progress will be made, 1 means progress may be possible.
     """
     pixels_to_dilate = int(np.ceil((gripper_width + push_length)/heightmap_resolution))
     kernel = np.ones((pixels_to_dilate, pixels_to_dilate), np.uint8)
     object_pixels = (heightmap > min_contact_height).astype(np.uint8)
     contactable_regions = cv2.dilate(object_pixels, kernel, iterations=1)
+
     if push_length > 0.0:
         # For push, skip regions where the gripper would be too high
         reigonal_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
-        push_too_high_pixels = np.nonzero(heightmap > (reigonal_maximums - z_buffer))
+        block_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
-        contactable_regions[push_too_high_pixels] = 0
+        # the blocks and the gripper width around them are set to zero.
+        gripper_width_pixels_to_dilate = int(np.ceil((gripper_width)/heightmap_resolution))
+        kernel = np.ones((gripper_width_pixels_to_dilate, gripper_width_pixels_to_dilate), np.uint8)
+        push_too_high_pixels = cv2.dilate(block_pixels, kernel, iterations=1)
+        contactable_regions[np.nonzero(push_too_high_pixels)] = 0
 
     return contactable_regions
 
@@ -577,10 +608,84 @@ def polyfit(*args, **kwargs):
         out = np.polyfit(*args, **kwargs)
     return out
 
-
 def is_jsonable(x):
     try:
         json.dumps(x)
         return True
     except (TypeError, OverflowError):
         return False
+
+# killeen: this is defining the goal
+class StackSequence(object):
+    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
+        """ Oracle to choose a sequence of specific color objects to interact with.
+
+        Generates one hot encodings for a list of objects of the specified length.
+        Can be used for stacking or simply grasping specific objects.
+
+        # Member Variables
+
+        num_obj: the number of objects to manage. Each object is assumed to be in a list indexed from 0 to num_obj.
+        is_goal_conditioned_task: do we care about which specific object we are using
+        object_color_sequence: to get the full order of the current stack goal.
+
+        """
+        self.num_obj = num_obj
+        self.is_goal_conditioned_task = is_goal_conditioned_task
+        self.trial = trial
+        self.reset_sequence()
+        self.total_steps = total_steps
+
+    def reset_sequence(self):
+        """ Generate a new sequence of specific objects to interact with.
+        """
+        if self.is_goal_conditioned_task:
+            # 3 is currently the red block
+            # object_color_index = 3
+            self.object_color_index = 0
+
+            # Choose a random sequence to stack
+            self.object_color_sequence = np.random.permutation(self.num_obj)
+            # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
+            self.object_color_one_hot_encodings = []
+            for color in self.object_color_sequence:
+                object_color_one_hot_encoding = np.zeros((self.num_obj))
+                object_color_one_hot_encoding[color] = 1.0
+                self.object_color_one_hot_encodings.append(object_color_one_hot_encoding)
+        else:
+            self.object_color_index = None
+            self.object_color_one_hot_encodings = None
+            self.object_color_sequence = None
+        self.trial += 1
+
+    def current_one_hot(self):
+        """ Return the one hot encoding for the current specific object.
+        """
+        return self.object_color_one_hot_encodings[self.object_color_index]
+
+    def sequence_one_hot(self):
+        """ Return the one hot encoding for the entire stack sequence.
+        """
+        return np.concatenate(self.object_color_one_hot_encodings)
+
+    def current_sequence_progress(self):
+        """ How much of the current stacking sequence we have completed.
+
+        For example, if the sequence should be [0, 1, 3, 2].
+        At initialization this will return [0].
+        After one next() calls it will return [0, 1].
+        After two next() calls it will return [0, 1, 3].
+        After three next() calls it will return [0, 1, 3, 2].
+        After four next() calls a new sequence will be generated and it will return one element again.
+        """
+        if self.is_goal_conditioned_task:
+            return self.object_color_sequence[:self.object_color_index+1]
+        else:
+            return None
+
+    def next(self):
+        self.total_steps += 1
+        if self.is_goal_conditioned_task:
+            self.object_color_index += 1
+            if not self.object_color_index < self.num_obj:
+                self.reset_sequence()

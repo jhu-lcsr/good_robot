@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
+from utils_torch import action_space_argmax
 
 try:
     import ptflops
@@ -29,7 +30,7 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet', common_sense=False):
+                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -39,6 +40,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
+        self.show_heightmap = show_heightmap
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -278,7 +280,7 @@ class Trainer(object):
                 current_reward = self.reward_value_log[i][0]
                 if future_r is None:
                     # Give the final time step its own reward twice.
-                    future_r = current_reward
+                    future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
                 if current_reward > 0:
                     # If a nonzero score was received, the reward propagates
                     future_r = current_reward + self.future_reward_discount * future_r
@@ -434,13 +436,27 @@ class Trainer(object):
             place_predictions = None
         if self.common_sense:
             # Mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.02, push_length=0.1)
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
             grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            if self.show_heightmap:
+                # visualize the common sense function results
+                # show the heightmap
+                f = plt.figure()
+                # f.suptitle(str(trainer.iteration))
+                f.add_subplot(1,4, 1)
+                plt.imshow(grasp_place_contactable_regions)
+                f.add_subplot(1,4, 2)
+                plt.imshow(push_contactable_regions)
+                f.add_subplot(1,4, 3)
+                plt.imshow(depth_heightmap)
+                f.add_subplot(1,4, 4)
+                plt.imshow(color_heightmap)
+                plt.show(block=True)
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
@@ -541,7 +557,7 @@ class Trainer(object):
             return expected_reward, current_reward
 
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, show_heightmap=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -553,7 +569,7 @@ class Trainer(object):
         #     if primitive_action == 'place':
         #         contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
         action_id = ACTION_TO_ID[primitive_action]
-        if show_heightmap:
+        if self.show_heightmap:
             # visualize the common sense function results
             # show the heightmap
             f = plt.figure()
@@ -660,7 +676,7 @@ class Trainer(object):
             self.optimizer.step()
 
         elif self.method == 'reinforcement':
-
+            self.optimizer.zero_grad()
             # Compute labels
             label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))
             action_area = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
@@ -676,6 +692,20 @@ class Trainer(object):
             label_weights = np.zeros(label.shape)
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label_weights[action_area > 0] = 1
+
+            # Do forward pass with specified rotation (to save gradients)
+            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+            if self.common_sense:
+                # If the current argmax is masked, the geometry indicates the action would not contact anything.
+                # Therefore, we know the action would fail so train the argmax value with 0 reward.  
+                # This new common sense reward will have the same weight as the actual historically executed action.
+                new_best_pix_ind, each_action_max_coordinate, predicted_value = action_space_argmax(primitive_action, push_predictions, grasp_predictions, place_predictions)
+                predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
+                if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
+                    # The tmp_label value will already be 0, so just set the weight.
+                    tmp_label_weights[each_action_max_coordinate[primitive_action]] = 1
+
+            # In the commented code we tried to apply Q values at every filtered pixel, but that didn't work well.
             # if self.common_sense:
             #     # all areas where we won't be able to contact anything will have
             #     # mask value 1 which allows the label value zero to be applied
@@ -688,11 +718,9 @@ class Trainer(object):
             #     # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
             label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
-            # Compute loss and backward pass
-            self.optimizer.zero_grad()
             loss_value = 0
-            # Do forward pass with specified rotation (to save gradients)
-            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+            # Compute loss and backward pass
+
             if self.use_cuda:
                 loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
             else:
