@@ -190,7 +190,8 @@ def main(args):
     # Initialize pick-and-place system (camera and robot)
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file, place, grasp_color_task, unstack=unstack)
+                  is_testing, test_preset_cases, test_preset_file,
+                  place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
 
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -1052,7 +1053,7 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > 60:
+            if is_sim and int(time_elapsed) > 60:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
@@ -1156,14 +1157,7 @@ def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap,
 
 def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
-    color_img, depth_img = robot.get_camera_data()
-    depth_img = depth_img * robot.cam_depth_scale  # Apply depth scale from calibration
-    # Get heightmap from RGB-D image (by re-projecting 3D point cloud)
-    color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, robot.cam_intrinsics, robot.cam_pose,
-                                                           workspace_limits, heightmap_resolution, background_heightmap=robot.background_heightmap)
-    # TODO(ahundt) switch to masked array, then only have a regular heightmap
-    valid_depth_heightmap = depth_heightmap.copy()
-    valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
+    valid_depth_heightmap, color_heightmap, depth_heightmap, _, color_img, depth_img = robot.get_camera_data(return_heightmaps=True)
 
     # Save RGB-D images and RGB-D heightmaps
     if save_image:
@@ -1329,7 +1323,7 @@ if __name__ == '__main__':
     parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
-    parser.add_argument('--check_z_height_max', dest='check_z_height_goal', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
+    parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. ')
 
     # -------------- Testing options --------------

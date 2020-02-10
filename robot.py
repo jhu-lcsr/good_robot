@@ -107,7 +107,7 @@ class Robot(object):
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False):
+                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -127,9 +127,10 @@ class Robot(object):
                 # Dimensions of workspace should be 448 mm x 448 mm. That's 224x224 pixels with each pixel being 2mm x2mm.
                 workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         self.workspace_limits = workspace_limits
-        self.heightmap_resolution = 0.002
+        self.heightmap_resolution = heightmap_resolution
         self.place_task = place
         self.unstack = unstack
+        self.place_pose_history_limit = 6
         self.grasp_color_task = grasp_color_task
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
@@ -579,46 +580,53 @@ class Robot(object):
         return obj_positions, obj_orientations
 
 
-    def reposition_objects(self, workspace_limits=None):
+    def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
+            holding_object = not(self.close_gripper())
+            # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
+            if holding_object:
+                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
+                rand_angle = rand_orientation[0]
+
+                self.place(rand_position, rand_angle, save_history=False)
+
             # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
             for pose in place_pose_history:
                 x, y, z, angle = pose
 
-                color_img, depth_img = self.get_camera_data()
-                depth_img = depth_img * self.cam_depth_scale
-
-                color_heightmap, depth_heightmap = utils.get_heightmap(color_img, depth_img, self.cam_intrinsics, self.cam_pose, self.workspace_limits, self.heightmap_resolution)
-                valid_depth_heightmap = depth_heightmap.copy()
-                valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0  # required otherwise max_z is always NaN
-                _, max_z, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1.0)
-
-                stack_z_height = max_z
+                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
                 if self.is_sim:
                     # otherwise simulated gripper grasps too low
                     offset = 0.01
 
-                    if stack_z_height + offset < self.workspace_limits[2][1]:
-                        z = stack_z_height + offset
+                    if max_z_height + offset < self.workspace_limits[2][1]:
+                        z = max_z_height + offset
                 else:
+                    offset = 0.05
                     # otherwise real gripper grasps too high
-                    z -= 0.05
+
+                    if max_z_height - offset > self.workspace_limits[2][0]:
+                        z = max_z_height - offset
+
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                    rand_position[2] = 0.05  # height from which to release blocks (0.05 m per block)
+                    rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
-                    self.place(rand_position, rand_angle)
+                    self.place(rand_position, rand_angle, save_history=False)
 
             self.place_pose_history = []  # clear place position history
+            print("------- UNSTACKING COMPLETE --------")
+
         else:
             if self.is_sim:
                 # Move gripper out of the way to the home position
@@ -640,7 +648,12 @@ class Robot(object):
 
             # TODO(ahundt) add real robot support for reposition_objects
 
-    def get_camera_data(self):
+    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        if heightmap_resolution is None:
+            heightmap_resolution = self.heightmap_resolution
 
         if self.is_sim:
             sim_ret = None
@@ -667,12 +680,46 @@ class Robot(object):
             depth_img = depth_img * (zFar - zNear) + zNear
 
         else:
+            # prevent camera from taking a picture while the robot is still in the frame.
+            if go_home:
+                self.go_home(block_until_home=True)
+
             # Get color and depth image from ROS service
             color_img, depth_img = self.camera.get_data()
             depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
             # color_img = self.camera.color_data.copy()
             # depth_img = self.camera.depth_data.copy()
 
+        if return_heightmaps:
+            # this allows the error to print only once, so it doesn't spam the console.
+            print_error = 0
+
+            max_z_height = np.inf
+            while max_z_height > z_height_retake_threshold:
+                scaled_depth_img = depth_img * self.cam_depth_scale  # Apply depth scale from calibration
+                color_heightmap, depth_heightmap = utils.get_heightmap(color_img, scaled_depth_img, self.cam_intrinsics, self.cam_pose,
+                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap)
+                # TODO(ahundt) switch to masked array, then only have a regular heightmap
+                valid_depth_heightmap = depth_heightmap.copy()
+                valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
+
+                _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
+
+                if max_z_height > z_height_retake_threshold:
+                    if print_error == 3:
+                        print("ERROR: depth_heightmap value too high. max_z_height: ", max_z_height)
+
+                    # Get color and depth image from ROS service
+                    color_img, depth_img = self.camera.get_data()
+                    depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
+
+                    print_error += 1
+                    time.sleep(0.1)
+
+
+            return valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img
+
+        # if not return_depthmaps, return just raw images
         return color_img, depth_img
 
 
@@ -1535,7 +1582,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1546,9 +1593,10 @@ class Robot(object):
         place_pose = (position[0], position[1], position[2], heightmap_rotation_angle)
         print('Executing: Place at (%f, %f, %f) angle: %f' % place_pose)
 
-        self.place_pose_history.append(place_pose)
-        while len(self.place_pose_history) > 4:  # only store x most recent place attempts
-            self.place_pose_history.pop(0)
+        if save_history:
+            self.place_pose_history.append(place_pose)
+            while len(self.place_pose_history) > self.place_pose_history_limit:  # only store x most recent place attempts
+                self.place_pose_history.pop(0)
 
         if self.is_sim:
 
