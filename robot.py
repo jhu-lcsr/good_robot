@@ -595,6 +595,8 @@ class Robot(object):
                 rand_angle = rand_orientation[0]
 
                 self.place(rand_position, rand_angle, save_history=False)
+            else:
+                self.open_gripper()
 
             # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
             for pose in place_pose_history:
