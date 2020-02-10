@@ -18,10 +18,11 @@ from logger import Logger
 import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
+from utils import StackSequence
 from utils_torch import action_space_argmax
 import plot
+import json
 import copy
-from utils import StackSequence
 
 
 def run_title(args):
@@ -209,17 +210,6 @@ def main(args):
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
-    # Find last executed iteration of pre-loaded log, and load execution info and RL variables
-    if continue_logging:
-        trainer.preload(logger.transitions_directory)
-        num_trials = trainer.end_trial()
-    else:
-        num_trials = 0
-
-    # Initialize variables for heuristic bootstrapping and exploration probability
-    no_change_count = [2, 2] if not is_testing else [0, 0]
-    explore_prob = 0.5 if not is_testing else 0.0
-
     # Quick hack for nonlocal memory between threads in Python 2
     nonlocal_variables = {'executing_action': False,
                           'primitive_action': None,
@@ -235,7 +225,43 @@ def main(args):
                           'replay_iteration': 0,
                           'trial_complete': False,
                           'finalize_prev_trial_log': False,
-                          'prev_stack_height': 1}
+                          'prev_stack_height': 1,
+                          'save_state_this_iteration': False}
+
+    # Ignore these nonlocal_variables when saving/loading and resuming a run.
+    # They will always be initialized to their default values
+    always_default_nonlocals = ['executing_action',
+                                'primitive_action',
+                                'save_state_this_iteration']
+
+    # Find last executed iteration of pre-loaded log, and load execution info and RL variables
+    if continue_logging:
+        trainer.preload(logger.transitions_directory)
+
+        # when resuming, load nonlocal_variables from previous point the the log was finalized in the run
+        nonlocal_vars_filename = os.path.join(logger.base_directory, 'data', 'variables', 'nonlocal_vars_%d.json' % (trainer.iteration))
+        if os.path.exists(nonlocal_vars_filename):
+            with open(nonlocal_vars_filename, 'r') as f:
+                nonlocals_to_load = json.load(f)
+
+                # copy loaded values to nonlocals
+                for k, v in nonlocals_to_load.items():
+                    if k not in always_default_nonlocals:
+                        if k in nonlocal_variables:  # ignore any entries in the saved data which aren't in nonlocal_variables
+                            nonlocal_variables[k] = v
+        else:
+            print('WARNING: Missing /data/variables/nonlocal_vars_%d.json on resume. Default values initialized. Inconsistencies' % (trainer.iteration))
+
+        num_trials = trainer.end_trial()
+
+        # trainer.iteration += 1  # Begin next trial after loading
+
+    else:
+        num_trials = 0
+
+    # Initialize variables for heuristic bootstrapping and exploration probability
+    no_change_count = [2, 2] if not is_testing else [0, 0]
+    explore_prob = 0.5 if not is_testing else 0.0
 
     if check_z_height:
         nonlocal_variables['stack_height'] = 0.0
@@ -347,6 +373,7 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+        last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
         successful_grasp_count = 0
@@ -364,6 +391,33 @@ def main(args):
         grasp_str = ''
         successful_trial_count = int(np.max(trainer.trial_success_log)) if continue_logging and len(trainer.trial_success_log) > 0 else 0
         trial_rate = np.inf
+
+        # when resuming a previous run, load variables saved from previous run
+        if continue_logging:
+            process_vars = None
+            resume_var_values_path = os.path.join(logger.base_directory, 'data', 'variables','process_action_var_values_%d.json' % (trainer.iteration))
+            if os.path.exists(resume_var_values_path):
+                with open(resume_var_values_path, 'r') as f:
+                    process_vars = json.load(f)
+
+                action_count = process_vars['action_count']
+                grasp_count = process_vars['grasp_count']
+                successful_grasp_count = process_vars['successful_grasp_count']
+                successful_color_grasp_count = process_vars['successful_color_grasp_count']
+                place_count = process_vars['place_count']
+                place_rate = process_vars['place_rate']
+                partial_stack_count = process_vars['partial_stack_count']
+                partial_stack_rate = process_vars['partial_stack_rate']
+                stack_count = process_vars['stack_count']
+                stack_rate = process_vars['stack_rate']
+                needed_to_reset = process_vars['needed_to_reset']
+                grasp_str = process_vars['grasp_str']
+                successful_trial_count = process_vars['successful_trial_count']
+                trial_rate = process_vars['trial_rate']
+
+            else:
+                print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
+
         while True:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -618,6 +672,40 @@ def main(args):
                 #     nonlocal_variables['prev_stack_height'] = 1
 
                 nonlocal_variables['executing_action'] = False
+
+            # save this thread's variables every time the log and model are saved
+            if nonlocal_variables['finalize_prev_trial_log']:
+                # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
+                # This flag is used to save variables in the other thread without
+                # breaking anything by messing with finalize_prev_trial_log
+                nonlocal_variables['save_state_this_iteration'] = True
+
+                if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
+                    last_iteration_saved = trainer.iteration
+
+                    # create dict of all variables and save a json file
+                    process_vars = {}
+                    process_vars['action_count'] = action_count
+                    process_vars['grasp_count'] = grasp_count
+                    process_vars['successful_grasp_count'] = successful_grasp_count
+                    process_vars['successful_color_grasp_count'] = successful_color_grasp_count
+                    process_vars['place_count'] = place_count
+                    process_vars['place_rate'] = place_rate
+                    process_vars['partial_stack_count'] = partial_stack_count
+                    process_vars['partial_stack_rate'] = partial_stack_rate
+                    process_vars['stack_count'] = stack_count
+                    process_vars['stack_rate'] = stack_rate
+                    process_vars['needed_to_reset'] = needed_to_reset
+                    process_vars['grasp_str'] = grasp_str
+                    process_vars['successful_trial_count'] = successful_trial_count
+                    process_vars['trial_rate'] = trial_rate
+
+                    save_location = os.path.join(logger.base_directory, 'data', 'variables')
+                    if not os.path.exists(save_location):
+                        os.mkdir(save_location)
+                    with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
+                            json.dump(process_vars, f)
+
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
@@ -913,10 +1001,34 @@ def main(args):
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
-                if trainer.iteration % 50 == 0:
+                 # saves once every logs are finalized
+                if nonlocal_variables['save_state_this_iteration']:
+                    nonlocal_variables['save_state_this_iteration'] = False
+
                     logger.save_model(trainer.model, method)
+
+                    # copy nonlocal_variable values and discard those which shouldn't be saved
+                    nonlocals_to_save = nonlocal_variables.copy()
+                    entries_to_pop = always_default_nonlocals.copy()
+
+                    # save all entries which are JSON serializable only. Otherwise don't save
+                    for k, v in nonlocals_to_save.items():
+                        if not utils.is_jsonable(v):
+                            entries_to_pop.append(k)
+
+                    for k in entries_to_pop:
+                        nonlocals_to_save.pop(k)
+
+                    # save nonlocal_variables for resuming later
+                    save_location = os.path.join(logger.base_directory, 'data', 'variables')
+                    if not os.path.exists(save_location):
+                        os.makedirs(save_location)
+                    with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
+                        json.dump(nonlocals_to_save, f)
+
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
+
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
                     best_stack_rate = nonlocal_variables['stack_rate']
@@ -924,6 +1036,7 @@ def main(args):
                     logger.save_backup_model(trainer.model, stack_rate_str)
                     logger.save_model(trainer.model, stack_rate_str)
                     logger.write_to_log('best-iteration', np.array([trainer.iteration]))
+
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
@@ -1009,11 +1122,12 @@ def main(args):
         else:
             prev_color_success = None
 
-        trainer.iteration += 1
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
-        print('Trainer iteration: %f' % (trainer.iteration))
+        print('Trainer iteration: %d complete' % int(trainer.iteration))
+        trainer.iteration += 1
+
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
     """ Detect changes
@@ -1177,7 +1291,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as TCP client (UR5)')
-    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                          help='port to robot arm as TCP client (UR5)')
+    parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as real-time client (UR5)')
     parser.add_argument('--rtc_port', dest='rtc_port', type=int, action='store', default=30003,                           help='port to robot arm as real-time client (UR5)')
     parser.add_argument('--heightmap_resolution', dest='heightmap_resolution', type=float, action='store', default=0.002, help='meters per pixel of heightmap')
@@ -1224,7 +1338,7 @@ if __name__ == '__main__':
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
-    parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                        help='Neural network architecture choice, options are efficientnet, densenet')
+    parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
 

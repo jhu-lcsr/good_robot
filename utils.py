@@ -6,6 +6,7 @@ import cv2
 from scipy import ndimage
 import datetime
 import os
+import json
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -606,6 +607,13 @@ def polyfit(*args, **kwargs):
         warnings.simplefilter('ignore', np.RankWarning)
         out = np.polyfit(*args, **kwargs)
     return out
+
+def is_jsonable(x):
+    try:
+        json.dumps(x)
+        return True
+    except (TypeError, OverflowError):
+        return False
 
 # killeen: this is defining the goal
 class StackSequence(object):
