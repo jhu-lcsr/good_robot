@@ -327,7 +327,7 @@ class Robot(object):
                 self.background_heightmap -= 0.03
 
             # real robot must use unstacking
-            if self.place:
+            if self.place_task:
                 self.unstack = True
 
 
@@ -583,7 +583,7 @@ class Robot(object):
 
     def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
-        if self.unstack:
+        if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
@@ -1964,7 +1964,7 @@ class Robot(object):
 
     def restart_real(self):
         # reset objects for stacking
-        if self.place:
+        if self.place_task:
             return self.reposition_objects()
 
         # reset objects for pushing and grasping
