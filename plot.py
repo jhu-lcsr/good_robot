@@ -9,15 +9,16 @@ import scipy
 
 def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
+    dict_title = str(title).replace(' ', '_')
+    best_dict = {dict_title + '_best_value': -np.inf, dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
+        best_index = np.argmax(success_rate[window:]) + window
+        best_dict = {str(title): -np.inf, str(title) + '_iteration': None}
         print('Max ' + title + ': ' + str(best) +
-              ', at action iteration: ' + str(np.argmax(success_rate[window:]) + window) +
+              ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
-        return best
-    else:
-        return 0.0
-
+    return best_dict
 
 def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_success_index=True):
     """Evaluate moving window of grasp success rate
@@ -61,8 +62,8 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'trial success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'trial success rate')
+    return success_rate, lower, upper, best_dict
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
@@ -89,8 +90,8 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'grasp success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'grasp success rate')
+    return success_rate, lower, upper, best_dict
 
 
 def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
@@ -130,8 +131,8 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'place success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'place success rate')
+    return success_rate, lower, upper, best_dict
 
 
 def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
@@ -161,8 +162,8 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(efficiency, window, 'action efficiency')
-    return efficiency, lower, upper
+    best_dict = best_success_rate(efficiency, window, 'action efficiency')
+    return efficiency, lower, upper, best_dict
 
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
@@ -187,8 +188,8 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(efficiency, window, 'grasp action efficiency')
-    return efficiency, lower, upper
+    best_dict = best_success_rate(efficiency, window, 'grasp action efficiency')
+    return efficiency, lower, upper, best_dict
 
 
 def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, over_height_threshold=6.0):
@@ -205,6 +206,7 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
 
 
 def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, apply_real_robot_speckle_noise_hotfix=False):
+    best_dict = {}
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
         heights = np.loadtxt(stack_height_file)
@@ -248,7 +250,8 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
             clearance = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
             heights, trials, trial_successes, clearance = real_robot_speckle_noise_hotfix(heights, trials, trial_successes, clearance)
         if trial_successes.size > 0:
-            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+            trial_success_rate, trial_success_lower, trial_success_upper, best = get_trial_success_rate(trials, trial_successes, window=window)
+            best_dict.update(best)
             plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
             plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
                             mult*trial_success_lower, mult*trial_success_upper,
@@ -257,15 +260,19 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     # if os.path.isfile(trial_reward_file):
     #     grasp_rewards = np.loadtxt(trial_reward_file)
 
-    grasp_rate, grasp_lower, grasp_upper = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    grasp_rate, grasp_lower, grasp_upper, best = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    best_dict.update(best)
     if place:
         if 'row' in log_dir or 'row' in title.lower():
-            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
+            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
         else:
-            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, window=window)
-        eff, eff_lower, eff_upper = get_action_efficiency(heights, window=window)
+            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, window=window)
+        best_dict.update(best)
+        eff, eff_lower, eff_upper, best = get_action_efficiency(heights, window=window)
+        best_dict.update(best)
     else:
-        eff, eff_lower, eff_upper = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+        eff, eff_lower, eff_upper, best = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+        best_dict.update(best)
 
     plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
     if place:
@@ -293,6 +300,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file + '.png')
     plt.savefig(save_file + '.png', dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
+    return best_dict
 
 
 
@@ -304,9 +312,10 @@ if __name__ == '__main__':
     log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
     log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    plot_it('./logs/2020-02-10-14-57-07_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000)
     #############################################################
     # REAL ROBOT STACKING run 
-    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=None, apply_real_robot_speckle_noise_hotfix=True)
+    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000, apply_real_robot_speckle_noise_hotfix=True)
     # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
     # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
     # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)

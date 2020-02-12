@@ -778,6 +778,8 @@ def main(args):
 
     num_trials = trainer.num_trials()
     do_continue = False
+    best_dict = {}
+    prev_best_dict = {}
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -954,8 +956,16 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if trainer.iteration > 1000:
-                    plot.plot_it(logger.base_directory, title, place=place)
+                # use a 1000 iteration history for plotting.
+                plot_window = 1000
+                if trainer.iteration > plot_window:
+                    prev_best_dict = copy.deepcopy(best_dict)
+                    if is_testing:
+                        # when testing the plot data should be averaged across the whole run
+                        plot_window = trainer.iteration - 1
+                    best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
+                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json', 'w')) as f:
+                        json.dump(best_dict, f)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1006,6 +1016,10 @@ def main(args):
                     nonlocal_variables['save_state_this_iteration'] = False
 
                     logger.save_model(trainer.model, method)
+                    # save the best model based on all tracked plotting metrics.
+                    for k, v in best_dict.items():
+                        if k in prev_best_dict and v > prev_best_dict[k]:
+                            logger.save_model(trainer.model, method + '_' + k)
 
                     # copy nonlocal_variable values and discard those which shouldn't be saved
                     nonlocals_to_save = nonlocal_variables.copy()
