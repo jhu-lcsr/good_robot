@@ -27,6 +27,7 @@ def gripper_control_pose_to_arm_control_pose(gripper_translation, gripper_orient
         if gripper_to_arm_transform is None:
             return gripper_translation, gripper_orientation
         gripper_pose = utils.axis_angle_and_translation_to_rigid_transformation(gripper_translation, gripper_orientation)
+        # print('gripper_control_pose_to_arm_control_pose() gripper_pose: \n' + str(gripper_pose))
         # 4x4 transform of the arm pose
         arm_pose = np.dot(gripper_pose, utils.pose_inv(gripper_to_arm_transform))
         # arm_pose = np.dot(gripper_pose, gripper_to_arm_transform)
