@@ -14,7 +14,7 @@ def best_success_rate(success_rate, window, title):
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
         best_index = np.argmax(success_rate[window:]) + window
-        best_dict = {str(title): -np.inf, str(title) + '_iteration': None}
+        best_dict = {dict_title + '_best_value': best, dict_title + '_best_index': best_index}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')

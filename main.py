@@ -1011,15 +1011,15 @@ def main(args):
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
+                # save the best model based on all tracked plotting metrics.
+                for k, v in best_dict.items():
+                    if k in prev_best_dict and v > prev_best_dict[k]:
+                        logger.save_model(trainer.model, method + '_' + k)
                  # saves once every logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
 
                     logger.save_model(trainer.model, method)
-                    # save the best model based on all tracked plotting metrics.
-                    for k, v in best_dict.items():
-                        if k in prev_best_dict and v > prev_best_dict[k]:
-                            logger.save_model(trainer.model, method + '_' + k)
 
                     # copy nonlocal_variable values and discard those which shouldn't be saved
                     nonlocals_to_save = nonlocal_variables.copy()
