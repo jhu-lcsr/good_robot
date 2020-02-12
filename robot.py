@@ -709,8 +709,10 @@ class Robot(object):
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
 
                 if max_z_height > z_height_retake_threshold:
-                    if print_error == 3:
-                        print("ERROR: depth_heightmap value too high. max_z_height: ", max_z_height)
+                    if print_error > 3:
+                        print('ERROR: depth_heightmap value too high. '
+                              'Use the UR5 teach mode to move the robot manually to the home position. '
+                              'max_z_height: ', max_z_height)
 
                     # Get color and depth image from ROS service
                     color_img, depth_img = self.camera.get_data()
