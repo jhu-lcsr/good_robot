@@ -964,7 +964,7 @@ def main(args):
                 logger.write_to_log('trial', trainer.trial_log)
                 # use a 1000 iteration history for plotting.
                 plot_window = 1000
-                if trainer.iteration > plot_window:
+                if trainer.iteration > plot_window or is_testing:
                     prev_best_dict = copy.deepcopy(best_dict)
                     if is_testing:
                         # when testing the plot data should be averaged across the whole run
