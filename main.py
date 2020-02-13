@@ -1014,7 +1014,7 @@ def main(args):
                 for k, v in best_dict.items():
                     if k in prev_best_dict and v > prev_best_dict[k]:
                         logger.save_model(trainer.model, method + '_' + k)
-                 # saves once every logs are finalized
+                # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
 
