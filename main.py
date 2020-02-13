@@ -2,6 +2,8 @@
 
 import time
 import os
+import signal
+import sys
 import random
 import threading
 import argparse
@@ -373,6 +375,8 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+        global global_pause
+
         last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
@@ -419,122 +423,210 @@ def main(args):
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
         while True:
-            if nonlocal_variables['executing_action']:
-                action_count += 1
-                # Determine whether grasping or pushing should be executed based on network predictions
-                best_push_conf = np.ma.max(push_predictions)
-                best_grasp_conf = np.ma.max(grasp_predictions)
-                if place:
-                    best_place_conf = np.ma.max(place_predictions)
-                    print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
-                else:
-                    print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-
-                explore_actions = False
-                # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
-                if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
-                    nonlocal_variables['primitive_action'] = 'place'
-                else:
-                    nonlocal_variables['primitive_action'] = 'grasp'
-
-                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
-                    if is_testing and method == 'reactive':
-                        if best_push_conf > 2 * best_grasp_conf:
-                            nonlocal_variables['primitive_action'] = 'push'
-                    else:
-                        if best_push_conf > best_grasp_conf:
-                            nonlocal_variables['primitive_action'] = 'push'
-                    explore_actions = np.random.uniform() < explore_prob
-                    # Exploitation (do best action) vs exploration (do random action)
-                    if explore_actions:
-                        print('Strategy: explore (exploration probability: %f)' % (explore_prob))
-                        push_frequency_one_in_n = 5
-                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                    else:
-                        print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
-                trainer.is_exploit_log.append([0 if explore_actions else 1])
-                logger.write_to_log('is-exploit', trainer.is_exploit_log)
-                # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
-                # trainer.trial_log.append([nonlocal_variables['stack'].trial])
-                # logger.write_to_log('trial', trainer.trial_log)
-
-                # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
-
-                # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
-                # NOTE: typically not necessary and can reduce final performance.
-                if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
-                    print('Change not detected for more than two pushes. Running heuristic pushing.')
-                    nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap)
-                    no_change_count[0] = 0
-                    predicted_value = push_predictions[nonlocal_variables['best_pix_ind']]
-                    use_heuristic = True
-                elif heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'grasp' and no_change_count[1] >= 2:
-                    print('Change not detected for more than two grasps. Running heuristic grasping.')
-                    nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap)
-                    no_change_count[1] = 0
-                    predicted_value = grasp_predictions[nonlocal_variables['best_pix_ind']]
-                    use_heuristic = True
-                else:
-                    use_heuristic = False
-
-                trainer.use_heuristic_log.append([1 if use_heuristic else 0])
-                logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
-
-                # Save predicted confidence value
-                trainer.predicted_value_log.append([predicted_value])
-                logger.write_to_log('predicted-value', trainer.predicted_value_log)
-
-                # Compute 3D position of pixel
-                print('Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]))
-                best_rotation_angle = np.deg2rad(nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
-                best_pix_x = nonlocal_variables['best_pix_ind'][2]
-                best_pix_y = nonlocal_variables['best_pix_ind'][1]
-
-                # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
-
-                # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
-                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
-                logger.write_to_log('executed-action', trainer.executed_action_log)
-
-                # Visualize executed primitive, and affordances
-                if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
-                    logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
-                    cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
-                    logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
-                    cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
+            #  When ctrl-c is pressed, global_pause gets set to True
+            if not global_pause:
+                if nonlocal_variables['executing_action']:
+                    action_count += 1
+                    # Determine whether grasping or pushing should be executed based on network predictions
+                    best_push_conf = np.ma.max(push_predictions)
+                    best_grasp_conf = np.ma.max(grasp_predictions)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
-                        logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
-                        cv2.imwrite('visualization.place.png', place_pred_vis)
-
-                # Initialize variables that influence reward
-                set_nonlocal_success_variables_false()
-                if place:
-                    current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-
-                # Execute primitive
-                if nonlocal_variables['primitive_action'] == 'push':
-                    if skip_noncontact_actions and not push_may_contact_something:
-                        # We are too high to contact anything, don't bother actually pushing.
-                        # TODO(ahundt) also check for case where we are too high for the local gripper path
-                        nonlocal_variables['push_success'] = False
+                        best_place_conf = np.ma.max(place_predictions)
+                        print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
                     else:
-                        nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+                        print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
-                    if place and check_row:
-                        needed_to_reset = check_stack_update_goal()
-                        if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
+                    explore_actions = False
+                    # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
+                    if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
+                        nonlocal_variables['primitive_action'] = 'place'
+                    else:
+                        nonlocal_variables['primitive_action'] = 'grasp'
 
-                            if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                    if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
+                        if is_testing and method == 'reactive':
+                            if best_push_conf > 2 * best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        else:
+                            if best_push_conf > best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        explore_actions = np.random.uniform() < explore_prob
+                        # Exploitation (do best action) vs exploration (do random action)
+                        if explore_actions:
+                            print('Strategy: explore (exploration probability: %f)' % (explore_prob))
+                            push_frequency_one_in_n = 5
+                            nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
+                        else:
+                            print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
+                    trainer.is_exploit_log.append([0 if explore_actions else 1])
+                    logger.write_to_log('is-exploit', trainer.is_exploit_log)
+                    # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
+                    # trainer.trial_log.append([nonlocal_variables['stack'].trial])
+                    # logger.write_to_log('trial', trainer.trial_log)
+
+                    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+
+                    # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
+                    # NOTE: typically not necessary and can reduce final performance.
+                    if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
+                        print('Change not detected for more than two pushes. Running heuristic pushing.')
+                        nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap)
+                        no_change_count[0] = 0
+                        predicted_value = push_predictions[nonlocal_variables['best_pix_ind']]
+                        use_heuristic = True
+                    elif heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'grasp' and no_change_count[1] >= 2:
+                        print('Change not detected for more than two grasps. Running heuristic grasping.')
+                        nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap)
+                        no_change_count[1] = 0
+                        predicted_value = grasp_predictions[nonlocal_variables['best_pix_ind']]
+                        use_heuristic = True
+                    else:
+                        use_heuristic = False
+
+                    trainer.use_heuristic_log.append([1 if use_heuristic else 0])
+                    logger.write_to_log('use-heuristic', trainer.use_heuristic_log)
+
+                    # Save predicted confidence value
+                    trainer.predicted_value_log.append([predicted_value])
+                    logger.write_to_log('predicted-value', trainer.predicted_value_log)
+
+                    # Compute 3D position of pixel
+                    print('Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]))
+                    best_rotation_angle = np.deg2rad(nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
+                    best_pix_x = nonlocal_variables['best_pix_ind'][2]
+                    best_pix_y = nonlocal_variables['best_pix_ind'][1]
+
+                    # Adjust start position of all actions, and make sure z value is safe and not too low
+                    primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
+
+                    # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
+                    trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
+                    logger.write_to_log('executed-action', trainer.executed_action_log)
+
+                    # Visualize executed primitive, and affordances
+                    if save_visualizations:
+                        push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
+                        logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
+                        cv2.imwrite('visualization.push.png', push_pred_vis)
+                        grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
+                        logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
+                        cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
+                        if place:
+                            place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
+                            logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
+                            cv2.imwrite('visualization.place.png', place_pred_vis)
+
+                    # Initialize variables that influence reward
+                    set_nonlocal_success_variables_false()
+                    if place:
+                        current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+
+                    # Execute primitive
+                    if nonlocal_variables['primitive_action'] == 'push':
+                        if skip_noncontact_actions and not push_may_contact_something:
+                            # We are too high to contact anything, don't bother actually pushing.
+                            # TODO(ahundt) also check for case where we are too high for the local gripper path
+                            nonlocal_variables['push_success'] = False
+                        else:
+                            nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
+
+                        if place and check_row:
+                            needed_to_reset = check_stack_update_goal()
+                            if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
+
+                                if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                                    nonlocal_variables['stack'].next()
+                                    # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
+                                    partial_stack_count += 1
+                                next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+                                if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
+                                    print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                                    nonlocal_variables['stack_success'] = True
+                                    stack_count += 1
+                                    # full stack complete! reset the scene
+                                    successful_trial_count += 1
+                                    get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                    robot.reposition_objects()
+                                    if len(next_stack_goal) > 1:
+                                        # if multiple parts of a row are completed in one action, we need to reset the trial counter.
+                                        nonlocal_variables['stack'].reset_sequence()
+                                    # goal is 2 blocks in a row
+                                    nonlocal_variables['stack'].next()
+                                    nonlocal_variables['trial_complete'] = True
+
+                        #TODO(hkwon214) Get image after executing push action. save also? better place to put?
+                        valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                        if place:
+                            # Check if the push caused a topple, size shift zero because
+                            # place operations expect increased height,
+                            # while push expects constant height.
+                            needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push)
+                        if not place or not needed_to_reset:
+                            print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
+                    elif nonlocal_variables['primitive_action'] == 'grasp':
+                        grasp_count += 1
+                        # TODO(ahundt) this probably will cause threading conflicts, add a mutex
+                        if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
+                            grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
+                            print('Attempt to grasp color: ' + grasp_color_name)
+
+                        if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or
+                                valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
+                            # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
+                            nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
+                            print('Grasp action failure, heuristics determined grasp would not contact anything.')
+                        else:
+                            nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
+                        print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+                        # Get image after executing grasp action.
+                        # TODO(ahundt) save also? better place to put?
+                        valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                        if place:
+                            # when we are stacking we must also check the stack in case we caused it to topple
+                            top_idx = -1
+                            if nonlocal_variables['grasp_success']:
+                                # we will need to check the second from top block for the stack
+                                top_idx = -2
+                            # check if a failed grasp led to a topple, or if the top block was grasped
+                            # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
+                            needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
+                        if nonlocal_variables['grasp_success']:
+                            # robot.restart_sim()
+                            successful_grasp_count += 1
+                            if grasp_color_task:
+                                if nonlocal_variables['grasp_color_success']:
+                                    successful_color_grasp_count += 1
+                                if not place:
+                                    # reposition the objects if we aren't also attempting to place correctly.
+                                    robot.reposition_objects()
+                                    nonlocal_variables['trial_complete'] = True
+
+                                print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
+                        grasp_rate = float(successful_grasp_count) / float(grasp_count)
+                        color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
+                        grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
+                        if grasp_color_task:
+                            grasp_str += ' color success rate: %r' % (color_grasp_rate)
+                        if not place:
+                            print(grasp_str)
+                    elif nonlocal_variables['primitive_action'] == 'place':
+                        place_count += 1
+                        nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+
+                        # Get image after executing place action.
+                        # TODO(ahundt) save also? better place to put?
+                        valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                        needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
+                        if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                            partial_stack_count += 1
+                            # Only increment our progress checks if we've surpassed the current goal
+                            # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
+                            if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
-                                # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
-                                partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
+                            if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
+                               (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
@@ -542,169 +634,83 @@ def main(args):
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                                 robot.reposition_objects()
-                                if len(next_stack_goal) > 1:
-                                    # if multiple parts of a row are completed in one action, we need to reset the trial counter.
-                                    nonlocal_variables['stack'].reset_sequence()
-                                # goal is 2 blocks in a row
+                                # We don't need to reset here because the algorithm already reset itself
+                                # nonlocal_variables['stack'].reset_sequence()
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
+                        # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
-                    #TODO(hkwon214) Get image after executing push action. save also? better place to put?
-                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    if place:
-                        # Check if the push caused a topple, size shift zero because
-                        # place operations expect increased height,
-                        # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push)
-                    if not place or not needed_to_reset:
-                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
-                elif nonlocal_variables['primitive_action'] == 'grasp':
-                    grasp_count += 1
-                    # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
-                        grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
-                        print('Attempt to grasp color: ' + grasp_color_name)
-
-                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or
-                            valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
-                        # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
-                        print('Grasp action failure, heuristics determined grasp would not contact anything.')
-                    else:
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
-                    print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
-                    # Get image after executing grasp action.
-                    # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    if place:
-                        # when we are stacking we must also check the stack in case we caused it to topple
-                        top_idx = -1
-                        if nonlocal_variables['grasp_success']:
-                            # we will need to check the second from top block for the stack
-                            top_idx = -2
-                        # check if a failed grasp led to a topple, or if the top block was grasped
-                        # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
-                    if nonlocal_variables['grasp_success']:
-                        # robot.restart_sim()
-                        successful_grasp_count += 1
-                        if grasp_color_task:
-                            if nonlocal_variables['grasp_color_success']:
-                                successful_color_grasp_count += 1
-                            if not place:
-                                # reposition the objects if we aren't also attempting to place correctly.
-                                robot.reposition_objects()
-                                nonlocal_variables['trial_complete'] = True
-
-                            print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
-                    grasp_rate = float(successful_grasp_count) / float(grasp_count)
-                    color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
-                    grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
+                    trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
                     if grasp_color_task:
-                        grasp_str += ' color success rate: %r' % (color_grasp_rate)
-                    if not place:
-                        print(grasp_str)
-                elif nonlocal_variables['primitive_action'] == 'place':
-                    place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+                        trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
+                    if place:
+                        # place trainer logs are updated in process_actions()
+                        trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
+                        trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
+                        trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
+                        trainer.trial_success_log.append([int(successful_trial_count)])
 
-                    # Get image after executing place action.
-                    # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
-                    if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
-                        partial_stack_count += 1
-                        # Only increment our progress checks if we've surpassed the current goal
-                        # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
-                        if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
-                            nonlocal_variables['stack'].next()
-                        next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-                        if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                           (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
-                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                            nonlocal_variables['stack_success'] = True
-                            stack_count += 1
-                            # full stack complete! reset the scene
-                            successful_trial_count += 1
-                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
-                            # We don't need to reset here because the algorithm already reset itself
-                            # nonlocal_variables['stack'].reset_sequence()
-                            nonlocal_variables['stack'].next()
-                            nonlocal_variables['trial_complete'] = True
-                    # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
+                        if partial_stack_count > 0 and place_count > 0:
+                            partial_stack_rate = float(action_count)/float(partial_stack_count)
+                            place_rate = float(partial_stack_count)/float(place_count)
+                        if stack_count > 0:
+                            stack_rate = float(action_count)/float(stack_count)
+                            nonlocal_variables['stack_rate'] = stack_rate
+                            trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
+                            nonlocal_variables['trial_success_rate'] = trial_rate
+                        print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
+                              '  actions/full stack: ' + str(stack_rate) +
+                              ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                              '  partial_stack_successes: ' + str(partial_stack_count) +
+                              '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
+                              ' current_height: ' + str(nonlocal_variables['stack_height']))
 
-                trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
-                if grasp_color_task:
-                    trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
-                if place:
-                    # place trainer logs are updated in process_actions()
-                    trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
-                    trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
-                    trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
-                    trainer.trial_success_log.append([int(successful_trial_count)])
+                    # if check_z_height and nonlocal_variables['trial_complete']:
+                    #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
+                    #     # Zero out the height because the trial is done.
+                    #     # Note these lines must be after the logging of these variables is complete.
+                    #     nonlocal_variables['stack_height'] = 0.0
+                    #     nonlocal_variables['prev_stack_height'] = 0.0
+                    # elif nonlocal_variables['trial_complete']:
+                    #     # Set back to the minimum stack height because the trial is done.
+                    #     # Note these lines must be after the logging of these variables is complete.
+                    #     nonlocal_variables['stack_height'] = 1
+                    #     nonlocal_variables['prev_stack_height'] = 1
 
-                    if partial_stack_count > 0 and place_count > 0:
-                        partial_stack_rate = float(action_count)/float(partial_stack_count)
-                        place_rate = float(partial_stack_count)/float(place_count)
-                    if stack_count > 0:
-                        stack_rate = float(action_count)/float(stack_count)
-                        nonlocal_variables['stack_rate'] = stack_rate
-                        trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
-                        nonlocal_variables['trial_success_rate'] = trial_rate
-                    print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
-                          '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
-                          '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
-                          ' current_height: ' + str(nonlocal_variables['stack_height']))
+                    nonlocal_variables['executing_action'] = False
 
-                # if check_z_height and nonlocal_variables['trial_complete']:
-                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
-                #     # Zero out the height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 0.0
-                #     nonlocal_variables['prev_stack_height'] = 0.0
-                # elif nonlocal_variables['trial_complete']:
-                #     # Set back to the minimum stack height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 1
-                #     nonlocal_variables['prev_stack_height'] = 1
+                # save this thread's variables every time the log and model are saved
+                if nonlocal_variables['finalize_prev_trial_log']:
+                    # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
+                    # This flag is used to save variables in the other thread without
+                    # breaking anything by messing with finalize_prev_trial_log
+                    nonlocal_variables['save_state_this_iteration'] = True
 
-                nonlocal_variables['executing_action'] = False
+                    if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
+                        last_iteration_saved = trainer.iteration
 
-            # save this thread's variables every time the log and model are saved
-            if nonlocal_variables['finalize_prev_trial_log']:
-                # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
-                # This flag is used to save variables in the other thread without
-                # breaking anything by messing with finalize_prev_trial_log
-                nonlocal_variables['save_state_this_iteration'] = True
+                        # create dict of all variables and save a json file
+                        process_vars = {}
+                        process_vars['action_count'] = action_count
+                        process_vars['grasp_count'] = grasp_count
+                        process_vars['successful_grasp_count'] = successful_grasp_count
+                        process_vars['successful_color_grasp_count'] = successful_color_grasp_count
+                        process_vars['place_count'] = place_count
+                        process_vars['place_rate'] = place_rate
+                        process_vars['partial_stack_count'] = partial_stack_count
+                        process_vars['partial_stack_rate'] = partial_stack_rate
+                        process_vars['stack_count'] = stack_count
+                        process_vars['stack_rate'] = stack_rate
+                        process_vars['needed_to_reset'] = needed_to_reset
+                        process_vars['grasp_str'] = grasp_str
+                        process_vars['successful_trial_count'] = successful_trial_count
+                        process_vars['trial_rate'] = trial_rate
 
-                if last_iteration_saved != trainer.iteration: # checks if it already saved this iteration
-                    last_iteration_saved = trainer.iteration
-
-                    # create dict of all variables and save a json file
-                    process_vars = {}
-                    process_vars['action_count'] = action_count
-                    process_vars['grasp_count'] = grasp_count
-                    process_vars['successful_grasp_count'] = successful_grasp_count
-                    process_vars['successful_color_grasp_count'] = successful_color_grasp_count
-                    process_vars['place_count'] = place_count
-                    process_vars['place_rate'] = place_rate
-                    process_vars['partial_stack_count'] = partial_stack_count
-                    process_vars['partial_stack_rate'] = partial_stack_rate
-                    process_vars['stack_count'] = stack_count
-                    process_vars['stack_rate'] = stack_rate
-                    process_vars['needed_to_reset'] = needed_to_reset
-                    process_vars['grasp_str'] = grasp_str
-                    process_vars['successful_trial_count'] = successful_trial_count
-                    process_vars['trial_rate'] = trial_rate
-
-                    save_location = os.path.join(logger.base_directory, 'data', 'variables')
-                    if not os.path.exists(save_location):
-                        os.mkdir(save_location)
-                    with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f)
+                        save_location = os.path.join(logger.base_directory, 'data', 'variables')
+                        if not os.path.exists(save_location):
+                            os.mkdir(save_location)
+                        with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
+                                json.dump(process_vars, f)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -1291,7 +1297,41 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
         time.sleep(0.01)
 
+# This function is designated as the KeyboardInterrupt handler. It blocks execution in the main thread
+# and pauses the process action thread. Execution will resume when this function returns, or will stop if
+# ctrl-c is pressed 5 more times
+def pause(signum, frame):
+    global global_pause
+    global_pause = True
 
+    # restore the original signal handler as otherwise evil things will happen
+    # in input when CTRL+C is pressed, and our signal handler is not re-entrant
+    signal.signal(signal.SIGINT, original_sigint)
+
+    ctrl_c_count = 0
+    ctrl_c_threshold = 5
+    paused = True
+
+    while paused:
+        try:
+            if input("\nPaused. Type `continue` to resume: ") == 'continue':
+                paused = False
+            else:
+                print('\nStill Paused.')
+
+        except KeyboardInterrupt:
+            ctrl_c_count += 1
+            if ctrl_c_count >= ctrl_c_threshold:
+                print("\nexiting")
+                sys.exit(1)
+            else:
+                print('\n\nPress ctrl-c %d more times to exit' % (ctrl_c_threshold - ctrl_c_count))
+
+    # restore the pause handler here
+    signal.signal(signal.SIGINT, pause)
+
+    # restore original executing_action value
+    global_pause = False
 
 if __name__ == '__main__':
 
@@ -1355,6 +1395,17 @@ if __name__ == '__main__':
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
 
-    # Run main program with specified arguments
+    # Parse args
     args = parser.parse_args()
+
+    # setup KeyboardInterrupt signal handler for pausing
+    original_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, pause)
+
+    # global flag to pause process_actions thread while main() is paused
+    global global_pause
+    global_pause = False
+
+    # Run main program with specified arguments
     main(args)
+
