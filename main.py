@@ -1000,7 +1000,7 @@ def main(args):
                 elif prev_primitive_action == 'grasp':
                     train_on_successful_experience = not prev_grasp_success
                 elif prev_primitive_action == 'place':
-                    train_on_successful_experience = not prev_push_success
+                    train_on_successful_experience = not prev_partial_stack_success
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
