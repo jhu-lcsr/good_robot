@@ -1003,7 +1003,6 @@ def main(args):
                     train_on_successful_experience = not prev_push_success
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
-                # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
                                   nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
                                   train_on_successful_experience=train_on_successful_experience)
