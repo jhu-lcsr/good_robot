@@ -299,11 +299,13 @@ def main(args):
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
 
-    
-    # This function is designated as the KeyboardInterrupt handler. It blocks execution in the main thread
-    # and pauses the process action thread. Execution will resume when this function returns, or will stop if
-    # ctrl-c is pressed 5 more times
     def pause(signum, frame):
+        """This function is designated as the KeyboardInterrupt handler. 
+        
+        It blocks execution in the main thread
+        and pauses the process action thread. Execution will resume when this function returns, 
+        or will stop if ctrl-c is pressed 5 more times
+        """
         # TODO(ahundt) come up with a cleaner pause resume API, maybe use an OpenCV interface.
         ctrl_c_stop_threshold = 3
         ctrl_c_kill_threshold = 5
