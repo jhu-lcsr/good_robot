@@ -300,10 +300,10 @@ def main(args):
         nonlocal_variables['stack'].next()
 
     def pause(signum, frame):
-        """This function is designated as the KeyboardInterrupt handler. 
-        
+        """This function is designated as the KeyboardInterrupt handler.
+
         It blocks execution in the main thread
-        and pauses the process action thread. Execution will resume when this function returns, 
+        and pauses the process action thread. Execution will resume when this function returns,
         or will stop if ctrl-c is pressed 5 more times
         """
         # TODO(ahundt) come up with a cleaner pause resume API, maybe use an OpenCV interface.
@@ -897,10 +897,10 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
-            # If the scene started empty, we are just setting up 
+            # If the scene started empty, we are just setting up
             # trial 0 with a reset, so no trials have been completed.
             if trainer.iteration > 0:
-                # All other nonzero trials should be considered over, 
+                # All other nonzero trials should be considered over,
                 # so mark the trial as complete and move on to the next one.
                 nonlocal_variables['trial_complete'] = True
                 # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
@@ -1011,7 +1011,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if trainer.iteration > plot_window or is_testing:
+                if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
                     prev_best_dict = copy.deepcopy(best_dict)
                     if is_testing:
                         # when testing the plot data should be averaged across the whole run
