@@ -10,11 +10,11 @@ import scipy
 def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
     dict_title = str(title).replace(' ', '_')
-    best_dict = {dict_title + '_best_value': -np.inf, dict_title + '_best_index': None}
+    best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
         best_index = np.argmax(success_rate[window:]) + window
-        best_dict = {dict_title + '_best_value': best, dict_title + '_best_index': best_index}
+        best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
