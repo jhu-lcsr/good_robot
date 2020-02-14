@@ -970,7 +970,7 @@ def main(args):
                         # when testing the plot data should be averaged across the whole run
                         plot_window = trainer.iteration - 1
                     best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
-                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json', 'w')) as f:
+                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
                         json.dump(best_dict, f)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
