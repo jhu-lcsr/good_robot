@@ -231,11 +231,11 @@ def main(args):
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False}
 
-    nonlocal_pause_variables = {'pause': 0,
-                                'pause_time_start': time.time(),
-                                # setup KeyboardInterrupt signal handler for pausing
-                                'original_sigint': signal.getsignal(signal.SIGINT),
-                                'exit_called':False}
+    nonlocal_pause = {'pause': 0,
+                      'pause_time_start': time.time(),
+                      # setup KeyboardInterrupt signal handler for pausing
+                      'original_sigint': signal.getsignal(signal.SIGINT),
+                      'exit_called':False}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -308,31 +308,31 @@ def main(args):
         try:
             # restore the original signal handler as otherwise evil things will happen
             # in input when CTRL+C is pressed, and our signal handler is not re-entrant
-            signal.signal(signal.SIGINT, nonlocal_pause_variables['original_sigint'])
-            time_since_last_ctrl_c = time.time() - nonlocal_pause_variables['pause_time_start']
+            signal.signal(signal.SIGINT, nonlocal_pause['original_sigint'])
+            time_since_last_ctrl_c = time.time() - nonlocal_pause['pause_time_start']
             if time_since_last_ctrl_c > 5:
-                nonlocal_pause_variables['pause'] = 0
-                nonlocal_pause_variables['pause_time_start'] = time.time()
+                nonlocal_pause['pause'] = 0
+                nonlocal_pause['pause_time_start'] = time.time()
                 print('More than 5 seconds since last ctrl+c, Unpausing. '
                       'Press again within 5 seconds to pause.'
-                      ' Ctrl+C Count:' + str(nonlocal_pause_variables['pause']))
+                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
             else:
-                nonlocal_pause_variables['pause'] += 1
+                nonlocal_pause['pause'] += 1
                 print('\n\nPaused, press ctrl-c 3 total times in less than 5 seconds '
                       'to stop the run cleanly, 5 to do a hard stop. '
                       'Pressing Ctrl + C after 5 seconds will resume.'
                       'Remember, you can always press Ctrl+\\ to hard kill the program at any time.'
-                      ' Ctrl+C Count:' + str(nonlocal_pause_variables['pause']))
+                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
 
-            if nonlocal_pause_variables['pause'] >= ctrl_c_stop_threshold:
+            if nonlocal_pause['pause'] >= ctrl_c_stop_threshold:
                 print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
-                nonlocal_pause_variables['exit_called'] = True
-            elif nonlocal_pause_variables['pause'] >= ctrl_c_kill_threshold:
+                nonlocal_pause['exit_called'] = True
+            elif nonlocal_pause['pause'] >= ctrl_c_kill_threshold:
                 print('Triggering a Hard exit now.')
                 sys.exit(1)
 
         except KeyboardInterrupt:
-            nonlocal_pause_variables['pause'] += 1
+            nonlocal_pause['pause'] += 1
         # restore the pause handler here
         signal.signal(signal.SIGINT, pause)
 
@@ -794,7 +794,7 @@ def main(args):
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
-    nonlocal_pause_variables['exit_called'] = False
+    nonlocal_pause['exit_called'] = False
     # -------------------------------------------------------------
     # -------------------------------------------------------------
     prev_primitive_action = None
@@ -912,7 +912,7 @@ def main(args):
                 print('loading case file: ' + str(case_file))
                 robot.load_preset_case(case_file)
             if is_testing and not place and num_trials >= max_test_trials:
-                nonlocal_pause_variables['exit_called'] = True  # Exit after training thread (backprop and saving labels)
+                nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
@@ -931,9 +931,9 @@ def main(args):
         # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
             # If we are doing a fixed number of test trials, end the run the next time around.
-            nonlocal_pause_variables['exit_called'] = True
+            nonlocal_pause['exit_called'] = True
 
-        if not nonlocal_pause_variables['exit_called']:
+        if not nonlocal_pause['exit_called']:
 
             # Run forward pass with network to get affordances
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
@@ -1093,7 +1093,7 @@ def main(args):
 
         # Sync both action thread and training thread
         num_problems_detected = 0
-        while nonlocal_variables['executing_action'] or nonlocal_pause_variables['pause']:
+        while nonlocal_variables['executing_action'] or nonlocal_pause['pause']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
@@ -1104,7 +1104,7 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if nonlocal_pause_variables['pause']:
+            if nonlocal_pause['pause']:
                 print('Pause engaged for ' + str(time_elapsed) + ' seconds, press ctrl + c after at least 5 seconds to resume.')
             elif is_sim and int(time_elapsed) > 60:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
@@ -1140,7 +1140,7 @@ def main(args):
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
 
-        if nonlocal_pause_variables['exit_called']:
+        if nonlocal_pause['exit_called']:
             # shut down the simulation or robot
             robot.shutdown()
             break
