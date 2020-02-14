@@ -175,6 +175,7 @@ def main(args):
             exit(1)
 
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
+    plot_window = args.plot_window
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
@@ -708,18 +709,6 @@ def main(args):
                             '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
                             ' current_height: ' + str(nonlocal_variables['stack_height']))
 
-                # if check_z_height and nonlocal_variables['trial_complete']:
-                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
-                #     # Zero out the height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 0.0
-                #     nonlocal_variables['prev_stack_height'] = 0.0
-                # elif nonlocal_variables['trial_complete']:
-                #     # Set back to the minimum stack height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 1
-                #     nonlocal_variables['prev_stack_height'] = 1
-
                 nonlocal_variables['executing_action'] = False
 
             # save this thread's variables every time the log and model are saved
@@ -1005,8 +994,6 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                # use a 1000 iteration history for plotting.
-                plot_window = 1000
                 if trainer.iteration > plot_window or is_testing:
                     prev_best_dict = copy.deepcopy(best_dict)
                     if is_testing:
@@ -1403,7 +1390,8 @@ if __name__ == '__main__':
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
-    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
+    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
+    parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set autmoatically.')
 
     # Parse args
     args = parser.parse_args()
