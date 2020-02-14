@@ -46,6 +46,7 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 ```
 
 To use trial SPOT also add `--trial_reward` to this command.
+to use the "common sense" dynamic action space regions add `--common_sense` to this command.
 
 #### Cube Stack Testing
 
