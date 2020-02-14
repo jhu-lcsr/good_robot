@@ -331,6 +331,8 @@ def main(args):
             if nonlocal_pause['pause'] >= ctrl_c_stop_threshold:
                 print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
                 nonlocal_pause['exit_called'] = True
+                # we need to unpause to complete the exit
+                nonlocal_pause['pause'] = 0
             elif nonlocal_pause['pause'] >= ctrl_c_kill_threshold:
                 print('Triggering a Hard exit now.')
                 sys.exit(1)
