@@ -2,6 +2,8 @@
 
 import time
 import os
+import signal
+import sys
 import random
 import threading
 import argparse
@@ -173,6 +175,7 @@ def main(args):
             exit(1)
 
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
+    plot_window = args.plot_window
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
@@ -211,6 +214,7 @@ def main(args):
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
     # Quick hack for nonlocal memory between threads in Python 2
+    # Most of these variables are saved to a json file during a run, and reloaded during resume.
     nonlocal_variables = {'executing_action': False,
                           'primitive_action': None,
                           'best_pix_ind': None,
@@ -233,6 +237,13 @@ def main(args):
     always_default_nonlocals = ['executing_action',
                                 'primitive_action',
                                 'save_state_this_iteration']
+
+    # These variables handle pause and exit state. Also a quick hack for nonlocal memory.
+    nonlocal_pause = {'pause': 0,
+                      'pause_time_start': time.time(),
+                      # setup KeyboardInterrupt signal handler for pausing
+                      'original_sigint': signal.getsignal(signal.SIGINT),
+                      'exit_called':False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -287,6 +298,52 @@ def main(args):
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
+
+    def pause(signum, frame):
+        """This function is designated as the KeyboardInterrupt handler. 
+        
+        It blocks execution in the main thread
+        and pauses the process action thread. Execution will resume when this function returns, 
+        or will stop if ctrl-c is pressed 5 more times
+        """
+        # TODO(ahundt) come up with a cleaner pause resume API, maybe use an OpenCV interface.
+        ctrl_c_stop_threshold = 3
+        ctrl_c_kill_threshold = 5
+        try:
+            # restore the original signal handler as otherwise evil things will happen
+            # in input when CTRL+C is pressed, and our signal handler is not re-entrant
+            signal.signal(signal.SIGINT, nonlocal_pause['original_sigint'])
+            time_since_last_ctrl_c = time.time() - nonlocal_pause['pause_time_start']
+            if time_since_last_ctrl_c > 5:
+                nonlocal_pause['pause'] = 0
+                nonlocal_pause['pause_time_start'] = time.time()
+                print('More than 5 seconds since last ctrl+c, Unpausing. '
+                      'Press again within 5 seconds to pause.'
+                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
+            else:
+                nonlocal_pause['pause'] += 1
+                print('\n\nPaused, press ctrl-c 3 total times in less than 5 seconds '
+                      'to stop the run cleanly, 5 to do a hard stop. '
+                      'Pressing Ctrl + C after 5 seconds will resume.'
+                      'Remember, you can always press Ctrl+\\ to hard kill the program at any time.'
+                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
+
+            if nonlocal_pause['pause'] >= ctrl_c_stop_threshold:
+                print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
+                nonlocal_pause['exit_called'] = True
+                # we need to unpause to complete the exit
+                nonlocal_pause['pause'] = 0
+            elif nonlocal_pause['pause'] >= ctrl_c_kill_threshold:
+                print('Triggering a Hard exit now.')
+                sys.exit(1)
+
+        except KeyboardInterrupt:
+            nonlocal_pause['pause'] += 1
+        # restore the pause handler here
+        signal.signal(signal.SIGINT, pause)
+
+    # Set up the pause signal
+    signal.signal(signal.SIGINT, pause)
 
     def set_nonlocal_success_variables_false():
         nonlocal_variables['push_success'] = False
@@ -373,6 +430,7 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+
         last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
@@ -620,7 +678,7 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                           (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
+                            (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
@@ -653,23 +711,11 @@ def main(args):
                         trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
                         nonlocal_variables['trial_success_rate'] = trial_rate
                     print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
-                          '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
-                          '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
-                          ' current_height: ' + str(nonlocal_variables['stack_height']))
-
-                # if check_z_height and nonlocal_variables['trial_complete']:
-                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
-                #     # Zero out the height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 0.0
-                #     nonlocal_variables['prev_stack_height'] = 0.0
-                # elif nonlocal_variables['trial_complete']:
-                #     # Set back to the minimum stack height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 1
-                #     nonlocal_variables['prev_stack_height'] = 1
+                            '  actions/full stack: ' + str(stack_rate) +
+                            ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                            '  partial_stack_successes: ' + str(partial_stack_count) +
+                            '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
+                            ' current_height: ' + str(nonlocal_variables['stack_height']))
 
                 nonlocal_variables['executing_action'] = False
 
@@ -754,7 +800,7 @@ def main(args):
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
-    exit_called = False
+    nonlocal_pause['exit_called'] = False
     # -------------------------------------------------------------
     # -------------------------------------------------------------
     prev_primitive_action = None
@@ -848,13 +894,18 @@ def main(args):
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
-                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (stuff_sum))
+                print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
-            nonlocal_variables['trial_complete'] = True
-            # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
-            do_continue = True
-            # continue
+            # If the scene started empty, we are just setting up 
+            # trial 0 with a reset, so no trials have been completed.
+            if trainer.iteration > 0:
+                # All other nonzero trials should be considered over, 
+                # so mark the trial as complete and move on to the next one.
+                nonlocal_variables['trial_complete'] = True
+                # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
+                do_continue = True
+                # continue
 
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
@@ -876,7 +927,7 @@ def main(args):
                     print('loading case file: ' + str(case_file))
                     robot.load_preset_case(case_file)
                 if not place and num_trials >= max_test_trials:
-                    exit_called = True  # Exit after training thread (backprop and saving labels)
+                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
@@ -895,9 +946,9 @@ def main(args):
         # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
             # If we are doing a fixed number of test trials, end the run the next time around.
-            exit_called = True
+            nonlocal_pause['exit_called'] = True
 
-        if not exit_called:
+        if not nonlocal_pause['exit_called']:
 
             # Run forward pass with network to get affordances
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
@@ -960,15 +1011,13 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                # use a 1000 iteration history for plotting.
-                plot_window = 1000
-                if trainer.iteration > plot_window:
+                if trainer.iteration > plot_window or is_testing:
                     prev_best_dict = copy.deepcopy(best_dict)
                     if is_testing:
                         # when testing the plot data should be averaged across the whole run
                         plot_window = trainer.iteration - 1
                     best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
-                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json', 'w')) as f:
+                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
                         json.dump(best_dict, f)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
@@ -1004,10 +1053,9 @@ def main(args):
                 elif prev_primitive_action == 'grasp':
                     train_on_successful_experience = not prev_grasp_success
                 elif prev_primitive_action == 'place':
-                    train_on_successful_experience = not prev_push_success
+                    train_on_successful_experience = not prev_partial_stack_success
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
-                # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
                                   nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
                                   train_on_successful_experience=train_on_successful_experience)
@@ -1019,7 +1067,7 @@ def main(args):
                 for k, v in best_dict.items():
                     if k in prev_best_dict and v > prev_best_dict[k]:
                         logger.save_model(trainer.model, method + '_' + k)
-                 # saves once every logs are finalized
+                # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
 
@@ -1060,7 +1108,7 @@ def main(args):
 
         # Sync both action thread and training thread
         num_problems_detected = 0
-        while nonlocal_variables['executing_action']:
+        while nonlocal_variables['executing_action'] or nonlocal_pause['pause']:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
@@ -1071,7 +1119,9 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if is_sim and int(time_elapsed) > 60:
+            if nonlocal_pause['pause']:
+                print('Pause engaged for ' + str(time_elapsed) + ' seconds, press ctrl + c after at least 5 seconds to resume.')
+            elif is_sim and int(time_elapsed) > 60:
                 # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
@@ -1105,7 +1155,7 @@ def main(args):
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
 
-        if exit_called:
+        if nonlocal_pause['exit_called']:
             # shut down the simulation or robot
             robot.shutdown()
             break
@@ -1297,7 +1347,6 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
-
 if __name__ == '__main__':
 
     # Parse arguments
@@ -1358,8 +1407,12 @@ if __name__ == '__main__':
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
-    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
+    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
+    parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set autmoatically.')
+
+    # Parse args
+    args = parser.parse_args()
 
     # Run main program with specified arguments
-    args = parser.parse_args()
     main(args)
+
