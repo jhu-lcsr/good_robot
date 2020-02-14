@@ -311,27 +311,28 @@ def main(args):
             signal.signal(signal.SIGINT, nonlocal_pause_variables['original_sigint'])
             time_since_last_ctrl_c = time.time() - nonlocal_pause_variables['pause_time_start']
             if time_since_last_ctrl_c > 5:
-                nonlocal_variables['pause'] = 0
+                nonlocal_pause_variables['pause'] = 0
                 nonlocal_pause_variables['pause_time_start'] = time.time()
                 print('More than 5 seconds since last ctrl+c, Unpausing. '
                       'Press again within 5 seconds to pause.'
-                      ' Ctrl+C Count:' + str(nonlocal_variables['pause']))
+                      ' Ctrl+C Count:' + str(nonlocal_pause_variables['pause']))
             else:
-                nonlocal_variables['pause'] += 1
+                nonlocal_pause_variables['pause'] += 1
                 print('\n\nPaused, press ctrl-c 3 total times in less than 5 seconds '
                       'to stop the run cleanly, 5 to do a hard stop. '
                       'Pressing Ctrl + C after 5 seconds will resume.'
                       'Remember, you can always press Ctrl+\\ to hard kill the program at any time.'
-                      ' Ctrl+C Count:' + str(nonlocal_variables['pause']))
+                      ' Ctrl+C Count:' + str(nonlocal_pause_variables['pause']))
 
-        except KeyboardInterrupt:
-            nonlocal_variables['pause'] += 1
-            if nonlocal_variables['pause'] >= ctrl_c_stop_threshold:
+            if nonlocal_pause_variables['pause'] >= ctrl_c_stop_threshold:
                 print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
                 nonlocal_pause_variables['exit_called'] = True
-            elif nonlocal_variables['pause'] >= ctrl_c_kill_threshold:
+            elif nonlocal_pause_variables['pause'] >= ctrl_c_kill_threshold:
                 print('Triggering a Hard exit now.')
                 sys.exit(1)
+
+        except KeyboardInterrupt:
+            nonlocal_pause_variables['pause'] += 1
         # restore the pause handler here
         signal.signal(signal.SIGINT, pause)
 
