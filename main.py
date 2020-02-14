@@ -561,14 +561,16 @@ def main(args):
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
+                    # Q values are mostly 0 to 1 for pushing/grasping, mostly 0 to 4 for multi-step tasks with placing
+                    scale_factor = 4 if place else 1
+                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'], scale_factor=scale_factor)
                         logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
