@@ -865,14 +865,18 @@ def main(args):
             nonlocal_variables['trial_complete'] = False
             # we're still not totally done, we still need to finilaize the log for the trial
             nonlocal_variables['finalize_prev_trial_log'] = True
-            if is_testing and test_preset_cases:
-                case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
-                # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
-                # load the current preset case, incrementing as trials are cleared
-                print('loading case file: ' + str(case_file))
-                robot.load_preset_case(case_file)
-            if is_testing and not place and num_trials >= max_test_trials:
-                exit_called = True  # Exit after training thread (backprop and saving labels)
+            if is_testing:
+                # Do special testing mode update steps
+                # If at end of test run, re-load original weights (before test run)
+                trainer.model.load_state_dict(torch.load(snapshot_file))
+                if test_preset_cases:
+                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
+                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
+                    # load the current preset case, incrementing as trials are cleared
+                    print('loading case file: ' + str(case_file))
+                    robot.load_preset_case(case_file)
+                if not place and num_trials >= max_test_trials:
+                    exit_called = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
