@@ -313,7 +313,8 @@ def main(args):
             if time_since_last_ctrl_c > 5:
                 nonlocal_variables['pause'] = 0
                 nonlocal_pause_variables['pause_time_start'] = time.time()
-                print('More than 5 seconds since last ctrl+c, Unpausing.'
+                print('More than 5 seconds since last ctrl+c, Unpausing. '
+                      'Press again within 5 seconds to pause.'
                       ' Ctrl+C Count:' + str(nonlocal_variables['pause']))
             else:
                 nonlocal_variables['pause'] += 1
