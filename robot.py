@@ -324,7 +324,7 @@ class Robot(object):
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
                 # TODO(ahundt) HACK REMOVE background_heightmap subtraction, COLLECT HEIGHTMAP AGAIN, SEE README.md for instructions
-                self.background_heightmap -= 0.03
+                # self.background_heightmap -= 0.03
 
             # real robot must use unstacking
             if self.place_task:
