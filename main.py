@@ -214,6 +214,7 @@ def main(args):
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
     # Quick hack for nonlocal memory between threads in Python 2
+    # Most of these variables are saved to a json file during a run, and reloaded during resume.
     nonlocal_variables = {'executing_action': False,
                           'primitive_action': None,
                           'best_pix_ind': None,
@@ -231,17 +232,18 @@ def main(args):
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False}
 
-    nonlocal_pause = {'pause': 0,
-                      'pause_time_start': time.time(),
-                      # setup KeyboardInterrupt signal handler for pausing
-                      'original_sigint': signal.getsignal(signal.SIGINT),
-                      'exit_called':False}
-
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
     always_default_nonlocals = ['executing_action',
                                 'primitive_action',
                                 'save_state_this_iteration']
+
+    # These variables handle pause and exit state. Also a quick hack for nonlocal memory.
+    nonlocal_pause = {'pause': 0,
+                      'pause_time_start': time.time(),
+                      # setup KeyboardInterrupt signal handler for pausing
+                      'original_sigint': signal.getsignal(signal.SIGINT),
+                      'exit_called':False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
