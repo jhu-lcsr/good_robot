@@ -753,7 +753,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -1021,7 +1021,7 @@ def main(args):
                         plot_window = trainer.iteration - 1
                     best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
                     with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
-                        json.dump(best_dict, f)
+                        json.dump(best_dict, f, cls=utils.NumpyEncoder)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1093,7 +1093,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
