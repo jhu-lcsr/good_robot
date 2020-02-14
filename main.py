@@ -894,13 +894,18 @@ def main(args):
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
-                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (stuff_sum))
+                print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
-            nonlocal_variables['trial_complete'] = True
-            # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
-            do_continue = True
-            # continue
+            # If the scene started empty, we are just setting up 
+            # trial 0 with a reset, so no trials have been completed.
+            if trainer.iteration > 0:
+                # All other nonzero trials should be considered over, 
+                # so mark the trial as complete and move on to the next one.
+                nonlocal_variables['trial_complete'] = True
+                # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
+                do_continue = True
+                # continue
 
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
