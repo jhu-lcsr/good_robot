@@ -1171,7 +1171,7 @@ def main(args):
                     
                 if wait_until_home_and_not_executing_action and num_problems_detected > 2:
                     print('The robot was not at home after the current action finished running. '
-                          'Make sure the robot did not experience an error or security stopped. '
+                          'Make sure the robot did not experience either an error or security stop. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
             elif is_sim and int(time_elapsed) > 60:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
