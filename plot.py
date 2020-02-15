@@ -46,7 +46,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         success_window_max = np.max(success_window)
         trial_window_max = np.max(trial_window)
         success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
-    
+
     # TODO(ahundt) fix the discontinuities in the log from writing the success count at a slightly different time, remove median filter workaround
     if np.any(success_rate > 1.0):
         print('WARNING: BUG DETECTED, applying median filter to compensate for trial success time step offsets. '
@@ -55,7 +55,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
               'fix the bug in the original code, and preprocess the raw data to correct this error.')
         # success_rate = np.clip(success_rate, 0, 1)
     success_rate = scipy.ndimage.median_filter(success_rate, 7)
-    for i in range(length - 1):        
+    for i in range(length - 1):
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
@@ -314,14 +314,14 @@ if __name__ == '__main__':
     log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
     plot_it('./logs/2020-02-10-14-57-07_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000)
     #############################################################
-    # REAL ROBOT STACKING run 
+    # REAL ROBOT STACKING run
     plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000, apply_real_robot_speckle_noise_hotfix=True)
     # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
     # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
     # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)
     # Max action efficiency: 0.3, at action iteration: 37. (total of 751 actions, max excludes first 200 actions)
     #############################################################
-    # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation. 
+    # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation.
     # It can basically complete trials 100% of the time within 400 actions!
     plot_it('./logs/2020-02-07-14-43-44_Sim-Push-and-Grasp-Trial-Reward-Common-Sense-Training','Sim Push and Grasp, SPOT Reward, Common Sense, Training', window=200, max_iter=2500)
     # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
