@@ -92,7 +92,8 @@ def init_trunk_weights(model, branch=None):
     # Initialize network weights
     for m in model.named_modules():
         #if 'push-' in m[0] or 'grasp-' in m[0]:
-        if((branch is None and 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]) or branch in m[0]):
+        if((branch is None and 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]) or 
+           (branch is not None and branch in m[0])):
             if isinstance(m[1], nn.Conv2d):
                 nn.init.kaiming_normal_(m[1].weight.data)
             elif isinstance(m[1], nn.BatchNorm2d):
