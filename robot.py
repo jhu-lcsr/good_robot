@@ -1180,7 +1180,7 @@ class Robot(object):
             return True
 
 
-    def go_home(self, block_until_home=False):
+    def go_home(self, block_until_home=False, timeout_seconds=7):
         if self.is_sim:
             success = self.move_to(self.sim_home_position, None)
             if not self.home_joint_config:
@@ -1191,10 +1191,12 @@ class Robot(object):
                 return self.move_joints(self.home_joint_config)
         else:
             self.move_joints(self.home_joint_config)
-            if block_until_home:
-                return self.block_until_home()
-            else:
-                return True
+            if not block_until_home:
+                timeout_seconds = 0
+            # block_until_home with 0 second timeout will just 
+            # get data from the robot once to indicate if we are
+            # without blocking otherwise.
+            return self.block_until_home(timeout_seconds)
 
 
     def check_grasp(self):
@@ -1533,18 +1535,19 @@ class Robot(object):
 
         if self.is_sim:
             raise NotImplementedError
-        # Don't wait for more than 20 seconds
+        # Don't wait for more than timeout_seconds, 
+        # but get the state from the real robot at least once.
         iteration_time_0 = time.time()
         while True:
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > timeout_seconds:
-                print('Move to Home Position Failed')
-                return False
             state_data = self.get_state()
             actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
             if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
                 print('Move to Home Position Complete')
                 return True
+            if int(time_elapsed) > timeout_seconds:
+                print('Move to Home Position Failed')
+                return False
             time.sleep(0.1)
 
     def block_until_cartesian_position(self, position, timeout_seconds=7):
