@@ -141,12 +141,14 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
-        if np.any(depth_heightmap < 0.0):
-            print('WARNING: get_heightmap() depth_heightmap contains values of height < 0, '
-                  'saved depth heightmap png files may be invalid!'
-                  'See README.md for instructions to collect the depth heightmap again.'
-                  'Clipping the minimum to 0 for now.')
+        min_z = np.min(depth_heightmap)
+        if min_z < 0:
             depth_heightmap = np.clip(depth_heightmap, 0, None)
+            if min_z < -0.002:
+                print('WARNING: get_heightmap() depth_heightmap contains negative heights with min ' + str(min_z) + ', '
+                    'saved depth heightmap png files may be invalid!'
+                    'See README.md for instructions to collect the depth heightmap again.'
+                    'Clipping the minimum to 0 for now.')
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)
