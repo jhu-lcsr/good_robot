@@ -1130,7 +1130,7 @@ def main(args):
         # The real robot may experience security stops, so we must check for those too.
         wait_until_home_and_not_executing_action = not is_sim
         # nonlocal variable for quick threading workaround
-        real_home = {'is_home': False, 'executing_action': threading.Lock()}
+        real_home = {'is_home': False, 'home_lock': threading.Lock()}
 
         # This is the primary experience replay loop which runs while the separate
         # robot thread is physically moving as well as when the program is paused.
@@ -1152,16 +1152,16 @@ def main(args):
                 # the robot has actually made it home. This is to prevent collecting bad data after a security stop due to the robot colliding.
                 # Here the action has finished, now we must make sure we are home.
                 def homing_thread():
-                    with real_home['executing_action']:
+                    with real_home['home_lock']:
                         real_home['is_home'] = robot.go_home(block_until_home=True)
-                if real_home['executing_action'].acquire(blocking=False):
+                if real_home['home_lock'].acquire(blocking=False):
                     # Keep waiting if we are not home
                     wait_until_home_and_not_executing_action = not real_home['is_home']
                     if wait_until_home_and_not_executing_action:
                         # start a thread to go home, we will continue to experience replay while we wait
                         t = threading.Thread(target=homing_thread)
                         t.start()
-                    real_home['executing_action'].release()
+                    real_home['home_lock'].release()
                     
                 if wait_until_home_and_not_executing_action:
                     print('The robot was not at home after the current action finished running. '
