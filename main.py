@@ -116,6 +116,9 @@ def main(args):
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
+    if is_testing:
+        print('Testing mode detected, automatically disabling situation removal.')
+        disable_situation_removal = True
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases
     trials_per_case = 1
@@ -300,10 +303,10 @@ def main(args):
         nonlocal_variables['stack'].next()
 
     def pause(signum, frame):
-        """This function is designated as the KeyboardInterrupt handler. 
-        
+        """This function is designated as the KeyboardInterrupt handler.
+
         It blocks execution in the main thread
-        and pauses the process action thread. Execution will resume when this function returns, 
+        and pauses the process action thread. Execution will resume when this function returns,
         or will stop if ctrl-c is pressed 5 more times
         """
         # TODO(ahundt) come up with a cleaner pause resume API, maybe use an OpenCV interface.
@@ -558,14 +561,16 @@ def main(args):
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
+                    # Q values are mostly 0 to 1 for pushing/grasping, mostly 0 to 4 for multi-step tasks with placing
+                    scale_factor = 4 if place else 1
+                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'], scale_factor=scale_factor)
                         logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
@@ -750,7 +755,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -897,10 +902,10 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
-            # If the scene started empty, we are just setting up 
+            # If the scene started empty, we are just setting up
             # trial 0 with a reset, so no trials have been completed.
             if trainer.iteration > 0:
-                # All other nonzero trials should be considered over, 
+                # All other nonzero trials should be considered over,
                 # so mark the trial as complete and move on to the next one.
                 nonlocal_variables['trial_complete'] = True
                 # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
@@ -1011,14 +1016,14 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if trainer.iteration > plot_window or is_testing:
+                if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
                     prev_best_dict = copy.deepcopy(best_dict)
                     if is_testing:
                         # when testing the plot data should be averaged across the whole run
                         plot_window = trainer.iteration - 1
                     best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
                     with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
-                        json.dump(best_dict, f)
+                        json.dump(best_dict, f, cls=utils.NumpyEncoder)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1090,7 +1095,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1391,7 +1396,7 @@ if __name__ == '__main__':
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
-    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. ')
+    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. Automatically enabled when is_testing is enable.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)

@@ -35,6 +35,25 @@ def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
     return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """ json encoder for numpy types
+    source: https://stackoverflow.com/a/49677241/99379
+    """
+    def default(self, obj):
+        if isinstance(obj,
+            (np.int_, np.intc, np.intp, np.int8,
+             np.int16, np.int32, np.int64, np.uint8,
+             np.uint16, np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj,
+           (np.float_, np.float16, np.float32,
+            np.float64)):
+            return float(obj)
+        elif isinstance(obj, (np.ndarray,)):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
 def clearance_log_to_trial_count(clearance_log):
     """ Convert clearance log list of end indices to a list of the current trial number at each iteration.
 
