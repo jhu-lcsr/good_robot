@@ -1111,9 +1111,28 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
-        # Sync both action thread and training thread
+        # While in simulated mode we need to keep count of simulator problems,
+        # because the simulator's physics engine is pretty buggy. For example, solid
+        # objects sometimes stick to each other or have their volumes intersect, and
+        # on occasion this and/or Inverse Kinematics issues lead to acceleration to
+        # nearly infinite velocities. We attempt to detect these situation and
+        # when problems occur we start with simple workarounds. If that does not work
+        # we apply more intrusive resets to restore the simulator to a valid state.
+        #
+        # Fortunately for us, the real robot is not like the simulator in that it
+        # tends to obey the laws of physics. :-) However, it can suffer from its own
+        # issues like safety/security stops when it collides with objects. In these
+        # cases it will not move until a human resets the robot. Therefore, we also
+        # try to detect these issues and wait for a human to intervene before resuming
+        # real robot execution. The way we do this is to make sure the robot is actually
+        # at the home position before moving on to the next iteration.
         num_problems_detected = 0
-        while nonlocal_variables['executing_action'] or nonlocal_pause['pause']:
+        # The real robot may experience security stops, so we must check for those too.
+        wait_until_home_and_not_executing_action = not is_sim
+
+        # This is the primary experience replay loop which runs while the separate
+        # robot thread is physically moving as well as when the program is paused.
+        while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
             if experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
@@ -1126,17 +1145,25 @@ def main(args):
             time_elapsed = time.time()-iteration_time_0
             if nonlocal_pause['pause']:
                 print('Pause engaged for ' + str(time_elapsed) + ' seconds, press ctrl + c after at least 5 seconds to resume.')
+            elif not is_sim and not nonlocal_variables['executing_action']:
+                # the real robot should not move to the next action until execution of this action is complete AND
+                # the robot has actually made it home. This is to prevent collecting bad data after a security stop due to the robot colliding.
+                # Here the action has finished, now we must make sure we are home.
+                wait_until_home_and_not_executing_action = robot.go_home(block_until_home=True)
+                if wait_until_home_and_not_executing_action:
+                    print('The robot was not at home after the current action finished running. '
+                          'Make sure the robot did not experience an error or security stopped. '
+                          'WARNING: The robot will attempt to go home again in a few seconds.')
             elif is_sim and int(time_elapsed) > 60:
-                # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
+                # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                if is_sim:
-                    robot.check_sim()
-                    if not robot.reposition_objects():
-                        # This can happen if objects are in impossible positions (NaN),
-                        # so set the variable to immediately and completely restart
-                        # the simulation below.
-                        num_problems_detected += 3
+                robot.check_sim()
+                if not robot.reposition_objects():
+                    # This can happen if objects are in impossible positions (NaN),
+                    # so set the variable to immediately and completely restart
+                    # the simulation below.
+                    num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
@@ -1152,7 +1179,7 @@ def main(args):
                     nonlocal_variables['stack_height'] = 1.0
                     nonlocal_variables['prev_stack_height'] = 1.0
                 num_problems_detected += 1
-                if num_problems_detected > 2 and is_sim:
+                if num_problems_detected > 2:
                     # Try more drastic recovery methods the second time around
                     robot.restart_sim(connect=True)
                     robot.add_objects()
