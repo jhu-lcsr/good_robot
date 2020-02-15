@@ -1161,9 +1161,10 @@ def main(args):
                         # start a thread to go home, we will continue to experience replay while we wait
                         t = threading.Thread(target=homing_thread)
                         t.start()
+                    num_problems_detected += 1
                     real_home['home_lock'].release()
                     
-                if wait_until_home_and_not_executing_action:
+                if wait_until_home_and_not_executing_action and num_problems_detected > 2:
                     print('The robot was not at home after the current action finished running. '
                           'Make sure the robot did not experience an error or security stopped. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
