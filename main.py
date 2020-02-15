@@ -1153,8 +1153,6 @@ def main(args):
                 # Here the action has finished, now we must make sure we are home.
                 def homing_thread():
                     with real_home['home_lock']:
-                        # open the gripper to keep it from reactivating the next time it gets a command.
-                        robot.open_gripper()
                         # send the robot home
                         real_home['is_home'] = robot.go_home(block_until_home=True)
                 if real_home['home_lock'].acquire(blocking=False):
