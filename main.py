@@ -1155,13 +1155,18 @@ def main(args):
                     with real_home['home_lock']:
                         real_home['is_home'] = robot.go_home(block_until_home=True)
                 if real_home['home_lock'].acquire(blocking=False):
-                    # Keep waiting if we are not home
-                    wait_until_home_and_not_executing_action = not real_home['is_home']
-                    if wait_until_home_and_not_executing_action:
-                        # start a thread to go home, we will continue to experience replay while we wait
-                        t = threading.Thread(target=homing_thread)
-                        t.start()
-                    num_problems_detected += 1
+                    if num_problems_detected == 0:
+                        # check if we are home
+                        wait_until_home_and_not_executing_action = not robot.block_until_home(0)
+                        num_problems_detected += 1
+                    if num_problems_detected > 0:
+                        # Command the robot to go home if we are not home
+                        wait_until_home_and_not_executing_action = not real_home['is_home']
+                        if wait_until_home_and_not_executing_action:
+                            # start a thread to go home, we will continue to experience replay while we wait
+                            t = threading.Thread(target=homing_thread)
+                            t.start()
+                            num_problems_detected += 1
                     real_home['home_lock'].release()
                     
                 if wait_until_home_and_not_executing_action and num_problems_detected > 2:
