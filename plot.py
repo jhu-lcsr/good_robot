@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
@@ -342,6 +343,10 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file + '.png')
     plt.savefig(save_file + '.png', dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
+    best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
+    print('saving best stats to: ' + best_stats_file)
+    with open(best_stats_file, 'w') as f:
+        json.dump(best_dict, f, cls=utils.NumpyEncoder)
     return best_dict
 
 
@@ -351,7 +356,9 @@ if __name__ == '__main__':
     window = 1000
     max_iter = None
 
-    best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
+    best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
+    # Sim stats for final paper:
+    # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
     # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
     print(best_dict)
     # log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'

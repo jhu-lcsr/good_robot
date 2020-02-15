@@ -246,7 +246,7 @@ def main(args):
                       'pause_time_start': time.time(),
                       # setup KeyboardInterrupt signal handler for pausing
                       'original_sigint': signal.getsignal(signal.SIGINT),
-                      'exit_called':False}
+                      'exit_called': False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -1014,14 +1014,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
-                    prev_best_dict = copy.deepcopy(best_dict)
-                    if is_testing:
-                        # when testing the plot data should be averaged across the whole run
-                        plot_window = trainer.iteration - 1
-                    best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
-                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
-                        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+                best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1245,6 +1238,22 @@ def main(args):
 
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         trainer.iteration += 1
+
+    # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
+    best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+
+
+def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
+    if preset_files is not None:
+        # note preset_files is changing from a list of strings to an integer
+        preset_files = len(preset_files)
+    if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
+        prev_best_dict = copy.deepcopy(best_dict)
+        if is_testing:
+            # when testing the plot data should be averaged across the whole run
+            plot_window = trainer.iteration - 3
+        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_cases=preset_files)
+    return best_dict, prev_best_dict
 
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
