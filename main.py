@@ -800,8 +800,6 @@ def main(args):
         primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
-
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -1169,7 +1167,7 @@ def main(args):
                             t.start()
                             num_problems_detected += 1
                     real_home['home_lock'].release()
-                    
+
                 if wait_until_home_and_not_executing_action and num_problems_detected > 2:
                     print('The robot was not at home after the current action finished running. '
                           'Make sure the robot did not experience either an error or security stop. '
