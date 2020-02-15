@@ -651,7 +651,7 @@ class Robot(object):
 
             # TODO(ahundt) add real robot support for reposition_objects
 
-    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=False, z_height_retake_threshold=0.3):
+    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
 
