@@ -464,24 +464,24 @@ def main(args):
             if os.path.exists(resume_var_values_path):
                 with open(resume_var_values_path, 'r') as f:
                     process_vars = json.load(f)
-
-                for k, v in process_vars.items():
-                    # initialize all the local variables based on the dictionary entries
-                    setattr(sys.modules[__name__], k, v)
-                # action_count = process_vars['action_count']
-                # grasp_count = process_vars['grasp_count']
-                # successful_grasp_count = process_vars['successful_grasp_count']
-                # successful_color_grasp_count = process_vars['successful_color_grasp_count']
-                # place_count = process_vars['place_count']
-                # place_rate = process_vars['place_rate']
-                # partial_stack_count = process_vars['partial_stack_count']
-                # partial_stack_rate = process_vars['partial_stack_rate']
-                # stack_count = process_vars['stack_count']
-                # stack_rate = process_vars['stack_rate']
-                # needed_to_reset = process_vars['needed_to_reset']
-                # grasp_str = process_vars['grasp_str']
-                # successful_trial_count = process_vars['successful_trial_count']
-                # trial_rate = process_vars['trial_rate']
+                # TODO(ahundt) the loop below should be a simpler way to do the same thing, but it doesn't seem to work
+                # for k, v in process_vars.items():
+                #     # initialize all the local variables based on the dictionary entries
+                #     setattr(sys.modules[__name__], k, v)
+                action_count = process_vars['action_count']
+                grasp_count = process_vars['grasp_count']
+                successful_grasp_count = process_vars['successful_grasp_count']
+                successful_color_grasp_count = process_vars['successful_color_grasp_count']
+                place_count = process_vars['place_count']
+                place_rate = process_vars['place_rate']
+                partial_stack_count = process_vars['partial_stack_count']
+                partial_stack_rate = process_vars['partial_stack_rate']
+                stack_count = process_vars['stack_count']
+                stack_rate = process_vars['stack_rate']
+                needed_to_reset = process_vars['needed_to_reset']
+                grasp_str = process_vars['grasp_str']
+                successful_trial_count = process_vars['successful_trial_count']
+                trial_rate = process_vars['trial_rate']
 
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
