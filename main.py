@@ -837,11 +837,7 @@ def main(args):
     do_continue = False
     best_dict = {}
     prev_best_dict = {}
-    # backprop is enabled if we are testing,
-    # otherwise it is disabled until a bit of data has been collected.
-    backprop_enabled = {'push': not is_testing, 'grasp': not is_testing}
-    if place:
-        backprop_enabled['place'] = not is_testing
+    backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -1050,7 +1046,9 @@ def main(args):
                     nonlocal_variables['prev_stack_height'] = 1
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
-
+    
+            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
+            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
@@ -1223,7 +1221,6 @@ def main(args):
             robot.shutdown()
             break
 
-        backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
         # If we don't have any successes reinitialize model
         # Save information for next training step
         prev_color_img = color_img.copy()
@@ -1460,8 +1457,8 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
-    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=10,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely.')
-    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=10,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model. 0 disables this feature entirely.')
+    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=0,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely, we have also tried 10 but more experiments are needed.')
+    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=0,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model. 0 disables this feature entirely, we have also tried 10 but more experiements are needed.')
     parser.add_argument('--random_trunk_weights_min_success', dest='random_trunk_weights_min_success', type=int, action='store', default=2,      help='The minimum number of successes we must have reached before we keep an initial set of random trunk weights.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,  help='enable skipping grasp and push actions when the heightmap is zero')
