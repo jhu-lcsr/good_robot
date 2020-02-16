@@ -113,6 +113,9 @@ def main(args):
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
     disable_two_step_backprop = args.disable_two_step_backprop
+    random_trunk_weights_max = args.random_trunk_weights_max
+    random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
+    random_trunk_weights_min_success = args.random_trunk_weights_min_success
 
 
     # -------------- Test grasping options --------------
@@ -462,20 +465,23 @@ def main(args):
                 with open(resume_var_values_path, 'r') as f:
                     process_vars = json.load(f)
 
-                action_count = process_vars['action_count']
-                grasp_count = process_vars['grasp_count']
-                successful_grasp_count = process_vars['successful_grasp_count']
-                successful_color_grasp_count = process_vars['successful_color_grasp_count']
-                place_count = process_vars['place_count']
-                place_rate = process_vars['place_rate']
-                partial_stack_count = process_vars['partial_stack_count']
-                partial_stack_rate = process_vars['partial_stack_rate']
-                stack_count = process_vars['stack_count']
-                stack_rate = process_vars['stack_rate']
-                needed_to_reset = process_vars['needed_to_reset']
-                grasp_str = process_vars['grasp_str']
-                successful_trial_count = process_vars['successful_trial_count']
-                trial_rate = process_vars['trial_rate']
+                for k, v in process_vars.items():
+                    # initialize all the local variables based on the dictionary entries
+                    setattr(sys.modules[__name__], k, v)
+                # action_count = process_vars['action_count']
+                # grasp_count = process_vars['grasp_count']
+                # successful_grasp_count = process_vars['successful_grasp_count']
+                # successful_color_grasp_count = process_vars['successful_color_grasp_count']
+                # place_count = process_vars['place_count']
+                # place_rate = process_vars['place_rate']
+                # partial_stack_count = process_vars['partial_stack_count']
+                # partial_stack_rate = process_vars['partial_stack_rate']
+                # stack_count = process_vars['stack_count']
+                # stack_rate = process_vars['stack_rate']
+                # needed_to_reset = process_vars['needed_to_reset']
+                # grasp_str = process_vars['grasp_str']
+                # successful_trial_count = process_vars['successful_trial_count']
+                # trial_rate = process_vars['trial_rate']
 
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
@@ -751,7 +757,8 @@ def main(args):
                     process_vars['grasp_str'] = grasp_str
                     process_vars['successful_trial_count'] = successful_trial_count
                     process_vars['trial_rate'] = trial_rate
-
+                    # save process vars into nonlocal variables so they can be used to inform future training
+                    nonlocal_variables['prev_process_vars'] = process_vars
                     save_location = os.path.join(logger.base_directory, 'data', 'variables')
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
@@ -836,6 +843,8 @@ def main(args):
         iteration_time_0 = time.time()
         # Record the current trial number
         trainer.trial_log.append([trainer.num_trials()])
+        # determine if backprop is enabled for this iteration
+        backprop_enabled =  trainer.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters
 
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
@@ -1039,7 +1048,7 @@ def main(args):
                 nonlocal_variables['executing_action'] = True
 
             # Backpropagate
-            if not disable_two_step_backprop:
+            if backprop_enabled and not disable_two_step_backprop:
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
@@ -1132,7 +1141,7 @@ def main(args):
         # This is the primary experience replay loop which runs while the separate
         # robot thread is physically moving as well as when the program is paused.
         while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
-            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if backprop_enabled and experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
@@ -1209,6 +1218,9 @@ def main(args):
             robot.shutdown()
             break
 
+        if not backprop_enabled:
+            trainer.randomize_trunk_weights(random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
+        # If we don't have any successes reinitialize model
         # Save information for next training step
         prev_color_img = color_img.copy()
         prev_depth_img = depth_img.copy()
@@ -1444,6 +1456,9 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
+    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=10,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion.')
+    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=6,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model.')
+    parser.add_argument('--random_trunk_weights_min_success', dest='random_trunk_weights_min_success', type=int, action='store', default=2,      help='The minimum number of successes we must have reached before we keep an initial set of random trunk weights.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,  help='enable skipping grasp and push actions when the heightmap is zero')
     parser.add_argument('--common_sense', dest='common_sense', action='store_true', default=False,                        help='Use common sense heuristics to detect and train on regions which do not contact anything, and will thus not result in task progress.')
@@ -1464,7 +1479,7 @@ if __name__ == '__main__':
     parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly setting their positions. Only applies when --place is set')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
-    parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='maximum number of actions before training exits automatically at the end of that trial.')
+    parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='maximum number of actions before training exits automatically at the end of that trial. Note this is slightly different from max_iter.')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
