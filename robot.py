@@ -1944,7 +1944,7 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.03, decrease_threshold=0.02, reward_multiplier=20.0):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.03, decrease_threshold=0.02, reward_multiplier=None):
         """ Checks the maximum z height after applying a median filter. Includes checks for significant increases and decreases.
 
         # Returns
@@ -1954,7 +1954,10 @@ class Robot(object):
             goal_success: has height increased by the increase_threshold
             max_z: what is the current maximum z height in the image
             neede_to_reset: has the height decreased from the prev_height enough to warrant special reset/recovery actions.
+            reward_multiplier: Converts scale from "meters" to "blocks" scale. Default None means 20.0 if self.is_sim else 22.0.
         """
+        if reward_multiplier is None:
+            reward_multiplier = 20.0 if self.is_sim else 22.0
         # TODO(ahundt) make reward multiplier, increase threshold, and decrease threshold command line parameters which can be modified.
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median) * reward_multiplier
