@@ -1052,7 +1052,7 @@ def main(args):
                 nonlocal_variables['executing_action'] = True
 
             # Backpropagate
-            if backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
@@ -1146,7 +1146,7 @@ def main(args):
         # This is the primary experience replay loop which runs while the separate
         # robot thread is physically moving as well as when the program is paused.
         while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
-            if backprop_enabled[prev_primitive_action] and experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
