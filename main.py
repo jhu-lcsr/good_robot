@@ -88,6 +88,7 @@ def main(args):
     force_cpu = args.force_cpu
     flops = args.flops
     show_heightmap = args.show_heightmap
+    max_train_actions = args.max_train_actions
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -246,7 +247,7 @@ def main(args):
                       'pause_time_start': time.time(),
                       # setup KeyboardInterrupt signal handler for pausing
                       'original_sigint': signal.getsignal(signal.SIGINT),
-                      'exit_called':False}
+                      'exit_called': False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -800,8 +801,6 @@ def main(args):
         primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
-
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -1016,14 +1015,9 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
-                    prev_best_dict = copy.deepcopy(best_dict)
-                    if is_testing:
-                        # when testing the plot data should be averaged across the whole run
-                        plot_window = trainer.iteration - 1
-                    best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window)
-                    with open(os.path.join(logger.base_directory, 'data', 'best_stats.json'), 'w') as f:
-                        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+                best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                if max_train_actions is not None and trainer.iteration > max_train_actions:
+                    nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1169,7 +1163,7 @@ def main(args):
                             t.start()
                             num_problems_detected += 1
                     real_home['home_lock'].release()
-                    
+
                 if wait_until_home_and_not_executing_action and num_problems_detected > 2:
                     print('The robot was not at home after the current action finished running. '
                           'Make sure the robot did not experience either an error or security stop. '
@@ -1247,6 +1241,23 @@ def main(args):
 
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         trainer.iteration += 1
+
+    # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
+    best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    return logger.base_directory
+
+
+def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
+    if preset_files is not None:
+        # note preset_files is changing from a list of strings to an integer
+        preset_files = len(preset_files)
+    if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
+        prev_best_dict = copy.deepcopy(best_dict)
+        if is_testing:
+            # when testing the plot data should be averaged across the whole run
+            plot_window = trainer.iteration - 3
+        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
+    return best_dict, prev_best_dict
 
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
@@ -1450,6 +1461,7 @@ if __name__ == '__main__':
     parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly setting their positions. Only applies when --place is set')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='maximum number of actions before training exits automatically at the end of that trial.')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
@@ -1466,5 +1478,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Run main program with specified arguments
-    main(args)
+    training_base_directory = main(args)
 
