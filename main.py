@@ -959,8 +959,8 @@ def main(args):
             # check for progress counting inconsistencies
             print('WARNING POSSIBLE CRITICAL ERROR DETECTED: log data index and trainer.iteration out of sync!!! Experience Replay may break! '
                   'Check code for errors in indexes, continue statements etc.')
-        if place and nonlocal_variables['stack'].trial != num_trials + 1:
-            # check that num trials is always 1 less than the current trial number
+        if place and nonlocal_variables['stack'].trial != num_trials:
+            # check that num trials is always the current trial number
             print('WARNING variable mismatch num_trials + 1: ' + str(num_trials + 1) + ' nonlocal_variables[stack].trial: ' + str(nonlocal_variables['stack'].trial))
 
         # check if we have completed the current test
