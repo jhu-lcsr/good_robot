@@ -1069,11 +1069,12 @@ def main(args):
                     train_on_successful_experience = not prev_grasp_success
                 elif prev_primitive_action == 'place':
                     train_on_successful_experience = not prev_partial_stack_success
+                # TODO(ahundt) the experience replay delays real robot execution, only use the parallel version below, delete this and move this code block down if that's been ok for a while.
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
-                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
-                                  train_on_successful_experience=train_on_successful_experience)
+                # experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
+                #                   nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
+                #                   train_on_successful_experience=train_on_successful_experience)
 
             # Save model snapshot
             if not is_testing:
@@ -1459,7 +1460,7 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
-    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=6,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely.')
+    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=10,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely.')
     parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=10,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model. 0 disables this feature entirely.')
     parser.add_argument('--random_trunk_weights_min_success', dest='random_trunk_weights_min_success', type=int, action='store', default=2,      help='The minimum number of successes we must have reached before we keep an initial set of random trunk weights.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
