@@ -42,6 +42,7 @@ class Trainer(object):
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
         self.show_heightmap = show_heightmap
+        self.is_testing = is_testing
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -790,7 +791,7 @@ class Trainer(object):
     def randomize_trunk_weights(self, backprop_enabled=None, random_trunk_weights_max=6, random_trunk_weights_reset_iters=10, min_success=2):
         """ Automatically re-initialize the trunk weights until we get something useful.
         """
-        if self.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters:
+        if self.is_testing or self.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters:
             # enable backprop
             backprop_enabled = {'push': True, 'grasp': True}
             if self.place:
@@ -805,7 +806,7 @@ class Trainer(object):
         # models_ready_for_backprop = 0
         # executed_action_log includes the action, push grasp or place, and the best pixel index
         max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
-        min_iteration = min(max_iteration - random_trunk_weights_reset_iters, 1)
+        min_iteration = max(max_iteration - random_trunk_weights_reset_iters, 1)
         actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
         successful_push_actions = np.argwhere(np.logical_and(np.asarray(self.change_detected_log)[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
         
