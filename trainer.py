@@ -800,6 +800,8 @@ class Trainer(object):
             backprop_enabled = {'push': False, 'grasp': False}
             if self.place:
                 backprop_enabled['place'] = False
+        if self.iteration < 2:
+            return backprop_enabled
         # models_ready_for_backprop = 0
         # executed_action_log includes the action, push grasp or place, and the best pixel index
         max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
