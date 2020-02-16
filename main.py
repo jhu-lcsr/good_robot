@@ -915,6 +915,9 @@ def main(args):
             # Check if the other thread ended the trial and reset the important values
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
+            if nonlocal_variables['stack'] is not None:
+                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
+                nonlocal_variables['stack'].trial = num_trials
             logger.write_to_log('clearance', trainer.clearance_log)
             # we've recorded the data to mark this trial as complete
             nonlocal_variables['trial_complete'] = False
