@@ -787,28 +787,44 @@ class Trainer(object):
 
         return canvas
 
-    def randomize_trunk_weights(self, random_trunk_weights_max=6, random_trunk_weights_reset_iters=10, min_success=2):
+    def randomize_trunk_weights(self, backprop_enabled=None, random_trunk_weights_max=6, random_trunk_weights_reset_iters=10, min_success=2):
         """ Automatically re-initialize the trunk weights until we get something useful.
         """
         if self.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters:
             # enable backprop
-            return True
-        elif self.iteration > 1 and self.iteration % random_trunk_weights_reset_iters == 0:
-            # models_ready_for_backprop = 0
-            # executed_action_log includes the action, push grasp or place, and the best pixel index
-            max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
-            min_iteration = min(max_iteration - random_trunk_weights_reset_iters, 1)
-            actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
-            successful_push_actions = np.argwhere(np.logical_and(np.asarray(self.change_detected_log)[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
-            # we need to return if we should backprop
-            if (self.place and not np.sum(np.asarray(self.partial_stack_success_log)[min_iteration:max_iteration, 0]) <= min_success):
-                init_trunk_weights(self.model, 'place-')
-            if (np.sum(np.asarray(self.grasp_success_log)[min_iteration:max_iteration, 0]) <= min_success):
-                init_trunk_weights(self.model, 'grasp-')
-            if (len(successful_push_actions) <= min_success):
+            backprop_enabled = {'push': True, 'grasp': True}
+            if self.place:
+                backprop_enabled['place'] = True
+            return backprop_enabled
+        if backprop_enabled is None:
+            backprop_enabled = {'push': False, 'grasp': False}
+            if self.place:
+                backprop_enabled['place'] = False
+        # models_ready_for_backprop = 0
+        # executed_action_log includes the action, push grasp or place, and the best pixel index
+        max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
+        min_iteration = min(max_iteration - random_trunk_weights_reset_iters, 1)
+        actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
+        successful_push_actions = np.argwhere(np.logical_and(np.asarray(self.change_detected_log)[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
+        
+        time_to_reset = self.iteration > 1 and self.iteration % random_trunk_weights_reset_iters == 0
+        # we need to return if we should backprop
+        if (len(successful_push_actions) >= min_success):
+            backprop_enabled['push'] = True
+        elif not backprop_enabled['grasp'] and time_to_reset:
                 init_trunk_weights(self.model, 'push-')
-            return False
-        return False
+
+        if (np.sum(np.asarray(self.grasp_success_log)[min_iteration:max_iteration, 0]) >= min_success):
+            backprop_enabled['grasp'] = True
+        elif not backprop_enabled['grasp'] and time_to_reset:
+                init_trunk_weights(self.model, 'grasp-')
+
+        if self.place:
+            if np.sum(np.asarray(self.partial_stack_success_log)[min_iteration:max_iteration, 0]) >= min_success:
+                backprop_enabled['place'] = True
+            elif not backprop_enabled['place'] and time_to_reset:
+                init_trunk_weights(self.model, 'place-')
+        return backprop_enabled
 
     def push_heuristic(self, depth_heightmap):
 
