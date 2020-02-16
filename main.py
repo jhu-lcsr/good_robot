@@ -88,6 +88,7 @@ def main(args):
     force_cpu = args.force_cpu
     flops = args.flops
     show_heightmap = args.show_heightmap
+    max_train_actions = args.max_train_actions
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -1015,6 +1016,8 @@ def main(args):
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
                 best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                if max_train_actions is not None and trainer.iteration > max_train_actions:
+                    nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -1241,6 +1244,7 @@ def main(args):
 
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
     best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    return logger.base_directory
 
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
@@ -1457,6 +1461,7 @@ if __name__ == '__main__':
     parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly setting their positions. Only applies when --place is set')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='maximum number of actions before training exits automatically at the end of that trial.')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
@@ -1473,5 +1478,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Run main program with specified arguments
-    main(args)
+    training_base_directory = main(args)
 
