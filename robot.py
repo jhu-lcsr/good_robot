@@ -1498,9 +1498,10 @@ class Robot(object):
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
             if go_home:
-                self.block_until_home()
+                push_success = self.block_until_home()
                 # Redundant go home is applied in case the first move operation fails.
-                push_success = self.go_home(block_until_home=True)
+                if not push_success:
+                    push_success = self.go_home(block_until_home=True)
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
@@ -1735,8 +1736,10 @@ class Robot(object):
             # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
             if go_home:
                 # TODO(ahundt) confirm redundant go_home works around some cases where the robot fails to reach the destination
-                self.go_home(block_until_home=True)
-                return self.go_home(block_until_home=True)
+                home_success = self.go_home(block_until_home=True)
+                if not home_success:
+                    home_success = self.go_home(block_until_home=True)
+                return home_success
             else:
                 return move_to_result
 
@@ -2004,7 +2007,7 @@ class Robot(object):
         time.sleep(.1)
         self.move_to(above_bin_waypoint, tool_orientation)
         time.sleep(.1)
-        self.go_home(block_until_home=True)
+        return self.go_home(block_until_home=True)
 
     def shutdown(self):
         if self.is_sim:
