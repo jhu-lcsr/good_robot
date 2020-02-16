@@ -1896,8 +1896,6 @@ class Robot(object):
                 # We know the goal won't be met, so goal_success is False
                 # But we still need to count the actual stack height so set the variable for later
                 goal_success = False
-                # TODO(ahundt) BUG this may actually return 1 when there is a stack of size 2 present, but 3 objects are needed
-                # return False, 1
             else:
                 # cut out objects we don't need to check
                 object_color_sequence = object_color_sequence[:num_obj+1]
