@@ -787,7 +787,7 @@ class Trainer(object):
 
         return canvas
 
-    def randomize_trunk_weights(self, random_trunk_weights_max=10, random_trunk_weights_reset_iters=6, min_success=2):
+    def randomize_trunk_weights(self, random_trunk_weights_max=6, random_trunk_weights_reset_iters=10, min_success=2):
         """ Automatically re-initialize the trunk weights until we get something useful.
         """
         if self.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters:
@@ -796,10 +796,10 @@ class Trainer(object):
         elif self.iteration > 1 and self.iteration % random_trunk_weights_reset_iters == 0:
             # models_ready_for_backprop = 0
             # executed_action_log includes the action, push grasp or place, and the best pixel index
-            max_iteration = np.min([self.executed_action_log.shape[0], self.change_detected_log.shape[0]])
-            min_iteration = min(max_iteration-random_trunk_weights_reset_iters, 1)
+            max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
+            min_iteration = min(max_iteration - random_trunk_weights_reset_iters, 1)
             actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
-            successful_push_actions = np.argwhere(np.logical_and(self.change_detected_log[min_iteration:max_iteration, 0] == 1, actions == ['push']))
+            successful_push_actions = np.argwhere(np.logical_and(self.change_detected_log[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
             # we need to return if we should backprop
             if (self.place and not np.sum(self.partial_stack_success_log[min_iteration:max_iteration, 0]) <= min_success):
                 init_trunk_weights(self.model, 'place-')
