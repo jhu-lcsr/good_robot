@@ -612,7 +612,7 @@ class Robot(object):
                     if max_z_height + offset < self.workspace_limits[2][1]:
                         z = max_z_height + offset
                 else:
-                    offset = 0.05
+                    offset = 0.01  # previously 0.05
                     # otherwise real gripper grasps too high
 
                     if max_z_height - offset > self.workspace_limits[2][0]:
