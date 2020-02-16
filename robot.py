@@ -1477,7 +1477,7 @@ class Robot(object):
                 tcp_command += " movej([%f" % self.home_joint_config[0]
                 for joint_idx in range(1,6):
                     tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
-                tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
+                tcp_command = tcp_command + "],a=%f,v=%f,t=0,r=0.09)\n" % (self.joint_acc, self.joint_vel)
                 # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
             else:
                 # go to up pos instead of home
