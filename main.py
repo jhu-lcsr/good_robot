@@ -1252,7 +1252,7 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         if is_testing:
             # when testing the plot data should be averaged across the whole run
             plot_window = trainer.iteration - 3
-        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_cases=preset_files)
+        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
     return best_dict, prev_best_dict
 
 
