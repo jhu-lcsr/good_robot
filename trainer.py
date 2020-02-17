@@ -436,14 +436,16 @@ class Trainer(object):
         if not self.place:
             place_predictions = None
         if self.common_sense:
-            # Mask pixels we know cannot lead to progress
+            # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
+            # "common sense" dynamic action space, mask pixels we know cannot lead to progress
             push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
-            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.01)
+            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
             if self.place:
-                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03)
+                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
             if self.show_heightmap:
                 # visualize the common sense function results
                 # show the heightmap
@@ -809,7 +811,7 @@ class Trainer(object):
         min_iteration = max(max_iteration - random_trunk_weights_reset_iters, 1)
         actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
         successful_push_actions = np.argwhere(np.logical_and(np.asarray(self.change_detected_log)[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
-        
+
         time_to_reset = self.iteration > 1 and self.iteration % random_trunk_weights_reset_iters == 0
         # we need to return if we should backprop
         if (len(successful_push_actions) >= min_success):
