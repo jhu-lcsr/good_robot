@@ -74,8 +74,8 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -105,8 +105,8 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -703,7 +703,7 @@ class Trainer(object):
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
             if self.common_sense and self.common_sense_backprop:
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
-                # Therefore, we know the action would fail so train the argmax value with 0 reward.  
+                # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
                 new_best_pix_ind, each_action_max_coordinate, predicted_value = action_space_argmax(primitive_action, push_predictions, grasp_predictions, place_predictions)
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
