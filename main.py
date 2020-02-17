@@ -25,6 +25,7 @@ from utils_torch import action_space_argmax
 import plot
 import json
 import copy
+import shutil
 
 
 def run_title(args):
@@ -326,14 +327,14 @@ def main(args):
                 nonlocal_pause['pause_time_start'] = time.time()
                 print('More than 5 seconds since last ctrl+c, Unpausing. '
                       'Press again within 5 seconds to pause.'
-                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
+                      ' Ctrl+C Count: ' + str(nonlocal_pause['pause']))
             else:
                 nonlocal_pause['pause'] += 1
                 print('\n\nPaused, press ctrl-c 3 total times in less than 5 seconds '
                       'to stop the run cleanly, 5 to do a hard stop. '
                       'Pressing Ctrl + C after 5 seconds will resume.'
                       'Remember, you can always press Ctrl+\\ to hard kill the program at any time.'
-                      ' Ctrl+C Count:' + str(nonlocal_pause['pause']))
+                      ' Ctrl+C Count: ' + str(nonlocal_pause['pause']))
 
             if nonlocal_pause['pause'] >= ctrl_c_stop_threshold:
                 print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
@@ -1046,7 +1047,7 @@ def main(args):
                     nonlocal_variables['prev_stack_height'] = 1
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
-    
+
             # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
@@ -1260,7 +1261,7 @@ def main(args):
 
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
     best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
-    return logger.base_directory
+    return logger.base_directory, best_dict
 
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
@@ -1426,6 +1427,51 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
+def choose_testing_snapshot(training_base_directory, best_dict):
+    """ Select the best test mode snapshot model file to load after training.
+    """
+    testing_snapshot = ''
+    print('Evaluating trial_success_rate_best_value')
+    if 'trial_success_rate_best_value' in best_dict:
+        best_trial_value = best_dict['trial_success_rate_best_value']
+        best_trial_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_success_rate_best_value.pth')
+        if os.path.exists(best_trial_snapshot):
+            testing_snapshot = best_trial_snapshot
+        else:
+            print(best_trial_snapshot + ' does not exist, looking for other options.')
+        # If the best trial success rate is high enough, lets use the best action efficiency model
+        if best_trial_value > 0.99 and 'trial_grasp_action_efficiency_best_value' in best_dict and best_dict['trial_grasp_action_efficiency_best_value']:
+            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_grasp_action_efficiency_best_value.')
+            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_grasp_action_efficiency_best_value.pth')
+            if os.path.exists(best_grasp_efficiency_snapshot):
+                testing_snapshot = best_grasp_efficiency_snapshot
+            else:
+                print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
+            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
+        if best_trial_value > 0.99 and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
+            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_action_efficiency_best_value.pth')
+            if os.path.exists(best_efficiency_snapshot):
+                testing_snapshot = best_efficiency_snapshot
+            else:
+                print(best_efficiency_snapshot + ' does not exist, looking for other options.')
+
+    if not testing_snapshot:
+        print('Could not find any best-of models, checking for the basic training models.')
+        final_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement.pth')
+        if os.path.exists(final_snapshot):
+            testing_snapshot = final_snapshot
+        else:
+            print(final_snapshot + ' does not exist, looking for other options.')
+        final_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reactive.pth')
+        if os.path.exists(final_snapshot):
+            testing_snapshot = final_snapshot
+        else:
+            print(final_snapshot + ' does not exist, looking for other options.')
+
+    print('Testing shapshot chosen: ' + testing_snapshot)
+    return testing_snapshot
+
+
 if __name__ == '__main__':
 
     # Parse arguments
@@ -1498,5 +1544,33 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Run main program with specified arguments
-    training_base_directory = main(args)
+    training_base_directory, best_dict = main(args)
+    # if os.path.exists()
+    if args.max_train_actions is not None:
+        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
+        args.snapshot_file = testing_snapshot
+        args.random_seed = 1238
+        args.is_testing = True
+        args.save_visualizations = True
+        args.max_test_trials = 100
+        testing_base_directory, testing_best_dict = main(args)
+        # move the testing data into the training directory
+        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        os.symlink(training_dest_dir, training_base_directory)
+        if not args.place:
+            # run preset arrangements for pushing and grasping
+            args.test_preset_cases = True
+            args.max_test_trials = 10
+            # run testing mode
+            preset_testing_base_directory, preset_testing_best_dict = main(args)
+            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+            os.symlink(preset_training_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
+        print('Random Testing Complete! Dir: ' + training_dest_dir)
+        print('Random Testing results: \n ' + str(testing_best_dict))
+            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+
+    print('Training Complete! Dir: ' + training_base_directory)
+    print('Training results: \n ' + str(best_dict))
