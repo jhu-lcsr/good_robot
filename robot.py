@@ -618,7 +618,6 @@ class Robot(object):
                     if max_z_height - offset > self.workspace_limits[2][0]:
                         z = max_z_height - offset
 
-
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
@@ -1193,7 +1192,7 @@ class Robot(object):
             self.move_joints(self.home_joint_config)
             if not block_until_home:
                 timeout_seconds = 0
-            # block_until_home with 0 second timeout will just 
+            # block_until_home with 0 second timeout will just
             # get data from the robot once to indicate if we are
             # without blocking otherwise.
             return self.block_until_home(timeout_seconds)
@@ -1536,7 +1535,7 @@ class Robot(object):
 
         if self.is_sim:
             raise NotImplementedError
-        # Don't wait for more than timeout_seconds, 
+        # Don't wait for more than timeout_seconds,
         # but get the state from the real robot at least once.
         iteration_time_0 = time.time()
         while True:
