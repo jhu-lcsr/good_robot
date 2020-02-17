@@ -49,7 +49,11 @@ def run_title(args):
         title += 'Two Step Reward, '
     if args.common_sense:
         title += 'Common Sense, '
-    title += 'Testing' if args.is_testing else 'Training'
+
+    if not args.test_preset_cases:
+        title += 'Testing' if args.is_testing else 'Training'
+    else:
+        title += 'Challenging Arrangements'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
