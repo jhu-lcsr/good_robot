@@ -101,6 +101,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
     best_dict = best_success_rate(success_rate, window, 'trial success rate')
     return success_rate, lower, upper, best_dict
 
+
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
