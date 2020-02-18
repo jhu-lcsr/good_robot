@@ -614,6 +614,10 @@ def main(args):
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                                if is_testing:
+                                    # we are in testing mode which is frequently recorded, 
+                                    # so sleep for 10 seconds to show off our results!
+                                    time.sleep(10)
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
                                 # full stack complete! reset the scene
@@ -700,6 +704,10 @@ def main(args):
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
                             (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                            if is_testing:
+                                # we are in testing mode which is frequently recorded, 
+                                # so sleep for 10 seconds to show off our results!
+                                time.sleep(10)
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
