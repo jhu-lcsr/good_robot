@@ -10,6 +10,7 @@ from torch.autograd import Variable
 from utils_torch import CrossEntropyLoss2d
 from models import PixelNet
 from models import reinforcement_net
+from models import init_trunk_weights
 from scipy import ndimage
 import matplotlib.pyplot as plt
 import utils
@@ -30,7 +31,7 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False):
+                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -41,6 +42,8 @@ class Trainer(object):
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
         self.show_heightmap = show_heightmap
+        self.is_testing = is_testing
+        self.place_dilation = place_dilation
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -69,8 +72,8 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -100,8 +103,8 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -119,10 +122,9 @@ class Trainer(object):
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
             loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+            # TODO(ahundt) use map_device param once updated to pytorch 1.4
+            # self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing, map_device='cuda' if self.use_cuda else 'cpu')
             self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
-
-            # self.model.load_state_dict(torch.load(snapshot_file)) # Old loading command pre v0.4
-
             print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
 
         # Convert model from CPU to GPU
@@ -435,14 +437,16 @@ class Trainer(object):
         if not self.place:
             place_predictions = None
         if self.common_sense:
-            # Mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
+            # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
+            # "common sense" dynamic action space, mask pixels we know cannot lead to progress
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_place_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap)
-            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.01)
+            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
             if self.place:
-                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - grasp_place_contactable_regions, push_predictions.shape, subok=True))
+                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
+                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
             if self.show_heightmap:
                 # visualize the common sense function results
                 # show the heightmap
@@ -697,7 +701,7 @@ class Trainer(object):
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
             if self.common_sense:
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
-                # Therefore, we know the action would fail so train the argmax value with 0 reward.  
+                # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
                 new_best_pix_ind, each_action_max_coordinate, predicted_value = action_space_argmax(primitive_action, push_predictions, grasp_predictions, place_predictions)
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
@@ -787,6 +791,46 @@ class Trainer(object):
 
         return canvas
 
+    def randomize_trunk_weights(self, backprop_enabled=None, random_trunk_weights_max=6, random_trunk_weights_reset_iters=10, min_success=2):
+        """ Automatically re-initialize the trunk weights until we get something useful.
+        """
+        if self.is_testing or self.iteration > random_trunk_weights_max * random_trunk_weights_reset_iters:
+            # enable backprop
+            backprop_enabled = {'push': True, 'grasp': True}
+            if self.place:
+                backprop_enabled['place'] = True
+            return backprop_enabled
+        if backprop_enabled is None:
+            backprop_enabled = {'push': False, 'grasp': False}
+            if self.place:
+                backprop_enabled['place'] = False
+        if self.iteration < 2:
+            return backprop_enabled
+        # models_ready_for_backprop = 0
+        # executed_action_log includes the action, push grasp or place, and the best pixel index
+        max_iteration = np.min([len(self.executed_action_log), len(self.change_detected_log)])
+        min_iteration = max(max_iteration - random_trunk_weights_reset_iters, 1)
+        actions = np.asarray(self.executed_action_log)[min_iteration:max_iteration, 0]
+        successful_push_actions = np.argwhere(np.logical_and(np.asarray(self.change_detected_log)[min_iteration:max_iteration, 0] == 1, actions == ACTION_TO_ID['push']))
+
+        time_to_reset = self.iteration > 1 and self.iteration % random_trunk_weights_reset_iters == 0
+        # we need to return if we should backprop
+        if (len(successful_push_actions) >= min_success):
+            backprop_enabled['push'] = True
+        elif not backprop_enabled['grasp'] and time_to_reset:
+                init_trunk_weights(self.model, 'push-')
+
+        if (np.sum(np.asarray(self.grasp_success_log)[min_iteration:max_iteration, 0]) >= min_success):
+            backprop_enabled['grasp'] = True
+        elif not backprop_enabled['grasp'] and time_to_reset:
+                init_trunk_weights(self.model, 'grasp-')
+
+        if self.place:
+            if np.sum(np.asarray(self.partial_stack_success_log)[min_iteration:max_iteration, 0]) >= min_success:
+                backprop_enabled['place'] = True
+            elif not backprop_enabled['place'] and time_to_reset:
+                init_trunk_weights(self.model, 'place-')
+        return backprop_enabled
 
     def push_heuristic(self, depth_heightmap):
 

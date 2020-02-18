@@ -101,7 +101,7 @@ class Logger():
             np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
 
     def save_model(self, model, name):
-        torch.save(model.cpu().state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
+        torch.save(model.state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
 
     def save_backup_model(self, model, name):
         torch.save(model.state_dict(), os.path.join(self.models_directory, 'snapshot-backup.%s.pth' % (name)))

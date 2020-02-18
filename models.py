@@ -82,6 +82,25 @@ def vector_block(name='', channels_in=4, fc_channels=2048, channels_out=2048):
         ]))
 
 
+def init_trunk_weights(model, branch=None):
+    """ Initializes the trunk network weight layer weights.
+
+    # Arguments
+
+        branch: string indicating the specific branch to initialize. Default of None will initialize 'push-', 'grasp-' and 'place-'.
+    """
+    # Initialize network weights
+    for m in model.named_modules():
+        #if 'push-' in m[0] or 'grasp-' in m[0]:
+        if((branch is None and 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]) or 
+           (branch is not None and branch in m[0])):
+            if isinstance(m[1], nn.Conv2d):
+                nn.init.kaiming_normal_(m[1].weight.data)
+            elif isinstance(m[1], nn.BatchNorm2d):
+                m[1].weight.data.fill_(1)
+                m[1].bias.data.zero_()
+
+
 def rot_to_affine_mat(rotate_theta):
     affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
     affine_mat_after.shape = (2,3,1)
@@ -157,16 +176,9 @@ class PixelNet(nn.Module):
         # placenet tests block stacking
         if place:
             self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
-
-        # Initialize network weights
-        for m in self.named_modules():
-            #if 'push-' in m[0] or 'grasp-' in m[0]:
-            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
-                if isinstance(m[1], nn.Conv2d):
-                    nn.init.kaiming_normal_(m[1].weight.data)
-                elif isinstance(m[1], nn.BatchNorm2d):
-                    m[1].weight.data.fill_(1)
-                    m[1].bias.data.zero_()
+        init_trunk_weights(self)
+        if self.use_cuda:
+            self.cuda()
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
 
@@ -187,7 +199,7 @@ class PixelNet(nn.Module):
                     rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
                     # Compute sample grid for rotation BEFORE neural network
-                    interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition, align_corners=self.align_corners)
+                    interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
                     if self.place:
                         interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
                     else:
@@ -222,7 +234,7 @@ class PixelNet(nn.Module):
             rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
             # Compute sample grid for rotation BEFORE branches
-            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition, align_corners=self.align_corners)
+            interm_push_feat, interm_grasp_feat, interm_place_feat, tiled_goal_condition = self.layers_forward(rotate_theta, input_color_data, input_depth_data, goal_condition, tiled_goal_condition)
             if self.place:
                 interm_feat.append([interm_push_feat, interm_grasp_feat, interm_place_feat])
             else:
@@ -402,16 +414,9 @@ class reinforcement_net(nn.Module):
         # placenet tests block stacking
         if place:
             self.placenet = trunk_net('place', fc_channels, second_fc_channels, goal_condition_len, 1)
-
-        # Initialize network weights
-        for m in self.named_modules():
-            #if 'push-' in m[0] or 'grasp-' in m[0]:
-            if 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]:
-                if isinstance(m[1], nn.Conv2d):
-                    nn.init.kaiming_normal_(m[1].weight.data)
-                elif isinstance(m[1], nn.BatchNorm2d):
-                    m[1].weight.data.fill_(1)
-                    m[1].bias.data.zero_()
+        init_trunk_weights(self)
+        if self.use_cuda:
+            self.cuda()
 
 
     def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):

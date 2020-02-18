@@ -2,6 +2,8 @@
 
 import time
 import os
+import signal
+import sys
 import random
 import threading
 import argparse
@@ -23,6 +25,7 @@ from utils_torch import action_space_argmax
 import plot
 import json
 import copy
+import shutil
 
 
 def run_title(args):
@@ -46,7 +49,11 @@ def run_title(args):
         title += 'Two Step Reward, '
     if args.common_sense:
         title += 'Common Sense, '
-    title += 'Testing' if args.is_testing else 'Training'
+
+    if not args.test_preset_cases:
+        title += 'Testing' if args.is_testing else 'Training'
+    else:
+        title += 'Challenging Arrangements'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
@@ -86,6 +93,7 @@ def main(args):
     force_cpu = args.force_cpu
     flops = args.flops
     show_heightmap = args.show_heightmap
+    max_train_actions = args.max_train_actions
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -110,10 +118,16 @@ def main(args):
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
     disable_two_step_backprop = args.disable_two_step_backprop
+    random_trunk_weights_max = args.random_trunk_weights_max
+    random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
+    random_trunk_weights_min_success = args.random_trunk_weights_min_success
 
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
+    if is_testing:
+        print('Testing mode detected, automatically disabling situation removal.')
+        disable_situation_removal = True
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
     test_preset_cases = args.test_preset_cases
     trials_per_case = 1
@@ -173,6 +187,7 @@ def main(args):
             exit(1)
 
     save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
+    plot_window = args.plot_window
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
@@ -193,12 +208,15 @@ def main(args):
                   is_testing, test_preset_cases, test_preset_file,
                   place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
 
+    # Set the "common sense" dynamic action space region around objects,
+    # which defines where place actions are permitted. Units are in meters.
+    place_dilation = 0.03 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap)
+                      show_heightmap=show_heightmap, place_dilation=place_dilation)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -211,6 +229,7 @@ def main(args):
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
     # Quick hack for nonlocal memory between threads in Python 2
+    # Most of these variables are saved to a json file during a run, and reloaded during resume.
     nonlocal_variables = {'executing_action': False,
                           'primitive_action': None,
                           'best_pix_ind': None,
@@ -233,6 +252,13 @@ def main(args):
     always_default_nonlocals = ['executing_action',
                                 'primitive_action',
                                 'save_state_this_iteration']
+
+    # These variables handle pause and exit state. Also a quick hack for nonlocal memory.
+    nonlocal_pause = {'pause': 0,
+                      'pause_time_start': time.time(),
+                      # setup KeyboardInterrupt signal handler for pausing
+                      'original_sigint': signal.getsignal(signal.SIGINT),
+                      'exit_called': False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -287,6 +313,52 @@ def main(args):
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
+
+    def pause(signum, frame):
+        """This function is designated as the KeyboardInterrupt handler.
+
+        It blocks execution in the main thread
+        and pauses the process action thread. Execution will resume when this function returns,
+        or will stop if ctrl-c is pressed 5 more times
+        """
+        # TODO(ahundt) come up with a cleaner pause resume API, maybe use an OpenCV interface.
+        ctrl_c_stop_threshold = 3
+        ctrl_c_kill_threshold = 5
+        try:
+            # restore the original signal handler as otherwise evil things will happen
+            # in input when CTRL+C is pressed, and our signal handler is not re-entrant
+            signal.signal(signal.SIGINT, nonlocal_pause['original_sigint'])
+            time_since_last_ctrl_c = time.time() - nonlocal_pause['pause_time_start']
+            if time_since_last_ctrl_c > 5:
+                nonlocal_pause['pause'] = 0
+                nonlocal_pause['pause_time_start'] = time.time()
+                print('More than 5 seconds since last ctrl+c, Unpausing. '
+                      'Press again within 5 seconds to pause.'
+                      ' Ctrl+C Count: ' + str(nonlocal_pause['pause']))
+            else:
+                nonlocal_pause['pause'] += 1
+                print('\n\nPaused, press ctrl-c 3 total times in less than 5 seconds '
+                      'to stop the run cleanly, 5 to do a hard stop. '
+                      'Pressing Ctrl + C after 5 seconds will resume.'
+                      'Remember, you can always press Ctrl+\\ to hard kill the program at any time.'
+                      ' Ctrl+C Count: ' + str(nonlocal_pause['pause']))
+
+            if nonlocal_pause['pause'] >= ctrl_c_stop_threshold:
+                print('Starting a clean exit, wait a few seconds for the robot and code to finish.')
+                nonlocal_pause['exit_called'] = True
+                # we need to unpause to complete the exit
+                nonlocal_pause['pause'] = 0
+            elif nonlocal_pause['pause'] >= ctrl_c_kill_threshold:
+                print('Triggering a Hard exit now.')
+                sys.exit(1)
+
+        except KeyboardInterrupt:
+            nonlocal_pause['pause'] += 1
+        # restore the pause handler here
+        signal.signal(signal.SIGINT, pause)
+
+    # Set up the pause signal
+    signal.signal(signal.SIGINT, pause)
 
     def set_nonlocal_success_variables_false():
         nonlocal_variables['push_success'] = False
@@ -373,6 +445,7 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
+
         last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
@@ -399,7 +472,10 @@ def main(args):
             if os.path.exists(resume_var_values_path):
                 with open(resume_var_values_path, 'r') as f:
                     process_vars = json.load(f)
-
+                # TODO(ahundt) the loop below should be a simpler way to do the same thing, but it doesn't seem to work
+                # for k, v in process_vars.items():
+                #     # initialize all the local variables based on the dictionary entries
+                #     setattr(sys.modules[__name__], k, v)
                 action_count = process_vars['action_count']
                 grasp_count = process_vars['grasp_count']
                 successful_grasp_count = process_vars['successful_grasp_count']
@@ -500,14 +576,16 @@ def main(args):
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
-                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'])
+                    # Q values are mostly 0 to 1 for pushing/grasping, mostly 0 to 4 for multi-step tasks with placing
+                    scale_factor = 4 if place else 1
+                    push_pred_vis = trainer.get_prediction_vis(push_predictions, color_heightmap, each_action_max_coordinate['push'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, push_pred_vis, 'push')
                     cv2.imwrite('visualization.push.png', push_pred_vis)
-                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'])
+                    grasp_pred_vis = trainer.get_prediction_vis(grasp_predictions, color_heightmap, each_action_max_coordinate['grasp'], scale_factor=scale_factor)
                     logger.save_visualizations(trainer.iteration, grasp_pred_vis, 'grasp')
                     cv2.imwrite('visualization.grasp.png', grasp_pred_vis)
                     if place:
-                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'])
+                        place_pred_vis = trainer.get_prediction_vis(place_predictions, color_heightmap, each_action_max_coordinate['place'], scale_factor=scale_factor)
                         logger.save_visualizations(trainer.iteration, place_pred_vis, 'place')
                         cv2.imwrite('visualization.place.png', place_pred_vis)
 
@@ -536,6 +614,10 @@ def main(args):
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                                if is_testing:
+                                    # we are in testing mode which is frequently recorded, 
+                                    # so sleep for 10 seconds to show off our results!
+                                    time.sleep(10)
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
                                 # full stack complete! reset the scene
@@ -620,8 +702,12 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                           (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
+                            (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                            if is_testing:
+                                # we are in testing mode which is frequently recorded, 
+                                # so sleep for 10 seconds to show off our results!
+                                time.sleep(10)
                             nonlocal_variables['stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
@@ -653,23 +739,11 @@ def main(args):
                         trial_rate = float(successful_trial_count)/float(nonlocal_variables['stack'].trial)
                         nonlocal_variables['trial_success_rate'] = trial_rate
                     print('STACK:  trial: ' + str(nonlocal_variables['stack'].trial) + ' actions/partial: ' + str(partial_stack_rate) +
-                          '  actions/full stack: ' + str(stack_rate) +
-                          ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
-                          '  partial_stack_successes: ' + str(partial_stack_count) +
-                          '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
-                          ' current_height: ' + str(nonlocal_variables['stack_height']))
-
-                # if check_z_height and nonlocal_variables['trial_complete']:
-                #     # TODO(ahundt) THIS IS PROBABLY IN THE WRONG LOCATION AND BREAKING THE END OF TRIAL REWARDS
-                #     # Zero out the height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 0.0
-                #     nonlocal_variables['prev_stack_height'] = 0.0
-                # elif nonlocal_variables['trial_complete']:
-                #     # Set back to the minimum stack height because the trial is done.
-                #     # Note these lines must be after the logging of these variables is complete.
-                #     nonlocal_variables['stack_height'] = 1
-                #     nonlocal_variables['prev_stack_height'] = 1
+                            '  actions/full stack: ' + str(stack_rate) +
+                            ' (lower is better)  ' + grasp_str + ' place_on_stack_rate: ' + str(place_rate) + ' place_attempts: ' + str(place_count) +
+                            '  partial_stack_successes: ' + str(partial_stack_count) +
+                            '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
+                            ' current_height: ' + str(nonlocal_variables['stack_height']))
 
                 nonlocal_variables['executing_action'] = False
 
@@ -699,12 +773,13 @@ def main(args):
                     process_vars['grasp_str'] = grasp_str
                     process_vars['successful_trial_count'] = successful_trial_count
                     process_vars['trial_rate'] = trial_rate
-
+                    # save process vars into nonlocal variables so they can be used to inform future training
+                    nonlocal_variables['prev_process_vars'] = process_vars
                     save_location = os.path.join(logger.base_directory, 'data', 'variables')
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -749,12 +824,10 @@ def main(args):
         primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    # TODO(ahundt) create a new experience replay reward schedule that goes backwards across multiple time steps.
-
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
-    exit_called = False
+    nonlocal_pause['exit_called'] = False
     # -------------------------------------------------------------
     # -------------------------------------------------------------
     prev_primitive_action = None
@@ -778,6 +851,10 @@ def main(args):
 
     num_trials = trainer.num_trials()
     do_continue = False
+    best_dict = {}
+    prev_best_dict = {}
+    backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -846,31 +923,43 @@ def main(args):
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
-                print('Not enough stuff on the table (value: %d)! Flipping over bin of objects...' % (stuff_sum))
+                print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
-            nonlocal_variables['trial_complete'] = True
-            # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
-            do_continue = True
-            # continue
+            # If the scene started empty, we are just setting up
+            # trial 0 with a reset, so no trials have been completed.
+            if trainer.iteration > 0:
+                # All other nonzero trials should be considered over,
+                # so mark the trial as complete and move on to the next one.
+                nonlocal_variables['trial_complete'] = True
+                # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
+                do_continue = True
+                # continue
 
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
             no_change_count = [0, 0]
             num_trials = trainer.end_trial()
+            if nonlocal_variables['stack'] is not None:
+                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
+                nonlocal_variables['stack'].trial = num_trials
             logger.write_to_log('clearance', trainer.clearance_log)
             # we've recorded the data to mark this trial as complete
             nonlocal_variables['trial_complete'] = False
             # we're still not totally done, we still need to finilaize the log for the trial
             nonlocal_variables['finalize_prev_trial_log'] = True
-            if is_testing and test_preset_cases:
-                case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
-                # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
-                # load the current preset case, incrementing as trials are cleared
-                print('loading case file: ' + str(case_file))
-                robot.load_preset_case(case_file)
-            if is_testing and not place and num_trials >= max_test_trials:
-                exit_called = True  # Exit after training thread (backprop and saving labels)
+            if is_testing:
+                # Do special testing mode update steps
+                # If at end of test run, re-load original weights (before test run)
+                trainer.model.load_state_dict(torch.load(snapshot_file))
+                if test_preset_cases:
+                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
+                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
+                    # load the current preset case, incrementing as trials are cleared
+                    print('loading case file: ' + str(case_file))
+                    robot.load_preset_case(case_file)
+                if not place and num_trials >= max_test_trials:
+                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
@@ -882,16 +971,16 @@ def main(args):
             # check for progress counting inconsistencies
             print('WARNING POSSIBLE CRITICAL ERROR DETECTED: log data index and trainer.iteration out of sync!!! Experience Replay may break! '
                   'Check code for errors in indexes, continue statements etc.')
-        if place and nonlocal_variables['stack'].trial != num_trials + 1:
-            # check that num trials is always 1 less than the current trial number
+        if place and nonlocal_variables['stack'].trial != num_trials:
+            # check that num trials is always the current trial number
             print('WARNING variable mismatch num_trials + 1: ' + str(num_trials + 1) + ' nonlocal_variables[stack].trial: ' + str(nonlocal_variables['stack'].trial))
 
         # check if we have completed the current test
         if is_testing and place and nonlocal_variables['stack'].trial > max_test_trials:
             # If we are doing a fixed number of test trials, end the run the next time around.
-            exit_called = True
+            nonlocal_pause['exit_called'] = True
 
-        if not exit_called:
+        if not nonlocal_pause['exit_called']:
 
             # Run forward pass with network to get affordances
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
@@ -954,8 +1043,9 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                if trainer.iteration > 1000:
-                    plot.plot_it(logger.base_directory, title, place=place)
+                best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                if max_train_actions is not None and trainer.iteration > max_train_actions:
+                    nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
 
                 # reset the state for this trial THEN START EXECUTING THE ACTION FOR THE NEW TRIAL
@@ -973,8 +1063,10 @@ def main(args):
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
 
+            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
+            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
-            if not disable_two_step_backprop:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
@@ -990,18 +1082,22 @@ def main(args):
                 elif prev_primitive_action == 'grasp':
                     train_on_successful_experience = not prev_grasp_success
                 elif prev_primitive_action == 'place':
-                    train_on_successful_experience = not prev_push_success
+                    train_on_successful_experience = not prev_partial_stack_success
+                # TODO(ahundt) the experience replay delays real robot execution, only use the parallel version below, delete this and move this code block down if that's been ok for a while.
                 # Here we will try to sample a reward value from the same action as the current one
                 # which differs from the most recent reward value to reduce the chance of catastrophic forgetting.
-                # TODO(ahundt) experience replay is very hard-coded with lots of bugs, won't evaluate all reward possibilities, and doesn't deal with long range time dependencies.
-                experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
-                                  nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
-                                  train_on_successful_experience=train_on_successful_experience)
+                # experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger,
+                #                   nonlocal_variables, place, goal_condition, trial_reward=trial_reward,
+                #                   train_on_successful_experience=train_on_successful_experience)
 
             # Save model snapshot
             if not is_testing:
                 logger.save_backup_model(trainer.model, method)
-                 # saves once every logs are finalized
+                # save the best model based on all tracked plotting metrics.
+                for k, v in best_dict.items():
+                    if k in prev_best_dict and v > prev_best_dict[k]:
+                        logger.save_model(trainer.model, method + '_' + k)
+                # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
 
@@ -1024,7 +1120,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1040,10 +1136,31 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
-        # Sync both action thread and training thread
+        # While in simulated mode we need to keep count of simulator problems,
+        # because the simulator's physics engine is pretty buggy. For example, solid
+        # objects sometimes stick to each other or have their volumes intersect, and
+        # on occasion this and/or Inverse Kinematics issues lead to acceleration to
+        # nearly infinite velocities. We attempt to detect these situation and
+        # when problems occur we start with simple workarounds. If that does not work
+        # we apply more intrusive resets to restore the simulator to a valid state.
+        #
+        # Fortunately for us, the real robot is not like the simulator in that it
+        # tends to obey the laws of physics. :-) However, it can suffer from its own
+        # issues like safety/security stops when it collides with objects. In these
+        # cases it will not move until a human resets the robot. Therefore, we also
+        # try to detect these issues and wait for a human to intervene before resuming
+        # real robot execution. The way we do this is to make sure the robot is actually
+        # at the home position before moving on to the next iteration.
         num_problems_detected = 0
-        while nonlocal_variables['executing_action']:
-            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+        # The real robot may experience security stops, so we must check for those too.
+        wait_until_home_and_not_executing_action = not is_sim
+        # nonlocal variable for quick threading workaround
+        real_home = {'is_home': False, 'home_lock': threading.Lock()}
+
+        # This is the primary experience replay loop which runs while the separate
+        # robot thread is physically moving as well as when the program is paused.
+        while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and prev_reward_value is not None and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
@@ -1053,17 +1170,45 @@ def main(args):
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
-            if is_sim and int(time_elapsed) > 60:
-                # TODO(ahundt) double check that this doesn't screw up state completely for future trials...
+            if nonlocal_pause['pause']:
+                print('Pause engaged for ' + str(time_elapsed) + ' seconds, press ctrl + c after at least 5 seconds to resume.')
+            elif not is_sim and not nonlocal_variables['executing_action']:
+                # the real robot should not move to the next action until execution of this action is complete AND
+                # the robot has actually made it home. This is to prevent collecting bad data after a security stop due to the robot colliding.
+                # Here the action has finished, now we must make sure we are home.
+                def homing_thread():
+                    with real_home['home_lock']:
+                        # send the robot home
+                        real_home['is_home'] = robot.go_home(block_until_home=True)
+                if real_home['home_lock'].acquire(blocking=False):
+                    if num_problems_detected == 0:
+                        # check if we are home
+                        wait_until_home_and_not_executing_action = not robot.block_until_home(0)
+                        num_problems_detected += 1
+                    if num_problems_detected > 0:
+                        # Command the robot to go home if we are not home
+                        wait_until_home_and_not_executing_action = not real_home['is_home']
+                        if wait_until_home_and_not_executing_action:
+                            # start a thread to go home, we will continue to experience replay while we wait
+                            t = threading.Thread(target=homing_thread)
+                            t.start()
+                            num_problems_detected += 1
+                    real_home['home_lock'].release()
+
+                if wait_until_home_and_not_executing_action and num_problems_detected > 2:
+                    print('The robot was not at home after the current action finished running. '
+                          'Make sure the robot did not experience either an error or security stop. '
+                          'WARNING: The robot will attempt to go home again in a few seconds.')
+            elif is_sim and int(time_elapsed) > 60:
+                # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                if is_sim:
-                    robot.check_sim()
-                    if not robot.reposition_objects():
-                        # This can happen if objects are in impossible positions (NaN),
-                        # so set the variable to immediately and completely restart
-                        # the simulation below.
-                        num_problems_detected += 3
+                robot.check_sim()
+                if not robot.reposition_objects():
+                    # This can happen if objects are in impossible positions (NaN),
+                    # so set the variable to immediately and completely restart
+                    # the simulation below.
+                    num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
@@ -1079,7 +1224,7 @@ def main(args):
                     nonlocal_variables['stack_height'] = 1.0
                     nonlocal_variables['prev_stack_height'] = 1.0
                 num_problems_detected += 1
-                if num_problems_detected > 2 and is_sim:
+                if num_problems_detected > 2:
                     # Try more drastic recovery methods the second time around
                     robot.restart_sim(connect=True)
                     robot.add_objects()
@@ -1087,11 +1232,12 @@ def main(args):
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
 
-        if exit_called:
+        if nonlocal_pause['exit_called']:
             # shut down the simulation or robot
             robot.shutdown()
             break
 
+        # If we don't have any successes reinitialize model
         # Save information for next training step
         prev_color_img = color_img.copy()
         prev_depth_img = depth_img.copy()
@@ -1127,6 +1273,23 @@ def main(args):
 
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         trainer.iteration += 1
+
+    # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
+    best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    return logger.base_directory, best_dict
+
+
+def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
+    if preset_files is not None:
+        # note preset_files is changing from a list of strings to an integer
+        preset_files = len(preset_files)
+    if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
+        prev_best_dict = copy.deepcopy(best_dict)
+        if is_testing:
+            # when testing the plot data should be averaged across the whole run
+            plot_window = trainer.iteration - 3
+        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
+    return best_dict, prev_best_dict
 
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
@@ -1279,6 +1442,50 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
+def choose_testing_snapshot(training_base_directory, best_dict):
+    """ Select the best test mode snapshot model file to load after training.
+    """
+    testing_snapshot = ''
+    print('Evaluating trial_success_rate_best_value')
+    if 'trial_success_rate_best_value' in best_dict:
+        best_trial_value = best_dict['trial_success_rate_best_value']
+        best_trial_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_success_rate_best_value.pth')
+        if os.path.exists(best_trial_snapshot):
+            testing_snapshot = best_trial_snapshot
+        else:
+            print(best_trial_snapshot + ' does not exist, looking for other options.')
+        # If the best trial success rate is high enough, lets use the best action efficiency model
+        if best_trial_value > 0.99 and 'trial_grasp_action_efficiency_best_value' in best_dict and best_dict['trial_grasp_action_efficiency_best_value']:
+            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_grasp_action_efficiency_best_value.')
+            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_grasp_action_efficiency_best_value.pth')
+            if os.path.exists(best_grasp_efficiency_snapshot):
+                testing_snapshot = best_grasp_efficiency_snapshot
+            else:
+                print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
+            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
+        if best_trial_value > 0.99 and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
+            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_action_efficiency_best_value.pth')
+            if os.path.exists(best_efficiency_snapshot):
+                testing_snapshot = best_efficiency_snapshot
+            else:
+                print(best_efficiency_snapshot + ' does not exist, looking for other options.')
+
+    if not testing_snapshot:
+        print('Could not find any best-of models, checking for the basic training models.')
+        final_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement.pth')
+        if os.path.exists(final_snapshot):
+            testing_snapshot = final_snapshot
+        else:
+            print(final_snapshot + ' does not exist, looking for other options.')
+        final_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reactive.pth')
+        if os.path.exists(final_snapshot):
+            testing_snapshot = final_snapshot
+        else:
+            print(final_snapshot + ' does not exist, looking for other options.')
+
+    print('Testing shapshot chosen: ' + testing_snapshot)
+    return testing_snapshot
+
 
 if __name__ == '__main__':
 
@@ -1311,6 +1518,9 @@ if __name__ == '__main__':
     parser.add_argument('--check_row', dest='check_row', action='store_true', default=False,                              help='check for placed rows instead of stacks')
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
+    parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=0,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely, we have also tried 10 but more experiments are needed.')
+    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=0,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model. 0 disables this feature entirely, we have also tried 10 but more experiements are needed.')
+    parser.add_argument('--random_trunk_weights_min_success', dest='random_trunk_weights_min_success', type=int, action='store', default=4,      help='The minimum number of successes we must have reached before we keep an initial set of random trunk weights.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,  help='enable skipping grasp and push actions when the heightmap is zero')
     parser.add_argument('--common_sense', dest='common_sense', action='store_true', default=False,                        help='Use common sense heuristics to detect and train on regions which do not contact anything, and will thus not result in task progress.')
@@ -1324,13 +1534,15 @@ if __name__ == '__main__':
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
-    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. ')
+    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. Automatically enabled when is_testing is enable.')
+
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
     parser.add_argument('--unstack', dest='unstack', action='store_true', default=False,                                   help='Simulator will reset block positions by unstacking rather than by randomly setting their positions. Only applies when --place is set')
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
+    parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='INTEGRATED TRAIN VAL TEST - maximum number of actions before training exits automatically at the end of that trial. Note this is slightly different from max_iter.')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
@@ -1340,8 +1552,40 @@ if __name__ == '__main__':
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
-    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions?')
+    parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
+    parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set autmoatically.')
+
+    # Parse args
+    args = parser.parse_args()
 
     # Run main program with specified arguments
-    args = parser.parse_args()
-    main(args)
+    training_base_directory, best_dict = main(args)
+    # if os.path.exists()
+    if args.max_train_actions is not None:
+        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
+        args.snapshot_file = testing_snapshot
+        args.random_seed = 1238
+        args.is_testing = True
+        args.save_visualizations = True
+        args.max_test_trials = 100
+        testing_base_directory, testing_best_dict = main(args)
+        # move the testing data into the training directory
+        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        os.symlink(training_dest_dir, training_base_directory)
+        if not args.place:
+            # run preset arrangements for pushing and grasping
+            args.test_preset_cases = True
+            args.max_test_trials = 10
+            # run testing mode
+            preset_testing_base_directory, preset_testing_best_dict = main(args)
+            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+            os.symlink(preset_training_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        print('Random Testing Complete! Dir: ' + training_dest_dir)
+        print('Random Testing results: \n ' + str(testing_best_dict))
+            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+
+    print('Training Complete! Dir: ' + training_base_directory)
+    print('Training results: \n ' + str(best_dict))

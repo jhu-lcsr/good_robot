@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
@@ -9,14 +10,50 @@ import scipy
 
 def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
+    dict_title = str(title).replace(' ', '_')
+    best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
+        best_index = np.argmax(success_rate[window:]) + window
+        best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
-              ', at action iteration: ' + str(np.argmax(success_rate[window:]) + window) +
+              ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
-        return best
-    else:
-        return 0.0
+    return best_dict
+
+
+def count_preset_arrangements(trial_complete_indices, trial_successes, num_preset_arrangements, hotfix_trial_success_index=True, log_dir=None):
+    arrangement_successes = np.zeros(num_preset_arrangements)
+    trials_per_arrangement = int(float(len(trial_complete_indices)) / float(num_preset_arrangements))
+    arrangement_trials = np.array([trials_per_arrangement]*num_preset_arrangements)
+    if hotfix_trial_success_index:
+        # TODO(ahundt) currently the trial success values are inserted too early in the array. Fix then set hotfix param above to false
+        trial_successes = np.insert(trial_successes, [0]*3, 0)
+    num_arrangements_complete = 0
+    length = np.min([np.max(trial_complete_indices), trial_successes.shape[0]])
+    arrangement_idx = 0
+    trial_num = 0
+    clearance_start = 0
+    successes_this_arrangement = 0
+    prev_trial_successes = 0
+    print('max trial successes: ' + str(np.max(trial_successes)))
+    for trial_num, index in enumerate(trial_complete_indices):
+        index = int(index)
+        cur_trial_successes = np.max(trial_successes[clearance_start:index])
+        # print(success)
+        arrangement_successes[arrangement_idx] += prev_trial_successes < cur_trial_successes
+        prev_trial_successes = cur_trial_successes
+        if trial_num > 0 and trial_num % trials_per_arrangement == 0:
+            arrangement_idx += 1
+        clearance_start = index
+    individual_arrangement_trial_success_rate = np.divide(np.array(arrangement_successes), arrangement_trials, out=np.zeros(num_preset_arrangements), where=arrangement_trials!=0.0)
+    print('individual_arrangement_trial_success_rate: ' + str(individual_arrangement_trial_success_rate))
+    senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
+    print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
+    best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
+    # if log_dir is not None:
+        # TODO(ahundt) save json file preset_arrangement_scores.json
+    return best_dict
 
 
 def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_success_index=True):
@@ -45,7 +82,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         success_window_max = np.max(success_window)
         trial_window_max = np.max(trial_window)
         success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
-    
+
     # TODO(ahundt) fix the discontinuities in the log from writing the success count at a slightly different time, remove median filter workaround
     if np.any(success_rate > 1.0):
         print('WARNING: BUG DETECTED, applying median filter to compensate for trial success time step offsets. '
@@ -54,15 +91,16 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
               'fix the bug in the original code, and preprocess the raw data to correct this error.')
         # success_rate = np.clip(success_rate, 0, 1)
     success_rate = scipy.ndimage.median_filter(success_rate, 7)
-    for i in range(length - 1):        
+    for i in range(length - 1):
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / success_window.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'trial success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'trial success rate')
+    return success_rate, lower, upper, best_dict
+
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
@@ -89,8 +127,8 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'grasp success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'grasp success rate')
+    return success_rate, lower, upper, best_dict
 
 
 def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
@@ -130,8 +168,8 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(success_rate, window, 'place success rate')
-    return success_rate, lower, upper
+    best_dict = best_success_rate(success_rate, window, 'place success rate')
+    return success_rate, lower, upper, best_dict
 
 
 def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
@@ -161,8 +199,8 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(efficiency, window, 'action efficiency')
-    return efficiency, lower, upper
+    best_dict = best_success_rate(efficiency, window, 'action efficiency')
+    return efficiency, lower, upper, best_dict
 
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
@@ -187,8 +225,8 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_success_rate(efficiency, window, 'grasp action efficiency')
-    return efficiency, lower, upper
+    best_dict = best_success_rate(efficiency, window, 'grasp action efficiency')
+    return efficiency, lower, upper, best_dict
 
 
 def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, over_height_threshold=6.0):
@@ -204,7 +242,8 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
     return heights, trial, trial_success, clearance
 
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, apply_real_robot_speckle_noise_hotfix=False):
+def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None):
+    best_dict = {}
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
         heights = np.loadtxt(stack_height_file)
@@ -216,8 +255,12 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         if place is None:
             place = False
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
-    trials = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
-    trials = np.array(utils.clearance_log_to_trial_count(trials)).astype(np.int)
+    trial_complete_indices = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
+    trials = np.array(utils.clearance_log_to_trial_count(trial_complete_indices)).astype(np.int)
+    if window is None:
+        # if window isn't defined, make it just shy of the full data length,
+        # since log updates are delayed by a couple actions in some cases
+        window = len(actions) - 4
 
     if max_iter is not None:
         if place:
@@ -248,24 +291,32 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
             clearance = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
             heights, trials, trial_successes, clearance = real_robot_speckle_noise_hotfix(heights, trials, trial_successes, clearance)
         if trial_successes.size > 0:
-            trial_success_rate, trial_success_lower, trial_success_upper = get_trial_success_rate(trials, trial_successes, window=window)
+            trial_success_rate, trial_success_lower, trial_success_upper, best = get_trial_success_rate(trials, trial_successes, window=window)
+            best_dict.update(best)
             plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
             plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
-                            mult*trial_success_lower, mult*trial_success_upper,
-                            color=colors[3], alpha=alpha)
+                             mult*trial_success_lower, mult*trial_success_upper,
+                             color=colors[3], alpha=alpha)
+        if num_preset_arrangements is not None:
+            best = count_preset_arrangements(trial_complete_indices, trial_successes, num_preset_arrangements)
+            best_dict.update(best)
     # trial_reward_file = os.path.join(log_dir, 'transitions', 'trial-reward-value.log.txt')
     # if os.path.isfile(trial_reward_file):
     #     grasp_rewards = np.loadtxt(trial_reward_file)
 
-    grasp_rate, grasp_lower, grasp_upper = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    grasp_rate, grasp_lower, grasp_upper, best = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    best_dict.update(best)
     if place:
         if 'row' in log_dir or 'row' in title.lower():
-            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
+            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
         else:
-            place_rate, place_lower, place_upper = get_place_success_rate(heights, actions, window=window)
-        eff, eff_lower, eff_upper = get_action_efficiency(heights, window=window)
+            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, window=window)
+        best_dict.update(best)
+        eff, eff_lower, eff_upper, best = get_action_efficiency(heights, window=window)
+        best_dict.update(best)
     else:
-        eff, eff_lower, eff_upper = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+        eff, eff_lower, eff_upper, best = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+        best_dict.update(best)
 
     plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
     if place:
@@ -293,6 +344,11 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     print('saving plot: ' + save_file + '.png')
     plt.savefig(save_file + '.png', dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
+    best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
+    print('saving best stats to: ' + best_stats_file)
+    with open(best_stats_file, 'w') as f:
+        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+    return best_dict
 
 
 
@@ -301,89 +357,95 @@ if __name__ == '__main__':
     window = 1000
     max_iter = None
 
-    log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
-    log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
-    log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
-    #############################################################
-    # REAL ROBOT STACKING run 
-    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=None, apply_real_robot_speckle_noise_hotfix=True)
-    # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
-    # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
-    # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)
-    # Max action efficiency: 0.3, at action iteration: 37. (total of 751 actions, max excludes first 200 actions)
-    #############################################################
-    # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation. 
-    # It can basically complete trials 100% of the time within 400 actions!
-    plot_it('./logs/2020-02-07-14-43-44_Sim-Push-and-Grasp-Trial-Reward-Common-Sense-Training','Sim Push and Grasp, SPOT Reward, Common Sense, Training', window=200, max_iter=2500)
+    best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
+    # Sim stats for final paper:
+    # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
+    # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
+    print(best_dict)
+    # log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
+    # log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
+    # log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    # plot_it('./logs/2020-02-10-14-57-07_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000)
+    # #############################################################
+    # # REAL ROBOT STACKING run
+    # plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000, apply_real_robot_speckle_noise_hotfix=True)
+    # # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
+    # # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
+    # # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)
+    # # Max action efficiency: 0.3, at action iteration: 37. (total of 751 actions, max excludes first 200 actions)
+    # #############################################################
+    # # Here is the good & clean simulation common sense push & grasp densenet plot with SPOT reward, run on the costar workstation.
+    # # It can basically complete trials 100% of the time within 400 actions!
+    # plot_it('./logs/2020-02-07-14-43-44_Sim-Push-and-Grasp-Trial-Reward-Common-Sense-Training','Sim Push and Grasp, SPOT Reward, Common Sense, Training', window=200, max_iter=2500)
+    # # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    # #############################################################
+    # # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04, on costar workstation
+    # log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    # # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
+    # plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=4000)
+    # #############################################################
+
+    # log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    # log_dir = './logs/2020-01-22-22-50-00_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    # log_dir = './logs/2020-02-03-17-35-43_Sim-Push-and-Grasp-Two-Step-Reward-Training'
+    # log_dir = './logs/2020-02-06-14-41-48_Sim-Stack-Trial-Reward-Common-Sense-Training'
     # plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
-    #############################################################
-    # ABSOLUTE BEST STACKING RUN AS OF 2020-02-04, on costar workstation
-    log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
-    # plot_it(log_dir, 'Sim Stack, Trial Reward, Common Sense, Training', window=window, max_iter=max_iter)
-    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=4000)
-    #############################################################
 
-    log_dir = './logs/2020-01-22-19-10-50_Sim-Push-and-Grasp-Two-Step-Reward-Training'
-    log_dir = './logs/2020-01-22-22-50-00_Sim-Push-and-Grasp-Two-Step-Reward-Training'
-    log_dir = './logs/2020-02-03-17-35-43_Sim-Push-and-Grasp-Two-Step-Reward-Training'
-    log_dir = './logs/2020-02-06-14-41-48_Sim-Stack-Trial-Reward-Common-Sense-Training'
-    plot_it(log_dir, log_dir, window=window, max_iter=max_iter)
+    # # log_dir = './logs/2019-12-31-20-17-06'
+    # # log_dir = './logs/2020-01-01-14-55-17'
+    # log_dir = './logs/2020-01-08-17-03-58'
+    # log_dir = './logs/2020-01-08-17-03-58-test-resume'
+    # # Stacking 0.
+    # log_dir = './logs/2020-01-12-12-33-41'
+    # # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-12-33-41 # this run had a problem
 
-    # log_dir = './logs/2019-12-31-20-17-06'
-    # log_dir = './logs/2020-01-01-14-55-17'
-    log_dir = './logs/2020-01-08-17-03-58'
-    log_dir = './logs/2020-01-08-17-03-58-test-resume'
-    # Stacking 0.
-    log_dir = './logs/2020-01-12-12-33-41'
-    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-12-33-41 # this run had a problem
+    # # ± /usr/bin/python3 /home/costar/src/real_good_robot/main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --skip_noncontact_actions --check_z_height --tcp_port 19997 --place --future_reward_discount 0.65
+    # # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-17-56-46
+    # # log_dir = './logs/2020-01-13-10-15-49' # this run stopped after 1750 actions
+    # # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-13-10-15-49 # stopped after 1750 actions
+    # log_dir = './logs/2020-01-14-18-36-16'
+    # # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-14-18-36-16
+    # log_dir = './logs/2020-01-15-15-44-39'
 
-    # ± /usr/bin/python3 /home/costar/src/real_good_robot/main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --skip_noncontact_actions --check_z_height --tcp_port 19997 --place --future_reward_discount 0.65
-    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-12-17-56-46
-    # log_dir = './logs/2020-01-13-10-15-49' # this run stopped after 1750 actions
-    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-13-10-15-49 # stopped after 1750 actions
-    log_dir = './logs/2020-01-14-18-36-16'
-    # Creating data logging session: /home/costar/src/real_good_robot/logs/2020-01-14-18-36-16
-    log_dir = './logs/2020-01-15-15-44-39'
-
-    title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
+    # title = 'Stack 4 Blocks, Trial Reward 0.65, Training'
+    # # plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
     # plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
-    plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
-    # this is a solid but slow training trial_reward grasp and push run without symmetry
-    # title = 'Push and Grasp, Trial Reward, No Symmetry, Training'
-    # log_dir = './logs/2020-01-06-19-15-55'
-    # plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
-    run = 2
-    if run == 0:
-        title = 'Rows, Trial Reward 0.5, No Symmetry, Training'
-        # log_dir = './logs/2020-01-07-17-53-42' # some progress, not complete
-        # log_dir = './logs/2020-01-08-17-08-57' # run killed early
-        log_dir = './logs/2020-01-09-12-54-53'
-        # Training iteration: 22769
-        # Current count of pixels with stuff: 2513.0 threshold below which the scene is considered empty: 1200
-        # WARNING variable mismatch num_trials + 1: 3118 nonlocal_variables[stack].trial: 3359
-        # Change detected: True (value: 2799)
-        # Primitive confidence scores: 4.359684 (push), 2.701111 (grasp), 4.351819 (place)
-        # Strategy: exploit (exploration probability: 0.100000)
-        # Action: push at (1, 99, 10)
-        # Real Robot push at (-0.704000, -0.026000, 0.000994) angle: 0.392699
-        # Trainer.get_label_value(): Current reward: 0.750000 Current reward multiplier: 1.000000 Predicted Future reward: 4.402410 Expected reward: 0.750000 + 0.500000 x 4.402410 = 2.951205
-        # Trial logging complete: 3117 --------------------------------------------------------------
-        # Training loss: 0.897331
-        # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
-        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    # # this is a solid but slow training trial_reward grasp and push run without symmetry
+    # # title = 'Push and Grasp, Trial Reward, No Symmetry, Training'
+    # # log_dir = './logs/2020-01-06-19-15-55'
+    # # plot_it(log_dir, title, window=window, max_iter=max_iter, place=False)
+    # run = 2
+    # if run == 0:
+    #     title = 'Rows, Trial Reward 0.5, No Symmetry, Training'
+    #     # log_dir = './logs/2020-01-07-17-53-42' # some progress, not complete
+    #     # log_dir = './logs/2020-01-08-17-08-57' # run killed early
+    #     log_dir = './logs/2020-01-09-12-54-53'
+    #     # Training iteration: 22769
+    #     # Current count of pixels with stuff: 2513.0 threshold below which the scene is considered empty: 1200
+    #     # WARNING variable mismatch num_trials + 1: 3118 nonlocal_variables[stack].trial: 3359
+    #     # Change detected: True (value: 2799)
+    #     # Primitive confidence scores: 4.359684 (push), 2.701111 (grasp), 4.351819 (place)
+    #     # Strategy: exploit (exploration probability: 0.100000)
+    #     # Action: push at (1, 99, 10)
+    #     # Real Robot push at (-0.704000, -0.026000, 0.000994) angle: 0.392699
+    #     # Trainer.get_label_value(): Current reward: 0.750000 Current reward multiplier: 1.000000 Predicted Future reward: 4.402410 Expected reward: 0.750000 + 0.500000 x 4.402410 = 2.951205
+    #     # Trial logging complete: 3117 --------------------------------------------------------------
+    #     # Training loss: 0.897331
+    #     # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
+    #     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
 
-    if run == 1:
-        title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
-        # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
-        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-11-19-54-58
-        log_dir = './logs/2020-01-11-19-54-58'
-        # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
-        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    # if run == 1:
+    #     title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
+    #     # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
+    #     # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-11-19-54-58
+    #     log_dir = './logs/2020-01-11-19-54-58'
+    #     # /home/ahundt/src/real_good_robot/logs/2020-01-08-18-16-12
+    #     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
 
-    if run == 2:
-        title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
-        # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
-        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-42-46
-        # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-45-22
-        log_dir = './logs/2020-01-12-17-45-22'
-        plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)
+    # if run == 2:
+    #     title = 'Rows, Trial Reward 0.65, No Symmetry, Training'
+    #     # ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --tcp_port 19997 --place --check_row --future_reward_discount 0.65
+    #     # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-42-46
+    #     # Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-01-12-17-45-22
+    #     log_dir = './logs/2020-01-12-17-45-22'
+    #     plot_it(log_dir, title, window=window, max_iter=max_iter, place=True)

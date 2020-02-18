@@ -71,7 +71,7 @@ class Calibrate:
         self.marker_poses = []
 
     def get_rgb_depth_image_and_transform(self):
-        color_img, depth_img = self.robot.get_camera_data()
+        color_img, depth_img = self.robot.get_camera_data(go_home=False)
         aruco_tf, aruco_img = self.robot.camera.get_aruco_tf()
         
         return color_img, depth_img, aruco_tf, aruco_img
@@ -117,7 +117,7 @@ class Calibrate:
         self.robot.go_home()
 
     
-    def collect_data(self, workspace_limits=None, rate_hz=0.5):
+    def collect_data(self, workspace_limits=None, rate_hz=0.25):
         """
         # Arguments
 
@@ -171,8 +171,9 @@ class Calibrate:
                 
                 self.robot.move_to(tool_position, tool_orientation)
                 rate.sleep()
-                # time.sleep(1)
 
+
+                time.sleep(1)
                 color_img, depth_img, aruco_tf, aruco_img = self.get_rgb_depth_image_and_transform()
 
                 cv2.imshow("aruco.png", aruco_img)
@@ -290,6 +291,6 @@ if __name__ == "__main__":
     # calib.test()
     # calib.collect_data()
     # calib.calibrate(load_dir='/home/costar/src/real_good_robot/calibration_2020_02_07')
-    calib = Calibrate(save_dir='/home/costar/src/real_good_robot/2020-02-07-12-58-25_calibration')
+    calib = Calibrate(save_dir='/home/costar/src/real_good_robot/2020-02-12_calibration')
     calib.collect_data()
-    calib.calibrate(load_dir='/home/costar/src/real_good_robot/2020-02-07-12-58-25_calibration')
+    calib.calibrate(load_dir='/home/costar/src/real_good_robot/2020-02-12_calibration')

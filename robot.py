@@ -27,6 +27,7 @@ def gripper_control_pose_to_arm_control_pose(gripper_translation, gripper_orient
         if gripper_to_arm_transform is None:
             return gripper_translation, gripper_orientation
         gripper_pose = utils.axis_angle_and_translation_to_rigid_transformation(gripper_translation, gripper_orientation)
+        # print('gripper_control_pose_to_arm_control_pose() gripper_pose: \n' + str(gripper_pose))
         # 4x4 transform of the arm pose
         arm_pose = np.dot(gripper_pose, utils.pose_inv(gripper_to_arm_transform))
         # arm_pose = np.dot(gripper_pose, gripper_to_arm_transform)
@@ -323,10 +324,10 @@ class Robot(object):
                  # for the corresponding save and load functions
                 self.background_heightmap = np.array(cv2.imread('real/background_heightmap.depth.png', cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
                 # TODO(ahundt) HACK REMOVE background_heightmap subtraction, COLLECT HEIGHTMAP AGAIN, SEE README.md for instructions
-                self.background_heightmap -= 0.03
+                # self.background_heightmap -= 0.03
 
             # real robot must use unstacking
-            if self.place:
+            if self.place_task:
                 self.unstack = True
 
 
@@ -582,7 +583,7 @@ class Robot(object):
 
     def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
-        if self.unstack:
+        if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
@@ -611,12 +612,11 @@ class Robot(object):
                     if max_z_height + offset < self.workspace_limits[2][1]:
                         z = max_z_height + offset
                 else:
-                    offset = 0.05
+                    offset = 0.01  # previously 0.05
                     # otherwise real gripper grasps too high
 
                     if max_z_height - offset > self.workspace_limits[2][0]:
                         z = max_z_height - offset
-
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
@@ -708,8 +708,10 @@ class Robot(object):
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
 
                 if max_z_height > z_height_retake_threshold:
-                    if print_error == 3:
-                        print("ERROR: depth_heightmap value too high. max_z_height: ", max_z_height)
+                    if print_error > 3:
+                        print('ERROR: depth_heightmap value too high. '
+                              'Use the UR5 teach mode to move the robot manually to the home position. '
+                              'max_z_height: ', max_z_height)
 
                     # Get color and depth image from ROS service
                     color_img, depth_img = self.camera.get_data()
@@ -1177,7 +1179,7 @@ class Robot(object):
             return True
 
 
-    def go_home(self, block_until_home=False):
+    def go_home(self, block_until_home=False, timeout_seconds=7):
         if self.is_sim:
             success = self.move_to(self.sim_home_position, None)
             if not self.home_joint_config:
@@ -1188,10 +1190,12 @@ class Robot(object):
                 return self.move_joints(self.home_joint_config)
         else:
             self.move_joints(self.home_joint_config)
-            if block_until_home:
-                return self.block_until_home()
-            else:
-                return True
+            if not block_until_home:
+                timeout_seconds = 0
+            # block_until_home with 0 second timeout will just
+            # get data from the robot once to indicate if we are
+            # without blocking otherwise.
+            return self.block_until_home(timeout_seconds)
 
 
     def check_grasp(self):
@@ -1393,11 +1397,11 @@ class Robot(object):
             if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
 
+            # go back to the grasp up pos
+            self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
+            time.sleep(0.1)
             if go_home:
                 self.go_home(block_until_home=True)
-            else:
-                # go back to the grasp up pos
-                self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
 
         # TODO: change to 1 and 2 arguments
         return grasp_success, color_success
@@ -1472,7 +1476,7 @@ class Robot(object):
                 tcp_command += " movej([%f" % self.home_joint_config[0]
                 for joint_idx in range(1,6):
                     tcp_command = tcp_command + (",%f" % self.home_joint_config[joint_idx])
-                tcp_command = tcp_command + "],a=%f,v=%f)\n" % (self.joint_acc, self.joint_vel)
+                tcp_command = tcp_command + "],a=%f,v=%f,t=0,r=0.09)\n" % (self.joint_acc, self.joint_vel)
                 # tcp_command += " movej(p[%f,%f,%f,%f,%f,%f],a=%f,v=%f,t=0,r=0.00)\n" % (home_position[0],home_position[1],home_position[2],tool_orientation[0],tool_orientation[1],tool_orientation[2],self.joint_acc*0.5,self.joint_vel*0.5)
             else:
                 # go to up pos instead of home
@@ -1493,9 +1497,10 @@ class Robot(object):
             # Block until robot reaches target home joint position and gripper fingers have stopped moving
             time.sleep(0.1)
             if go_home:
-                self.block_until_home()
+                push_success = self.block_until_home()
                 # Redundant go home is applied in case the first move operation fails.
-                push_success = self.go_home(block_until_home=True)
+                if not push_success:
+                    push_success = self.go_home(block_until_home=True)
             self.open_gripper(nonblocking=True)
             # time.sleep(0.25)
 
@@ -1530,18 +1535,19 @@ class Robot(object):
 
         if self.is_sim:
             raise NotImplementedError
-        # Don't wait for more than 20 seconds
+        # Don't wait for more than timeout_seconds,
+        # but get the state from the real robot at least once.
         iteration_time_0 = time.time()
         while True:
             time_elapsed = time.time()-iteration_time_0
-            if int(time_elapsed) > timeout_seconds:
-                print('Move to Home Position Failed')
-                return False
             state_data = self.get_state()
             actual_joint_pose = self.parse_tcp_state_data(state_data, 'joint_data')
             if all([np.abs(actual_joint_pose[j] - self.home_joint_config[j]) < self.joint_tolerance for j in range(5)]):
                 print('Move to Home Position Complete')
                 return True
+            if int(time_elapsed) > timeout_seconds:
+                print('Move to Home Position Failed')
+                return False
             time.sleep(0.1)
 
     def block_until_cartesian_position(self, position, timeout_seconds=7):
@@ -1729,8 +1735,10 @@ class Robot(object):
             # TODO(ahundt) save previous and new depth image, and if the depth at the place coordinate increased, return True for place success
             if go_home:
                 # TODO(ahundt) confirm redundant go_home works around some cases where the robot fails to reach the destination
-                self.go_home(block_until_home=True)
-                return self.go_home(block_until_home=True)
+                home_success = self.go_home(block_until_home=True)
+                if not home_success:
+                    home_success = self.go_home(block_until_home=True)
+                return home_success
             else:
                 return move_to_result
 
@@ -1887,8 +1895,6 @@ class Robot(object):
                 # We know the goal won't be met, so goal_success is False
                 # But we still need to count the actual stack height so set the variable for later
                 goal_success = False
-                # TODO(ahundt) BUG this may actually return 1 when there is a stack of size 2 present, but 3 objects are needed
-                # return False, 1
             else:
                 # cut out objects we don't need to check
                 object_color_sequence = object_color_sequence[:num_obj+1]
@@ -1937,7 +1943,7 @@ class Robot(object):
             goal_success = True
         return goal_success, detected_height
 
-    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.03, decrease_threshold=0.02, reward_multiplier=20.0):
+    def check_z_height(self, input_img, prev_height=0.0, increase_threshold=0.03, decrease_threshold=0.02, reward_multiplier=None):
         """ Checks the maximum z height after applying a median filter. Includes checks for significant increases and decreases.
 
         # Returns
@@ -1947,7 +1953,10 @@ class Robot(object):
             goal_success: has height increased by the increase_threshold
             max_z: what is the current maximum z height in the image
             neede_to_reset: has the height decreased from the prev_height enough to warrant special reset/recovery actions.
+            reward_multiplier: Converts scale from "meters" to "blocks" scale. Default None means 20.0 if self.is_sim else 22.0.
         """
+        if reward_multiplier is None:
+            reward_multiplier = 20.0 if self.is_sim else 22.0
         # TODO(ahundt) make reward multiplier, increase threshold, and decrease threshold command line parameters which can be modified.
         img_median = ndimage.median_filter(input_img, size=5)
         max_z = np.max(img_median) * reward_multiplier
@@ -1963,7 +1972,7 @@ class Robot(object):
 
     def restart_real(self):
         # reset objects for stacking
-        if self.place:
+        if self.place_task:
             return self.reposition_objects()
 
         # reset objects for pushing and grasping
@@ -1998,7 +2007,7 @@ class Robot(object):
         time.sleep(.1)
         self.move_to(above_bin_waypoint, tool_orientation)
         time.sleep(.1)
-        self.go_home(block_until_home=True)
+        return self.go_home(block_until_home=True)
 
     def shutdown(self):
         if self.is_sim:

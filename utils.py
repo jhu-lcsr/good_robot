@@ -35,6 +35,25 @@ def timeStamped(fname, fmt='%Y-%m-%d-%H-%M-%S_{fname}'):
     return datetime.datetime.now().strftime(fmt).format(fname=fname)
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """ json encoder for numpy types
+    source: https://stackoverflow.com/a/49677241/99379
+    """
+    def default(self, obj):
+        if isinstance(obj,
+            (np.int_, np.intc, np.intp, np.int8,
+             np.int16, np.int32, np.int64, np.uint8,
+             np.uint16, np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj,
+           (np.float_, np.float16, np.float32,
+            np.float64)):
+            return float(obj)
+        elif isinstance(obj, (np.ndarray,)):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
 def clearance_log_to_trial_count(clearance_log):
     """ Convert clearance log list of end indices to a list of the current trial number at each iteration.
 
@@ -122,12 +141,14 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
-        if np.any(depth_heightmap < 0.0):
-            print('WARNING: get_heightmap() depth_heightmap contains values of height < 0, '
-                  'saved depth heightmap png files may be invalid!'
-                  'See README.md for instructions to collect the depth heightmap again.'
-                  'Clipping the minimum to 0 for now.')
+        min_z = np.min(depth_heightmap)
+        if min_z < 0:
             depth_heightmap = np.clip(depth_heightmap, 0, None)
+            if min_z < -0.002:
+                print('WARNING: get_heightmap() depth_heightmap contains negative heights with min ' + str(min_z) + ', '
+                    'saved depth heightmap png files may be invalid!'
+                    'See README.md for instructions to collect the depth heightmap again.'
+                    'Clipping the minimum to 0 for now.')
 
     # Create orthographic top-down-view RGB-D color heightmaps
     color_heightmap_r = np.zeros((heightmap_size[0], heightmap_size[1], 1), dtype=np.uint8)

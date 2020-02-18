@@ -75,7 +75,7 @@ class HumanControlOfRobot(object):
 
         # wait a second for things to initialize
         time.sleep(1)
-        self.camera_color_img, self.camera_depth_img = robot.get_camera_data()
+        self.camera_color_img, self.camera_depth_img = robot.get_camera_data(go_home=False)
         def mouseclick_callback(event, x, y, flags, param):
             if event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_RBUTTONDOWN:
                 # global camera, robot, self.click_point_pix, action, self.grasp_angle, self.grasp_success, self.grasp_color_success, self.mutex
@@ -175,7 +175,7 @@ class HumanControlOfRobot(object):
             shape = [0, 0, 0, 0]
             # get the camera data, but make sure all the images are valid first
             while not all(shape):
-                self.camera_color_img, self.camera_depth_img = self.robot.get_camera_data()
+                self.camera_color_img, self.camera_depth_img = self.robot.get_camera_data(go_home=False)
                 shape = self.camera_color_img.shape + self.camera_depth_img.shape
         else:
             self.camera_color_img = camera_color_img
@@ -355,8 +355,8 @@ if __name__ == '__main__':
         raise NotImplementedError
     is_sim = False
     if is_sim:
-        tcp_port = 19990
-    calibrate = True
+        tcp_port = 19997
+    calibrate = False
     # Move robot to home pose
     robot = Robot(is_sim, None, None, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,

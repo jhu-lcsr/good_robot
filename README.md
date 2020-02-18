@@ -46,6 +46,7 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'obje
 ```
 
 To use trial SPOT also add `--trial_reward` to this command.
+to use the "common sense" dynamic action space regions add `--common_sense` to this command.
 
 #### Cube Stack Testing
 
@@ -115,6 +116,34 @@ After Running the test you need to summarize the results:
 python3 evaluate.py --session_directory /home/ahundt/src/costar_visual_stacking/logs/2019-09-16.02:11:25  --method reinforcement --num_obj_complete 6 --preset
 ```
 
+## Data Collection and Data Release Checklist (v0.1, checklist creation is in progress)
+
+This is a checklist for all the steps you should follow to collect data consistently.
+
+1. Save the following data about the run you are going to do into a txt file for your records:
+        1. Describe the configuration you are running
+        2. Git commit hash of the code version you will run
+        2. Exact command line command you will run
+        3. Current CoppeliaSim (aka V-REP) ip address port (if simulation mode)
+        4. GPU number you will use on the computer
+2. Start recording: If sim, start V-REP & Start V-REP Recording. If running the real robot, start a real camera recording the robot.
+3. Start the run.
+4. After the run completes:
+    1. Do a random testing run for a reasonable number of trials like 10-100.
+    2. If pushing and grasping do an adversarial scenario testing run.
+    3. Make note of the directories with results, and include dir path in your txt file.
+5. Create a github release.
+    1. Add the model file binary to the release binaries so it is easier to download and utilize.
+    2. Incorporate the log folder name in the release name.
+    3. Provide a good description in english of what the run was trying to achieve.
+    4. Find several representative images, and add them directly to the release page for easy viewing.
+    5. Zip visualization directory separately because they tend to be larger files & upload to the github release.
+    6. Move the visualization directory out and then zip the remainder of the log directory and upload to the github release.
+    7. Zip up the random testing directories and adversarial testing directories (if applicable) upload to the github release binaries.
+    8. Upload the video recording to a website such as youtube, and add a link to the github release.
+    9. Make sure the github release commit lines up with the commit you actually ran your experiment on.
+    10. Submit the github release.
+
 ## Costar Visual Stacking Execution Details
 
 ### Running Multiple Simulations in Parallel
@@ -155,14 +184,14 @@ Additional runs in parallel should use ports 19995, 19994, etc.
 
 ## Generating plots
 
-To run jupyter lab or a jupyter notebook in the `costar_visual_stacking/plot_success_rate` folder use the following command:
+To generate plots run `python3 plot.py`, you can manually edit the bottom part of `plot.py` to call `plot_it()` for your folder.
 
-```bash
-jupyter lab ~/src/costar_visual_stacking/plot_success_rate
+```python
+    log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
+    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=None)
 ```
 
-Open jupyter in your favorite browser and there you will also find instructions for generating the plots.
-
+The configuration of the plot should be done automatically from the folder.
 
 ## Running on a Real UR5 with ROS Based Image Collection
 
@@ -174,7 +203,7 @@ We require python3, so you'll need to ensure `export ROS_PYTHON_VERSION=3` is se
 ~/ros_catkin_ws
 ```
 
-Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source). 
+Follow instructions in the [ROS Melodic steps to build ros from source](http://wiki.ros.org/melodic/Installation/Source).
 
 In particular fix up this command:
 
@@ -197,7 +226,7 @@ Run the build and install.
 cd ~/ros_catkin_ws
 rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
 ```
-<!-- 
+<!--
 Then install the primesense image pipeline:
 
 ```bash
@@ -274,7 +303,7 @@ You will need to generate and load a calibration yaml file which goes in a locat
     <param name="do_pose_estimation" value="$(arg do_pose_estimation)"/>
     <param name="ignore_fiducials" value="$(arg ignore_fiducials)"/>
     <param name="fiducial_len_override" value="$(arg fiducial_len_override)"/>
-    <remap from="/camera/compressed" 
+    <remap from="/camera/compressed"
         to="$(arg camera)/$(arg image)/$(arg transport)"/>
     <remap from="/camera_info" to="$(arg camera)/camera_info"/>
   </node>
@@ -313,21 +342,21 @@ The robot will move suddenly and rapidly. Users **must** be ready to push the **
 ```
 Total number of poses: 26
 Invalid poses number: 0
-Robot Base to Camera:  
+Robot Base to Camera:
 [[ 0.1506513   0.87990966 -0.45062533  0.79319678]
  [ 0.98857761 -0.13210593  0.07254191 -0.14601768]
  [ 0.00430005 -0.45640664 -0.88976092  0.55173518]
  [ 0.          0.          0.          1.        ]]
 Total number of poses: 26
 Invalid poses number: 0
-Tool Tip to AR Tag:  
+Tool Tip to AR Tag:
 [[ 0.18341198 -0.01617267 -0.98290309  0.0050482 ]
  [ 0.03295954  0.99940367 -0.01029385  0.01899328]
  [ 0.98248344 -0.03050802  0.18383565  0.10822485]
  [ 0.          0.          0.          1.        ]]
 ```
 
-Backup procedure (in place of the steps 6 and later from above): 
+Backup procedure (in place of the steps 6 and later from above):
 with caution, run the following to move the robot and calibrate:
 
 The robot will move suddenly and rapidly. Users **must** be ready to push the **emergency stop** button at any time.
@@ -342,7 +371,7 @@ If you already have corresponded pose file of the robot and the ArUco tag, you c
 
 ### Collecting the Background heightmap
 
-The real robot also uses a background heightmap of the scene with no objects present. 
+The real robot also uses a background heightmap of the scene with no objects present.
 
 1. Completely clear the table or working surface.
 2. Back up and remove the current `real/background_heightmap.depth.png`.
@@ -720,7 +749,7 @@ python capture.py
 <img src="images/calibration.gif" height=200px align="right" />
 <img src="images/checkerboard.jpg" height=200px align="right" />
 
-We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand [here](https://github.com/IFL-CAMP/easy_handeye)). To do so, the script move the robot to several random positions and orientations within the workspace. 
+We provide a simple calibration script `calibration_ros.py` to estimate camera extrinsics with respect to robot base coordinates. In this project, we are dealing with an eye-on-base calibration (see more explanation of eye-on-base vs eye-on-hand [here](https://github.com/IFL-CAMP/easy_handeye)). To do so, the script move the robot to several random positions and orientations within the workspace.
 
 We are using the PrimeSense Carmine 1.08 for this project. If you are using other cameras which need calibration for the depth scale (e.g. [Intel RealSense D415]((https://click.intel.com/intelr-realsensetm-depth-camera-d415.html)), you may refer the calibration method provided by Andy Zeng [here](https://github.com/andyzeng/visual-pushing-grasping).
 
