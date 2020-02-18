@@ -208,12 +208,15 @@ def main(args):
                   is_testing, test_preset_cases, test_preset_file,
                   place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
 
+    # Set the "common sense" dynamic action space region around objects,
+    # which defines where place actions are permitted. Units are in meters.
+    place_dilation = 0.03 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap)
+                      show_heightmap=show_heightmap, place_dilation=place_dilation)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.

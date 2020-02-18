@@ -31,7 +31,7 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False):
+                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -43,6 +43,7 @@ class Trainer(object):
         self.common_sense = common_sense
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
+        self.place_dilation = place_dilation
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -438,13 +439,13 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03, push_length=0.1)
+            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
             grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.01)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
             if self.place:
-                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.03)
+                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
                 place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
             if self.show_heightmap:
                 # visualize the common sense function results
