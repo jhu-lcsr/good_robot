@@ -1397,9 +1397,10 @@ class Robot(object):
             if not grasp_success or not self.place_task:
                 self.open_gripper(nonblocking=True)
 
-            # go back to the grasp up pos
-            self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
-            time.sleep(0.1)
+            if place_task:
+                # go back to the grasp up pos
+                self.move_to(up_pos,[tool_orientation[0],tool_orientation[1],0.0])
+                time.sleep(0.1)
             if go_home:
                 self.go_home(block_until_home=True)
 
