@@ -843,7 +843,7 @@ class Robot(object):
             if nonblocking:
                 gripper_fully_closed = True
             else:
-                gripper_fully_closed = self.gripper.is_closed()
+                gripper_fully_closed = not self.gripper.object_detected()
 
         return gripper_fully_closed
 
@@ -1301,7 +1301,7 @@ class Robot(object):
             self.move_to(position, None)
 
             # Close gripper to grasp target
-            gripper_full_closed = self.close_gripper()
+            gripper_fully_closed = self.close_gripper()
 
             # Move gripper to location above grasp target
             self.move_to(location_above_grasp_target, None)
@@ -1310,8 +1310,8 @@ class Robot(object):
                 self.go_home()
 
             # Check if grasp is successful
-            gripper_full_closed = self.close_gripper()
-            grasp_success = not gripper_full_closed
+            gripper_fully_closed = self.close_gripper()
+            grasp_success = not gripper_fully_closed
 
             # HK: Check if right color is grasped
             color_success = False
