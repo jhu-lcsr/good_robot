@@ -141,7 +141,7 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
-        min_z = np.min(depth_heightmap)
+        min_z = np.nanmin(depth_heightmap)
         if min_z < 0:
             depth_heightmap = np.clip(depth_heightmap, 0, None)
             if min_z < -0.002:
