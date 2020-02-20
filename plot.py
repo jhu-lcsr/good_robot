@@ -14,7 +14,8 @@ def best_success_rate(success_rate, window, title):
     best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
-        best_index = np.argmax(success_rate[window:]) + window
+        # If there are multiple entries with equal maximum success rates, take the last one because it will have the most training.
+        best_index = np.max(np.argmax(success_rate[window:], axis=0)) + window
         best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
