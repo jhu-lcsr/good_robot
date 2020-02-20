@@ -340,14 +340,24 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.title(title)
     plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot'
-    print('saving plot: ' + save_file + '.png')
-    plt.savefig(save_file + '.png', dpi=300, optimize=True)
+    # we save the best stats and the generated plots in multiple locations for user convenience and backwards compatibility
+    file_format = '.png'
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',', '').replace(' ', '-') + '_success_plot'
+    print('saving plot: ' + save_file + file_format)
+    plt.savefig(save_file + file_format, dpi=300, optimize=True)
+    log_dir_fig_file = os.path.join(log_dir, save_file)
+    plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
+    # this is a backwards compatibility location for best_stats.json
     best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
     print('saving best stats to: ' + best_stats_file)
     with open(best_stats_file, 'w') as f:
-        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+    # this is the more useful location for best_stats.json
+    best_stats_file = os.path.join(log_dir, 'best_stats.json')
+    print('saving best stats to: ' + best_stats_file)
+    with open(best_stats_file, 'w') as f:
+        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
     return best_dict
 
 
