@@ -605,6 +605,29 @@ class Robot(object):
 
                 valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
+                # TODO: This code is basically copied from main. Refactor and put everything in one place.
+                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+
+                x_pixel = max(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+                y_pixel = max(y_pixel, 223)
+
+                def get_local_region(heightmap, region_width=0.03):
+                    safe_kernel_width = int(np.round((region_width/2)/self.heightmap_resolution))
+                    return heightmap[max(x_pixel - safe_kernel_width, 0):min(y_pixel + safe_kernel_width + 1, heightmap.shape[0]), max(x_pixel - safe_kernel_width, 0):min(x_pixel + safe_kernel_width + 1, heightmap.shape[1])]
+
+                finger_width = 0.04
+                finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
+                safe_z_position = self.workspace_limits[2][0]
+                if finger_touchdown_region.size != 0:
+                    safe_z_position += np.max(finger_touchdown_region)
+                else:
+                    safe_z_position += valid_depth_heightmap[y_pixel][x_pixel]
+                if self.background_heightmap is not None:
+                    # add the height of the background scene
+                    safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
+                # TODO: end of chunk copied from main
+
                 if self.is_sim:
                     # otherwise simulated gripper grasps too low
                     offset = 0.01
@@ -612,11 +635,7 @@ class Robot(object):
                     if max_z_height + offset < self.workspace_limits[2][1]:
                         z = max_z_height + offset
                 else:
-                    offset = 0.01  # previously 0.05
-                    # otherwise real gripper grasps too high
-
-                    if max_z_height - offset > self.workspace_limits[2][0]:
-                        z = max_z_height - offset
+                    z = safe_z_position
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
