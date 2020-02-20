@@ -117,6 +117,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
+    common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
@@ -216,7 +217,8 @@ def main(args):
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap, place_dilation=place_dilation)
+                      show_heightmap=show_heightmap, place_dilation=place_dilation,
+                      common_sense_backprop=common_sense_backprop)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -1535,6 +1537,7 @@ if __name__ == '__main__':
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. Automatically enabled when is_testing is enable.')
+    parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
 
 
     # -------------- Testing options --------------
