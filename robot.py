@@ -690,52 +690,64 @@ class Robot(object):
             # TODO(ahundt) add real robot support for reposition_objects
 
     def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
+        """
+        # Returns
+
+        [valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img] if return_heightmaps is True, otherwise [color_img, depth_img]
+
+        """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
 
         if heightmap_resolution is None:
             heightmap_resolution = self.heightmap_resolution
 
-        if self.is_sim:
-            sim_ret = None
-            while sim_ret != vrep.simx_return_ok:
-                # Get color image from simulation
-                sim_ret, resolution, raw_image = vrep.simxGetVisionSensorImage(self.sim_client, self.cam_handle, 0, vrep.simx_opmode_blocking)
-            color_img = np.asarray(raw_image)
-            color_img.shape = (resolution[1], resolution[0], 3)
-            color_img = color_img.astype(np.float)/255
-            color_img[color_img < 0] += 1
-            color_img *= 255
-            color_img = np.fliplr(color_img)
-            color_img = color_img.astype(np.uint8)
+        max_z_height = np.inf
+        if go_home:
+            self.go_home(block_until_home=True)
 
-            sim_ret = None
-            while sim_ret != vrep.simx_return_ok:
-                # Get depth image from simulation
-                sim_ret, resolution, depth_buffer = vrep.simxGetVisionSensorDepthBuffer(self.sim_client, self.cam_handle, vrep.simx_opmode_blocking)
-            depth_img = np.asarray(depth_buffer)
-            depth_img.shape = (resolution[1], resolution[0])
-            depth_img = np.fliplr(depth_img)
-            zNear = 0.01
-            zFar = 10
-            depth_img = depth_img * (zFar - zNear) + zNear
+        def get_color_depth():
+            """Get the raw color and depth images
+            """
+            if self.is_sim:
+                sim_ret = None
+                while sim_ret != vrep.simx_return_ok:
+                    # Get color image from simulation
+                    sim_ret, resolution, raw_image = vrep.simxGetVisionSensorImage(self.sim_client, self.cam_handle, 0, vrep.simx_opmode_blocking)
+                color_img = np.asarray(raw_image)
+                color_img.shape = (resolution[1], resolution[0], 3)
+                color_img = color_img.astype(np.float)/255
+                color_img[color_img < 0] += 1
+                color_img *= 255
+                color_img = np.fliplr(color_img)
+                color_img = color_img.astype(np.uint8)
 
-        else:
-            # prevent camera from taking a picture while the robot is still in the frame.
-            if go_home:
-                self.go_home(block_until_home=True)
+                sim_ret = None
+                while sim_ret != vrep.simx_return_ok:
+                    # Get depth image from simulation
+                    sim_ret, resolution, depth_buffer = vrep.simxGetVisionSensorDepthBuffer(self.sim_client, self.cam_handle, vrep.simx_opmode_blocking)
+                depth_img = np.asarray(depth_buffer)
+                depth_img.shape = (resolution[1], resolution[0])
+                depth_img = np.fliplr(depth_img)
+                zNear = 0.01
+                zFar = 10
+                depth_img = depth_img * (zFar - zNear) + zNear
 
-            # Get color and depth image from ROS service
-            color_img, depth_img = self.camera.get_data()
-            depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
-            # color_img = self.camera.color_data.copy()
-            # depth_img = self.camera.depth_data.copy()
+            else:
+                # prevent camera from taking a picture while the robot is still in the frame.
+
+                # Get color and depth image from ROS service
+                color_img, depth_img = self.camera.get_data()
+                depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
+                # color_img = self.camera.color_data.copy()
+                # depth_img = self.camera.depth_data.copy()
+            return color_img, depth_img
+        color_img, depth_img  = get_color_depth() # unit: mm -> meter
 
         if return_heightmaps:
             # this allows the error to print only once, so it doesn't spam the console.
             print_error = 0
 
-            max_z_height = np.inf
             while max_z_height > z_height_retake_threshold:
                 scaled_depth_img = depth_img * self.cam_depth_scale  # Apply depth scale from calibration
                 color_heightmap, depth_heightmap = utils.get_heightmap(color_img, scaled_depth_img, self.cam_intrinsics, self.cam_pose,
@@ -753,9 +765,7 @@ class Robot(object):
                               'max_z_height: ', max_z_height)
 
                     # Get color and depth image from ROS service
-                    color_img, depth_img = self.camera.get_data()
-                    depth_img = depth_img.astype(float) / 1000 # unit: mm -> meter
-
+                    color_img, depth_img = get_color_depth()
                     print_error += 1
                     time.sleep(0.1)
 
@@ -882,7 +892,7 @@ class Robot(object):
             if nonblocking:
                 gripper_fully_closed = True
             else:
-                gripper_fully_closed = self.gripper.is_closed()
+                gripper_fully_closed = not self.gripper.object_detected()
 
         return gripper_fully_closed
 
@@ -1340,7 +1350,7 @@ class Robot(object):
             self.move_to(position, None)
 
             # Close gripper to grasp target
-            gripper_full_closed = self.close_gripper()
+            gripper_fully_closed = self.close_gripper()
 
             # Move gripper to location above grasp target
             self.move_to(location_above_grasp_target, None)
@@ -1349,8 +1359,8 @@ class Robot(object):
                 self.go_home()
 
             # Check if grasp is successful
-            gripper_full_closed = self.close_gripper()
-            grasp_success = not gripper_full_closed
+            gripper_fully_closed = self.close_gripper()
+            grasp_success = not gripper_fully_closed
 
             # HK: Check if right color is grasped
             color_success = False
