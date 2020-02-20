@@ -165,7 +165,7 @@ class RobotiqCGripper(object):
         startTime = time.time()
         while time.time() - startTime < timeout:
             if self.is_ready():
-                print("The gripper is activated!")
+                print("The gripper is active!")
                 return True
         return False
 
