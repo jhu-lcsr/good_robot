@@ -568,7 +568,7 @@ def main(args):
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
 
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
@@ -615,7 +615,7 @@ def main(args):
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
-                                    # we are in testing mode which is frequently recorded, 
+                                    # we are in testing mode which is frequently recorded,
                                     # so sleep for 10 seconds to show off our results!
                                     time.sleep(10)
                                 nonlocal_variables['stack_success'] = True
@@ -705,7 +705,7 @@ def main(args):
                             (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
-                                # we are in testing mode which is frequently recorded, 
+                                # we are in testing mode which is frequently recorded,
                                 # so sleep for 10 seconds to show off our results!
                                 time.sleep(10)
                             nonlocal_variables['stack_success'] = True
