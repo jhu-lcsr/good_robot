@@ -52,8 +52,6 @@ def count_preset_arrangements(trial_complete_indices, trial_successes, num_prese
     senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
     print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
     best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
-    # if log_dir is not None:
-        # TODO(ahundt) save json file preset_arrangement_scores.json
     return best_dict
 
 
