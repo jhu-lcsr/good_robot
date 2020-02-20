@@ -652,7 +652,7 @@ class Robot(object):
                 y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
                 y_pixel = max(y_pixel, 223)
 
-                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, action_name, valid_depth_heightmap)
+                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
 
                 # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
                 # plus an offset. There
