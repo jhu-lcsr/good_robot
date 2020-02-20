@@ -615,7 +615,7 @@ def main(args):
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
-                                    # we are in testing mode which is frequently recorded, 
+                                    # we are in testing mode which is frequently recorded,
                                     # so sleep for 10 seconds to show off our results!
                                     time.sleep(10)
                                 nonlocal_variables['stack_success'] = True
@@ -705,7 +705,7 @@ def main(args):
                             (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
-                                # we are in testing mode which is frequently recorded, 
+                                # we are in testing mode which is frequently recorded,
                                 # so sleep for 10 seconds to show off our results!
                                 time.sleep(10)
                             nonlocal_variables['stack_success'] = True
@@ -779,7 +779,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder, sort_keys=True)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -1120,7 +1120,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder, sort_keys=True)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
