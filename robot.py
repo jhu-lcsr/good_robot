@@ -626,7 +626,6 @@ class Robot(object):
 
                     self.place(rand_position, rand_angle, save_history=False)
 
-            self.place_pose_history = []  # clear place position history
             print("------- UNSTACKING COMPLETE --------")
 
         else:
