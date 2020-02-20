@@ -644,7 +644,7 @@ if self.background_heightmap is not None:
 # TODO: end of chunk copied from main
 
 
-    def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
+    def reposition_objects(self, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
