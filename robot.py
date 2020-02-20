@@ -580,6 +580,69 @@ class Robot(object):
 
         return obj_positions, obj_orientations
 
+    def action_heightmap_coordinate_to_3d_robot_pose(self, x_pixel, y_pixel, action_name, robot_push_vertical_offset=0.026):
+        # Adjust start position of all actions, and make sure z value is safe and not too low
+        def get_local_region(heightmap, region_width=0.03):
+            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
+            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
+        # make sure the fingers will not collide with the objects
+        finger_width = 0.04
+        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
+        safe_z_position = workspace_limits[2][0]
+        if finger_touchdown_region.size != 0:
+            safe_z_position += np.max(finger_touchdown_region)
+        else:
+            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
+        if robot.background_heightmap is not None:
+            # add the height of the background scene
+            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
+        push_may_contact_something = False
+        if action_name == 'push':
+            # determine if the safe z position might actually contact anything during the push action
+            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
+            push_width = 0.2
+            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
+            # push_may_contact_something is True for something noticeably higher than the push action z height
+            max_local_push_region = np.max(local_push_region)
+            if max_local_push_region < 0.01:
+                # if there is nothing more than 1cm tall, there is nothing to push
+                push_may_contact_something = False
+            else:
+                push_may_contact_something = safe_z_position - workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
+            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
+            push_str = ''
+            if not push_may_contact_something:
+                push_str += 'Predicting push action failure, heuristics determined '
+                push_str += 'push at height ' + str(safe_z_position)
+                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
+                print(push_str)
+
+        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
+        return primitive_position, push_may_contact_something
+
+# TODO: This code is basically copied from main. Refactor and put everything in one place.
+x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+
+x_pixel = max(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+y_pixel = max(y_pixel, 223)
+
+def get_local_region(heightmap, region_width=0.03):
+    safe_kernel_width = int(np.round((region_width/2)/self.heightmap_resolution))
+    return heightmap[max(x_pixel - safe_kernel_width, 0):min(y_pixel + safe_kernel_width + 1, heightmap.shape[0]), max(x_pixel - safe_kernel_width, 0):min(x_pixel + safe_kernel_width + 1, heightmap.shape[1])]
+
+finger_width = 0.04
+finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
+safe_z_position = self.workspace_limits[2][0]
+if finger_touchdown_region.size != 0:
+    safe_z_position += np.max(finger_touchdown_region)
+else:
+    safe_z_position += valid_depth_heightmap[y_pixel][x_pixel]
+if self.background_heightmap is not None:
+    # add the height of the background scene
+    safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
+# TODO: end of chunk copied from main
+
 
     def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
@@ -605,28 +668,7 @@ class Robot(object):
 
                 valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
-                # TODO: This code is basically copied from main. Refactor and put everything in one place.
-                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
 
-                x_pixel = max(x_pixel, 223)  # prevent indexing outside the heightmap bounds
-                y_pixel = max(y_pixel, 223)
-
-                def get_local_region(heightmap, region_width=0.03):
-                    safe_kernel_width = int(np.round((region_width/2)/self.heightmap_resolution))
-                    return heightmap[max(x_pixel - safe_kernel_width, 0):min(y_pixel + safe_kernel_width + 1, heightmap.shape[0]), max(x_pixel - safe_kernel_width, 0):min(x_pixel + safe_kernel_width + 1, heightmap.shape[1])]
-
-                finger_width = 0.04
-                finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
-                safe_z_position = self.workspace_limits[2][0]
-                if finger_touchdown_region.size != 0:
-                    safe_z_position += np.max(finger_touchdown_region)
-                else:
-                    safe_z_position += valid_depth_heightmap[y_pixel][x_pixel]
-                if self.background_heightmap is not None:
-                    # add the height of the background scene
-                    safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
-                # TODO: end of chunk copied from main
 
                 if self.is_sim:
                     # otherwise simulated gripper grasps too low
