@@ -1574,7 +1574,8 @@ if __name__ == '__main__':
         testing_base_directory, testing_best_dict = main(args)
         # move the testing data into the training directory
         training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        os.symlink(training_dest_dir, training_base_directory)
+        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        # os.symlink(training_dest_dir, training_base_directory)
         if not args.place:
             # run preset arrangements for pushing and grasping
             args.test_preset_cases = True
@@ -1582,7 +1583,8 @@ if __name__ == '__main__':
             # run testing mode
             preset_testing_base_directory, preset_testing_best_dict = main(args)
             preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-            os.symlink(preset_training_dest_dir, training_base_directory)
+            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+            # os.symlink(preset_training_dest_dir, training_base_directory)
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
