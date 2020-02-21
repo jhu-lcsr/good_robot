@@ -647,10 +647,10 @@ class Robot(object):
 
                 # get depth_heightmap pixel_coordinates of where the previous place was
                 x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                x_pixel = max(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
 
                 y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                y_pixel = max(y_pixel, 223)
+                y_pixel = min(y_pixel, 223)
 
                 primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
 
