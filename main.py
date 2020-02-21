@@ -117,6 +117,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
+    common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
@@ -216,7 +217,8 @@ def main(args):
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap, place_dilation=place_dilation)
+                      show_heightmap=show_heightmap, place_dilation=place_dilation,
+                      common_sense_backprop=common_sense_backprop)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -779,7 +781,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder, sort_keys=True)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
@@ -1080,7 +1082,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder, sort_keys=True)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1495,6 +1497,7 @@ if __name__ == '__main__':
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. Automatically enabled when is_testing is enable.')
+    parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
 
 
     # -------------- Testing options --------------
@@ -1531,7 +1534,8 @@ if __name__ == '__main__':
         testing_base_directory, testing_best_dict = main(args)
         # move the testing data into the training directory
         training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        os.symlink(training_dest_dir, training_base_directory)
+        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        # os.symlink(training_dest_dir, training_base_directory)
         if not args.place:
             # run preset arrangements for pushing and grasping
             args.test_preset_cases = True
@@ -1539,7 +1543,8 @@ if __name__ == '__main__':
             # run testing mode
             preset_testing_base_directory, preset_testing_best_dict = main(args)
             preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-            os.symlink(preset_training_dest_dir, training_base_directory)
+            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+            # os.symlink(preset_training_dest_dir, training_base_directory)
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 

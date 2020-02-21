@@ -14,7 +14,8 @@ def best_success_rate(success_rate, window, title):
     best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
-        best_index = np.argmax(success_rate[window:]) + window
+        # If there are multiple entries with equal maximum success rates, take the last one because it will have the most training.
+        best_index = np.max(np.argmax(success_rate[window:], axis=0)) + window
         best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
@@ -51,8 +52,6 @@ def count_preset_arrangements(trial_complete_indices, trial_successes, num_prese
     senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
     print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
     best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
-    # if log_dir is not None:
-        # TODO(ahundt) save json file preset_arrangement_scores.json
     return best_dict
 
 
@@ -340,14 +339,24 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
     plt.title(title)
     plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot'
-    print('saving plot: ' + save_file + '.png')
-    plt.savefig(save_file + '.png', dpi=300, optimize=True)
+    # we save the best stats and the generated plots in multiple locations for user convenience and backwards compatibility
+    file_format = '.png'
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',', '').replace(' ', '-') + '_success_plot'
+    print('saving plot: ' + save_file + file_format)
+    plt.savefig(save_file + file_format, dpi=300, optimize=True)
+    log_dir_fig_file = os.path.join(log_dir, save_file)
+    plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
     # plt.savefig(save_file + '.pdf')
+    # this is a backwards compatibility location for best_stats.json
     best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
     print('saving best stats to: ' + best_stats_file)
     with open(best_stats_file, 'w') as f:
-        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+    # this is the more useful location for best_stats.json
+    best_stats_file = os.path.join(log_dir, 'best_stats.json')
+    print('saving best stats to: ' + best_stats_file)
+    with open(best_stats_file, 'w') as f:
+        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
     return best_dict
 
 
@@ -357,7 +366,9 @@ if __name__ == '__main__':
     window = 1000
     max_iter = None
 
-    best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
+    best_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
+    best_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
+    # best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
     # Sim stats for final paper:
     # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
     # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
