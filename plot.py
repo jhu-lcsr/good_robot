@@ -124,6 +124,8 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
             successes = places[start+1: i+2][grasps[start:i+1]]
         else:
             successes = (rewards[start: i+1] > reward_threshold)[grasps[start:i+1]]
+        if successes.shape[0] < window:
+            successes = np.concatenate([successes, np.zeros(window - successes.shape[0])], axis=0)
         success_rate[i] = successes.mean()
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
         lower[i] = success_rate[i] + 3*var
@@ -221,9 +223,12 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
         start = max(i - window, 0)
         window_size = np.array(min(i+1, window), np.float64)
         successful = rewards[start: i+1] > reward_threshold
+        
         successful_grasps = np.array(successful[grasps[start:start+successful.shape[0]]].sum(), np.float64)
+        # print(successfu)
+        
         # print(successful_grasps)
-        efficiency[i] = successful_grasps / window_size
+        efficiency[i] = successful_grasps / window
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
         upper[i] = efficiency[i] - 3*var
@@ -377,10 +382,10 @@ def plot_it(log_dir, title, window=1000, colors=None,
     return best_dict
 
 
-def plot_compare(dirs, title, colors=None, labels=None, **kwargs):
+def plot_compare(dirs, title, colors=None, labels=None, category='trial_success', **kwargs):
     if labels is None:
         labels = dirs
-    kwargs['categories'] = ['trial_success']
+    kwargs['categories'] = [category]
     best_dicts = {}
     if colors is None:
         cmap = plt.get_cmap('viridis')
@@ -399,11 +404,21 @@ if __name__ == '__main__':
     window = 1000
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
     ##############################################################
-    best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
-                              './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
-                              title='Effect of Action Space on Early Training Progress', labels=['Dynamic', 'Standard'],
-                              max_iter=3000, window=window,
-                              ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    # best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
+    #                           './logs/TODO-from-femur',
+    #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
+    #                           title='Effect of Action Space on Early Training Progress', 
+    #                           labels=['Dynamic with SPOT-Q', 'Dynamic no SPOT-Q', 'Standard'],
+    #                           max_iter=3000, window=window,
+    #                           ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    window = 200
+    best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
+                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
+                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'], 
+                              title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
+                              max_iter=2000, window=window,
+                              category='grasp_success',
+                              ylabel='Mean Grasp Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
     # best_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
     # best_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
     # best_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
