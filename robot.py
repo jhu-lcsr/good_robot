@@ -628,6 +628,9 @@ class Robot(object):
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
+            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot. 
+            place_pose_history.append(place_pose_history[-1])  
+
             holding_object = not(self.close_gripper())
             # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
             if holding_object:
@@ -666,6 +669,8 @@ class Robot(object):
 
                     self.place(rand_position, rand_angle, save_history=False)
 
+            # clear the place hisory after unstacking
+            self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
 
         else:
