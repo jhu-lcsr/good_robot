@@ -257,7 +257,8 @@ class HumanControlOfRobot(object):
                 t.start()
         elif key == ord('-'):
             with self.mutex:
-                t = threading.Thread(target=lambda: self.robot.close_gripper())
+                t = threading.Thread(target=lambda: 
+                                        print('fully closed: ' + str(self.robot.close_gripper()) + ' obj detected: ' + str(self.robot.gripper.object_detected())))
                 t.start()
         elif key == ord('='):
             with self.mutex:
