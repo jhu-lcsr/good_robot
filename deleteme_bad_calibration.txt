@@ -1,0 +1,16 @@
+Total number of poses: 22
+Invalid poses number: 0
+Robot Base to Camera:
+ [[ 0.24993767  0.81209389 -0.52728993  0.9004003 ]
+ [ 0.9678438  -0.2255378   0.11140503 -0.10290073]
+ [-0.02845247 -0.5381786  -0.84235043  0.59671466]
+ [ 0.          0.          0.          1.        ]]
+Saving results to: real/robot_base_to_camera_pose.txt
+Total number of poses: 22
+Invalid poses number: 0
+Tool Tip to AR Tag:
+ [[ 0.02165835  0.11405903 -0.99323786 -0.0018488 ]
+ [ 0.99760957 -0.06767302  0.01398241 -0.0270717 ]
+ [-0.06562058 -0.99116643 -0.11525207  0.13810974]
+ [ 0.          0.          0.          1.        ]]
+Saving results to: real/tool_tip_to_ar_tag_transform.txt
