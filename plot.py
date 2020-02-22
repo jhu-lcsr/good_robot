@@ -255,7 +255,7 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
 def plot_it(log_dir, title, window=1000, colors=None, 
             alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, 
             apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
-            label=None, categories=None, ylabel=None):
+            label=None, categories=None, ylabel=None, save=True):
     if categories is None:
         categories = ['place_success', 'grasp_success', 'action_efficiency', 'trial_success']
     if colors is None:
@@ -364,21 +364,22 @@ def plot_it(log_dir, title, window=1000, colors=None,
     # we save the best stats and the generated plots in multiple locations for user convenience and backwards compatibility
     file_format = '.png'
     save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',', '').replace(' ', '-') + '_success_plot'
-    print('saving plot: ' + save_file + file_format)
-    plt.savefig(save_file + file_format, dpi=300, optimize=True)
-    log_dir_fig_file = os.path.join(log_dir, save_file)
-    plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
-    # plt.savefig(save_file + '.pdf')
-    # this is a backwards compatibility location for best_stats.json
-    best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
-    print('saving best stats to: ' + best_stats_file)
-    with open(best_stats_file, 'w') as f:
-        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
-    # this is the more useful location for best_stats.json
-    best_stats_file = os.path.join(log_dir, 'best_stats.json')
-    print('saving best stats to: ' + best_stats_file)
-    with open(best_stats_file, 'w') as f:
-        json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+    if save:
+        print('saving plot: ' + save_file + file_format)
+        plt.savefig(save_file + file_format, dpi=300, optimize=True)
+        log_dir_fig_file = os.path.join(log_dir, save_file)
+        plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+        # plt.savefig(save_file + '.pdf')
+        # this is a backwards compatibility location for best_stats.json
+        best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
+        print('saving best stats to: ' + best_stats_file)
+        with open(best_stats_file, 'w') as f:
+            json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+        # this is the more useful location for best_stats.json
+        best_stats_file = os.path.join(log_dir, 'best_stats.json')
+        print('saving best stats to: ' + best_stats_file)
+        with open(best_stats_file, 'w') as f:
+            json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
     return best_dict
 
 
@@ -394,6 +395,7 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
         kwargs['clear_figure'] = i == 0
         kwargs['label'] = labels[i]
         kwargs['colors'] = colors[i]
+        kwargs['save'] = i == len(dirs)-1
         best_dicts[run_dir] = plot_it(run_dir, title, **kwargs)
     return best_dicts # for some reason
 
