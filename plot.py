@@ -83,7 +83,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         #     success_window = np.concatenate([success_window, np.zeros(window - success_window.shape[0])], axis=0)
         success_window_max = np.max(success_window)
         trial_window_max = np.max(trial_window)
-        if trials.shape[0] >= window:
+        if trials.shape[0] >= window and i < window:
             trial_window_max = max(trial_window_max, np.max(trials[:window]))
         success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
 
@@ -109,11 +109,12 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
-
+    rewards: an array of size N with the rewards associated with each action, only viable in pushing/grasping scenario, 
+             do not specify if placing is available, because a place action indicates the previous grasp was successful.
     """
-    grasps = actions[:, 0] == 1
+    grasps = actions[:, 0] == utils.ACTION_TO_ID['grasp']
     if rewards is None:
-        places = actions[:, 0] == 2
+        places = actions[:, 0] == utils.ACTION_TO_ID['place']
     length = np.min([rewards.shape[0], actions.shape[0]])
     success_rate = np.zeros(length - 1)
     lower = np.zeros_like(success_rate)
@@ -121,12 +122,16 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     for i in range(length - 1):
         start = max(i - window, 0)
         if rewards is None:
+            # Where a place entry is True, the grasp on the previous action was successful
             successes = places[start+1: i+2][grasps[start:i+1]]
         else:
             successes = (rewards[start: i+1] > reward_threshold)[grasps[start:i+1]]
-        if successes.shape[0] < window:
-            successes = np.concatenate([successes, np.zeros(window - successes.shape[0])], axis=0)
-        success_rate[i] = successes.mean()
+        grasp_count = grasps[start:i+1].sum()
+        if successes.shape[0] < window and length > window and i < window:
+            # Inital actions are zero filled, assuming an "infinite past of failure" before the first action.
+            # print('extra zeros: ' + str(np.sum(grasps[i:window])))
+            grasp_count =  grasps[start:min(start+window, grasps.shape[0])].sum()
+        success_rate[i] = float(successes.sum()) / float(grasp_count) if grasp_count > 0 else 0.0
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
@@ -406,13 +411,15 @@ if __name__ == '__main__':
     window = 1000
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
     ##############################################################
-    # best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
-    #                           './logs/TODO-from-femur',
-    #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
-    #                           title='Effect of Action Space on Early Training Progress', 
-    #                           labels=['Dynamic with SPOT-Q', 'Dynamic no SPOT-Q', 'Standard'],
-    #                           max_iter=3000, window=window,
-    #                           ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
+                            #   './logs/TODO-from-femur',
+                              './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
+                              title='Effect of Action Space on Early Training Progress', 
+                              labels=['Dynamic with SPOT-Q', 
+                                    #   'Dynamic no SPOT-Q', 
+                                      'Standard'],
+                              max_iter=3000, window=window,
+                              ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
     window = 200
     best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
                               './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
