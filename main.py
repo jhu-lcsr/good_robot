@@ -701,7 +701,7 @@ def main(args):
                         print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?

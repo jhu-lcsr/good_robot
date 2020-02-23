@@ -1645,7 +1645,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1744,7 +1744,8 @@ class Robot(object):
 
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             # position[2] += self.gripper_ee_offset + 0.05
-            position[2] += 0.04
+            if over_block:
+                position[2] += 0.04
             # Compute tool orientation from heightmap rotation angle
             grasp_orientation = [1.0,0.0]
             if heightmap_rotation_angle > np.pi:
