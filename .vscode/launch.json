@@ -149,7 +149,7 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19997", "--place", "--resume", "./logs/2020-01-15-16-04-36-test-resume", "--future_reward_discount", "0.65"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--common_sense", "--check_z_height", "--tcp_port", "19997", "--place", "--resume", "./logs/2020-01-15-16-04-36-test-resume", "--future_reward_discount", "0.65"]
         },
         {
             "name": "main.py: Sim Stack check_z_height COMMON SENSE (External Terminal)",
@@ -158,7 +158,7 @@
             "pythonPath": "/usr/bin/python3",
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
-            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--skip_noncontact_actions", "--check_z_height", "--tcp_port", "19990", "--place", "--future_reward_discount", "0.65", "--common_sense"]
+            "args": [ "--is_sim", "--obj_mesh_dir", "objects/blocks", "--num_obj", "8", "--push_rewards", "--experience_replay", "--explore_rate_decay", "--trial_reward", "--save_visualizations", "--common_sense", "--check_z_height", "--tcp_port", "19990", "--place", "--future_reward_discount", "0.65"]
         }
     ]
 }

@@ -65,10 +65,13 @@ def main(args):
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = args.num_obj if is_sim else None # Number of objects to add to simulation
-    num_extra_obj = args.num_extra_obj if is_sim else None
+    num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
     if num_obj is not None:
         num_obj += num_extra_obj
+    if args.check_row:
+        print('Overriding --num_obj to 4 because we have --check_row and will expect 4 blocks in a row.')
+        num_obj = 4
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port  # TODO(killeen) change the rest of these?
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -211,7 +214,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    place_dilation = 0.03 if check_row else 0.0
+    place_dilation = 0.05 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
@@ -399,7 +402,10 @@ def main(args):
         if check_row:
             row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
-            stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+            if check_z_height:
+                stack_matches_goal = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
+            else:
+                stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
@@ -440,7 +446,7 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row:
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         return needed_to_reset
 
@@ -608,8 +614,13 @@ def main(args):
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal()
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
-
-                            if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                            # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
+                            if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                                nonlocal_variables['stack'].next()
+                                # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
+                                partial_stack_count += 1
+                                print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+                            elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
