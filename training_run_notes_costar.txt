@@ -303,7 +303,31 @@ Grasp Count: 52, grasp success rate: 0.34615384615384615
 SIM TO REAL TESTING ROWS
 ========================
 
-export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --place --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 10 --check_row --snapshot_file '/home/costar/Downloads/2020-02-10-18-38-rows-snapshot.reinforcement-best-stack-rate.pth'
+export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --place --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 10 --check_row  --num_obj 4 --snapshot_file '/home/costar/Downloads/2020-02-10-18-38-rows-snapshot.reinforcement-best-stack-rate.pth'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -65,10 +65,13 @@ def main(args):
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = args.num_obj if is_sim else None # Number of objects to add to simulation
-    num_extra_obj = args.num_extra_obj if is_sim else None
+    num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
     if num_obj is not None:
         num_obj += num_extra_obj
+    if args.check_row:
+        print('Overriding --num_obj to 4 because we have --check_row and will expect 4 blocks in a row.')
+        num_obj = 4
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port  # TODO(killeen) change the rest of these?
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -211,7 +214,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    place_dilation = 0.03 if check_row else 0.0
+    place_dilation = 0.04 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
@@ -397,9 +400,12 @@ def main(args):
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
-            row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+            row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
-            stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+            if check_z_height:
+                stack_matches_goal = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
+            else:
+                stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
@@ -440,7 +446,7 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row:
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         return needed_to_reset
 
@@ -570,7 +576,7 @@ def main(args):
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
 
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
@@ -608,8 +614,13 @@ def main(args):
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal()
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
-
-                            if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                            # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
+                            if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                                nonlocal_variables['stack'].next()
+                                # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
+                                partial_stack_count += 1
+                                print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+                            elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
@@ -785,46 +796,6 @@ def main(args):
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
-
-    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name, robot_push_vertical_offset=0.026):
-        # Adjust start position of all actions, and make sure z value is safe and not too low
-        def get_local_region(heightmap, region_width=0.03):
-            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
-            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
-        # make sure the fingers will not collide with the objects
-        finger_width = 0.04
-        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
-        safe_z_position = workspace_limits[2][0]
-        if finger_touchdown_region.size != 0:
-            safe_z_position += np.max(finger_touchdown_region)
-        else:
-            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
-        if robot.background_heightmap is not None:
-            # add the height of the background scene
-            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
-        push_may_contact_something = False
-        if action_name == 'push':
-            # determine if the safe z position might actually contact anything during the push action
-            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
-            push_width = 0.2
-            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
-            # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region)
-            if max_local_push_region < 0.01:
-                # if there is nothing more than 1cm tall, there is nothing to push
-                push_may_contact_something = False
-            else:
-                push_may_contact_something = safe_z_position - workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
-            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
-            push_str = ''
-            if not push_may_contact_something:
-                push_str += 'Predicting push action failure, heuristics determined '
-                push_str += 'push at height ' + str(safe_z_position)
-                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
-                print(push_str)
-
-        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
-        return primitive_position, push_may_contact_something
 
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True

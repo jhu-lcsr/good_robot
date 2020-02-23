@@ -580,13 +580,56 @@ class Robot(object):
 
         return obj_positions, obj_orientations
 
+    def action_heightmap_coordinate_to_3d_robot_pose(self, x_pixel, y_pixel, action_name, valid_depth_heightmap, robot_push_vertical_offset=0.026):
+        # Adjust start position of all actions, and make sure z value is safe and not too low
+        def get_local_region(heightmap, region_width=0.03):
+            safe_kernel_width = int(np.round((region_width/2)/self.heightmap_resolution))
+            return heightmap[max(y_pixel - safe_kernel_width, 0):min(y_pixel + safe_kernel_width + 1, heightmap.shape[0]), max(x_pixel - safe_kernel_width, 0):min(x_pixel + safe_kernel_width + 1, heightmap.shape[1])]
 
-    def reposition_objects(self, workspace_limits=None, unstack_drop_height=0.05):
+        finger_width = 0.04
+        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
+        safe_z_position = self.workspace_limits[2][0]
+        if finger_touchdown_region.size != 0:
+            safe_z_position += np.max(finger_touchdown_region)
+        else:
+            safe_z_position += valid_depth_heightmap[y_pixel][x_pixel]
+        if self.background_heightmap is not None:
+            # add the height of the background scene
+            safe_z_position += np.max(get_local_region(self.background_heightmap, region_width=0.03))
+        push_may_contact_something = False
+
+        if action_name == 'push':
+            # determine if the safe z position might actually contact anything during the push action
+            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
+            push_width = 0.2
+            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
+            # push_may_contact_something is True for something noticeably higher than the push action z height
+            max_local_push_region = np.max(local_push_region)
+            if max_local_push_region < 0.01:
+                # if there is nothing more than 1cm tall, there is nothing to push
+                push_may_contact_something = False
+            else:
+                push_may_contact_something = safe_z_position - self.workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
+            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
+            push_str = ''
+            if not push_may_contact_something:
+                push_str += 'Predicting push action failure, heuristics determined '
+                push_str += 'push at height ' + str(safe_z_position)
+                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
+                print(push_str)
+
+        primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
+        return primitive_position, push_may_contact_something
+
+    def reposition_objects(self, unstack_drop_height=0.05):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
+
+            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot. 
+            place_pose_history.append(place_pose_history[-1])  
 
             holding_object = not(self.close_gripper())
             # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
@@ -605,18 +648,18 @@ class Robot(object):
 
                 valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
-                if self.is_sim:
-                    # otherwise simulated gripper grasps too low
-                    offset = 0.01
+                # get depth_heightmap pixel_coordinates of where the previous place was
+                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
 
-                    if max_z_height + offset < self.workspace_limits[2][1]:
-                        z = max_z_height + offset
-                else:
-                    offset = 0.01  # previously 0.05
-                    # otherwise real gripper grasps too high
+                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                y_pixel = min(y_pixel, 223)
 
-                    if max_z_height - offset > self.workspace_limits[2][0]:
-                        z = max_z_height - offset
+                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
+
+                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                # plus an offset. There
+                z = primitive_position[2]
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
@@ -626,7 +669,8 @@ class Robot(object):
 
                     self.place(rand_position, rand_angle, save_history=False)
 
-            self.place_pose_history = []  # clear place position history
+            # clear the place hisory after unstacking
+            self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
 
         else:
@@ -1758,7 +1802,9 @@ class Robot(object):
                   num_obj=4,
                   distance_threshold=0.02,
                   separation_threshold=0.1,
-                  num_directions=64):
+                  num_directions=64,
+                  check_z_height=False,
+                  valid_depth_heightmap=None):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1781,69 +1827,75 @@ class Robot(object):
             i.e. if 4 blocks pass the check the return will be 4, but if there are only single blocks it will be 1.
             If the list passed is length 0 then height_count will return 0 and it will automatically pass successfully.
         """
-        if len(object_color_sequence) < 1:
-            print('check_row() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
-            return True, 1
 
-        pos = np.asarray(self.get_obj_positions())
-        success = False
-        row_size = 1
-        row_length = len(object_color_sequence)
-        # Color order of blocks doesn't matter, just the length of the sequence.
-        # Therefore, check every row_length-size subset of blocks to see if
-        # they are in a row and, if so, whether they are close enough
-        # together.
+        if check_z_height:
+            success, row_size = utils.check_row_success(valid_depth_heightmap)
+            return success, row_size
 
-        # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
-        # So for 3 objects, this would be:
-        # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
-        all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
-                                 for length in range(1, num_obj+1)]
+        else:
+            if len(object_color_sequence) < 1:
+                print('check_row() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
+                return True, 1
 
-        successful_block_indices = []
-        for block_indices_of_length in all_block_indices:
-            for block_indices in block_indices_of_length:
-                # check each rotation angle for a possible row
-                # print('checking {}'.format(block_indices))
-                xs = pos[block_indices][:, 0]
-                ys = pos[block_indices][:, 1]
-                # print('xs: {}'.format(xs))
-                # print('ys: {}'.format(ys))
-                m, b = utils.polyfit(xs, ys, 1)
+            pos = np.asarray(self.get_obj_positions())
+            success = False
+            row_size = 1
+            row_length = len(object_color_sequence)
+            # Color order of blocks doesn't matter, just the length of the sequence.
+            # Therefore, check every row_length-size subset of blocks to see if
+            # they are in a row and, if so, whether they are close enough
+            # together.
 
-                # print('m, b: {}, {}'.format(m, b))
-                theta = np.arctan(m)  # TODO(bendkill): use arctan2?
-                c = np.cos(theta)
-                s = np.sin(theta)
-                R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-                T = np.array([0, -b, 0])
-                # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
-                aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
+            # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
+            # So for 3 objects, this would be:
+            # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
+            all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
+                                    for length in range(1, num_obj+1)]
 
-                aligned = True
-                median_z = np.median(aligned_pos[:, 2])
-                for p in aligned_pos:
-                    # print('distance from line: {:.03f}'.format(p[1]))
-                    if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
-                        # too far from line on table, or blocks are not on the same Z plane
-                        aligned = False
-                        break
+            successful_block_indices = []
+            for block_indices_of_length in all_block_indices:
+                for block_indices in block_indices_of_length:
+                    # check each rotation angle for a possible row
+                    # print('checking {}'.format(block_indices))
+                    xs = pos[block_indices][:, 0]
+                    ys = pos[block_indices][:, 1]
+                    # print('xs: {}'.format(xs))
+                    # print('ys: {}'.format(ys))
+                    m, b = utils.polyfit(xs, ys, 1)
 
-                indices = aligned_pos[:, 0].argsort()
-                xs = aligned_pos[indices, 0]
-                if aligned and utils.check_separation(xs, separation_threshold):
-                    # print('valid row along', theta, 'with indices', block_indices)
-                    if self.grasp_color_task:
-                        success = np.equal(indices, object_color_sequence).all()
-                    else:
-                        success = True
-                    successful_block_indices = block_indices
-                    row_size = max(len(block_indices), row_size)
-                    continue
+                    # print('m, b: {}, {}'.format(m, b))
+                    theta = np.arctan(m)  # TODO(bendkill): use arctan2?
+                    c = np.cos(theta)
+                    s = np.sin(theta)
+                    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+                    T = np.array([0, -b, 0])
+                    # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
+                    aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
 
-        print('check_row: {} | row_size: {} | blocks: {}'.format(
-            success, row_size, np.array(self.color_names)[successful_block_indices]))
-        return success, row_size
+                    aligned = True
+                    median_z = np.median(aligned_pos[:, 2])
+                    for p in aligned_pos:
+                        # print('distance from line: {:.03f}'.format(p[1]))
+                        if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
+                            # too far from line on table, or blocks are not on the same Z plane
+                            aligned = False
+                            break
+
+                    indices = aligned_pos[:, 0].argsort()
+                    xs = aligned_pos[indices, 0]
+                    if aligned and utils.check_separation(xs, separation_threshold):
+                        # print('valid row along', theta, 'with indices', block_indices)
+                        if self.grasp_color_task:
+                            success = np.equal(indices, object_color_sequence).all()
+                        else:
+                            success = True
+                        successful_block_indices = block_indices
+                        row_size = max(len(block_indices), row_size)
+                        continue
+
+            print('check_row: {} | row_size: {} | blocks: {}'.format(
+                success, row_size, np.array(self.color_names)[successful_block_indices]))
+            return success, row_size
 
 
     def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
