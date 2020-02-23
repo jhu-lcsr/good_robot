@@ -719,7 +719,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
     heightmap_trans = np.transpose(heightmap_trans)
 
     heightmaps = (depth_heightmap, heightmap_trans)
-    results = []
+    counts = []
 
     for heightmap in heightmaps:
         # threshold pixels which contain a block
@@ -767,25 +767,17 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         block_pixels_in_row = np.logical_and(mask, block_pixels)
         count = np.count_nonzero(block_pixels_in_row)
 
-        success = False
-        if count > success_threshold:
-            success = True
+        counts.append(count)
 
-        row_size = int(np.round(count/block_pixel_size))
 
-        thresh = (block_pixels > 0.02).astype('uint8')*120
-        print(type(thresh))
-        # cv2.polylines(thresh, [pts], True, (255,255,255))
-        
-        cv2.imshow('asdf', thresh)
-        cv2.waitKey()
+    true_count = max(counts[0], counts[1])
 
-        results.append((success, row_size, count))
+    success = False
+    if true_count > success_threshold:
+        success = True
 
-    true_success = results[0][0] and results[1][0]
-    true_row_size = max(results[0][1], results[1][1])
-    true_count = max(results[0][2], results[1][2])
+    row_size = int(np.round(true_count/block_pixel_size))
 
-    print("ROW CHECK PIXEL COUNT: ", true_count, ", row_size: ", true_row_size)
+    print("ROW CHECK PIXEL COUNT: ", true_count, ", row_size: ", row_size)
 
-    return(true_success, true_row_size)
+    return(success, row_size)
