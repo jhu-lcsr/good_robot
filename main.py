@@ -576,7 +576,7 @@ def main(args):
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
 
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
@@ -797,46 +797,6 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
-    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name, robot_push_vertical_offset=0.026):
-        # Adjust start position of all actions, and make sure z value is safe and not too low
-        def get_local_region(heightmap, region_width=0.03):
-            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
-            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
-        # make sure the fingers will not collide with the objects
-        finger_width = 0.04
-        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
-        safe_z_position = workspace_limits[2][0]
-        if finger_touchdown_region.size != 0:
-            safe_z_position += np.max(finger_touchdown_region)
-        else:
-            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
-        if robot.background_heightmap is not None:
-            # add the height of the background scene
-            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
-        push_may_contact_something = False
-        if action_name == 'push':
-            # determine if the safe z position might actually contact anything during the push action
-            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
-            push_width = 0.2
-            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
-            # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region)
-            if max_local_push_region < 0.01:
-                # if there is nothing more than 1cm tall, there is nothing to push
-                push_may_contact_something = False
-            else:
-                push_may_contact_something = safe_z_position - workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
-            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
-            push_str = ''
-            if not push_may_contact_something:
-                push_str += 'Predicting push action failure, heuristics determined '
-                push_str += 'push at height ' + str(safe_z_position)
-                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
-                print(push_str)
-
-        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
-        return primitive_position, push_may_contact_something
-
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -921,7 +881,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
-        if stuff_sum < empty_threshold or (is_sim and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -1080,6 +1040,7 @@ def main(args):
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability

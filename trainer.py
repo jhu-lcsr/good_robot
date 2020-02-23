@@ -140,7 +140,7 @@ class Trainer(object):
         momentum = 0.9
         weight_decay = 2e-5
         if is_testing:
-            lr = 1e-6
+            lr = 1e-5
             momentum = 0
             weight_decay = 0
         # Initialize optimizer
@@ -444,7 +444,7 @@ class Trainer(object):
             push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.01)
+            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
             if self.place:
                 place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
