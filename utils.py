@@ -712,7 +712,7 @@ class StackSequence(object):
                 self.reset_sequence()
 
 
-def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=80, row_boundary_width=20, block_pixel_size=575):
+def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=80, row_boundary_width=20, block_pixel_size=650):
     """ Return if the current arrangement of blocks in the heightmap is a valid row 
     """
     heightmap_trans = np.copy(depth_heightmap)
