@@ -715,58 +715,77 @@ class StackSequence(object):
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=80, row_boundary_width=20, success_threshold=2300, block_pixel_size=700):
     """ Return if the current arrangement of blocks in the heightmap is a valid row 
     """
+    heightmap_trans = np.copy(depth_heightmap)
+    heightmap_trans = np.transpose(heightmap_trans)
 
-    # threshold pixels which contain a block
-    block_pixels = depth_heightmap > block_height_threshold
+    heightmaps = (depth_heightmap, heightmap_trans)
+    results = []
 
-    # get positions of all those pixels  
-    coords = np.nonzero(block_pixels)
-    x = coords[1]
-    y = coords[0]
+    for heightmap in heightmaps:
+        # threshold pixels which contain a block
+        block_pixels = heightmap > block_height_threshold
 
-    # get best fit line y=mx+b
-    m, b = np.polyfit(x, y, 1)
+        # get positions of all those pixels  
+        coords = np.nonzero(block_pixels)
+        x = coords[1]
+        y = coords[0]
 
-    # pick 2 random points on the line and find the unit vector
-    x1 = 0
-    y1 = int(m*x1 + b)
-    x2 = 224
-    y2 = int(m*x2 + b)
+        # get best fit line y=mx+b
+        m, b = np.polyfit(x, y, 1)
 
-    l = np.sqrt((x2-x1)**2 + (y2-y1)**2)
-    x_unit = (x2-x1)/l
-    y_unit = (y2-y1)/l
+        # pick 2 random points on the line and find the unit vector
+        x1 = 0
+        y1 = int(m*x1 + b)
+        x2 = 224
+        y2 = int(m*x2 + b)
 
-    # centroid of block_pixels
-    centroid = (int(np.mean(x)), int(np.mean(y)))
-    
-    # get row_boundary_rectangle points
-    x1_r = int(centroid[0] - x_unit * row_boundary_length - y_unit * row_boundary_width)
-    y1_r = int(centroid[1] - y_unit * row_boundary_length + x_unit * row_boundary_width)
-    x2_r = int(centroid[0] + x_unit * row_boundary_length - y_unit * row_boundary_width)
-    y2_r = int(centroid[1] + y_unit * row_boundary_length + x_unit * row_boundary_width)
-    x3_r = int(centroid[0] + x_unit * row_boundary_length + y_unit * row_boundary_width)
-    y3_r = int(centroid[1] + y_unit * row_boundary_length - x_unit * row_boundary_width)
-    x4_r = int(centroid[0] - x_unit * row_boundary_length + y_unit * row_boundary_width)
-    y4_r = int(centroid[1] - y_unit * row_boundary_length - x_unit * row_boundary_width)
+        l = np.sqrt((x2-x1)**2 + (y2-y1)**2)
+        x_unit = (x2-x1)/l
+        y_unit = (y2-y1)/l
 
-    # create row_boundary_mask
-    mask = np.zeros((224,224))
-    pts = np.array([[x1_r,y1_r],[x2_r,y2_r],[x3_r,y3_r],[x4_r,y4_r]], np.int32)
-    pts = pts.reshape((-1,1,2))
-    cv2.fillPoly(mask, [pts], (255,255,255))
-    mask = mask > 0  # convert to bool
+        # centroid of block_pixels
+        centroid = (int(np.mean(x)), int(np.mean(y)))
+        
+        # get row_boundary_rectangle points
+        x1_r = int(centroid[0] - x_unit * row_boundary_length - y_unit * row_boundary_width)
+        y1_r = int(centroid[1] - y_unit * row_boundary_length + x_unit * row_boundary_width)
+        x2_r = int(centroid[0] + x_unit * row_boundary_length - y_unit * row_boundary_width)
+        y2_r = int(centroid[1] + y_unit * row_boundary_length + x_unit * row_boundary_width)
+        x3_r = int(centroid[0] + x_unit * row_boundary_length + y_unit * row_boundary_width)
+        y3_r = int(centroid[1] + y_unit * row_boundary_length - x_unit * row_boundary_width)
+        x4_r = int(centroid[0] - x_unit * row_boundary_length + y_unit * row_boundary_width)
+        y4_r = int(centroid[1] - y_unit * row_boundary_length - x_unit * row_boundary_width)
 
-    # get all block_pixels inside of row_boundary_rectangle and count them 
-    block_pixels_in_row = np.logical_and(mask, block_pixels)
-    count = np.count_nonzero(block_pixels_in_row)
+        # create row_boundary_mask
+        mask = np.zeros((224,224))
+        pts = np.array([[x1_r,y1_r],[x2_r,y2_r],[x3_r,y3_r],[x4_r,y4_r]], np.int32)
+        pts = pts.reshape((-1,1,2))
+        cv2.fillPoly(mask, [pts], (255,255,255))
+        mask = mask > 0  # convert to bool
 
-    success = False
-    if count > success_threshold:
-        success = True
+        # get all block_pixels inside of row_boundary_rectangle and count them 
+        block_pixels_in_row = np.logical_and(mask, block_pixels)
+        count = np.count_nonzero(block_pixels_in_row)
 
-    row_size = int(np.round(count/block_pixel_size))
+        success = False
+        if count > success_threshold:
+            success = True
 
-    print("ROW CHECK PIXEL COUNT: ", count, ", row_size: ", row_size)
+        row_size = int(np.round(count/block_pixel_size))
 
-    return success, row_size
+        thresh = (block_pixels > 0.02).astype('uint8')*120
+        print(type(thresh))
+        # cv2.polylines(thresh, [pts], True, (255,255,255))
+        
+        cv2.imshow('asdf', thresh)
+        cv2.waitKey()
+
+        results.append((success, row_size, count))
+
+    true_success = results[0][0] and results[1][0]
+    true_row_size = max(results[0][1], results[1][1])
+    true_count = max(results[0][2], results[1][2])
+
+    print("ROW CHECK PIXEL COUNT: ", true_count, ", row_size: ", true_row_size)
+
+    return(true_success, true_row_size)
