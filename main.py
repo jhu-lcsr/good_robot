@@ -910,7 +910,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
-        if stuff_sum < empty_threshold or (is_sim and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -1069,6 +1069,7 @@ def main(args):
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
