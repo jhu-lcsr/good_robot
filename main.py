@@ -214,7 +214,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    place_dilation = 0.04 if check_row else 0.0
+    place_dilation = 0.05 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
