@@ -625,6 +625,19 @@ class Robot(object):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
+
+            if len(self.place_pose_history) == 0:
+                print("NO PLACE HISTORY TO UNSTACK YET.")
+                print("HUMAN, PLEASE MOVE BLOCKS AROUND")
+                print("SLEEPING FOR 10 SECONDS")
+
+                for i in range(10):
+                    print("SLEEPING FOR %d" % (10 - i))
+                    time.sleep(1)
+
+                print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
+                
+
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
@@ -1805,7 +1818,8 @@ class Robot(object):
                   separation_threshold=0.1,
                   num_directions=64,
                   check_z_height=False,
-                  valid_depth_heightmap=None):
+                  valid_depth_heightmap=None,
+                  prev_z_height=None):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1830,7 +1844,12 @@ class Robot(object):
         """
 
         if check_z_height:
-            success, row_size = utils.check_row_success(valid_depth_heightmap)
+            # TODO(ahundt) Remove this call to self.get_camera_data. Added because the
+            # valid_depth_heightmap here used for row checking is delayed by one action
+            # Figure out why.
+            valid_depth_heightmap, _, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
+            
+            success, row_size = utils.check_row_success(valid_depth_heightmap, prev_z_height=prev_z_height)
             return success, row_size
 
         else:
