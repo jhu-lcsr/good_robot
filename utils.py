@@ -712,7 +712,7 @@ class StackSequence(object):
                 self.reset_sequence()
 
 
-def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=80, row_boundary_width=20, block_pixel_size=650):
+def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, success_threshold=2222, block_pixel_size=620):
     """ Return if the current arrangement of blocks in the heightmap is a valid row 
     """
     heightmap_trans = np.copy(depth_heightmap)
@@ -771,8 +771,8 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
 
     true_count = max(counts[0], counts[1])
     row_size = int(np.round(true_count/block_pixel_size))
-    success = (row_size >= 4)
+    success = (true_count >= success_threshold)
 
-    print("ROW CHECK PIXEL COUNT: ", true_count, ", row_size: ", row_size)
+    print("ROW CHECK PIXEL COUNT: ", true_count, ", success: ", success, ", row size: ", row_size)
 
     return(success, row_size)
