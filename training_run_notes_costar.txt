@@ -265,7 +265,7 @@ GPU 0, Tab 0, port 19990, left v-rep window
 
 
 
-SIM->REAL STACKING TRAINING COMMAND, Common Sense, SPOT Trial Reward
+SIM TO REAL STACKING TRAINING COMMAND, Common Sense, SPOT Trial Reward
 ====================================================================
 /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training
 export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --place --future_reward_discount 0.65 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training
@@ -307,13 +307,28 @@ export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_re
 
 
 
+REAL, PUSHING AND GRASPING, COMMON SENSE, SPOT - FEB 23 - LONG AND GOOD RUN
+=================================================================================
+export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65
+ '/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME: export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65 --resume  '/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training'
+
+Max trial success rate: 1.0, at action iteration: 682. (total of 1032 actions, max excludes first 500 actions)
+Max grasp success rate: 0.6054421768707483, at action iteration: 774. (total of 1032 actions, max excludes first 500 actions)                            
+Max grasp action efficiency: 0.534, at action iteration: 774. (total of 1033 actions, max excludes first 500 actions)
+saving plot: 2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training-Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training_success_plot.png
+saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/data/best_stats.json
+saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/best_stats.json
+Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
+Training results:                                                                                                                                                                        
+ {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 682, 'grasp_success_rate_best_value': 0.6054421768707483, 'grasp_success_rate_best_index': 774, 'grasp_action_efficiency_b
+est_value': 0.534, 'grasp_action_efficiency_best_index': 774}
 
 
+TESTING push and grasp
 
-
-
-
-
+export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 1 --snapshot_file '/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement_grasp_success_rate_best_value.pth'
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing
 
 
 
@@ -345,3 +360,10 @@ SIM TO REAL TESTING Pushing and Grasping
 
 Testing Efficientnet model: https://github.com/jhu-lcsr/good_robot/releases/tag/push_grasp_v0.3.2
 export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 10 --nn efficientnet --snapshot_file '/home/costar/Downloads/snapshot.reinforcement.pth'
+
+saving plot: 2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing-Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing
+Training results: 
+ {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 67, 'grasp_success_rate_best_value': 0.6829268292682927, 'grasp_success_rate_best_index': 68, 'place_success_rate_best_value': 0.8888888888888888, 'place_success_rate_best_index': 68, 'action_efficiency_best_value': 1.0746268656716418, 'action_efficiency_best_index': 69}

@@ -280,6 +280,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             place = False
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
     trial_complete_indices = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
+    print('trial_complete_indices: ' + str(trial_complete_indices))
     trials = np.array(utils.clearance_log_to_trial_count(trial_complete_indices)).astype(np.int)
     if window is None:
         # if window isn't defined, make it just shy of the full data length,
@@ -412,6 +413,9 @@ if __name__ == '__main__':
     # window = 1000
     max_iter = None
     window = 1000
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT-Q, Training', max_iter=1000, window=500)
     ##############################################################
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
     best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',

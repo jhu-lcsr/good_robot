@@ -625,6 +625,19 @@ class Robot(object):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
+
+            if len(self.place_pose_history) == 0:
+                print("NO PLACE HISTORY TO UNSTACK YET.")
+                print("HUMAN, PLEASE MOVE BLOCKS AROUND")
+                print("SLEEPING FOR 10 SECONDS")
+
+                for i in range(10):
+                    print("SLEEPING FOR %d" % (10 - i))
+                    time.sleep(1)
+
+                print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
+                
+
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
@@ -1645,7 +1658,7 @@ class Robot(object):
             time.sleep(0.1)
 
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
@@ -1744,7 +1757,8 @@ class Robot(object):
 
             # Warning: "Real Good Robot!" specific hack, increase gripper height for our different mounting config
             # position[2] += self.gripper_ee_offset + 0.05
-            position[2] += 0.04
+            if over_block:
+                position[2] += 0.04
             # Compute tool orientation from heightmap rotation angle
             grasp_orientation = [1.0,0.0]
             if heightmap_rotation_angle > np.pi:
@@ -1804,7 +1818,8 @@ class Robot(object):
                   separation_threshold=0.1,
                   num_directions=64,
                   check_z_height=False,
-                  valid_depth_heightmap=None):
+                  valid_depth_heightmap=None,
+                  prev_z_height=None):
         """Check for a complete row in the correct order, along any of the `num_directions` directions.
 
         Input: vector length of 1, 2, or 3
@@ -1829,7 +1844,12 @@ class Robot(object):
         """
 
         if check_z_height:
-            success, row_size = utils.check_row_success(valid_depth_heightmap)
+            # TODO(ahundt) Remove this call to self.get_camera_data. Added because the
+            # valid_depth_heightmap here used for row checking is delayed by one action
+            # Figure out why.
+            valid_depth_heightmap, _, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
+            
+            success, row_size = utils.check_row_success(valid_depth_heightmap, prev_z_height=prev_z_height)
             return success, row_size
 
         else:
