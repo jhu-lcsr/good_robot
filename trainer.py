@@ -455,7 +455,7 @@ class Trainer(object):
                 f = plt.figure()
                 # f.suptitle(str(trainer.iteration))
                 f.add_subplot(1,4, 1)
-                plt.imshow(grasp_place_contactable_regions)
+                plt.imshow(grasp_contact_regions)
                 f.add_subplot(1,4, 2)
                 plt.imshow(push_contactable_regions)
                 f.add_subplot(1,4, 3)
