@@ -14,7 +14,8 @@ def best_success_rate(success_rate, window, title):
     best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
-        best_index = np.argmax(success_rate[window:]) + window
+        # If there are multiple entries with equal maximum success rates, take the last one because it will have the most training.
+        best_index = np.max(np.argmax(success_rate[window:], axis=0)) + window
         best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
@@ -51,8 +52,6 @@ def count_preset_arrangements(trial_complete_indices, trial_successes, num_prese
     senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
     print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
     best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
-    # if log_dir is not None:
-        # TODO(ahundt) save json file preset_arrangement_scores.json
     return best_dict
 
 
@@ -79,8 +78,13 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
         # the beginning of the trial window, by subtracting the
         # min successful trial count in the window from the current
         success_window = trial_successes[start:i+1] - np.min(trial_successes[start:i+1])
+        # if success_window.shape[0] < window:
+        #     print(window - success_window.shape[0])
+        #     success_window = np.concatenate([success_window, np.zeros(window - success_window.shape[0])], axis=0)
         success_window_max = np.max(success_window)
         trial_window_max = np.max(trial_window)
+        if trials.shape[0] >= window and i < window:
+            trial_window_max = max(trial_window_max, np.max(trials[:window]))
         success_rate[i] = np.divide(success_window_max, trial_window_max, out=np.zeros(1), where=trial_window_max!=0.0)
 
     # TODO(ahundt) fix the discontinuities in the log from writing the success count at a slightly different time, remove median filter workaround
@@ -105,11 +109,12 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
-
+    rewards: an array of size N with the rewards associated with each action, only viable in pushing/grasping scenario, 
+             do not specify if placing is available, because a place action indicates the previous grasp was successful.
     """
-    grasps = actions[:, 0] == 1
+    grasps = actions[:, 0] == utils.ACTION_TO_ID['grasp']
     if rewards is None:
-        places = actions[:, 0] == 2
+        places = actions[:, 0] == utils.ACTION_TO_ID['place']
     length = np.min([rewards.shape[0], actions.shape[0]])
     success_rate = np.zeros(length - 1)
     lower = np.zeros_like(success_rate)
@@ -117,10 +122,16 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     for i in range(length - 1):
         start = max(i - window, 0)
         if rewards is None:
+            # Where a place entry is True, the grasp on the previous action was successful
             successes = places[start+1: i+2][grasps[start:i+1]]
         else:
             successes = (rewards[start: i+1] > reward_threshold)[grasps[start:i+1]]
-        success_rate[i] = successes.mean()
+        grasp_count = grasps[start:i+1].sum()
+        if successes.shape[0] < window and length > window and i < window:
+            # Inital actions are zero filled, assuming an "infinite past of failure" before the first action.
+            # print('extra zeros: ' + str(np.sum(grasps[i:window])))
+            grasp_count =  grasps[start:min(start+window, grasps.shape[0])].sum()
+        success_rate[i] = float(successes.sum()) / float(grasp_count) if grasp_count > 0 else 0.0
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
@@ -152,6 +163,7 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
 
     stack_height_increased = np.zeros_like(stack_height, np.bool)
     stack_height_increased[0] = False
+    # the stack height increased if the next stack height is higher than the previous
     stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
 
     success_rate = np.zeros_like(stack_height)
@@ -160,6 +172,8 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     for i in range(stack_height.shape[0]):
         start = max(i - window, 0)
         successes = stack_height_increased[start:i+1][success_possible[start:i+1]]
+        if stack_height.shape[0] > window and i < window:
+            successes = np.concatenate([successes, np.zeros(window - i)], axis=0)
         success_rate[i] = successes.mean()
         success_rate[np.isnan(success_rate)] = 0
         var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
@@ -192,7 +206,7 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
         # window_size = min(i, window)
         window_size = np.array(min(i+1, window), np.float64)
         num_trials = success[start:i+1].sum()
-        efficiency[i] = num_trials * ideal_actions_per_trial / window_size
+        efficiency[i] = num_trials * ideal_actions_per_trial / window
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
         upper[i] = efficiency[i] - 3*var
@@ -216,9 +230,12 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
         start = max(i - window, 0)
         window_size = np.array(min(i+1, window), np.float64)
         successful = rewards[start: i+1] > reward_threshold
+        
         successful_grasps = np.array(successful[grasps[start:start+successful.shape[0]]].sum(), np.float64)
+        # print(successfu)
+        
         # print(successful_grasps)
-        efficiency[i] = successful_grasps / window_size
+        efficiency[i] = successful_grasps / window
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
         upper[i] = efficiency[i] - 3*var
@@ -242,7 +259,14 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
     return heights, trial, trial_success, clearance
 
 
-def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:orange', 'tab:purple'], alpha=0.35, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None):
+def plot_it(log_dir, title, window=1000, colors=None, 
+            alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, 
+            apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
+            label=None, categories=None, ylabel=None, save=True):
+    if categories is None:
+        categories = ['place_success', 'grasp_success', 'action_efficiency', 'trial_success']
+    if colors is None:
+        colors = ['tab:blue', 'tab:green', 'tab:orange', 'tab:purple']
     best_dict = {}
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
@@ -256,6 +280,7 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
             place = False
     actions = np.loadtxt(os.path.join(log_dir, 'transitions', 'executed-action.log.txt'))
     trial_complete_indices = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
+    print('trial_complete_indices: ' + str(trial_complete_indices))
     trials = np.array(utils.clearance_log_to_trial_count(trial_complete_indices)).astype(np.int)
     if window is None:
         # if window isn't defined, make it just shy of the full data length,
@@ -278,9 +303,12 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         grasp_rewards = rewards
 
     # create and clear the figure
-    fig = plt.figure()
     if clear_figure:
+        fig = plt.figure()
         fig.clf()
+    else:
+        # get the currently active figure
+        fig = plt.gcf()
     # Plot the rate and variance of trial successes
     trial_success_file = os.path.join(log_dir, 'transitions', 'trial-success.log.txt')
     if os.path.isfile(trial_success_file):
@@ -293,10 +321,6 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         if trial_successes.size > 0:
             trial_success_rate, trial_success_lower, trial_success_upper, best = get_trial_success_rate(trials, trial_successes, window=window)
             best_dict.update(best)
-            plt.plot(mult*trial_success_rate, color=colors[3], label='Trial Success Rate')
-            plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
-                             mult*trial_success_lower, mult*trial_success_upper,
-                             color=colors[3], alpha=alpha)
         if num_preset_arrangements is not None:
             best = count_preset_arrangements(trial_complete_indices, trial_successes, num_preset_arrangements)
             best_dict.update(best)
@@ -318,46 +342,105 @@ def plot_it(log_dir, title, window=1000, colors=['tab:blue', 'tab:green', 'tab:o
         eff, eff_lower, eff_upper, best = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
         best_dict.update(best)
 
-    plt.plot(mult*grasp_rate, color=colors[0], label='Grasp Success Rate')
-    if place:
-        plt.plot(mult*place_rate, color=colors[1], label='Place Success Rate')
-    plt.plot(mult*eff, color=colors[2], label='Action Efficiency')
-
-    plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
-                     mult*grasp_lower, mult*grasp_upper,
-                     color=colors[0], alpha=alpha)
-    if place:
-        plt.fill_between(np.arange(1, place_rate.shape[0]+1),
-                         mult*place_lower, mult*place_upper,
-                         color=colors[1], alpha=alpha)
-    plt.fill_between(np.arange(1, eff.shape[0]+1),
-                     mult*eff_lower, mult*eff_upper,
-                     color=colors[2], alpha=alpha)
+    if 'action_efficiency' in categories:
+        plt.plot(mult*eff, color=colors[2], label=label or 'Action Efficiency')
+        plt.fill_between(np.arange(1, eff.shape[0]+1),
+                         mult*eff_lower, mult*eff_upper,
+                         color=colors[2], alpha=alpha)
+    if 'grasp_success' in categories:
+        plt.plot(mult*grasp_rate, color=colors[0], label=label or 'Grasp Success Rate')    
+        # plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
+        #                  mult*grasp_lower, mult*grasp_upper,
+        #                  color=colors[0], alpha=alpha)
+    if place and 'place_success' in categories:
+        plt.plot(mult*place_rate, color=colors[1], label=label or 'Place Success Rate')
+        # plt.fill_between(np.arange(1, place_rate.shape[0]+1),
+                        #  mult*place_lower, mult*place_upper,
+                        #  color=colors[1], alpha=alpha)
+    
+    if 'trial_success' in categories and os.path.isfile(trial_success_file) and trial_successes.size > 0:
+        plt.plot(mult*trial_success_rate, color=colors[3], label=label or 'Trial Success Rate')
+        # plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
+        #                  mult*trial_success_lower, mult*trial_success_upper,
+        #                  color=colors[3], alpha=alpha)
 
     ax = plt.gca()
     plt.xlabel('Number of Actions')
-    plt.ylabel('Mean % Over ' + str(window) + ' Actions, Higher is Better')
+    plt.ylabel('Mean % Over ' + str(window) + ' Actions, Higher is Better' if ylabel is None else ylabel)
     plt.title(title)
     plt.legend(loc='upper left')
     ax.yaxis.set_major_formatter(PercentFormatter())
-    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-') + '_success_plot'
-    print('saving plot: ' + save_file + '.png')
-    plt.savefig(save_file + '.png', dpi=300, optimize=True)
-    # plt.savefig(save_file + '.pdf')
-    best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
-    print('saving best stats to: ' + best_stats_file)
-    with open(best_stats_file, 'w') as f:
-        json.dump(best_dict, f, cls=utils.NumpyEncoder)
+    # we save the best stats and the generated plots in multiple locations for user convenience and backwards compatibility
+    file_format = '.png'
+    save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',', '').replace(' ', '-') + '_success_plot'
+    if save:
+        print('saving plot: ' + save_file + file_format)
+        plt.savefig(save_file + file_format, dpi=300, optimize=True)
+        log_dir_fig_file = os.path.join(log_dir, save_file)
+        plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+        # plt.savefig(save_file + '.pdf')
+        # this is a backwards compatibility location for best_stats.json
+        best_stats_file = os.path.join(log_dir, 'data', 'best_stats.json')
+        print('saving best stats to: ' + best_stats_file)
+        with open(best_stats_file, 'w') as f:
+            json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+        # this is the more useful location for best_stats.json
+        best_stats_file = os.path.join(log_dir, 'best_stats.json')
+        print('saving best stats to: ' + best_stats_file)
+        with open(best_stats_file, 'w') as f:
+            json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
     return best_dict
 
 
+def plot_compare(dirs, title, colors=None, labels=None, category='trial_success', **kwargs):
+    if labels is None:
+        labels = dirs
+    kwargs['categories'] = [category]
+    best_dicts = {}
+    if colors is None:
+        cmap = plt.get_cmap('viridis')
+        colors = [[cmap(i / len(dirs))] * 4 for i, run_dir in enumerate(dirs)]
+    for i, run_dir in enumerate(dirs):
+        kwargs['clear_figure'] = i == 0
+        kwargs['label'] = labels[i]
+        kwargs['colors'] = colors[i]
+        kwargs['save'] = i == len(dirs)-1
+        best_dicts[run_dir] = plot_it(run_dir, title, **kwargs)
+    return best_dicts # for some reason
 
 
 if __name__ == '__main__':
-    window = 1000
+    # window = 1000
     max_iter = None
+    window = 1000
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT-Q, Training', max_iter=1000, window=500)
+    ##############################################################
+    #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
+    best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
+                              './logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training',
+                              './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
+                              title='Effect of Action Space on Early Training Progress', 
+                              labels=['Dynamic with SPOT-Q', 
+                                      'Dynamic no SPOT-Q', 
+                                      'Standard'],
+                              max_iter=3000, window=window,
+                              ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
 
-    best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
+    ##############################################################
+    window = 200
+    best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
+                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
+                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'], 
+                              title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
+                              max_iter=2000, window=window,
+                              category='grasp_success',
+                              ylabel='Mean Grasp Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    # best_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
+    # best_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
+    # best_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
+    # best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
     # Sim stats for final paper:
     # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
     # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
@@ -368,7 +451,7 @@ if __name__ == '__main__':
     # plot_it('./logs/2020-02-10-14-57-07_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000)
     # #############################################################
     # # REAL ROBOT STACKING run
-    # plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000, apply_real_robot_speckle_noise_hotfix=True)
+    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT-Q Dynamic Action Space, Training', window=500, max_iter=2500, apply_real_robot_speckle_noise_hotfix=True)
     # # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
     # # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
     # # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)

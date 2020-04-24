@@ -31,7 +31,8 @@ except ImportError:
 class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
-                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03):
+                 flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
+                 common_sense_backprop=True):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -41,6 +42,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
+        self.common_sense_backprop = common_sense_backprop
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
@@ -138,7 +140,7 @@ class Trainer(object):
         momentum = 0.9
         weight_decay = 2e-5
         if is_testing:
-            lr = 1e-6
+            lr = 1e-5
             momentum = 0
             weight_decay = 0
         # Initialize optimizer
@@ -442,7 +444,7 @@ class Trainer(object):
             push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
             # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
             push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.01)
+            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
             grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
             if self.place:
                 place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
@@ -453,7 +455,7 @@ class Trainer(object):
                 f = plt.figure()
                 # f.suptitle(str(trainer.iteration))
                 f.add_subplot(1,4, 1)
-                plt.imshow(grasp_place_contactable_regions)
+                plt.imshow(grasp_contact_regions)
                 f.add_subplot(1,4, 2)
                 plt.imshow(push_contactable_regions)
                 f.add_subplot(1,4, 3)
@@ -699,7 +701,7 @@ class Trainer(object):
 
             # Do forward pass with specified rotation (to save gradients)
             push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
-            if self.common_sense:
+            if self.common_sense and self.common_sense_backprop:
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.

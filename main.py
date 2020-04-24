@@ -65,10 +65,13 @@ def main(args):
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = args.num_obj if is_sim else None # Number of objects to add to simulation
-    num_extra_obj = args.num_extra_obj if is_sim else None
+    num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
     if num_obj is not None:
         num_obj += num_extra_obj
+    if args.check_row:
+        print('Overriding --num_obj to 4 because we have --check_row and will expect 4 blocks in a row.')
+        num_obj = 4
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port  # TODO(killeen) change the rest of these?
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -117,6 +120,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
+    common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
@@ -210,13 +214,14 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    place_dilation = 0.03 if check_row else 0.0
+    place_dilation = 0.05 if check_row else 0.0
     # Initialize trainer
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap, place_dilation=place_dilation)
+                      show_heightmap=show_heightmap, place_dilation=place_dilation,
+                      common_sense_backprop=common_sense_backprop)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -395,9 +400,10 @@ def main(args):
             stack_shift = 0
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if check_row:
-            row_found, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap, prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
-            stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+            if not check_z_height:
+                stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
@@ -438,7 +444,7 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row:
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj)
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
         return needed_to_reset
 
@@ -568,7 +574,7 @@ def main(args):
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
 
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'])
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
@@ -606,16 +612,22 @@ def main(args):
                     if place and check_row:
                         needed_to_reset = check_stack_update_goal()
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
-
-                            if nonlocal_variables['stack_height'] >= len(current_stack_goal):
+                            # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
+                            if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                                nonlocal_variables['stack'].next()
+                                # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
+                                partial_stack_count += 1
+                                print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+                            elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
-                                    # we are in testing mode which is frequently recorded, 
+                                    # we are in testing mode which is frequently recorded,
                                     # so sleep for 10 seconds to show off our results!
                                     time.sleep(10)
                                 nonlocal_variables['stack_success'] = True
@@ -688,7 +700,7 @@ def main(args):
                         print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
@@ -701,11 +713,12 @@ def main(args):
                         if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
                             (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
-                                # we are in testing mode which is frequently recorded, 
+                                # we are in testing mode which is frequently recorded,
                                 # so sleep for 10 seconds to show off our results!
                                 time.sleep(10)
                             nonlocal_variables['stack_success'] = True
@@ -779,50 +792,10 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.mkdir(save_location)
                     with open(os.path.join(save_location, 'process_action_var_values_%d.json' % (trainer.iteration)), 'w') as f:
-                            json.dump(process_vars, f, cls=utils.NumpyEncoder)
+                            json.dump(process_vars, f, cls=utils.NumpyEncoder, sort_keys=True)
 
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
-
-    def action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, action_name, robot_push_vertical_offset=0.026):
-        # Adjust start position of all actions, and make sure z value is safe and not too low
-        def get_local_region(heightmap, region_width=0.03):
-            safe_kernel_width = int(np.round((region_width/2)/heightmap_resolution))
-            return heightmap[max(best_pix_y - safe_kernel_width, 0):min(best_pix_y + safe_kernel_width + 1, heightmap.shape[0]), max(best_pix_x - safe_kernel_width, 0):min(best_pix_x + safe_kernel_width + 1, heightmap.shape[1])]
-        # make sure the fingers will not collide with the objects
-        finger_width = 0.04
-        finger_touchdown_region = get_local_region(valid_depth_heightmap, region_width=finger_width)
-        safe_z_position = workspace_limits[2][0]
-        if finger_touchdown_region.size != 0:
-            safe_z_position += np.max(finger_touchdown_region)
-        else:
-            safe_z_position += valid_depth_heightmap[best_pix_y][best_pix_x]
-        if robot.background_heightmap is not None:
-            # add the height of the background scene
-            safe_z_position += np.max(get_local_region(robot.background_heightmap, region_width=0.03))
-        push_may_contact_something = False
-        if action_name == 'push':
-            # determine if the safe z position might actually contact anything during the push action
-            # TODO(ahundt) common sense push motion region can be refined based on the rotation angle and the direction of travel
-            push_width = 0.2
-            local_push_region = get_local_region(valid_depth_heightmap, region_width=push_width)
-            # push_may_contact_something is True for something noticeably higher than the push action z height
-            max_local_push_region = np.max(local_push_region)
-            if max_local_push_region < 0.01:
-                # if there is nothing more than 1cm tall, there is nothing to push
-                push_may_contact_something = False
-            else:
-                push_may_contact_something = safe_z_position - workspace_limits[2][0] + robot_push_vertical_offset < max_local_push_region
-            # print('>>>> Gripper will push at height: ' + str(safe_z_position) + ' max height of stuff: ' + str(max_local_push_region) + ' predict contact: ' + str(push_may_contact_something))
-            push_str = ''
-            if not push_may_contact_something:
-                push_str += 'Predicting push action failure, heuristics determined '
-                push_str += 'push at height ' + str(safe_z_position)
-                push_str += ' would not contact anything at the max height of ' + str(max_local_push_region)
-                print(push_str)
-
-        primitive_position = [best_pix_x * heightmap_resolution + workspace_limits[0][0], best_pix_y * heightmap_resolution + workspace_limits[1][0], safe_z_position]
-        return primitive_position, push_may_contact_something
 
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
@@ -908,7 +881,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
-        if stuff_sum < empty_threshold or (is_sim and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -1067,6 +1040,7 @@ def main(args):
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
             # Adjust exploration probability
@@ -1120,7 +1094,7 @@ def main(args):
                     if not os.path.exists(save_location):
                         os.makedirs(save_location)
                     with open(os.path.join(save_location, 'nonlocal_vars_%d.json' % (trainer.iteration)), 'w') as f:
-                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder)
+                        json.dump(nonlocals_to_save, f, cls=utils.NumpyEncoder, sort_keys=True)
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1519,14 +1493,13 @@ if __name__ == '__main__':
     parser.add_argument('--random_weights', dest='random_weights', action='store_true', default=False,                    help='use random weights rather than weights pretrained on ImageNet')
     parser.add_argument('--max_iter', dest='max_iter', action='store', type=int, default=-1,                              help='max iter for training. -1 (default) trains indefinitely.')
     parser.add_argument('--random_trunk_weights_max', dest='random_trunk_weights_max', type=int, action='store', default=0,                      help='Max Number of times to randomly initialize the model trunk before starting backpropagaion. 0 disables this feature entirely, we have also tried 10 but more experiments are needed.')
-    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=0,      help='Max number of times a randomly initialized model should be run without seuccess before trying a new model. 0 disables this feature entirely, we have also tried 10 but more experiements are needed.')
+    parser.add_argument('--random_trunk_weights_reset_iters', dest='random_trunk_weights_reset_iters', type=int, action='store', default=0,      help='Max number of times a randomly initialized model should be run without success before trying a new model. 0 disables this feature entirely, we have also tried 10 but more experiements are needed.')
     parser.add_argument('--random_trunk_weights_min_success', dest='random_trunk_weights_min_success', type=int, action='store', default=4,      help='The minimum number of successes we must have reached before we keep an initial set of random trunk weights.')
     parser.add_argument('--place', dest='place', action='store_true', default=False,                                      help='enable placing of objects')
     parser.add_argument('--skip_noncontact_actions', dest='skip_noncontact_actions', action='store_true', default=False,  help='enable skipping grasp and push actions when the heightmap is zero')
     parser.add_argument('--common_sense', dest='common_sense', action='store_true', default=False,                        help='Use common sense heuristics to detect and train on regions which do not contact anything, and will thus not result in task progress.')
     parser.add_argument('--no_height_reward', dest='no_height_reward', action='store_true', default=False,                help='disable stack height reward multiplier')
     parser.add_argument('--grasp_color_task', dest='grasp_color_task', action='store_true', default=False,                help='enable grasping specific colored objects')
-    parser.add_argument('--grasp_count', dest='grasp_cout', type=int, action='store', default=0,                          help='number of successful task based grasps')
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
     # TODO(ahundt) determine a way to deal with the side effect
@@ -1534,7 +1507,8 @@ if __name__ == '__main__':
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
-    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggerd upon reveral of task progress. Automatically enabled when is_testing is enable.')
+    parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
+    parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
 
 
     # -------------- Testing options --------------
@@ -1553,7 +1527,7 @@ if __name__ == '__main__':
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
-    parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set autmoatically.')
+    parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
 
     # Parse args
     args = parser.parse_args()
@@ -1571,7 +1545,8 @@ if __name__ == '__main__':
         testing_base_directory, testing_best_dict = main(args)
         # move the testing data into the training directory
         training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        os.symlink(training_dest_dir, training_base_directory)
+        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        # os.symlink(training_dest_dir, training_base_directory)
         if not args.place:
             # run preset arrangements for pushing and grasping
             args.test_preset_cases = True
@@ -1579,7 +1554,8 @@ if __name__ == '__main__':
             # run testing mode
             preset_testing_base_directory, preset_testing_best_dict = main(args)
             preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-            os.symlink(preset_training_dest_dir, training_base_directory)
+            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+            # os.symlink(preset_training_dest_dir, training_base_directory)
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 

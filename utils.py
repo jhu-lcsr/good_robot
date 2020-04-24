@@ -141,10 +141,10 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     # subtract out the scene background heights, if available
     if background_heightmap is not None:
         depth_heightmap -= background_heightmap
-        min_z = np.min(depth_heightmap)
+        min_z = np.nanmin(depth_heightmap)
         if min_z < 0:
             depth_heightmap = np.clip(depth_heightmap, 0, None)
-            if min_z < -0.002:
+            if min_z < -0.005:
                 print('WARNING: get_heightmap() depth_heightmap contains negative heights with min ' + str(min_z) + ', '
                     'saved depth heightmap png files may be invalid!'
                     'See README.md for instructions to collect the depth heightmap again.'
@@ -704,9 +704,79 @@ class StackSequence(object):
         else:
             return None
 
-    def next(self):
+    def next(self): 
         self.total_steps += 1
         if self.is_goal_conditioned_task:
             self.object_color_index += 1
             if not self.object_color_index < self.num_obj:
                 self.reset_sequence()
+
+
+def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
+    """ Return if the current arrangement of blocks in the heightmap is a valid row 
+    """
+    heightmap_trans = np.copy(depth_heightmap)
+    heightmap_trans = np.transpose(heightmap_trans)
+
+    heightmaps = (depth_heightmap, heightmap_trans)
+    counts = []
+
+    for heightmap in heightmaps:
+        # threshold pixels which contain a block
+        block_pixels = heightmap > block_height_threshold
+
+        # get positions of all those pixels  
+        coords = np.nonzero(block_pixels)
+        x = coords[1]
+        y = coords[0]
+
+        # get best fit line y=mx+b
+        m, b = np.polyfit(x, y, 1)
+
+        # pick 2 random points on the line and find the unit vector
+        x1 = 0
+        y1 = int(m*x1 + b)
+        x2 = 224
+        y2 = int(m*x2 + b)
+
+        l = np.sqrt((x2-x1)**2 + (y2-y1)**2)
+        x_unit = (x2-x1)/l
+        y_unit = (y2-y1)/l
+
+        # centroid of block_pixels
+        centroid = (int(np.mean(x)), int(np.mean(y)))
+        
+        # get row_boundary_rectangle points
+        x1_r = int(centroid[0] - x_unit * row_boundary_length - y_unit * row_boundary_width)
+        y1_r = int(centroid[1] - y_unit * row_boundary_length + x_unit * row_boundary_width)
+        x2_r = int(centroid[0] + x_unit * row_boundary_length - y_unit * row_boundary_width)
+        y2_r = int(centroid[1] + y_unit * row_boundary_length + x_unit * row_boundary_width)
+        x3_r = int(centroid[0] + x_unit * row_boundary_length + y_unit * row_boundary_width)
+        y3_r = int(centroid[1] + y_unit * row_boundary_length - x_unit * row_boundary_width)
+        x4_r = int(centroid[0] - x_unit * row_boundary_length + y_unit * row_boundary_width)
+        y4_r = int(centroid[1] - y_unit * row_boundary_length - x_unit * row_boundary_width)
+
+        # create row_boundary_mask
+        mask = np.zeros((224,224))
+        pts = np.array([[x1_r,y1_r],[x2_r,y2_r],[x3_r,y3_r],[x4_r,y4_r]], np.int32)
+        pts = pts.reshape((-1,1,2))
+        cv2.fillPoly(mask, [pts], (255,255,255))
+        mask = mask > 0  # convert to bool
+
+        # get all block_pixels inside of row_boundary_rectangle and count them 
+        block_pixels_in_row = np.logical_and(mask, block_pixels)
+        count = np.count_nonzero(block_pixels_in_row)
+
+        counts.append(count)
+
+    true_count = max(counts[0], counts[1])
+    row_size = true_count / block_pixel_size
+
+    if prev_z_height is not None:
+        success = row_size > prev_z_height
+    else:
+        success = True
+
+    print("ROW CHECK PIXEL COUNT: ", true_count, ", success: ", success, ", row size: ", row_size)
+
+    return success, row_size
