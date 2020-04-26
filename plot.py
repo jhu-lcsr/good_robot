@@ -413,45 +413,47 @@ if __name__ == '__main__':
     # window = 1000
     max_iter = None
     window = 1000
-    plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
-    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
-    plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT-Q, Training', max_iter=1000, window=500)
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
+
+    # plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
+    # plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
+    # plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT-Q, Training', max_iter=1000, window=500)
     ##############################################################
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
-    best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
-                              './logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training',
-                              './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
-                              title='Effect of Action Space on Early Training Progress', 
-                              labels=['Dynamic with SPOT-Q', 
-                                      'Dynamic no SPOT-Q', 
-                                      'Standard'],
-                              max_iter=3000, window=window,
-                              ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    # best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
+    #                           './logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training',
+    #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
+    #                           title='Effect of Action Space on Early Training Progress', 
+    #                           labels=['Dynamic with SPOT-Q', 
+    #                                   'Dynamic no SPOT-Q', 
+    #                                   'Standard'],
+    #                           max_iter=3000, window=window,
+    #                           ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
 
     ##############################################################
-    window = 200
-    best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
-                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
-                              './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'], 
-                              title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
-                              max_iter=2000, window=window,
-                              category='grasp_success',
-                              ylabel='Mean Grasp Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
-    # best_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
+    # window = 200
+    # best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
+    #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
+    #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'], 
+    #                           title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
+    #                           max_iter=2000, window=window,
+    #                           category='grasp_success',
+    #                           ylabel='Mean Grasp Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    # # best_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
     # best_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
     # best_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
     # best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
     # Sim stats for final paper:
     # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
     # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
-    print(best_dict)
+    # print(best_dict)
     # log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     # log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'
     # log_dir = './logs/2020-02-03-14-47-16_Sim-Stack-Trial-Reward-Common-Sense-Training'
     # plot_it('./logs/2020-02-10-14-57-07_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT Reward, Common Sense, Training', window=200, max_iter=1000)
     # #############################################################
     # # REAL ROBOT STACKING run
-    plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT-Q Dynamic Action Space, Training', window=500, max_iter=2500, apply_real_robot_speckle_noise_hotfix=True)
+    # plot_it('./logs/2020-02-09-11-02-57_Real-Stack-SPOT-Trial-Reward-Common-Sense-Training','Real Stack, SPOT-Q Dynamic Action Space, Training', window=500, max_iter=2500, apply_real_robot_speckle_noise_hotfix=True)
     # # Max trial success rate: 0.5833333333333334, at action iteration: 449. (total of 737 actions, max excludes first 200 actions)
     # # Max grasp success rate: 0.794392523364486, at action iteration: 289. (total of 750 actions, max excludes first 200 actions)
     # # Max place success rate: 0.7582417582417582, at action iteration: 119. (total of 751 actions, max excludes first 200 actions)
