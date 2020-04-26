@@ -312,8 +312,6 @@ saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_
 
 
 
-
-
 SIM TO REAL TESTING ROWS
 ========================
 
@@ -346,18 +344,40 @@ Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f103
 
 
 
+=============================================================
+2020-04 and 2020-05
+=============================================================
+
+Tab 7: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19990_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+Tab 8: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+
+
+
+SIM STACK DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD
+-------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19990 --place --check_z_height --max_train_actions 10000 --no_height_reward --disable_situation_removal
+RESUME: 
+Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-04_Sim-Stack-Two-Step-Reward-Training
+IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-19-59-01_Sim-Stack-Two-Step-Reward-Training
+GPU 0, Tab 4, port 19990, left v-rep window
+
+
+SIM ROW DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD
+-------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_row --max_train_actions 10000 --no_height_reward --disable_situation_removal
+RESUME: 
+Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-35_Sim-Rows-Two-Step-Reward-Training
+IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-20-00-41_Sim-Rows-Two-Step-Reward-Training
+GPU 1, Tab 5, port 19998, right v-rep window
 
 
 
 
 
-
-
-
-
-
-
-
+=============================================================
+=============================================================
 
 
 TODO:
