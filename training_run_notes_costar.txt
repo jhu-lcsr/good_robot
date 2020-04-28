@@ -353,23 +353,26 @@ Tab 8: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVER
 
 
 
-SIM STACK DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD
--------------------------------------------------------------------------
+SIM STACK DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD - 2020-04-25-19-59-01
+----------------------------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19990 --place --check_z_height --max_train_actions 10000 --no_height_reward --disable_situation_removal
 RESUME: 
 Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-04_Sim-Stack-Two-Step-Reward-Training
 IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-19-59-01_Sim-Stack-Two-Step-Reward-Training
+± cat logs/2020-04-25-21-41-04_Sim-Stack-Two-Step-Reward-Training/2020-04-27-17-44-27_Sim-Stack-Two-Step-Reward-Testing/best_stats.json
+{"action_efficiency_best_index": 3991, "action_efficiency_best_value": 0.019543973941368076, "grasp_success_rate_best_index": 3991, "grasp_success_rate_best_value": 0.9404958677685951, "place_success_rate_best_index": 3991, "place_success_rate_best_value": 0.5837526959022286, "trial_success_rate_best_index": 3991, "trial_success_rate_best_value": 0.13}%
 GPU 0, Tab 4, port 19990, left v-rep window
 
 
-SIM ROW DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD
--------------------------------------------------------------------------
+SIM ROW DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD - 2020-04-25-20-00-41
+--------------------------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_row --max_train_actions 10000 --no_height_reward --disable_situation_removal
-RESUME: 
 Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-35_Sim-Rows-Two-Step-Reward-Training
 IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-20-00-41_Sim-Rows-Two-Step-Reward-Training
+± cat logs/2020-04-25-21-41-35_Sim-Rows-Two-Step-Reward-Training/2020-04-27-17-25-31_Sim-Rows-Two-Step-Reward-Testing/best_stats.json
+{"action_efficiency_best_index": 2124, "action_efficiency_best_value": 0.00847457627118644, "grasp_success_rate_best_index": 2124, "grasp_success_rate_best_value": 0.5886075949367089, "place_success_rate_best_index": 2124, "place_success_rate_best_value": 0.2507204610951009, "trial_success_rate_best_index": 2124, "trial_success_rate_best_value": 0.13}
 GPU 1, Tab 5, port 19998, right v-rep window
 
 
