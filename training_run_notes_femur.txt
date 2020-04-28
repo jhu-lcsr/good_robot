@@ -248,3 +248,40 @@ export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objec
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
 Commit: e6363c7248adce5ddab1c2409d1b90bb86e08dab
 Tab 0, GPU 0, port 19961
+
+
+
+
+
+
+
+
+=============================================================
+2020-04 and 2020-05
+=============================================================
+
+Tab 7: ~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh  -gREMOTEAPISERVERSERVICE_19965_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+Tab 8: ~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh  -gREMOTEAPISERVERSERVICE_19999_FALSE_TRUE -s simulation/simulation.ttt
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN
+-----------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --tcp_port 19965
+RESUME: export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --tcp_port 19965 --resume /home/ahundt/src/real_good_robot/logs/2020-04-27-10-23-17_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-04-27-10-23-17_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+RUN CRASHED, NEEDED TO RESTART: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-04-26-16-03-44_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Commit: b11dc983b93e1b3cf4beeef7a786b51e9df0f751
+GPU 0, Tab 0, port 19965, left v-rep window, v-rep tab 7
+
+
+
+SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN
+-----------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_row --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 10000
+RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_row --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 10000 --resume /home/ahundt/src/real_good_robot/logs/2020-04-26-16-09-48_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-04-26-16-09-48_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Commit: b11dc983b93e1b3cf4beeef7a786b51e9df0f751
+GPU 1, Tab 1, port 1999, right v-rep window, v-rep tab 8
+
+=============================================================
+=============================================================
