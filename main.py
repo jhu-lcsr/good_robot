@@ -1101,13 +1101,16 @@ def main(args):
                         trainer.model = trainer.model.cuda()
                 
                 # reload the best model if trial performance has declined by more than 10%
-                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and 
-                        best_dict['trial_success_rate_best_value'] * 0.9 > current_dict['trial_success_rate_current_value']):
-                    snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
-                    trainer.load_snapshot_file(snapshot_file)
-                    print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
-                          ' is more than 10 percent below the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
-                          ', reloading the best model ' + str(snapshot_file))
+                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict:
+                    allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
+                    if allowed_decline > current_dict['trial_success_rate_current_value']):
+                        # The model quality has declined too much from the peak, reload the previous best model.
+                        snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
+                        trainer.load_snapshot_file(snapshot_file)
+                        print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
+                            ' is below the allowed decline of ' + str(allowed_decline) + 
+                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
+                            ', reloading the best model ' + str(snapshot_file))
 
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000:
