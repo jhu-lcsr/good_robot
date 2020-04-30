@@ -109,7 +109,7 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
     """Evaluate moving window of grasp success rate
     actions: Nx4 array of actions giving [id, rotation, i, j]
-    rewards: an array of size N with the rewards associated with each action, only viable in pushing/grasping scenario, 
+    rewards: an array of size N with the rewards associated with each action, only viable in pushing/grasping scenario,
              do not specify if placing is available, because a place action indicates the previous grasp was successful.
     """
     grasps = actions[:, 0] == utils.ACTION_TO_ID['grasp']
@@ -230,10 +230,10 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
         start = max(i - window, 0)
         window_size = np.array(min(i+1, window), np.float64)
         successful = rewards[start: i+1] > reward_threshold
-        
+
         successful_grasps = np.array(successful[grasps[start:start+successful.shape[0]]].sum(), np.float64)
         # print(successfu)
-        
+
         # print(successful_grasps)
         efficiency[i] = successful_grasps / window
         var = efficiency[i] / np.sqrt(window_size)
@@ -259,8 +259,8 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
     return heights, trial, trial_success, clearance
 
 
-def plot_it(log_dir, title, window=1000, colors=None, 
-            alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True, 
+def plot_it(log_dir, title, window=1000, colors=None,
+            alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True,
             apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
             label=None, categories=None, ylabel=None, save=True):
     if categories is None:
@@ -348,7 +348,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
                          mult*eff_lower, mult*eff_upper,
                          color=colors[2], alpha=alpha)
     if 'grasp_success' in categories:
-        plt.plot(mult*grasp_rate, color=colors[0], label=label or 'Grasp Success Rate')    
+        plt.plot(mult*grasp_rate, color=colors[0], label=label or 'Grasp Success Rate')
         # plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
         #                  mult*grasp_lower, mult*grasp_upper,
         #                  color=colors[0], alpha=alpha)
@@ -357,7 +357,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
         # plt.fill_between(np.arange(1, place_rate.shape[0]+1),
                         #  mult*place_lower, mult*place_upper,
                         #  color=colors[1], alpha=alpha)
-    
+
     if 'trial_success' in categories and os.path.isfile(trial_success_file) and trial_successes.size > 0:
         plt.plot(mult*trial_success_rate, color=colors[3], label=label or 'Trial Success Rate')
         # plt.fill_between(np.arange(1, trial_success_rate.shape[0]+1),
@@ -389,6 +389,8 @@ def plot_it(log_dir, title, window=1000, colors=None,
         print('saving best stats to: ' + best_stats_file)
         with open(best_stats_file, 'w') as f:
             json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+    if clear_figure:
+        plt.close(fig)
     return best_dict
 
 
@@ -422,10 +424,10 @@ if __name__ == '__main__':
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
     # best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
     #                           './logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training',
-    #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'], 
-    #                           title='Effect of Action Space on Early Training Progress', 
-    #                           labels=['Dynamic with SPOT-Q', 
-    #                                   'Dynamic no SPOT-Q', 
+    #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'],
+    #                           title='Effect of Action Space on Early Training Progress',
+    #                           labels=['Dynamic with SPOT-Q',
+    #                                   'Dynamic no SPOT-Q',
     #                                   'Standard'],
     #                           max_iter=3000, window=window,
     #                           ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
@@ -434,7 +436,7 @@ if __name__ == '__main__':
     # window = 200
     # best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
     #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
-    #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'], 
+    #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'],
     #                           title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
     #                           max_iter=2000, window=window,
     #                           category='grasp_success',
