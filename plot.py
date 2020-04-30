@@ -11,16 +11,18 @@ import scipy
 def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
     dict_title = str(title).replace(' ', '_')
-    best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
+    best_dict, current_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
+    current_dict = {dict_title + '_current_value': float(-np.inf), dict_title + '_current_index': None}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
         # If there are multiple entries with equal maximum success rates, take the last one because it will have the most training.
         best_index = np.max(np.argmax(success_rate[window:], axis=0)) + window
-        best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
+        best_dict, current_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
+        current_dict = {dict_title + '_current_value': float(success_rate[-1]), dict_title + '_current_index': int(len(success_rate)-1)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
-    return best_dict
+    return best_dict, current_dict
 
 
 def count_preset_arrangements(trial_complete_indices, trial_successes, num_preset_arrangements, hotfix_trial_success_index=True, log_dir=None):
@@ -51,7 +53,7 @@ def count_preset_arrangements(trial_complete_indices, trial_successes, num_prese
     print('individual_arrangement_trial_success_rate: ' + str(individual_arrangement_trial_success_rate))
     senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
     print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
-    best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
+    best_dict, current_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
     return best_dict
 
 
@@ -102,8 +104,8 @@ def get_trial_success_rate(trials, trial_successes, window=200, hotfix_trial_suc
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_dict = best_success_rate(success_rate, window, 'trial success rate')
-    return success_rate, lower, upper, best_dict
+    best_dict, current_dict = best_success_rate(success_rate, window, 'trial success rate')
+    return success_rate, lower, upper, best_dict, current_dict
 
 
 def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0.5):
@@ -138,8 +140,8 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_dict = best_success_rate(success_rate, window, 'grasp success rate')
-    return success_rate, lower, upper, best_dict
+    best_dict, current_dict = best_success_rate(success_rate, window, 'grasp success rate')
+    return success_rate, lower, upper, best_dict, current_dict
 
 
 def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
@@ -182,8 +184,8 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_dict = best_success_rate(success_rate, window, 'place success rate')
-    return success_rate, lower, upper, best_dict
+    best_dict, current_dict = best_success_rate(success_rate, window, 'place success rate')
+    return success_rate, lower, upper, best_dict, current_dict
 
 
 def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
@@ -213,8 +215,8 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_dict = best_success_rate(efficiency, window, 'action efficiency')
-    return efficiency, lower, upper, best_dict
+    best_dict, current_dict = best_success_rate(efficiency, window, 'action efficiency')
+    return efficiency, lower, upper, best_dict, current_dict
 
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
@@ -242,8 +244,8 @@ def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=2
     lower = np.clip(lower, 0, 1)
     upper = np.clip(upper, 0, 1)
     # Print the best success rate ever, excluding actions before the initial window
-    best_dict = best_success_rate(efficiency, window, 'grasp action efficiency')
-    return efficiency, lower, upper, best_dict
+    best_dict, current_dict = best_success_rate(efficiency, window, 'grasp action efficiency')
+    return efficiency, lower, upper, best_dict, current_dict
 
 
 def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, over_height_threshold=6.0):
@@ -267,7 +269,8 @@ def plot_it(log_dir, title, window=1000, colors=None,
         categories = ['place_success', 'grasp_success', 'action_efficiency', 'trial_success']
     if colors is None:
         colors = ['tab:blue', 'tab:green', 'tab:orange', 'tab:purple']
-    best_dict = {}
+    best_dict, current_dict = {}
+    current_dict = {}
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
         heights = np.loadtxt(stack_height_file)
@@ -319,28 +322,34 @@ def plot_it(log_dir, title, window=1000, colors=None,
             clearance = np.loadtxt(os.path.join(log_dir, 'transitions', 'clearance.log.txt'))
             heights, trials, trial_successes, clearance = real_robot_speckle_noise_hotfix(heights, trials, trial_successes, clearance)
         if trial_successes.size > 0:
-            trial_success_rate, trial_success_lower, trial_success_upper, best = get_trial_success_rate(trials, trial_successes, window=window)
+            trial_success_rate, trial_success_lower, trial_success_upper, best, current = get_trial_success_rate(trials, trial_successes, window=window)
             best_dict.update(best)
+            current_dict.update(current)
         if num_preset_arrangements is not None:
             best = count_preset_arrangements(trial_complete_indices, trial_successes, num_preset_arrangements)
             best_dict.update(best)
+            current_dict.update(current)
     # trial_reward_file = os.path.join(log_dir, 'transitions', 'trial-reward-value.log.txt')
     # if os.path.isfile(trial_reward_file):
     #     grasp_rewards = np.loadtxt(trial_reward_file)
 
-    grasp_rate, grasp_lower, grasp_upper, best = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
+    grasp_rate, grasp_lower, grasp_upper, best, current = get_grasp_success_rate(actions, rewards=grasp_rewards, window=window)
     best_dict.update(best)
+    current_dict.update(current)
     if place:
         if 'row' in log_dir or 'row' in title.lower():
-            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
+            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
         else:
-            place_rate, place_lower, place_upper, best = get_place_success_rate(heights, actions, window=window)
+            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, window=window)
         best_dict.update(best)
-        eff, eff_lower, eff_upper, best = get_action_efficiency(heights, window=window)
+        current_dict.update(current)
+        eff, eff_lower, eff_upper, best, current = get_action_efficiency(heights, window=window)
         best_dict.update(best)
+        current_dict.update(current)
     else:
-        eff, eff_lower, eff_upper, best = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
+        eff, eff_lower, eff_upper, best, current = get_grasp_action_efficiency(actions, grasp_rewards, window=window)
         best_dict.update(best)
+        current_dict.update(current)
 
     if 'action_efficiency' in categories:
         plt.plot(mult*eff, color=colors[2], label=label or 'Action Efficiency')
@@ -391,7 +400,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
     if clear_figure:
         plt.close(fig)
-    return best_dict
+    return best_dict, current_dict
 
 
 def plot_compare(dirs, title, colors=None, labels=None, category='trial_success', **kwargs):
@@ -407,7 +416,7 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
         kwargs['label'] = labels[i]
         kwargs['colors'] = colors[i]
         kwargs['save'] = i == len(dirs)-1
-        best_dicts[run_dir] = plot_it(run_dir, title, **kwargs)
+        best_dicts[run_dir], _ = plot_it(run_dir, title, **kwargs)
     return best_dicts # for some reason
 
 
@@ -422,7 +431,7 @@ if __name__ == '__main__':
     # plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT-Q, Training', max_iter=1000, window=500)
     ##############################################################
     #### IMPORTANT PLOT IN FINAL PAPER, data on costar workstation
-    # best_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
+    # best_dict, current_dict = plot_compare(['./logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training',
     #                           './logs/2020-02-20-16-20-23_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training',
     #                           './logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training'],
     #                           title='Effect of Action Space on Early Training Progress',
@@ -434,20 +443,20 @@ if __name__ == '__main__':
 
     ##############################################################
     # window = 200
-    # best_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
+    # best_dict, current_dict = plot_compare(['./logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training',
     #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-37-47_Sim-Push-and-Grasp-SPOT-Trial-Reward-Training',
     #                           './logs/2020-02-16-push-and-grasp-comparison/2020-02-16-21-33-55_Sim-Push-and-Grasp-Two-Step-Reward-Training'],
     #                           title='Early Grasping Success Rate in Training', labels=['SPOT-Q (Dynamic Action Space)', 'SPOT (Standard Action Space)', 'VPG (Prior Work)'],
     #                           max_iter=2000, window=window,
     #                           category='grasp_success',
     #                           ylabel='Mean Grasp Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
-    # # best_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
-    # best_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
-    # best_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
-    # best_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
+    # # best_dict, current_dict = plot_it('./logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training','Sim Stack, SPOT Trial Reward, Standard Action Space', window=1000)
+    # best_dict, current_dict = plot_it('./logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training', 'Real Push and Grasp, SPOT Reward, Common Sense', window=150)
+    # best_dict, current_dict = plot_it('./logs/2020-02-18-18-58-15_Real-Push-and-Grasp-Two-Step-Reward-Training', 'Real Push and Grasp, VPG', window=150)
+    # best_dict, current_dict = plot_it('./logs/2020-02-14-15-24-00_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=None)
     # Sim stats for final paper:
-    # best_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
-    # best_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
+    # best_dict, current_dict = plot_it('./logs/2020-02-11-15-53-12_Sim-Push-and-Grasp-Two-Step-Reward-Testing', 'Sim Push & Grasp, VPG, Challenging Arrangements', window=None, num_preset_arrangements=11)
+    # best_dict, current_dict = plot_it('./logs/2020-02-12-21-10-24_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim Rows, SPOT Trial Reward, Common Sense, Testing', window=563)
     # print(best_dict)
     # log_dir = './logs/2020-01-20-11-40-56_Sim-Push-and-Grasp-Trial-Reward-Training'
     # log_dir = './logs/2020-01-20-14-25-13_Sim-Push-and-Grasp-Trial-Reward-Training'

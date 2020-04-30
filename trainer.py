@@ -119,15 +119,7 @@ class Trainer(object):
         if snapshot_file:
 
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
-            loaded_snapshot_state_dict = torch.load(snapshot_file)
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            # TODO(ahundt) use map_device param once updated to pytorch 1.4
-            # self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing, map_device='cuda' if self.use_cuda else 'cpu')
-            self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
-            print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
+            self.load_snapshot_file(snapshot_file)
 
         # Convert model from CPU to GPU
         if self.use_cuda:
@@ -170,6 +162,21 @@ class Trainer(object):
             self.partial_stack_success_log = []
             self.place_success_log = []
 
+    def load_snapshot_file(self, snapshot_file, is_testing=None):
+        if is_testing is None:
+            is_testing = self.is_testing
+        # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
+        loaded_snapshot_state_dict = torch.load(snapshot_file)
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        # TODO(ahundt) use map_device param once updated to pytorch 1.4
+        # self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing, map_device='cuda' if self.use_cuda else 'cpu')
+        self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
+        print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
+        if self.use_cuda:
+            self.model = self.model.cuda()
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):

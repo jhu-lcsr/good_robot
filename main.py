@@ -1016,7 +1016,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
@@ -1069,8 +1069,9 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 # save the best model based on all tracked plotting metrics.
                 for k, v in best_dict.items():
-                    if k in prev_best_dict and v > prev_best_dict[k]:
-                        logger.save_model(trainer.model, method + '_' + k)
+                    if k in prev_best_dict:
+                        if v > prev_best_dict[k]:
+                            logger.save_model(trainer.model, method + '_' + k)
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
@@ -1098,14 +1099,25 @@ def main(args):
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
+                
+                # reload the best model if trial performance has declined by more than 10%
+                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and 
+                        best_dict['trial_success_rate_best_value'] * 0.9 > current_dict['trial_success_rate_current_value']):
+                    snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
+                    trainer.load_snapshot_file(snapshot_file)
+                    print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
+                          ' is more than 10 percent below the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
+                          ', reloading the best model ' + str(snapshot_file))
 
                 # Save model if we are at a new best stack rate
-                if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
-                    best_stack_rate = nonlocal_variables['stack_rate']
-                    stack_rate_str = method + '-best-stack-rate'
-                    logger.save_backup_model(trainer.model, stack_rate_str)
-                    logger.save_model(trainer.model, stack_rate_str)
-                    logger.write_to_log('best-iteration', np.array([trainer.iteration]))
+                if place and trainer.iteration >= 1000:
+                    # if the stack rate is lower that means new stacks happen in fewer actions.
+                    if nonlocal_variables['stack_rate'] < best_stack_rate:
+                        best_stack_rate = nonlocal_variables['stack_rate']
+                        stack_rate_str = method + '-best-stack-rate'
+                        logger.save_backup_model(trainer.model, stack_rate_str)
+                        logger.save_model(trainer.model, stack_rate_str)
+                        logger.write_to_log('best-iteration', np.array([trainer.iteration]))
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
@@ -1249,7 +1261,7 @@ def main(args):
         trainer.iteration += 1
 
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
-    best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
     return logger.base_directory, best_dict
 
 
@@ -1262,8 +1274,8 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         if is_testing:
             # when testing the plot data should be averaged across the whole run
             plot_window = trainer.iteration - 3
-        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
-    return best_dict, prev_best_dict
+        best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
+    return best_dict, prev_best_dict, current_dict
 
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
