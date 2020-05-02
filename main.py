@@ -319,6 +319,8 @@ def main(args):
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
 
+    trainer_iteration_of_most_recent_model_reload = 0
+
     def pause(signum, frame):
         """This function is designated as the KeyboardInterrupt handler.
 
@@ -1101,12 +1103,14 @@ def main(args):
                         trainer.model = trainer.model.cuda()
                 
                 # reload the best model if trial performance has declined by more than 10%
-                if trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict:
+                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and
+                   trainer_iteration_of_most_recent_model_reload + 60 < trainer.iteration):
                     allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
                     if allowed_decline > current_dict['trial_success_rate_current_value']:
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
+                        trainer_iteration_of_most_recent_model_reload = trainer.iteration
                         print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
                             ' is below the allowed decline of ' + str(allowed_decline) + 
                             ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
