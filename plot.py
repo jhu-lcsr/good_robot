@@ -12,13 +12,12 @@ def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
     dict_title = str(title).replace(' ', '_')
     best_dict, current_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
-    current_dict = {dict_title + '_current_value': float(-np.inf), dict_title + '_current_index': None}
+    current_dict = {dict_title + '_current_value': float(success_rate[-1]), dict_title + '_current_index': int(len(success_rate)-1)}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
         # If there are multiple entries with equal maximum success rates, take the last one because it will have the most training.
         best_index = np.max(np.argmax(success_rate[window:], axis=0)) + window
-        best_dict, current_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
-        current_dict = {dict_title + '_current_value': float(success_rate[-1]), dict_title + '_current_index': int(len(success_rate)-1)}
+        best_dict = {dict_title + '_best_value': float(best), dict_title + '_best_index': int(best_index)}
         print('Max ' + title + ': ' + str(best) +
               ', at action iteration: ' + str(best_index) +
               '. (total of ' + str(success_rate.shape[0]) + ' actions, max excludes first ' + str(window) + ' actions)')
