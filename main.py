@@ -1101,9 +1101,9 @@ def main(args):
                         trainer.model = trainer.model.cuda()
                 
                 # reload the best model if trial performance has declined by more than 10%
-                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict:
+                if trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict:
                     allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
-                    if allowed_decline > current_dict['trial_success_rate_current_value']):
+                    if allowed_decline > current_dict['trial_success_rate_current_value']:
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
