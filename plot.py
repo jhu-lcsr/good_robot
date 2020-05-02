@@ -269,7 +269,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
         categories = ['place_success', 'grasp_success', 'action_efficiency', 'trial_success']
     if colors is None:
         colors = ['tab:blue', 'tab:green', 'tab:orange', 'tab:purple']
-    best_dict, current_dict = {}
+    best_dict = {}
     current_dict = {}
     stack_height_file = os.path.join(log_dir, 'transitions', 'stack-height.log.txt')
     if os.path.isfile(stack_height_file):
