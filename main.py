@@ -1276,6 +1276,7 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
     if preset_files is not None:
         # note preset_files is changing from a list of strings to an integer
         preset_files = len(preset_files)
+    current_dict = {}
     if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
         prev_best_dict = copy.deepcopy(best_dict)
         if is_testing:
