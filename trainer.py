@@ -448,28 +448,7 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
-            # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
-            push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
-            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
-            if self.place:
-                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
-                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
-            if self.show_heightmap:
-                # visualize the common sense function results
-                # show the heightmap
-                f = plt.figure()
-                # f.suptitle(str(trainer.iteration))
-                f.add_subplot(1,4, 1)
-                plt.imshow(grasp_contact_regions)
-                f.add_subplot(1,4, 2)
-                plt.imshow(push_contactable_regions)
-                f.add_subplot(1,4, 3)
-                plt.imshow(depth_heightmap)
-                f.add_subplot(1,4, 4)
-                plt.imshow(color_heightmap)
-                plt.show(block=True)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(color_heightmap, depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation)
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
