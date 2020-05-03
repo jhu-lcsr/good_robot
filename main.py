@@ -515,13 +515,24 @@ def main(args):
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
-                explore_actions = False if is_testing else np.random.uniform() < explore_prob
-                # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
+                # Exploitation (do best action) vs exploration (do random action)
+                if is_testing:
+                    explore_actions = False
+                else:
+                    explore_actions = np.random.uniform() < explore_prob
+                    if explore_actions:
+                        print('Strategy: explore (exploration probability: %f)' % (explore_prob))
+                    else:
+                        print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
+
+                # If we just did a successful grasp, we always need to place
                 if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                     nonlocal_variables['primitive_action'] = 'place'
                 else:
                     nonlocal_variables['primitive_action'] = 'grasp'
 
+                # determine if the network indicates we should do a push or a grasp
+                # otherwise if we are exploring and not placing choose between push and grasp randomly
                 if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
                     if is_testing and method == 'reactive':
                         if best_push_conf > 2 * best_grasp_conf:
@@ -529,13 +540,10 @@ def main(args):
                     else:
                         if best_push_conf > best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
-                    # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
-                        print('Strategy: explore (exploration probability: %f)' % (explore_prob))
+                        # explore the choices of push actions vs place actions
                         push_frequency_one_in_n = 5
                         nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                    else:
-                        print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
                 # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
@@ -543,10 +551,10 @@ def main(args):
                 # logger.write_to_log('trial', trainer.trial_log)
 
                 if explore_actions and not is_testing:
-                    # choose a random action from the masked predictions
+                    # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
                 else:
-                    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+                    # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
