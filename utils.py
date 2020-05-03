@@ -188,7 +188,7 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
 
     return contactable_regions
 
-def common_sense_action_space_mask(color_heightmap, depth_heightmap, push_predictions, grasp_predictions, place_predictions=None, place_dilation=None, show_heightmap=False):
+def common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions=None, place_dilation=None, show_heightmap=False, color_heightmap=None):
     # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
     # "common sense" dynamic action space, mask pixels we know cannot lead to progress
     push_contactable_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
@@ -211,7 +211,8 @@ def common_sense_action_space_mask(color_heightmap, depth_heightmap, push_predic
         f.add_subplot(1,4, 3)
         plt.imshow(depth_heightmap)
         f.add_subplot(1,4, 4)
-        plt.imshow(color_heightmap)
+        if color_heightmap is not None:
+            plt.imshow(color_heightmap)
         plt.show(block=True)
     return push_predictions, grasp_predictions, place_predictions
 
