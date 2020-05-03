@@ -1108,7 +1108,7 @@ def main(args):
                     allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
                     if allowed_decline > current_dict['trial_success_rate_current_value']:
                         # The model quality has declined too much from the peak, reload the previous best model.
-                        snapshot_file = choose_testing_snapshot(training_base_directory, best_dict)
+                        snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
                         print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
