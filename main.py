@@ -515,7 +515,7 @@ def main(args):
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
-                explore_actions = False
+                explore_actions = False if is_testing else np.random.uniform() < explore_prob
                 # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
                 if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                     nonlocal_variables['primitive_action'] = 'place'
@@ -529,7 +529,6 @@ def main(args):
                     else:
                         if best_push_conf > best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
-                    explore_actions = np.random.uniform() < explore_prob
                     # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
                         print('Strategy: explore (exploration probability: %f)' % (explore_prob))
@@ -1106,7 +1105,7 @@ def main(args):
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
-                
+
                 # reload the best model if trial performance has declined by more than 10%
                 if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and
                    trainer_iteration_of_most_recent_model_reload + 60 < trainer.iteration):
@@ -1117,8 +1116,8 @@ def main(args):
                         trainer.load_snapshot_file(snapshot_file)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
                         print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
-                            ' is below the allowed decline of ' + str(allowed_decline) + 
-                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
+                            ' is below the allowed decline of ' + str(allowed_decline) +
+                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) +
                             ', reloading the best model ' + str(snapshot_file))
 
                 # Save model if we are at a new best stack rate
