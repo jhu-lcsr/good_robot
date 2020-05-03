@@ -448,7 +448,7 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(color_heightmap, depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(color_heightmap, depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap)
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
