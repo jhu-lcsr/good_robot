@@ -188,14 +188,27 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
 
     return contactable_regions
 
-def common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions=None, place_dilation=None, show_heightmap=False, color_heightmap=None):
+def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp_predictions=None, place_predictions=None, place_dilation=None, show_heightmap=False, color_heightmap=None):
+    """ Convert predictions to a masked array indicating if tasks may make progress in this region, based on depth_heightmap.
+
+    The masked arrays will indicate 0 where progress may be possible (no mask applied), and 1 where our model confidently indicates no progress will be made.
+    Note the mask values here are the opposite of the common_sense_failure_heuristic() function, so where that function has a mask value of 0, this function has a value of 1. 
+    In other words the mask values returned here are equivalent to 1-common_sense_action_failure_heuristic(). 
+    This is because in the numpy MaksedArray a True value inticates the data at the corresponding location is INVALID.
+
+    # Returns
+
+    Numpy MaskedArrays push_predictions, grasp_predictions, place_predictions
+    """
     # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
     # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-    push_contactable_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
-    # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
-    push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-    grasp_contact_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
-    grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
+    if push_predictions is not None:
+        push_contactable_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
+        # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
+        push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
+    if grasp_predictions is not None:
+        grasp_contact_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
+        grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
     if place_predictions is not None:
         place_contact_regions = common_sense_action_failure_heuristic(depth_heightmap, gripper_width=place_dilation)
         place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
@@ -205,9 +218,11 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_pred
         f = plt.figure()
         # f.suptitle(str(trainer.iteration))
         f.add_subplot(1,4, 1)
-        plt.imshow(grasp_contact_regions)
+        if grasp_predictions is not None:
+            plt.imshow(grasp_contact_regions)
         f.add_subplot(1,4, 2)
-        plt.imshow(push_contactable_regions)
+        if push_predictions is not None:
+            plt.imshow(push_contactable_regions)
         f.add_subplot(1,4, 3)
         plt.imshow(depth_heightmap)
         f.add_subplot(1,4, 4)
