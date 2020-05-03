@@ -38,4 +38,30 @@ def action_space_argmax(primitive_action, push_predictions, grasp_predictions, p
     best_pixel_index = each_action_max_coordinate[primitive_action]
     predicted_value = each_action_predicted_value[primitive_action]
     return best_pixel_index, each_action_max_coordinate, predicted_value
-    
+
+
+def random_unmasked_index_in_mask_array(maskarray):
+    """ Return an index in a masked array which is selected with a uniform random distribution from the valid aka unmasked entries where the masked value is 0.
+    """
+    # TODO(ahundt) currently a whole new float mask is created to define the probabilities. There may be a much more efficient way to handle this.
+    return np.unravel_index(np.random.choice(maskarray.size, p=np.array(1-maskarray.mask, dtype=np.float)/np.float(maskarray.count())), maskarray.shape)
+
+
+def action_space_explore_random(primitive_action, push_predictions, grasp_predictions, place_predictions=None):
+    """ Return an index in a masked prediction arrays which is selected with a uniform random distribution from the valid aka unmasked entries where the masked value is 0. (rotation, y, x)
+    """
+    each_action_rand_coordinate = {
+        'push': random_unmasked_index_in_mask_array(push_predictions), # push, index 0
+        'grasp': random_unmasked_index_in_mask_array(grasp_predictions),
+    }
+    each_action_predicted_value = {
+        'push': push_predictions[each_action_rand_coordinate['push']], # push, index 0
+        'grasp': grasp_predictions[each_action_rand_coordinate['grasp']],
+    }
+    if place_predictions is not None:
+        each_action_rand_coordinate['place'] = random_unmasked_index_in_mask_array(place_predictions)
+        each_action_predicted_value['place'] = place_predictions[each_action_rand_coordinate['place']]
+    # we will actually execute the best pixel index of the selected action
+    best_pixel_index = each_action_rand_coordinate[primitive_action]
+    predicted_value = each_action_predicted_value[primitive_action]
+    return best_pixel_index, each_action_rand_coordinate, predicted_value

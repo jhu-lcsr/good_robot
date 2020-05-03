@@ -22,6 +22,7 @@ from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils_torch import action_space_argmax
+from utils_torch import action_space_explore_random
 import plot
 import json
 import copy
@@ -542,8 +543,12 @@ def main(args):
                 # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 # logger.write_to_log('trial', trainer.trial_log)
 
-                # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+                if explore_actions and not is_testing:
+                    # choose a random action from the masked predictions
+                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+                else:
+                    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
