@@ -1111,7 +1111,7 @@ def main(args):
                         snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
-                        print('WARNING: current trial performance ' + str(best_dict['trial_success_rate_current_value']) +
+                        print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
                             ' is below the allowed decline of ' + str(allowed_decline) + 
                             ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) + 
                             ', reloading the best model ' + str(snapshot_file))
