@@ -11,7 +11,7 @@ import scipy
 def best_success_rate(success_rate, window, title):
     # Print the best success rate ever
     dict_title = str(title).replace(' ', '_')
-    best_dict, current_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
+    best_dict = {dict_title + '_best_value': float(-np.inf), dict_title + '_best_index': None}
     current_dict = {dict_title + '_current_value': float(success_rate[-1]), dict_title + '_current_index': int(len(success_rate)-1)}
     if success_rate.shape[0] > window:
         best = np.max(success_rate[window:])
