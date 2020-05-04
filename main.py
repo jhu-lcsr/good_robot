@@ -1570,7 +1570,12 @@ if __name__ == '__main__':
     training_base_directory, best_dict = main(args)
     # if os.path.exists()
     if args.max_train_actions is not None:
+        if args.resume:
+            # testing mode will always start from scratch
+            args.resume = None
+        print('Training Complete! Dir: ' + training_base_directory)
         testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
+        print('testing snapshot: ' + str(testing_snapshot))
         args.snapshot_file = testing_snapshot
         args.random_seed = 1238
         args.is_testing = True
