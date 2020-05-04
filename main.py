@@ -222,7 +222,8 @@ def main(args):
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
                       show_heightmap=show_heightmap, place_dilation=place_dilation,
-                      common_sense_backprop=common_sense_backprop)
+                      common_sense_backprop=common_sense_backprop,
+                      trial_reward='discounted' if args.discounted_reward else 'spot')
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -1535,7 +1536,8 @@ if __name__ == '__main__':
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
     # TODO(ahundt) determine a way to deal with the side effect
-    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
+    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers SPOT Trial rewards for the whole trial, not just next step. Decay rate is future_reward_discount.')
+    parser.add_argument('--discounted_reward', dest='discounted_reward', action='store_true', default=False,                        help='Experience replay delivers a standard discounted reward aka decaying reward, with the decay rate set by current_reward_t = future_reward_discount * future_reward_t_plus_1, the final reward is set by the regular spot (non-trial) reward. With this parameter we suggest setting --future_reward_discount 0.9')
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')

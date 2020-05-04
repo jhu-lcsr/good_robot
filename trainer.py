@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True):
+                 common_sense_backprop=True, trial_reward='spot'):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -46,6 +46,7 @@ class Trainer(object):
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
+        self.trial_reward = trial_reward
         if self.place:
             # Stacking Reward Schedule
             reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -252,7 +253,14 @@ class Trainer(object):
             if len(self.trial_reward_value_log) < self.iteration:
                 self.trial_reward_value_log_update()
 
-    def trial_reward_value_log_update(self):
+    def trial_reward_value_log_update(self, reward=None):
+        """
+        Apply trial reward to the most recently completed trial.
+
+        reward: the reward algorithm to use. Options are 'spot', and 'discounted'. 
+        """
+        if reward is None:
+            reward = self.trial_reward
         # update the reward values for a whole trial, not just recent time steps
         end = int(self.clearance_log[-1][0])
         clearance_length = len(self.clearance_log)
@@ -289,17 +297,28 @@ class Trainer(object):
                 # this is confusing, but we are not modifying the previously written code's behavior to reduce
                 # the risks of other bugs cropping up with such a change.
                 current_reward = self.reward_value_log[i][0]
-                if future_r is None:
-                    # Give the final time step its own reward twice.
-                    future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
-                if current_reward > 0:
-                    # If a nonzero score was received, the reward propagates
-                    future_r = current_reward + self.future_reward_discount * future_r
+                if reward == 'spot':
+                    if future_r is None:
+                        # Give the final time step its own reward twice.
+                        future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
+                    if current_reward > 0:
+                        # If a nonzero score was received, the reward propagates
+                        future_r = current_reward + self.future_reward_discount * future_r
+                        new_log_values.append([future_r])
+                    else:
+                        # If the reward was zero, propagation is stopped
+                        new_log_values.append([current_reward])
+                        future_r = current_reward
+                elif reward == 'discounted':
+                    if future_r is None:
+                        future_r = current_reward
+                    else:
+                        future_r = future_r * self.future_reward_discount
                     new_log_values.append([future_r])
                 else:
-                    # If the reward was zero, propagation is stopped
-                    new_log_values.append([current_reward])
-                    future_r = current_reward
+                    raise ValueError('Unsupported trial_reward schedule: ' + str(reward))
+                        
+
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
             if len(self.trial_reward_value_log) != len(self.reward_value_log):
