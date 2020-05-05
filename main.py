@@ -105,6 +105,7 @@ def main(args):
     future_reward_discount = args.future_reward_discount
     experience_replay_enabled = args.experience_replay # Use prioritized experience replay?
     trial_reward = args.trial_reward
+    discounted_reward = args.discounted_reward
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
@@ -224,7 +225,7 @@ def main(args):
                       network=neural_network_name, common_sense=common_sense,
                       show_heightmap=show_heightmap, place_dilation=place_dilation,
                       common_sense_backprop=common_sense_backprop,
-                      trial_reward='discounted' if args.discounted_reward else 'spot')
+                      trial_reward='discounted' if discounted_reward else 'spot')
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -1064,7 +1065,7 @@ def main(args):
                 explore_prob = max(0.5 * np.power(0.9996, trainer.iteration), 0.01) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
-            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if experience_replay_enabled and prev_primitive_action is not None and not is_testing:
                 # Choose if experience replay should be trained on a
                 # historical successful or failed action
                 if prev_primitive_action == 'push':
@@ -1167,13 +1168,13 @@ def main(args):
         # This is the primary experience replay loop which runs while the separate
         # robot thread is physically moving as well as when the program is paused.
         while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                                   grasp_color_task, logger, nonlocal_variables, place, goal_condition,
-                                  trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
+                                  trial_reward=trial_reward or discounted_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
@@ -1370,7 +1371,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         sample_ind = np.argwhere(np.logical_and(log_to_compare[1:max_iteration, 0] == train_on_successful_experience,
                                                 actions == sample_primitive_action_id))
 
-    if sample_ind.size == 0 and prev_reward_value is not None and max_iteration > 2:
+    if sample_ind.size == 0 and (trial_reward or prev_reward_value is not None) and max_iteration > 2:
         print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(train_on_successful_experience) + ', so sampling from the whole history.')
         sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
 
@@ -1380,7 +1381,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
         elif method == 'reinforcement':
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+            if trial_reward:
+                sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.trial_reward_value_log)[sample_ind[:,0]])
+            else:
+                sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
         sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
