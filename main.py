@@ -126,6 +126,7 @@ def main(args):
     random_trunk_weights_max = args.random_trunk_weights_max
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
     random_trunk_weights_min_success = args.random_trunk_weights_min_success
+    random_actions = args.random_actions
 
 
     # -------------- Test grasping options --------------
@@ -551,7 +552,7 @@ def main(args):
                 # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 # logger.write_to_log('trial', trainer.trial_log)
 
-                if explore_actions and not is_testing:
+                if random_actions and explore_actions and not is_testing:
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
                 else:
@@ -1543,6 +1544,7 @@ if __name__ == '__main__':
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
+    parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
 
 
     # -------------- Testing options --------------
