@@ -553,7 +553,8 @@ def main(args):
                 # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 # logger.write_to_log('trial', trainer.trial_log)
 
-                if random_actions and explore_actions and not is_testing:
+                if random_actions and explore_actions and not is_testing and np.random.uniform() < explore_prob:
+                    print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob**2))
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
                 else:
