@@ -1689,9 +1689,11 @@ class Robot(object):
             # Compute tool orientation from heightmap rotation angle
             # tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
             # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
+            if over_block:
+                position[2] += 0.04
 
             # Avoid collision with floor
-            position[2] = max(position[2] + 0.04 + 0.02, workspace_limits[2][0] + 0.02)
+            position[2] = max(position[2] + 0.02, workspace_limits[2][0] + 0.02)
 
             # Move gripper to location above place target
             place_location_margin = 0.2
