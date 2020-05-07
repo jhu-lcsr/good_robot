@@ -1883,14 +1883,14 @@ class Robot(object):
                     # check each rotation angle for a possible row
                     # print('checking {}'.format(block_indices))
                     specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
-                    if specific_success:
+                    if specific_row_size > row_size:
                         success = specific_success
                         row_size = max(row_size, specific_row_size)
                         successful_block_indices = specific_successful_block_indices
                     else:
                         # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
                         specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(posyx, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
-                        if specific_success:
+                        if specific_row_size > row_size:
                             success = specific_success
                             row_size = max(row_size, specific_row_size)
                             successful_block_indices = specific_successful_block_indices
