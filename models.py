@@ -176,7 +176,8 @@ class PixelNet(nn.Module):
             # how much will the dilations affect the upsample step
             self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
-            second_fc_channels = None
+            # second_fc_channels = None
+            second_fc_channels = 64
 
         # Construct network branches for pushing and grasping
         self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
