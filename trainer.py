@@ -55,7 +55,7 @@ class Trainer(object):
             # self.grasp_color_reward = reward_schedule[2]
             # self.place_reward = reward_schedule[3]
             # self.place_color_reward = reward_schedule[4]
-            self.push_reward = 0.25
+            self.push_reward = 0.125
             self.grasp_reward = 1.0
             self.grasp_color_reward = 1.25
             self.place_reward = 1.0
