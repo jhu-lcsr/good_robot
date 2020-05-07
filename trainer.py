@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot'):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -55,7 +55,7 @@ class Trainer(object):
             # self.grasp_color_reward = reward_schedule[2]
             # self.place_reward = reward_schedule[3]
             # self.place_color_reward = reward_schedule[4]
-            self.push_reward = 0.125
+            self.push_reward = 0.1
             self.grasp_reward = 1.0
             self.grasp_color_reward = 1.25
             self.place_reward = 1.0
@@ -80,8 +80,8 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network, num_dilation=num_dilation)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
             push_num_classes = 3 # 0 - push, 1 - no change push, 2 - no loss
@@ -111,8 +111,8 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            # self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
-            self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network, num_dilation=num_dilation)
+            # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
 
@@ -262,7 +262,7 @@ class Trainer(object):
         """
         Apply trial reward to the most recently completed trial.
 
-        reward: the reward algorithm to use. Options are 'spot', and 'discounted'. 
+        reward: the reward algorithm to use. Options are 'spot', and 'discounted'.
         """
         if reward is None:
             reward = self.trial_reward
@@ -322,7 +322,6 @@ class Trainer(object):
                     new_log_values.append([future_r])
                 else:
                     raise ValueError('Unsupported trial_reward schedule: ' + str(reward))
-                        
 
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)

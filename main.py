@@ -118,6 +118,7 @@ def main(args):
     no_height_reward = args.no_height_reward
     transfer_grasp_to_place = args.transfer_grasp_to_place
     neural_network_name = args.nn
+    num_dilation = args.num_dilation
     disable_situation_removal = args.disable_situation_removal
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
@@ -225,7 +226,8 @@ def main(args):
                       network=neural_network_name, common_sense=common_sense,
                       show_heightmap=show_heightmap, place_dilation=place_dilation,
                       common_sense_backprop=common_sense_backprop,
-                      trial_reward='discounted' if discounted_reward else 'spot')
+                      trial_reward='discounted' if discounted_reward else 'spot',
+                      num_dilation=num_dilation)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -1567,6 +1569,7 @@ if __name__ == '__main__':
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
+    parser.add_argument('--num_dilation', dest='num_dilation', type=int, action='store', default=0,                       help='Number of dilations to apply to efficientnet, each increment doubles output resolution and increases computational expense.')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
     parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
