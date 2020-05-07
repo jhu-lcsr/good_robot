@@ -322,7 +322,6 @@ class Trainer(object):
                     new_log_values.append([future_r])
                 else:
                     raise ValueError('Unsupported trial_reward schedule: ' + str(reward))
-                        
 
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
