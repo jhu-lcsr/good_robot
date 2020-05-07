@@ -408,6 +408,7 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-05-01-21-47-56
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000
+RESUME 20k: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
 RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
 Commit (crash): dae67d0f89fba1917e4fb89fc82f8f6171330f1f
@@ -420,10 +421,64 @@ SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-05-01-21
 --------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 10000
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
-RESUME: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 10000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+RESUME 20k: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
 Commit (crash): dae67d0f89fba1917e4fb89fc82f8f6171330f1f
 Commit (resume): 2f9f569f0c9bfd00df480a9dbce1dba8d43b5020
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - costar 
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop
+2020-05-05-14-26-12_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Commit: 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - RANDOM ACTIONS - costar 
+----------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-05-16-44-34_Sim-Stack-SPOT-Trial-Reward-Commo
+Commit: 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.25, 1, 1 - costar 2020-05-06
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+'/home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME: export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume '/home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training'
+Commit: d4e776ffb89f6d916ca7ff96ebaf717bfdd45db5
+Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.25, 1, 1 - costar 2020-05-06
+----------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+'/home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Commit: d4e776ffb89f6d916ca7ff96ebaf717bfdd45db5
+Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
 
 
 =============================================================
