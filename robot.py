@@ -1896,6 +1896,7 @@ class Robot(object):
         """ check_row helper function to workaround that it cannot currently check vertical rows of blocks.
         """
         # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
+        successful_block_indices = []
         xs = pos[block_indices][:, 0]
         ys = pos[block_indices][:, 1]
         # print('xs: {}'.format(xs))
