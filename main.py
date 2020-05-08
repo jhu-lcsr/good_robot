@@ -727,7 +727,9 @@ def main(args):
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
-                    if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                    if (not needed_to_reset and
+                            ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
+                             (check_row and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
@@ -736,13 +738,15 @@ def main(args):
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                            (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
+                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
                                 # we are in testing mode which is frequently recorded,
                                 # so sleep for 10 seconds to show off our results!
                                 time.sleep(10)
                             nonlocal_variables['stack_success'] = True
+                            nonlocal_variables['place_success'] = True
+                            nonlocal_variables['partial_stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
                             successful_trial_count += 1
