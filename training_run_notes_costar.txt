@@ -439,7 +439,7 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
-SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - costar 
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - costar
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop
 2020-05-05-14-26-12_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
@@ -449,7 +449,7 @@ GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
 
 
-SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - RANDOM ACTIONS - costar 
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - RANDOM ACTIONS - costar
 ----------------------------------------------------------------------------------------
 ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop --random_actions
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-05-16-44-34_Sim-Stack-SPOT-Trial-Reward-Commo
@@ -473,6 +473,19 @@ Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
 
+Max trial success rate: 0.89, at action iteration: 4489. (total of 4491 actions, max excludes first 4489 actions)
+Max grasp success rate: 0.6816311260755705, at action iteration: 4489. (total of 4491 actions, max excludes first 4489 actions)
+Max place success rate: 0.6521739130434783, at action iteration: 4489. (total of 4492 actions, max excludes first 4489 actions)
+Max action efficiency: 0.12029405212742258, at action iteration: 4491. (total of 4492 actions, max excludes first 4489 actions)
+saving plot: 2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing-Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+Random Testing Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing
+Random Testing results:
+ {'trial_success_rate_best_value': 0.89, 'trial_success_rate_best_index': 4489, 'grasp_success_rate_best_value': 0.6816311260755705, 'grasp_success_rate_best_index': 4489, 'place_success_rate_best_value': 0.6521739130434783, 'place_success_rate_best_index': 4489, 'action_efficiency_best_value': 0.12029405212742258, 'action_efficiency_best_index': 4491}
+Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Training results:
+ {'trial_success_rate_best_value': 0.7692307692307693, 'trial_success_rate_best_index': 8827, 'grasp_success_rate_best_value': 0.8487084870848709, 'grasp_success_rate_best_index': 7472, 'place_success_rate_best_value': 0.8325991189427313, 'place_success_rate_best_index': 11194, 'action_efficiency_best_value': 0.552, 'action_efficiency_best_index': 11183}
 
 
 SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.25, 1, 1 - costar 2020-05-06
@@ -485,7 +498,24 @@ Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
-
+Max trial success rate: 0.67, at action iteration: 2523. (total of 2525 actions, max excludes first 2523 actions)
+Max grasp success rate: 0.63566388710712, at action iteration: 2523. (total of 2525 actions, max excludes first 2523 actions)
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:178: RuntimeWarning: Mean of empty slice.
+  success_rate[i] = successes.mean()
+/home/costar/.local/lib/python3.6/site-packages/numpy/core/_methods.py:161: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:180: RuntimeWarning: invalid value encountered in double_scalars
+  var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+Max action efficiency: 0.26634958382877527, at action iteration: 2525. (total of 2526 actions, max excludes first 2523 actions)
+saving plot: 2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing-Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+Random Testing Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing
+Random Testing results:
+ {'trial_success_rate_best_value': 0.67, 'trial_success_rate_best_index': 2523, 'grasp_success_rate_best_value': 0.63566388710712, 'grasp_success_rate_best_index': 2523, 'place_success_rate_best_value': -inf, 'place_success_rate_best_index': None, 'action_efficiency_best_value': 0.26634958382877527, 'action_efficiency_best_index': 2525}
+Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Training results:
+ {'trial_success_rate_best_value': 0.5045871559633027, 'trial_success_rate_best_index': 12648, 'grasp_success_rate_best_value': 0.7074829931972789, 'grasp_success_rate_best_index': 12492, 'place_success_rate_best_value': 0.8138297872340425, 'place_success_rate_best_index': 11971, 'action_efficiency_best_value': 0.696, 'action_efficiency_best_index': 12624}
 
 =============================================================
 =============================================================
