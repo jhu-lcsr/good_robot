@@ -55,7 +55,7 @@ class Logger():
         if args is not None:
             params_path = os.path.join(self.base_directory, 'commandline_args.json')
             with open(params_path, 'w') as f:
-                json.dump(vars(args), f)
+                json.dump(vars(args), f, sort_keys=True)
 
     def save_camera_info(self, intrinsics, pose, depth_scale):
         np.savetxt(os.path.join(self.info_directory, 'camera-intrinsics.txt'), intrinsics, delimiter=' ')
