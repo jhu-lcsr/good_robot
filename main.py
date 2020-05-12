@@ -46,10 +46,12 @@ def run_title(args):
         title += 'Push and Grasp, '
     if args.trial_reward:
         title += 'SPOT Trial Reward, '
+    elif args.discounted_reward:
+        title += 'Discounted Reward, '
     else:
         title += 'Two Step Reward, '
     if args.common_sense:
-        title += 'Common Sense, '
+        title += 'Masked, '
 
     if not args.test_preset_cases:
         title += 'Testing' if args.is_testing else 'Training'

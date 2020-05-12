@@ -44,7 +44,14 @@ def random_unmasked_index_in_mask_array(maskarray):
     """ Return an index in a masked array which is selected with a uniform random distribution from the valid aka unmasked entries where the masked value is 0.
     """
     # TODO(ahundt) currently a whole new float mask is created to define the probabilities. There may be a much more efficient way to handle this.
-    return np.unravel_index(np.random.choice(maskarray.size, p=(np.array(1-maskarray.mask, dtype=np.float)/np.float(maskarray.count())).ravel()), maskarray.shape)
+    if np.ma.getmask(maskarray) == np.ma.nomask:
+        # Uniform random across all locations
+        p = None
+    else:
+        # Randomly select from only regions which are valid exploration regions
+        p = (np.array(1-maskarray.mask, dtype=np.float)/np.float(maskarray.count())).ravel()
+
+    return np.unravel_index(np.random.choice(maskarray.size, p=p), maskarray.shape)
 
 
 def action_space_explore_random(primitive_action, push_predictions, grasp_predictions, place_predictions=None):

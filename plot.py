@@ -264,6 +264,9 @@ def plot_it(log_dir, title, window=1000, colors=None,
             alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True,
             apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
             label=None, categories=None, ylabel=None, save=True):
+
+    # set the global plot font to Times New Roman https://stackoverflow.com/a/40734893
+    plt.rcParams["font.family"] = "Times New Roman"
     if categories is None:
         categories = ['place_success', 'grasp_success', 'action_efficiency', 'trial_success']
     if colors is None:
