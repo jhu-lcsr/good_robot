@@ -508,7 +508,7 @@ def main(args):
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
-        while True:
+        while not nonlocal_pause['exit_called']:
             if nonlocal_variables['executing_action']:
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
