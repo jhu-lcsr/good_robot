@@ -1517,6 +1517,24 @@ def choose_testing_snapshot(training_base_directory, best_dict):
     return testing_snapshot
 
 
+
+def check_training_complete(args):
+    ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
+    '''
+    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+
+    training_complete = False
+    iteration = 0
+    if continue_logging:
+        transitions_directory = os.path.join(logging_directory, 'transitions')
+        kwargs = {'delimiter': ' ', 'ndmin': 2}
+        iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0])
+        max_iter_complete = args.max_iter < 0 or iteration < args.max_iter
+        max_train_actions_complete = args.max_train_actions is not None and iteration > args.max_train_actions
+        training_complete = max_iter_complete or max_train_actions_complete
+    return training_complete
+
+
 if __name__ == '__main__':
 
     # Parse arguments
@@ -1591,8 +1609,11 @@ if __name__ == '__main__':
     # Parse args
     args = parser.parse_args()
 
-    # Run main program with specified arguments
-    training_base_directory, best_dict = main(args)
+    training_complete = check_training_complete(args)
+
+    if not training_complete:
+        # Run main program with specified arguments
+        training_base_directory, best_dict = main(args)
     # if os.path.exists()
     if args.max_train_actions is not None:
         if args.resume:
