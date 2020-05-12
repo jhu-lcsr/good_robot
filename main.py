@@ -49,7 +49,7 @@ def run_title(args):
     else:
         title += 'Two Step Reward, '
     if args.common_sense:
-        title += 'Common Sense, '
+        title += 'Masked, '
 
     if not args.test_preset_cases:
         title += 'Testing' if args.is_testing else 'Training'
