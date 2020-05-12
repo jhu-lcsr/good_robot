@@ -1292,6 +1292,12 @@ def main(args):
 
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
     best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    if not is_testing:
+        # save a backup of the best training stats from the original run, this is because plotting updates
+        # or other utilities might modify or overwrite the real stats fom the original run.
+        best_stats_path = os.path.join(training_base_directory, 'best_stats.json')
+        best_stats_backup_path = os.path.join(training_base_directory, 'models', 'training_best_stats.json')
+        shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
 
 
