@@ -166,35 +166,8 @@ def main(args):
         print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
-    if args.resume == 'last':
-        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
-        dirs = list(filter(os.path.isdir, dirs))
-        if dirs:
-            continue_logging = True
-            logging_directory = sorted(dirs)[-1]
-        else:
-            print('no logging dirs to resume, starting new run')
-            continue_logging = False
-            logging_directory = os.path.abspath('logs')
-    elif args.resume:
-        continue_logging = True
-        logging_directory = os.path.abspath(args.resume)
-    else:
-        continue_logging = False
-        logging_directory = os.path.abspath('logs')
-
-    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
-    if continue_logging and not snapshot_file:
-        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
-        print('loading snapshot file: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
-            print('snapshot file does not exist, trying backup: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
-            exit(1)
-
-    save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
+    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+    save_visualizations = args.save_visualizations  # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
     plot_window = args.plot_window
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
@@ -1299,6 +1272,37 @@ def main(args):
         best_stats_backup_path = os.path.join(training_base_directory, 'models', 'training_best_stats.json')
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
+
+
+def parse_resume_and_snapshot_file_args(args):
+    if args.resume == 'last':
+        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
+        dirs = list(filter(os.path.isdir, dirs))
+        if dirs:
+            continue_logging = True
+            logging_directory = sorted(dirs)[-1]
+        else:
+            print('no logging dirs to resume, starting new run')
+            continue_logging = False
+            logging_directory = os.path.abspath('logs')
+    elif args.resume:
+        continue_logging = True
+        logging_directory = os.path.abspath(args.resume)
+    else:
+        continue_logging = False
+        logging_directory = os.path.abspath('logs')
+
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    if continue_logging and not snapshot_file:
+        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
+        print('loading snapshot file: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
+            print('snapshot file does not exist, trying backup: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
+            exit(1)
+    return snapshot_file, continue_logging, logging_directory
 
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
