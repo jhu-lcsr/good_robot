@@ -1535,6 +1535,52 @@ def check_training_complete(args):
     return training_complete
 
 
+def one_train_test_run(args):
+    ''' One run of all necessary training and testing configurations.
+    '''
+    training_complete = check_training_complete(args)
+
+    if not training_complete:
+        # Run main program with specified arguments
+        training_base_directory, best_dict = main(args)
+    # if os.path.exists()
+    if args.max_train_actions is not None:
+        if args.resume:
+            # testing mode will always start from scratch
+            args.resume = None
+        print('Training Complete! Dir: ' + training_base_directory)
+        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
+        print('testing snapshot: ' + str(testing_snapshot))
+        args.snapshot_file = testing_snapshot
+        args.random_seed = 1238
+        args.is_testing = True
+        args.save_visualizations = True
+        args.max_test_trials = 100
+        testing_base_directory, testing_best_dict = main(args)
+        # move the testing data into the training directory
+        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        # os.symlink(training_dest_dir, training_base_directory)
+        if not args.place:
+            # run preset arrangements for pushing and grasping
+            args.test_preset_cases = True
+            args.max_test_trials = 10
+            # run testing mode
+            preset_testing_base_directory, preset_testing_best_dict = main(args)
+            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+            # os.symlink(preset_training_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        print('Random Testing Complete! Dir: ' + training_dest_dir)
+        print('Random Testing results: \n ' + str(testing_best_dict))
+            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+
+    print('Training Complete! Dir: ' + training_base_directory)
+    print('Training results: \n ' + str(best_dict))
+
+
 if __name__ == '__main__':
 
     # Parse arguments
@@ -1609,44 +1655,4 @@ if __name__ == '__main__':
     # Parse args
     args = parser.parse_args()
 
-    training_complete = check_training_complete(args)
-
-    if not training_complete:
-        # Run main program with specified arguments
-        training_base_directory, best_dict = main(args)
-    # if os.path.exists()
-    if args.max_train_actions is not None:
-        if args.resume:
-            # testing mode will always start from scratch
-            args.resume = None
-        print('Training Complete! Dir: ' + training_base_directory)
-        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
-        print('testing snapshot: ' + str(testing_snapshot))
-        args.snapshot_file = testing_snapshot
-        args.random_seed = 1238
-        args.is_testing = True
-        args.save_visualizations = True
-        args.max_test_trials = 100
-        testing_base_directory, testing_best_dict = main(args)
-        # move the testing data into the training directory
-        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-        # os.symlink(training_dest_dir, training_base_directory)
-        if not args.place:
-            # run preset arrangements for pushing and grasping
-            args.test_preset_cases = True
-            args.max_test_trials = 10
-            # run testing mode
-            preset_testing_base_directory, preset_testing_best_dict = main(args)
-            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-            # os.symlink(preset_training_dest_dir, training_base_directory)
-            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
-            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
-
-        print('Random Testing Complete! Dir: ' + training_dest_dir)
-        print('Random Testing results: \n ' + str(testing_best_dict))
-            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
-
-    print('Training Complete! Dir: ' + training_base_directory)
-    print('Training results: \n ' + str(best_dict))
+    one_train_test_run(args)
