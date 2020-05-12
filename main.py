@@ -1352,17 +1352,17 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     sample_primitive_action = prev_primitive_action
     sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
     if trial_reward and len(trainer.trial_reward_value_log) > 2:
-        max_iteration = len(trainer.trial_reward_value_log)
+        log_len = len(trainer.trial_reward_value_log)
     else:
         trial_reward = False
-        max_iteration = trainer.iteration
+        log_len = trainer.iteration
     # executed_action_log includes the action, push grasp or place, and the best pixel index
-    actions = np.asarray(trainer.executed_action_log)[1:max_iteration, 0]
+    actions = np.asarray(trainer.executed_action_log)[1:log_len, 0]
 
     # Get samples of the same primitive but with different success results
     if np.random.random(1) < all_history_prob:
         # Sample all of history every one out of n times.
-        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+        sample_ind = np.arange(1, log_len-1).reshape(log_len-2, 1)
     else:
         # Sample from the current specific action
         if sample_primitive_action == 'push':
@@ -1376,12 +1376,12 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         else:
             raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
 
-        sample_ind = np.argwhere(np.logical_and(log_to_compare[1:max_iteration, 0] == train_on_successful_experience,
+        sample_ind = np.argwhere(np.logical_and(log_to_compare[1:log_len, 0] == train_on_successful_experience,
                                                 actions == sample_primitive_action_id))
 
-    if sample_ind.size == 0 and (trial_reward or prev_reward_value is not None) and max_iteration > 2:
+    if sample_ind.size == 0 and (trial_reward or prev_reward_value is not None) and log_len > 2:
         print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(train_on_successful_experience) + ', so sampling from the whole history.')
-        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+        sample_ind = np.arange(1, log_len-1).reshape(log_len-2, 1)
 
     if sample_ind.size > 0:
         # Find sample with highest surprise value
