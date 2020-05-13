@@ -244,7 +244,8 @@ def main(args):
                       'pause_time_start': time.time(),
                       # setup KeyboardInterrupt signal handler for pausing
                       'original_sigint': signal.getsignal(signal.SIGINT),
-                      'exit_called': False}
+                      'exit_called': False,
+                      'process_actions_exit_called': False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -483,7 +484,7 @@ def main(args):
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
-        while not nonlocal_pause['exit_called']:
+        while not nonlocal_pause['process_actions_exit_called']:
             if nonlocal_variables['executing_action']:
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
@@ -1265,6 +1266,7 @@ def main(args):
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         trainer.iteration += 1
 
+    nonlocal_pause['process_actions_exit_called'] = True
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
     best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
     if not is_testing:
