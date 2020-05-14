@@ -1431,7 +1431,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
         # sample_push_success is always true in the current version, because it only checks if the push action run, not if something was actually pushed, that is handled by change_detected.
         sample_push_success = True
-        # TODO(ahundt) deletme if this has been working for a while, sample reward value isn't actually used for anything...
+        # TODO(ahundt) deleteme if this has been working for a while, sample reward value isn't actually used for anything...
         # if trial_reward:
         #     sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
         # else:
@@ -1553,6 +1553,8 @@ def one_train_test_run(args):
         # Run main program with specified arguments
         training_base_directory, best_dict = main(args)
     # if os.path.exists()
+    testing_best_dict = {}
+    training_dest_dir = ''
     if args.max_train_actions is not None:
         if args.resume:
             # testing mode will always start from scratch
@@ -1588,6 +1590,35 @@ def one_train_test_run(args):
 
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
+    return training_base_directory, best_dict, training_dest_dir, testing_best_dict
+
+
+def ablation(args):
+
+    ablation_dir = utils.mkdir_p(os.path.join('logs', 'ablation'))
+    ablation_summary_json = os.path.join(ablation_dir, 'ablation.json')
+    ablation_summary = {}
+    if os.path.exists(ablation_summary_json):
+        with open(ablation_summary_json, 'r') as f:
+            ablation_summary.update(json.load(f))
+    args_run_one = copy.deepcopy(args)
+
+    run_name = 'two step training (no task progress) Baseline case'
+    args_run_one.no_height_reward = True
+    # export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_z_height --max_train_actions 10000
+    # --no_height_reward
+    training_base_directory, best_dict, training_dest_dir, testing_best_dict = one_train_test_run(args_run_one)
+    preset_training_dest_dir = shutil.move(training_base_directory, ablation_dir)
+
+    # SPOT, no masking, no SPOT-Q "No Reversal" (basic task progress)
+    # export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_z_height --max_train_actions 10000
+    # --no_height_reward
+
+    # SPOT, no masking, Trial Reward
+
+    # SPOT, masking,
+
+    # SPOT, masking, FULL FEATURED RUN
 
 
 if __name__ == '__main__':
@@ -1652,6 +1683,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
+    parser.add_argument('--ablation', dest='ablation', nargs='?', action='store_true', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
@@ -1664,4 +1696,7 @@ if __name__ == '__main__':
     # Parse args
     args = parser.parse_args()
 
-    one_train_test_run(args)
+    if not args.ablation:
+        one_train_test_run(args)
+    else:
+        ablation(args)
