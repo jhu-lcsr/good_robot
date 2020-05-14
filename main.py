@@ -1072,7 +1072,12 @@ def main(args):
                 for k, v in best_dict.items():
                     if k in prev_best_dict:
                         if v > prev_best_dict[k]:
-                            logger.save_model(trainer.model, method + '_' + k)
+                            best_model_name = method + '_' + k
+                            logger.save_model(trainer.model, best_model_name)
+                            best_stats_file = os.path.join(logger.models_directory, best_model_name + '.json')
+                            print('Saving new best model with stats in: ' + best_stats_file)
+                            with open(best_stats_file, 'w') as f:
+                                json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
