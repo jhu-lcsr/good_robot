@@ -1272,8 +1272,8 @@ def main(args):
     if not is_testing:
         # save a backup of the best training stats from the original run, this is because plotting updates
         # or other utilities might modify or overwrite the real stats fom the original run.
-        best_stats_path = os.path.join(training_base_directory, 'best_stats.json')
-        best_stats_backup_path = os.path.join(training_base_directory, 'models', 'training_best_stats.json')
+        best_stats_path = os.path.join(logger.base_directory, 'best_stats.json')
+        best_stats_backup_path = os.path.join(logger.base_directory, 'models', 'training_best_stats.json')
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
 
