@@ -1538,20 +1538,27 @@ def check_training_complete(args):
         transitions_directory = os.path.join(logging_directory, 'transitions')
         kwargs = {'delimiter': ' ', 'ndmin': 2}
         iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0])
-        max_iter_complete = args.max_iter < 0 or iteration < args.max_iter
+        max_iter_complete = args.max_train_actions is None and (args.max_iter < 0 or iteration < args.max_iter)
         max_train_actions_complete = args.max_train_actions is not None and iteration > args.max_train_actions
         training_complete = max_iter_complete or max_train_actions_complete
-    return training_complete
+    return training_complete, logging_directory
 
 
 def one_train_test_run(args):
     ''' One run of all necessary training and testing configurations.
     '''
-    training_complete = check_training_complete(args)
+    training_complete, training_base_directory = check_training_complete(args)
 
     if not training_complete:
         # Run main program with specified arguments
         training_base_directory, best_dict = main(args)
+    else:
+        best_dict_path = os.path.join(training_base_directory, 'best_stats.json')
+        if os.path.exists(best_dict_path):
+            with open(best_dict_path, 'r') as f:
+                best_dict = json.load(f)
+        else:
+            raise ValueError('main.py one_train_test_run() best_dict:' + best_dict_path + ' does not exist! Cannot load final results.')
     # if os.path.exists()
     if args.max_train_actions is not None:
         if args.resume:
