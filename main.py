@@ -1481,7 +1481,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
-def choose_testing_snapshot(training_base_directory, best_dict):
+def choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=False):
     """ Select the best test mode snapshot model file to load after training.
     """
     testing_snapshot = ''
@@ -1502,7 +1502,7 @@ def choose_testing_snapshot(training_base_directory, best_dict):
             else:
                 print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
             print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
-        if best_trial_value > 0.99 and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
+        if (prioritize_action_efficiency or best_trial_value > 0.99) and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
             best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_action_efficiency_best_value.pth')
             if os.path.exists(best_efficiency_snapshot):
                 testing_snapshot = best_efficiency_snapshot
@@ -1588,6 +1588,29 @@ def one_train_test_run(args):
             preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
             # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
             # os.symlink(preset_training_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+        # TODO(ahundt) consider testing action efficiency model too
+        # testing_snapshot_action_efficiency = choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=True)
+        # if not testing_snapshot_action_efficiency == testing_snapshot:
+        #     print('testing snapshot, prioritizing action efficiency: ' + str(testing_snapshot))
+        #     args.snapshot_file = testing_snapshot_action_efficiency
+        #     efficiency_testing_base_directory, testing_best_dict = main(args)
+        #     # move the testing data into the training directory
+        #     training_dest_dir = shutil.move(efficiency_testing_base_directory, training_base_directory)
+        #     if not args.place:
+        #         # run preset arrangements for pushing and grasping
+        #         args.test_preset_cases = True
+        #         args.max_test_trials = 10
+        #         # run testing mode
+        #         preset_testing_base_directory, preset_testing_best_dict = main(args)
+        #         preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        #         # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        #         # os.symlink(preset_training_dest_dir, training_base_directory)
+        #         print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_base_directory)
+        #         print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
+        
+        if not args.place:
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
