@@ -1037,13 +1037,6 @@ def main(args):
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
 
-            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
-            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
-            # Backpropagate
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
-                print('Running two step backprop()')
-                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
-
             # Adjust exploration probability
             if not is_testing:
                 explore_prob = max(0.5 * np.power(0.9996, trainer.iteration), 0.01) if explore_rate_decay else 0.5
@@ -1133,6 +1126,13 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
+            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
+            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
+            # Backpropagate
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
+                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
+    
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
         # objects sometimes stick to each other or have their volumes intersect, and
