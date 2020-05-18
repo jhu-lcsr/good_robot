@@ -1561,7 +1561,9 @@ def one_train_test_run(args):
             raise ValueError('main.py one_train_test_run() best_dict:' + best_dict_path + ' does not exist! Cannot load final results.')
     # if os.path.exists()
     testing_best_dict = {}
-    training_dest_dir = ''
+    training_base_directory = ''
+    testing_dest_dir = ''
+    preset_testing_dest_dir = ''
     if args.max_train_actions is not None:
         if args.resume:
             # testing mode will always start from scratch
@@ -1576,51 +1578,62 @@ def one_train_test_run(args):
         args.max_test_trials = 100
         testing_base_directory, testing_best_dict = main(args)
         # move the testing data into the training directory
-        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        testing_dest_dir = shutil.move(testing_base_directory, training_base_directory)
         # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-        # os.symlink(training_dest_dir, training_base_directory)
+        # os.symlink(testing_dest_dir, training_base_directory)
         if not args.place:
             # run preset arrangements for pushing and grasping
-            args.test_preset_cases = True
-            args.max_test_trials = 10
+            pargs = copy.deepcopy(args)
+            pargs.test_preset_cases = True
+            pargs.max_test_trials = 10
             # run testing mode
-            preset_testing_base_directory, preset_testing_best_dict = main(args)
-            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+            preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+            preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
             # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-            # os.symlink(preset_training_dest_dir, training_base_directory)
-            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
-            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
-        # TODO(ahundt) consider testing action efficiency model too
-        # testing_snapshot_action_efficiency = choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=True)
-        # if not testing_snapshot_action_efficiency == testing_snapshot:
-        #     print('testing snapshot, prioritizing action efficiency: ' + str(testing_snapshot))
-        #     args.snapshot_file = testing_snapshot_action_efficiency
-        #     efficiency_testing_base_directory, testing_best_dict = main(args)
-        #     # move the testing data into the training directory
-        #     training_dest_dir = shutil.move(efficiency_testing_base_directory, training_base_directory)
-        #     if not args.place:
-        #         # run preset arrangements for pushing and grasping
-        #         args.test_preset_cases = True
-        #         args.max_test_trials = 10
-        #         # run testing mode
-        #         preset_testing_base_directory, preset_testing_best_dict = main(args)
-        #         preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        #         # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-        #         # os.symlink(preset_training_dest_dir, training_base_directory)
-        #         print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_base_directory)
-        #         print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
-        
-        if not args.place:
-            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            # os.symlink(preset_testing_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
-        print('Random Testing Complete! Dir: ' + training_dest_dir)
+        # Test action efficiency model too
+        testing_snapshot_action_efficiency = choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=True)
+        if testing_snapshot_action_efficiency != testing_snapshot:
+            print('testing snapshot, prioritizing action efficiency: ' + str(testing_snapshot))
+            args.snapshot_file = testing_snapshot_action_efficiency
+            efficiency_testing_base_directory, eff_testing_best_dict = main(args)
+            # move the testing data into the training directory
+            eff_testing_dest_dir = shutil.move(efficiency_testing_base_directory, training_base_directory)
+
+            if not args.place:
+                # run preset arrangements for pushing and grasping efficiency configuration
+                pargs = copy.deepcopy(args)
+                pargs.test_preset_cases = True
+                pargs.max_test_trials = 10
+                # run testing mode
+                preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+                preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
+                # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+                # os.symlink(preset_testing_dest_dir, training_base_directory)
+                print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_dest_dir)
+                print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
+            
+            test_diff = eff_testing_best_dict['trial_success_rate_best_value'] - testing_best_dict['trial_success_rate_best_value']
+            if test_diff > 0.0 or (abs(test_diff) < 2.0 and testing_best_dict['action_efficiency_best_value'] - eff_testing_best_dict['action_efficiency_best_value'] > 10.0):
+                # keep the better of the saved models
+                testing_best_dict = eff_testing_best_dict
+                testing_dest_dir = eff_testing_dest_dir
+
+        
+        if not args.place:
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        print('Random Testing Complete! Dir: ' + testing_dest_dir)
         print('Random Testing results: \n ' + str(testing_best_dict))
             #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
 
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
-    return training_base_directory, best_dict, training_dest_dir, testing_best_dict
+    return training_base_directory, best_dict, testing_dest_dir, testing_best_dict
 
 
 def ablation(args):
