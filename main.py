@@ -1494,7 +1494,7 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
         else:
             print(best_trial_snapshot + ' does not exist, looking for other options.')
         # If the best trial success rate is high enough, lets use the best action efficiency model
-        if best_trial_value > 0.99 and 'grasp_success_rate_best_value' in best_dict and best_dict['grasp_success_rate_best_value'] > 0.9:
+        if 'grasp_success_rate_best_value' in best_dict and (not testing_snapshot or (best_trial_value > 0.99 and best_dict['grasp_success_rate_best_value'] > 0.9)):
             print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best grasp_success_rate_best_value.')
             best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_grasp_success_rate_best_value.pth')
             if os.path.exists(best_grasp_efficiency_snapshot):
@@ -1502,7 +1502,7 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
             else:
                 print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
             print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
-        if (prioritize_action_efficiency or best_trial_value > 0.99) and 'action_efficiency_best_value' in best_dict and best_dict['action_efficiency_best_value'] > .5:
+        if 'action_efficiency_best_value' in best_dict and (prioritize_action_efficiency or best_trial_value > 0.99) and best_dict['action_efficiency_best_value'] > .5:
             best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_action_efficiency_best_value.pth')
             if os.path.exists(best_efficiency_snapshot):
                 testing_snapshot = best_efficiency_snapshot
@@ -1524,7 +1524,6 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
 
     print('Testing shapshot chosen: ' + testing_snapshot)
     return testing_snapshot
-
 
 
 def check_training_complete(args):
