@@ -1132,7 +1132,7 @@ def main(args):
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 print('Running two step backprop()')
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
-    
+
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
         # objects sometimes stick to each other or have their volumes intersect, and
@@ -1561,7 +1561,6 @@ def one_train_test_run(args):
             raise ValueError('main.py one_train_test_run() best_dict:' + best_dict_path + ' does not exist! Cannot load final results.')
     # if os.path.exists()
     testing_best_dict = {}
-    training_base_directory = ''
     testing_dest_dir = ''
     preset_testing_dest_dir = ''
     if args.max_train_actions is not None:
@@ -1615,14 +1614,14 @@ def one_train_test_run(args):
                 # os.symlink(preset_testing_dest_dir, training_base_directory)
                 print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_dest_dir)
                 print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
-            
+
             test_diff = eff_testing_best_dict['trial_success_rate_best_value'] - testing_best_dict['trial_success_rate_best_value']
             if test_diff > 0.0 or (abs(test_diff) < 2.0 and testing_best_dict['action_efficiency_best_value'] - eff_testing_best_dict['action_efficiency_best_value'] > 10.0):
                 # keep the better of the saved models
                 testing_best_dict = eff_testing_best_dict
                 testing_dest_dir = eff_testing_dest_dir
 
-        
+
         if not args.place:
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
