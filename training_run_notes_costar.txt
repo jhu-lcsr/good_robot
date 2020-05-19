@@ -706,6 +706,29 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
+
+
+
+
+
+SIM STACK - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-18
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-18-19-56-49_Sim-Stack-SPOT-Trial-Reward-Training
+Commit: e99391ae3c0921bd95b5b5d2a7d6e992efa69d63
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+SIM ROW - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-18
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-18-19-57-17_Sim-Rows-SPOT-Trial-Reward-Training
+Commit: e99391ae3c0921bd95b5b5d2a7d6e992efa69d63
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
 =============================================================
 =============================================================
 
