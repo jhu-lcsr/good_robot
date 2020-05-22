@@ -524,6 +524,7 @@ SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - EFFICIENTNET, 1 di
 ---------------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --tcp_port 20000 --future_reward_discount 0.65 --max_train_actions 20000 --nn efficientnet --num_dilation 1 --random_actions
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-15-09-59-06_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Resume: ± export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --tcp_port 20000 --future_reward_discount 0.65 --max_train_actions 20000 --nn efficientnet --num_dilation 1 --random_actions --resume  /home/ahundt/src/real_good_robot/logs/2020-05-15-09-59-06_Sim-Stack-SPOT-Trial-Reward-Masked-Training
 Commit: adb9792b15704fb96adf97622235d6547cbf8386
 GPU 2, Tab 1, port 20000, right v-rep window, v-rep tab 9
 
@@ -546,23 +547,31 @@ GPU 2, Tab 1, port 20000, right v-rep window, v-rep tab 9
 
 
 
-SIM STACK - "No Reversal" (maybe rename basic progress) - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-18
+SIM STACK - "Baseline" - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - TODO
 ---------------------------------------------------------------------------------------------
-± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.9 --max_train_actions 20000 --random_actions --no_height_reward
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-18-20-35-14_Sim-Stack-Two-Step-Reward-Training
-Commit: 7cbb47979cdb12b2e1125fd777a6617b0d5192f9
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward --disable_situation_removal
+BAD RUN RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.9 --max_train_actions 20000 --random_actions --no_height_reward --resume /home/ahundt/src/real_good_robot/logs/2020-05-18-20-35-14_Sim-Stack-Two-Step-Reward-Training
+BAD RUN, used 0.9 discount rather than 0.65: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-18-20-35-14_Sim-Stack-Two-Step-Reward-Training
+Commit:
 GPU 0, Tab 0, port 19965, left v-rep window, v-rep tab 7
 
 
 
-SIM ROW - "No Reversal" (maybe rename basic progress) - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-18
+SIM ROW - "Baseline" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - TODO
 -------------------------------------------------------------------------------------------
-export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-18-20-27-01_Sim-Rows-Two-Step-Reward-Training
-Commit: 7cbb47979cdb12b2e1125fd777a6617b0d5192f9
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward --disable_situation_removal
+Creating data logging session:
+Commit:
 GPU 1, Tab 1, port 19999, right v-rep window, v-rep tab 8
 
 
+
+
+
+
+
+TODO:
+"No Reversal" (maybe rename basic progress)
 
 =============================================================
 =============================================================
