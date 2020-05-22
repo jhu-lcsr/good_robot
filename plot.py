@@ -52,7 +52,7 @@ def count_preset_arrangements(trial_complete_indices, trial_successes, num_prese
     print('individual_arrangement_trial_success_rate: ' + str(individual_arrangement_trial_success_rate))
     senarios_100_percent_complete = np.sum(individual_arrangement_trial_success_rate == 1.0)
     print('senarios_100_percent_complete: ' + str(senarios_100_percent_complete))
-    best_dict, current_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
+    best_dict = {'senarios_100_percent_complete': senarios_100_percent_complete}
     return best_dict
 
 
