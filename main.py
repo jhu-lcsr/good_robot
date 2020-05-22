@@ -1624,8 +1624,10 @@ def ablation(args):
     # SPOT, no masking, Trial Reward
 
     # SPOT, masking,
+    args_run_one.common_sense = True
 
     # SPOT, masking, FULL FEATURED RUN
+    args_run_one.common_sense = True
 
 
 if __name__ == '__main__':
