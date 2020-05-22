@@ -1037,13 +1037,6 @@ def main(args):
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
 
-            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
-            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
-            # Backpropagate
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
-                print('Running two step backprop()')
-                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
-
             # Adjust exploration probability
             if not is_testing:
                 explore_prob = max(0.5 * np.power(0.9996, trainer.iteration), 0.01) if explore_rate_decay else 0.5
@@ -1132,6 +1125,13 @@ def main(args):
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
+
+            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
+            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
+            # Backpropagate
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
+                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
@@ -1481,10 +1481,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
-def choose_testing_snapshot(training_base_directory, best_dict):
+def choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=False):
     """ Select the best test mode snapshot model file to load after training.
     """
     testing_snapshot = ''
+    print('Choosing a snapshot from the following options:' + str(best_dict))
     print('Evaluating trial_success_rate_best_value')
     if 'trial_success_rate_best_value' in best_dict:
         best_trial_value = best_dict['trial_success_rate_best_value']
@@ -1494,16 +1495,18 @@ def choose_testing_snapshot(training_base_directory, best_dict):
         else:
             print(best_trial_snapshot + ' does not exist, looking for other options.')
         # If the best trial success rate is high enough, lets use the best action efficiency model
-        if best_trial_value > 0.99 and 'trial_grasp_action_efficiency_best_value' in best_dict and best_dict['trial_grasp_action_efficiency_best_value']:
-            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_grasp_action_efficiency_best_value.')
-            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_grasp_action_efficiency_best_value.pth')
+        if 'grasp_success_rate_best_value' in best_dict and (not testing_snapshot or (best_trial_value > 0.99 and best_dict['grasp_success_rate_best_value'] > 0.9)):
+            if testing_snapshot:
+                print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best grasp_success_rate_best_value.')
+            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_grasp_success_rate_best_value.pth')
             if os.path.exists(best_grasp_efficiency_snapshot):
                 testing_snapshot = best_grasp_efficiency_snapshot
             else:
                 print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
-            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
-        if best_trial_value > 0.99 and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
-            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_action_efficiency_best_value.pth')
+        if 'action_efficiency_best_value' in best_dict and (prioritize_action_efficiency or best_trial_value > 0.99) and best_dict['action_efficiency_best_value'] > .5:
+            if testing_snapshot:
+                print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best action_efficiency_best_value.')
+            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_action_efficiency_best_value.pth')
             if os.path.exists(best_efficiency_snapshot):
                 testing_snapshot = best_efficiency_snapshot
             else:
@@ -1522,9 +1525,8 @@ def choose_testing_snapshot(training_base_directory, best_dict):
         else:
             print(final_snapshot + ' does not exist, looking for other options.')
 
-    print('Testing shapshot chosen: ' + testing_snapshot)
+    print('Shapshot chosen: ' + testing_snapshot)
     return testing_snapshot
-
 
 
 def check_training_complete(args):
@@ -1561,7 +1563,8 @@ def one_train_test_run(args):
             raise ValueError('main.py one_train_test_run() best_dict:' + best_dict_path + ' does not exist! Cannot load final results.')
     # if os.path.exists()
     testing_best_dict = {}
-    training_dest_dir = ''
+    testing_dest_dir = ''
+    preset_testing_dest_dir = ''
     if args.max_train_actions is not None:
         if args.resume:
             # testing mode will always start from scratch
@@ -1576,28 +1579,62 @@ def one_train_test_run(args):
         args.max_test_trials = 100
         testing_base_directory, testing_best_dict = main(args)
         # move the testing data into the training directory
-        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        testing_dest_dir = shutil.move(testing_base_directory, training_base_directory)
         # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-        # os.symlink(training_dest_dir, training_base_directory)
+        # os.symlink(testing_dest_dir, training_base_directory)
         if not args.place:
             # run preset arrangements for pushing and grasping
-            args.test_preset_cases = True
-            args.max_test_trials = 10
+            pargs = copy.deepcopy(args)
+            pargs.test_preset_cases = True
+            pargs.max_test_trials = 10
             # run testing mode
-            preset_testing_base_directory, preset_testing_best_dict = main(args)
-            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+            preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+            preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
             # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-            # os.symlink(preset_training_dest_dir, training_base_directory)
-            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
+            # os.symlink(preset_testing_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
-        print('Random Testing Complete! Dir: ' + training_dest_dir)
+        # Test action efficiency model too
+        testing_snapshot_action_efficiency = choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=True)
+        if testing_snapshot_action_efficiency != testing_snapshot:
+            print('testing snapshot, prioritizing action efficiency: ' + str(testing_snapshot))
+            args.snapshot_file = testing_snapshot_action_efficiency
+            efficiency_testing_base_directory, eff_testing_best_dict = main(args)
+            # move the testing data into the training directory
+            eff_testing_dest_dir = shutil.move(efficiency_testing_base_directory, training_base_directory)
+
+            if not args.place:
+                # run preset arrangements for pushing and grasping efficiency configuration
+                pargs = copy.deepcopy(args)
+                pargs.test_preset_cases = True
+                pargs.max_test_trials = 10
+                # run testing mode
+                preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+                preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
+                # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+                # os.symlink(preset_testing_dest_dir, training_base_directory)
+                print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_dest_dir)
+                print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
+
+            test_diff = eff_testing_best_dict['trial_success_rate_best_value'] - testing_best_dict['trial_success_rate_best_value']
+            if test_diff > 0.0 or (abs(test_diff) < 2.0 and testing_best_dict['action_efficiency_best_value'] - eff_testing_best_dict['action_efficiency_best_value'] > 10.0):
+                # keep the better of the saved models
+                testing_best_dict = eff_testing_best_dict
+                testing_dest_dir = eff_testing_dest_dir
+
+
+        if not args.place:
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        print('Random Testing Complete! Dir: ' + testing_dest_dir)
         print('Random Testing results: \n ' + str(testing_best_dict))
             #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
 
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
-    return training_base_directory, best_dict, training_dest_dir, testing_best_dict
+    return training_base_directory, best_dict, testing_dest_dir, testing_best_dict
 
 
 def ablation(args):
