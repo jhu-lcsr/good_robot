@@ -7,6 +7,7 @@ import numpy as np
 import itertools
 import utils
 import traceback
+import copy
 from simulation import vrep
 from scipy import ndimage, misc
 try:
@@ -1689,9 +1690,11 @@ class Robot(object):
             # Compute tool orientation from heightmap rotation angle
             # tool_rotation_angle = (heightmap_rotation_angle % np.pi) - np.pi/2
             # tool_orientation = (np.pi/2, tool_rotation_angle, np.pi/2)
+            if over_block:
+                position[2] += 0.04
 
             # Avoid collision with floor
-            position[2] = max(position[2] + 0.04 + 0.02, workspace_limits[2][0] + 0.02)
+            position[2] = max(position[2] + 0.02, workspace_limits[2][0] + 0.02)
 
             # Move gripper to location above place target
             place_location_margin = 0.2
@@ -1858,6 +1861,8 @@ class Robot(object):
                 return True, 1
 
             pos = np.asarray(self.get_obj_positions())
+            posyx = copy.deepcopy(pos)
+            posyx[:, [0,1]] = posyx[:, [1,0]] 
             success = False
             row_size = 1
             row_length = len(object_color_sequence)
@@ -1877,45 +1882,64 @@ class Robot(object):
                 for block_indices in block_indices_of_length:
                     # check each rotation angle for a possible row
                     # print('checking {}'.format(block_indices))
-                    xs = pos[block_indices][:, 0]
-                    ys = pos[block_indices][:, 1]
-                    # print('xs: {}'.format(xs))
-                    # print('ys: {}'.format(ys))
-                    m, b = utils.polyfit(xs, ys, 1)
-
-                    # print('m, b: {}, {}'.format(m, b))
-                    theta = np.arctan(m)  # TODO(bendkill): use arctan2?
-                    c = np.cos(theta)
-                    s = np.sin(theta)
-                    R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
-                    T = np.array([0, -b, 0])
-                    # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
-                    aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
-
-                    aligned = True
-                    median_z = np.median(aligned_pos[:, 2])
-                    for p in aligned_pos:
-                        # print('distance from line: {:.03f}'.format(p[1]))
-                        if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
-                            # too far from line on table, or blocks are not on the same Z plane
-                            aligned = False
-                            break
-
-                    indices = aligned_pos[:, 0].argsort()
-                    xs = aligned_pos[indices, 0]
-                    if aligned and utils.check_separation(xs, separation_threshold):
-                        # print('valid row along', theta, 'with indices', block_indices)
-                        if self.grasp_color_task:
-                            success = np.equal(indices, object_color_sequence).all()
-                        else:
-                            success = True
-                        successful_block_indices = block_indices
-                        row_size = max(len(block_indices), row_size)
-                        continue
+                    specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                    if specific_row_size > row_size:
+                        success = specific_success
+                        row_size = max(row_size, specific_row_size)
+                        successful_block_indices = specific_successful_block_indices
+                    else:
+                        # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
+                        specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(posyx, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                        if specific_row_size > row_size:
+                            success = specific_success
+                            row_size = max(row_size, specific_row_size)
+                            successful_block_indices = specific_successful_block_indices
+                    
 
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
             return success, row_size
+
+    def check_specific_blocks_for_row(self, pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success):
+        """ check_row helper function to workaround that it cannot currently check vertical rows of blocks.
+        """
+        # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
+        successful_block_indices = []
+        xs = pos[block_indices][:, 0]
+        ys = pos[block_indices][:, 1]
+        # print('xs: {}'.format(xs))
+        # print('ys: {}'.format(ys))
+        m, b = utils.polyfit(xs, ys, 1)
+
+        # print('m, b: {}, {}'.format(m, b))
+        theta = np.arctan(m)  # TODO(bendkill): use arctan2?
+        c = np.cos(theta)
+        s = np.sin(theta)
+        R = np.array([[c, s, 0], [-s, c, 0], [0, 0, 1]])
+        T = np.array([0, -b, 0])
+        # aligned_pos rotates X along the line of best fit (in x,y), so y should be small
+        aligned_pos = np.array([np.matmul(R, p + T) for p in pos[block_indices]])
+
+        aligned = True
+        median_z = np.median(aligned_pos[:, 2])
+        for p in aligned_pos:
+            # print('distance from line: {:.03f}'.format(p[1]))
+            if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
+                # too far from line on table, or blocks are not on the same Z plane
+                aligned = False
+                break
+
+        indices = aligned_pos[:, 0].argsort()
+        xs = aligned_pos[indices, 0]
+        if aligned and utils.check_separation(xs, separation_threshold):
+            # print('valid row along', theta, 'with indices', block_indices)
+            if self.grasp_color_task:
+                success = np.equal(indices, object_color_sequence).all()
+            else:
+                success = True
+            successful_block_indices = block_indices
+            row_size = max(len(block_indices), row_size)
+        return success, row_size, successful_block_indices
 
 
     def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):

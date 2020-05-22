@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -46,14 +46,20 @@ class Trainer(object):
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
+        self.trial_reward = trial_reward
         if self.place:
-            # Stacking Reward Schedule
-            reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
-            self.push_reward = reward_schedule[0]
-            self.grasp_reward = reward_schedule[1]
-            self.grasp_color_reward = reward_schedule[2]
-            self.place_reward = reward_schedule[3]
-            self.place_color_reward = reward_schedule[4]
+            # # Stacking Reward Schedule
+            # reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
+            # self.push_reward = reward_schedule[0]
+            # self.grasp_reward = reward_schedule[1]
+            # self.grasp_color_reward = reward_schedule[2]
+            # self.place_reward = reward_schedule[3]
+            # self.place_color_reward = reward_schedule[4]
+            self.push_reward = 0.1
+            self.grasp_reward = 1.0
+            self.grasp_color_reward = 1.25
+            self.place_reward = 1.0
+            self.place_color_reward = 1.25
         else:
             # Push Grasp Reward Schedule
             self.push_reward = 0.5
@@ -74,7 +80,7 @@ class Trainer(object):
 
         # Fully convolutional classification network for supervised learning
         if self.method == 'reactive':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network, num_dilation=num_dilation)
             # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
 
             # Initialize classification loss
@@ -105,7 +111,7 @@ class Trainer(object):
 
         # Fully convolutional Q network for deep reinforcement learning
         elif self.method == 'reinforcement':
-            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
+            self.model = PixelNet(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network, num_dilation=num_dilation)
             # self.model = reinforcement_net(self.use_cuda, goal_condition_len=goal_condition_len, place=place, pretrained=pretrained, network=network)
             self.push_rewards = push_rewards
             self.future_reward_discount = future_reward_discount
@@ -119,15 +125,7 @@ class Trainer(object):
         if snapshot_file:
 
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
-            loaded_snapshot_state_dict = torch.load(snapshot_file)
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
-            # TODO(ahundt) use map_device param once updated to pytorch 1.4
-            # self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing, map_device='cuda' if self.use_cuda else 'cpu')
-            self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
-            print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
+            self.load_snapshot_file(snapshot_file)
 
         # Convert model from CPU to GPU
         if self.use_cuda:
@@ -170,6 +168,21 @@ class Trainer(object):
             self.partial_stack_success_log = []
             self.place_success_log = []
 
+    def load_snapshot_file(self, snapshot_file, is_testing=None):
+        if is_testing is None:
+            is_testing = self.is_testing
+        # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
+        loaded_snapshot_state_dict = torch.load(snapshot_file)
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'), v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+        # TODO(ahundt) use map_device param once updated to pytorch 1.4
+        # self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing, map_device='cuda' if self.use_cuda else 'cpu')
+        self.model.load_state_dict(loaded_snapshot_state_dict, strict=is_testing)
+        print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
+        if self.use_cuda:
+            self.model = self.model.cuda()
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
@@ -245,7 +258,14 @@ class Trainer(object):
             if len(self.trial_reward_value_log) < self.iteration:
                 self.trial_reward_value_log_update()
 
-    def trial_reward_value_log_update(self):
+    def trial_reward_value_log_update(self, reward=None):
+        """
+        Apply trial reward to the most recently completed trial.
+
+        reward: the reward algorithm to use. Options are 'spot', and 'discounted'.
+        """
+        if reward is None:
+            reward = self.trial_reward
         # update the reward values for a whole trial, not just recent time steps
         end = int(self.clearance_log[-1][0])
         clearance_length = len(self.clearance_log)
@@ -282,17 +302,27 @@ class Trainer(object):
                 # this is confusing, but we are not modifying the previously written code's behavior to reduce
                 # the risks of other bugs cropping up with such a change.
                 current_reward = self.reward_value_log[i][0]
-                if future_r is None:
-                    # Give the final time step its own reward twice.
-                    future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
-                if current_reward > 0:
-                    # If a nonzero score was received, the reward propagates
-                    future_r = current_reward + self.future_reward_discount * future_r
+                if reward == 'spot':
+                    if future_r is None:
+                        # Give the final time step its own reward twice.
+                        future_r = current_reward / self.future_reward_discount if self.future_reward_discount != 0.0 else 0.0
+                    if current_reward > 0:
+                        # If a nonzero score was received, the reward propagates
+                        future_r = current_reward + self.future_reward_discount * future_r
+                        new_log_values.append([future_r])
+                    else:
+                        # If the reward was zero, propagation is stopped
+                        new_log_values.append([current_reward])
+                        future_r = current_reward
+                elif reward == 'discounted':
+                    if future_r is None:
+                        future_r = current_reward
+                    else:
+                        future_r = future_r * self.future_reward_discount
                     new_log_values.append([future_r])
                 else:
-                    # If the reward was zero, propagation is stopped
-                    new_log_values.append([current_reward])
-                    future_r = current_reward
+                    raise ValueError('Unsupported trial_reward schedule: ' + str(reward))
+
             # stick the reward_value_log on the end in the forward time order
             self.trial_reward_value_log += reversed(new_log_values)
             if len(self.trial_reward_value_log) != len(self.reward_value_log):
@@ -441,28 +471,7 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            push_contactable_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.04, push_length=0.1)
-            # "1 - push_contactable_regions" switches the values to mark masked regions we should not visit with the value 1
-            push_predictions = np.ma.masked_array(push_predictions, np.broadcast_to(1 - push_contactable_regions, push_predictions.shape, subok=True))
-            grasp_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=0.00)
-            grasp_predictions = np.ma.masked_array(grasp_predictions, np.broadcast_to(1 - grasp_contact_regions, push_predictions.shape, subok=True))
-            if self.place:
-                place_contact_regions = utils.common_sense_action_failure_heuristic(depth_heightmap, gripper_width=self.place_dilation)
-                place_predictions = np.ma.masked_array(place_predictions, np.broadcast_to(1 - place_contact_regions, push_predictions.shape, subok=True))
-            if self.show_heightmap:
-                # visualize the common sense function results
-                # show the heightmap
-                f = plt.figure()
-                # f.suptitle(str(trainer.iteration))
-                f.add_subplot(1,4, 1)
-                plt.imshow(grasp_contact_regions)
-                f.add_subplot(1,4, 2)
-                plt.imshow(push_contactable_regions)
-                f.add_subplot(1,4, 3)
-                plt.imshow(depth_heightmap)
-                f.add_subplot(1,4, 4)
-                plt.imshow(color_heightmap)
-                plt.show(block=True)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)

@@ -92,7 +92,7 @@ def init_trunk_weights(model, branch=None):
     # Initialize network weights
     for m in model.named_modules():
         #if 'push-' in m[0] or 'grasp-' in m[0]:
-        if((branch is None and 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]) or 
+        if((branch is None and 'push-' in m[0] or 'grasp-' in m[0] or 'place-' in m[0]) or
            (branch is not None and branch in m[0])):
             if isinstance(m[1], nn.Conv2d):
                 nn.init.kaiming_normal_(m[1].weight.data)
@@ -111,7 +111,7 @@ def rot_to_affine_mat(rotate_theta):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False, num_dilation=1): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
@@ -145,30 +145,39 @@ class PixelNet(nn.Module):
             second_fc_channels = 64
         else:
             # how many dilations to do at the end of the network
-            num_dilation = 1
-            # Initialize network trunks with DenseNet pre-trained on ImageNet
-            try:
-                if pretrained:
-                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
-                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
-                else:
-                    self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
-                    self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
-                print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
-            except:
-                print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
-                      'instead of the original efficientnet pytorch')
-                num_dilation = 0
+            # num_dilation = 1
+            if num_dilation == 0:
                 if pretrained:
                     self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
                     self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
                 else:
                     self.image_trunk = EfficientNet.from_name('efficientnet-b0')
                     self.push_trunk = EfficientNet.from_name('efficientnet-b0')
+            else:
+                # Initialize network trunks with DenseNet pre-trained on ImageNet
+                try:
+                    if pretrained:
+                        self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                        self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                    else:
+                        self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                        self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                    print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
+                except:
+                    print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                        'instead of the original efficientnet pytorch')
+                    num_dilation = 0
+                    if pretrained:
+                        self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                        self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                    else:
+                        self.image_trunk = EfficientNet.from_name('efficientnet-b0')
+                        self.push_trunk = EfficientNet.from_name('efficientnet-b0')
             # how much will the dilations affect the upsample step
             self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
-            second_fc_channels = None
+            # second_fc_channels = None
+            second_fc_channels = 64
 
         # Construct network branches for pushing and grasping
         self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)
@@ -348,7 +357,7 @@ class PixelNet(nn.Module):
 
 class reinforcement_net(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='densenet', use_vector_block=False, pretrained=True, align_corners=False): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='densenet', use_vector_block=False, pretrained=True, align_corners=False, num_dilation=1): # , snapshot=None
         super(reinforcement_net, self).__init__()
         # super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
@@ -383,30 +392,39 @@ class reinforcement_net(nn.Module):
             second_fc_channels = 64
         else:
             # how many dilations to do at the end of the network
-            num_dilation = 1
-            # Initialize network trunks with DenseNet pre-trained on ImageNet
-            try:
-                if pretrained:
-                    self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
-                    self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
-                else:
-                    self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
-                    self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
-                print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
-            except:
-                print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
-                      'instead of the original efficientnet pytorch')
-                num_dilation = 0
+            # num_dilation = 1
+            if num_dilation == 0:
                 if pretrained:
                     self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
                     self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
                 else:
                     self.image_trunk = EfficientNet.from_name('efficientnet-b0')
                     self.push_trunk = EfficientNet.from_name('efficientnet-b0')
+            else:
+                # Initialize network trunks with DenseNet pre-trained on ImageNet
+                try:
+                    if pretrained:
+                        self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                        self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0', num_dilation=num_dilation)
+                    else:
+                        self.image_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                        self.push_trunk = EfficientNet.from_name('efficientnet-b0', num_dilation=num_dilation)
+                    print('DILATED EfficientNet models created, num_dilation: ' + str(num_dilation))
+                except:
+                    print('WARNING: Could not dilate, try installing https://github.com/ahundt/EfficientNet-PyTorch '
+                          'instead of the original efficientnet pytorch')
+                    num_dilation = 0
+                    if pretrained:
+                        self.image_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                        self.push_trunk = EfficientNet.from_pretrained('efficientnet-b0')
+                    else:
+                        self.image_trunk = EfficientNet.from_name('efficientnet-b0')
+                        self.push_trunk = EfficientNet.from_name('efficientnet-b0')
             # how much will the dilations affect the upsample step
             self.upsample_scale = self.upsample_scale / 2 ** num_dilation
             fc_channels = 1280 * 2
-            second_fc_channels = None
+            # second_fc_channels = None
+            second_fc_channels = 64
 
         # Construct network branches for pushing and grasping
         self.pushnet = trunk_net('push', fc_channels, second_fc_channels, goal_condition_len, 1)

@@ -22,6 +22,7 @@ from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils_torch import action_space_argmax
+from utils_torch import action_space_explore_random
 import plot
 import json
 import copy
@@ -45,10 +46,12 @@ def run_title(args):
         title += 'Push and Grasp, '
     if args.trial_reward:
         title += 'SPOT Trial Reward, '
+    elif args.discounted_reward:
+        title += 'Discounted Reward, '
     else:
         title += 'Two Step Reward, '
     if args.common_sense:
-        title += 'Common Sense, '
+        title += 'Masked, '
 
     if not args.test_preset_cases:
         title += 'Testing' if args.is_testing else 'Training'
@@ -104,6 +107,7 @@ def main(args):
     future_reward_discount = args.future_reward_discount
     experience_replay_enabled = args.experience_replay # Use prioritized experience replay?
     trial_reward = args.trial_reward
+    discounted_reward = args.discounted_reward
     heuristic_bootstrap = args.heuristic_bootstrap # Use handcrafted grasping algorithm when grasping fails too many times in a row?
     explore_rate_decay = args.explore_rate_decay
     grasp_only = args.grasp_only
@@ -116,6 +120,7 @@ def main(args):
     no_height_reward = args.no_height_reward
     transfer_grasp_to_place = args.transfer_grasp_to_place
     neural_network_name = args.nn
+    num_dilation = args.num_dilation
     disable_situation_removal = args.disable_situation_removal
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
@@ -125,6 +130,7 @@ def main(args):
     random_trunk_weights_max = args.random_trunk_weights_max
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
     random_trunk_weights_min_success = args.random_trunk_weights_min_success
+    random_actions = args.random_actions
 
 
     # -------------- Test grasping options --------------
@@ -162,35 +168,8 @@ def main(args):
         print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
-    if args.resume == 'last':
-        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
-        dirs = list(filter(os.path.isdir, dirs))
-        if dirs:
-            continue_logging = True
-            logging_directory = sorted(dirs)[-1]
-        else:
-            print('no logging dirs to resume, starting new run')
-            continue_logging = False
-            logging_directory = os.path.abspath('logs')
-    elif args.resume:
-        continue_logging = True
-        logging_directory = os.path.abspath(args.resume)
-    else:
-        continue_logging = False
-        logging_directory = os.path.abspath('logs')
-
-    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
-    if continue_logging and not snapshot_file:
-        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
-        print('loading snapshot file: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
-            print('snapshot file does not exist, trying backup: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
-            exit(1)
-
-    save_visualizations = args.save_visualizations # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
+    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+    save_visualizations = args.save_visualizations  # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
     plot_window = args.plot_window
 
     # ------ Stacking Blocks and Grasping Specific Colors -----
@@ -221,7 +200,9 @@ def main(args):
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
                       show_heightmap=show_heightmap, place_dilation=place_dilation,
-                      common_sense_backprop=common_sense_backprop)
+                      common_sense_backprop=common_sense_backprop,
+                      trial_reward='discounted' if discounted_reward else 'spot',
+                      num_dilation=num_dilation)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -263,7 +244,8 @@ def main(args):
                       'pause_time_start': time.time(),
                       # setup KeyboardInterrupt signal handler for pausing
                       'original_sigint': signal.getsignal(signal.SIGINT),
-                      'exit_called': False}
+                      'exit_called': False,
+                      'process_actions_exit_called': False}
 
     # Find last executed iteration of pre-loaded log, and load execution info and RL variables
     if continue_logging:
@@ -318,6 +300,8 @@ def main(args):
     if place:
         # If we are stacking we actually skip to the second block which needs to go on the first
         nonlocal_variables['stack'].next()
+
+    trainer_iteration_of_most_recent_model_reload = 0
 
     def pause(signum, frame):
         """This function is designated as the KeyboardInterrupt handler.
@@ -500,7 +484,7 @@ def main(args):
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
-        while True:
+        while not nonlocal_pause['process_actions_exit_called']:
             if nonlocal_variables['executing_action']:
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
@@ -512,13 +496,24 @@ def main(args):
                 else:
                     print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
-                explore_actions = False
-                # TODO(ahundt) this grasp/place condition needs refinement so we can do colors and grasp -> push -> place
+                # Exploitation (do best action) vs exploration (do random action)
+                if is_testing:
+                    explore_actions = False
+                else:
+                    explore_actions = np.random.uniform() < explore_prob
+                    if explore_actions:
+                        print('Strategy: explore (exploration probability: %f)' % (explore_prob))
+                    else:
+                        print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
+
+                # If we just did a successful grasp, we always need to place
                 if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                     nonlocal_variables['primitive_action'] = 'place'
                 else:
                     nonlocal_variables['primitive_action'] = 'grasp'
 
+                # determine if the network indicates we should do a push or a grasp
+                # otherwise if we are exploring and not placing choose between push and grasp randomly
                 if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
                     if is_testing and method == 'reactive':
                         if best_push_conf > 2 * best_grasp_conf:
@@ -526,22 +521,24 @@ def main(args):
                     else:
                         if best_push_conf > best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
-                    explore_actions = np.random.uniform() < explore_prob
-                    # Exploitation (do best action) vs exploration (do random action)
                     if explore_actions:
-                        print('Strategy: explore (exploration probability: %f)' % (explore_prob))
+                        # explore the choices of push actions vs place actions
                         push_frequency_one_in_n = 5
                         nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                    else:
-                        print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
                 # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
                 # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 # logger.write_to_log('trial', trainer.trial_log)
 
-                # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
-                nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+                if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
+                    # Half the time we actually explore the full 2D action space
+                    print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob/2))
+                    # explore a random action from the masked predictions
+                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+                else:
+                    # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
+                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
@@ -706,7 +703,9 @@ def main(args):
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
-                    if not needed_to_reset and nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']:
+                    if (not needed_to_reset and
+                            ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
+                             (check_row and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
@@ -715,13 +714,15 @@ def main(args):
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                            (not check_z_height and len(next_stack_goal) < len(current_stack_goal))):
+                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
                                 # we are in testing mode which is frequently recorded,
                                 # so sleep for 10 seconds to show off our results!
                                 time.sleep(10)
                             nonlocal_variables['stack_success'] = True
+                            nonlocal_variables['place_success'] = True
+                            nonlocal_variables['partial_stack_success'] = True
                             stack_count += 1
                             # full stack complete! reset the scene
                             successful_trial_count += 1
@@ -1016,7 +1017,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
-                best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
@@ -1036,19 +1037,12 @@ def main(args):
                 # Start executing the action for the new trial
                 nonlocal_variables['executing_action'] = True
 
-            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
-            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
-            # Backpropagate
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
-                print('Running two step backprop()')
-                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
-
             # Adjust exploration probability
             if not is_testing:
-                explore_prob = max(0.5 * np.power(0.9998, trainer.iteration), 0.1) if explore_rate_decay else 0.5
+                explore_prob = max(0.5 * np.power(0.9996, trainer.iteration), 0.01) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
-            if experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if experience_replay_enabled and prev_primitive_action is not None and not is_testing:
                 # Choose if experience replay should be trained on a
                 # historical successful or failed action
                 if prev_primitive_action == 'push':
@@ -1069,8 +1063,14 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 # save the best model based on all tracked plotting metrics.
                 for k, v in best_dict.items():
-                    if k in prev_best_dict and v > prev_best_dict[k]:
-                        logger.save_model(trainer.model, method + '_' + k)
+                    if k in prev_best_dict:
+                        if v > prev_best_dict[k]:
+                            best_model_name = method + '_' + k
+                            logger.save_model(trainer.model, best_model_name)
+                            best_stats_file = os.path.join(logger.models_directory, best_model_name + '.json')
+                            print('Saving new best model with stats in: ' + best_stats_file)
+                            with open(best_stats_file, 'w') as f:
+                                json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
@@ -1099,16 +1099,39 @@ def main(args):
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
 
+                # reload the best model if trial performance has declined by more than 10%
+                if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and
+                   trainer_iteration_of_most_recent_model_reload + 60 < trainer.iteration):
+                    allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
+                    if allowed_decline > current_dict['trial_success_rate_current_value']:
+                        # The model quality has declined too much from the peak, reload the previous best model.
+                        snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
+                        trainer.load_snapshot_file(snapshot_file)
+                        trainer_iteration_of_most_recent_model_reload = trainer.iteration
+                        print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
+                            ' is below the allowed decline of ' + str(allowed_decline) +
+                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) +
+                            ', reloading the best model ' + str(snapshot_file))
+
                 # Save model if we are at a new best stack rate
-                if place and trainer.iteration >= 1000 and nonlocal_variables['stack_rate'] < best_stack_rate:
-                    best_stack_rate = nonlocal_variables['stack_rate']
-                    stack_rate_str = method + '-best-stack-rate'
-                    logger.save_backup_model(trainer.model, stack_rate_str)
-                    logger.save_model(trainer.model, stack_rate_str)
-                    logger.write_to_log('best-iteration', np.array([trainer.iteration]))
+                if place and trainer.iteration >= 1000:
+                    # if the stack rate is lower that means new stacks happen in fewer actions.
+                    if nonlocal_variables['stack_rate'] < best_stack_rate:
+                        best_stack_rate = nonlocal_variables['stack_rate']
+                        stack_rate_str = method + '-best-stack-rate'
+                        logger.save_backup_model(trainer.model, stack_rate_str)
+                        logger.save_model(trainer.model, stack_rate_str)
+                        logger.write_to_log('best-iteration', np.array([trainer.iteration]))
 
                     if trainer.use_cuda:
                         trainer.model = trainer.model.cuda()
+
+            # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
+            backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
+            # Backpropagate
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+                print('Running two step backprop()')
+                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
@@ -1134,13 +1157,13 @@ def main(args):
         # This is the primary experience replay loop which runs while the separate
         # robot thread is physically moving as well as when the program is paused.
         while nonlocal_variables['executing_action'] or nonlocal_pause['pause'] or wait_until_home_and_not_executing_action:
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and prev_reward_value is not None and not is_testing:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and experience_replay_enabled and not is_testing:
                 # flip between training success and failure, disabled because it appears to slow training down
                 # train_on_successful_experience = not train_on_successful_experience
                 # do some experience replay while waiting, rather than sleeping
                 experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
                                   grasp_color_task, logger, nonlocal_variables, place, goal_condition,
-                                  trial_reward=trial_reward, train_on_successful_experience=train_on_successful_experience)
+                                  trial_reward=trial_reward or discounted_reward, train_on_successful_experience=train_on_successful_experience)
             else:
                 time.sleep(0.1)
             time_elapsed = time.time()-iteration_time_0
@@ -1248,22 +1271,61 @@ def main(args):
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         trainer.iteration += 1
 
+    nonlocal_pause['process_actions_exit_called'] = True
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
-    best_dict, prev_best_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    if not is_testing:
+        # save a backup of the best training stats from the original run, this is because plotting updates
+        # or other utilities might modify or overwrite the real stats fom the original run.
+        best_stats_path = os.path.join(logger.base_directory, 'best_stats.json')
+        best_stats_backup_path = os.path.join(logger.base_directory, 'models', 'training_best_stats.json')
+        shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
+
+
+def parse_resume_and_snapshot_file_args(args):
+    if args.resume == 'last':
+        dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
+        dirs = list(filter(os.path.isdir, dirs))
+        if dirs:
+            continue_logging = True
+            logging_directory = sorted(dirs)[-1]
+        else:
+            print('no logging dirs to resume, starting new run')
+            continue_logging = False
+            logging_directory = os.path.abspath('logs')
+    elif args.resume:
+        continue_logging = True
+        logging_directory = os.path.abspath(args.resume)
+    else:
+        continue_logging = False
+        logging_directory = os.path.abspath('logs')
+
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    if continue_logging and not snapshot_file:
+        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
+        print('loading snapshot file: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
+            print('snapshot file does not exist, trying backup: ' + snapshot_file)
+        if not os.path.isfile(snapshot_file):
+            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
+            exit(1)
+    return snapshot_file, continue_logging, logging_directory
 
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
     if preset_files is not None:
         # note preset_files is changing from a list of strings to an integer
         preset_files = len(preset_files)
+    current_dict = {}
     if (trainer.iteration > plot_window or is_testing) and num_trials > 1:
         prev_best_dict = copy.deepcopy(best_dict)
         if is_testing:
             # when testing the plot data should be averaged across the whole run
             plot_window = trainer.iteration - 3
-        best_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
-    return best_dict, prev_best_dict
+        best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
+    return best_dict, prev_best_dict, current_dict
 
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
@@ -1309,17 +1371,17 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
     sample_primitive_action = prev_primitive_action
     sample_primitive_action_id = ACTION_TO_ID[sample_primitive_action]
     if trial_reward and len(trainer.trial_reward_value_log) > 2:
-        max_iteration = len(trainer.trial_reward_value_log)
+        log_len = len(trainer.trial_reward_value_log)
     else:
         trial_reward = False
-        max_iteration = trainer.iteration
+        log_len = trainer.iteration
     # executed_action_log includes the action, push grasp or place, and the best pixel index
-    actions = np.asarray(trainer.executed_action_log)[1:max_iteration, 0]
+    actions = np.asarray(trainer.executed_action_log)[1:log_len, 0]
 
     # Get samples of the same primitive but with different success results
     if np.random.random(1) < all_history_prob:
         # Sample all of history every one out of n times.
-        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+        sample_ind = np.arange(1, log_len-1).reshape(log_len-2, 1)
     else:
         # Sample from the current specific action
         if sample_primitive_action == 'push':
@@ -1333,12 +1395,12 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         else:
             raise NotImplementedError('ERROR: ' + sample_primitive_action + ' action is not yet supported in experience replay')
 
-        sample_ind = np.argwhere(np.logical_and(log_to_compare[1:max_iteration, 0] == train_on_successful_experience,
+        sample_ind = np.argwhere(np.logical_and(log_to_compare[1:log_len, 0] == train_on_successful_experience,
                                                 actions == sample_primitive_action_id))
 
-    if sample_ind.size == 0 and prev_reward_value is not None and max_iteration > 2:
+    if sample_ind.size == 0 and (trial_reward or prev_reward_value is not None) and log_len > 2:
         print('Experience Replay: We do not have samples for the ' + sample_primitive_action + ' action with a success state of ' + str(train_on_successful_experience) + ', so sampling from the whole history.')
-        sample_ind = np.arange(1, max_iteration-1).reshape(max_iteration-2, 1)
+        sample_ind = np.arange(1, log_len-1).reshape(log_len-2, 1)
 
     if sample_ind.size > 0:
         # Find sample with highest surprise value
@@ -1346,7 +1408,10 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
             # TODO(ahundt) BUG what to do with prev_reward_value? (formerly named sample_reward_value in previous commits)
             sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - (1 - prev_reward_value))
         elif method == 'reinforcement':
-            sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
+            if trial_reward:
+                sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.trial_reward_value_log)[sample_ind[:,0]])
+            else:
+                sample_surprise_values = np.abs(np.asarray(trainer.predicted_value_log)[sample_ind[:, 0]] - np.asarray(trainer.label_value_log)[sample_ind[:,0]])
         sorted_surprise_ind = np.argsort(sample_surprise_values[:, 0])
         sorted_sample_ind = sample_ind[sorted_surprise_ind, 0]
         pow_law_exp = 2
@@ -1366,7 +1431,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
         # sample_push_success is always true in the current version, because it only checks if the push action run, not if something was actually pushed, that is handled by change_detected.
         sample_push_success = True
-        # TODO(ahundt) deletme if this has been working for a while, sample reward value isn't actually used for anything...
+        # TODO(ahundt) deleteme if this has been working for a while, sample reward value isn't actually used for anything...
         # if trial_reward:
         #     sample_reward_value = trainer.trial_reward_value_log[sample_iteration]
         # else:
@@ -1416,10 +1481,11 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         time.sleep(0.01)
 
 
-def choose_testing_snapshot(training_base_directory, best_dict):
+def choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=False):
     """ Select the best test mode snapshot model file to load after training.
     """
     testing_snapshot = ''
+    print('Choosing a snapshot from the following options:' + str(best_dict))
     print('Evaluating trial_success_rate_best_value')
     if 'trial_success_rate_best_value' in best_dict:
         best_trial_value = best_dict['trial_success_rate_best_value']
@@ -1429,16 +1495,18 @@ def choose_testing_snapshot(training_base_directory, best_dict):
         else:
             print(best_trial_snapshot + ' does not exist, looking for other options.')
         # If the best trial success rate is high enough, lets use the best action efficiency model
-        if best_trial_value > 0.99 and 'trial_grasp_action_efficiency_best_value' in best_dict and best_dict['trial_grasp_action_efficiency_best_value']:
-            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_grasp_action_efficiency_best_value.')
-            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_grasp_action_efficiency_best_value.pth')
+        if 'grasp_success_rate_best_value' in best_dict and (not testing_snapshot or (best_trial_value > 0.99 and best_dict['grasp_success_rate_best_value'] > 0.9)):
+            if testing_snapshot:
+                print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best grasp_success_rate_best_value.')
+            best_grasp_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_grasp_success_rate_best_value.pth')
             if os.path.exists(best_grasp_efficiency_snapshot):
                 testing_snapshot = best_grasp_efficiency_snapshot
             else:
                 print(best_grasp_efficiency_snapshot + ' does not exist, looking for other options.')
-            print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best trial_action_efficiency_best_value.')
-        if best_trial_value > 0.99 and 'trial_action_efficiency_best_value' in best_dict and best_dict['trial_action_efficiency_best_value']:
-            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_trial_action_efficiency_best_value.pth')
+        if 'action_efficiency_best_value' in best_dict and (prioritize_action_efficiency or best_trial_value > 0.99) and best_dict['action_efficiency_best_value'] > .5:
+            if testing_snapshot:
+                print('The trial_success_rate_best_value is fantastic at ' + str(best_trial_value) + ', so we will look for the best action_efficiency_best_value.')
+            best_efficiency_snapshot = os.path.join(training_base_directory, 'models', 'snapshot.reinforcement_action_efficiency_best_value.pth')
             if os.path.exists(best_efficiency_snapshot):
                 testing_snapshot = best_efficiency_snapshot
             else:
@@ -1457,8 +1525,146 @@ def choose_testing_snapshot(training_base_directory, best_dict):
         else:
             print(final_snapshot + ' does not exist, looking for other options.')
 
-    print('Testing shapshot chosen: ' + testing_snapshot)
+    print('Shapshot chosen: ' + testing_snapshot)
     return testing_snapshot
+
+
+def check_training_complete(args):
+    ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
+    '''
+    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+
+    training_complete = False
+    iteration = 0
+    if continue_logging:
+        transitions_directory = os.path.join(logging_directory, 'transitions')
+        kwargs = {'delimiter': ' ', 'ndmin': 2}
+        iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0])
+        max_iter_complete = args.max_train_actions is None and (args.max_iter < 0 or iteration < args.max_iter)
+        max_train_actions_complete = args.max_train_actions is not None and iteration > args.max_train_actions
+        training_complete = max_iter_complete or max_train_actions_complete
+    return training_complete, logging_directory
+
+
+def one_train_test_run(args):
+    ''' One run of all necessary training and testing configurations.
+    '''
+    training_complete, training_base_directory = check_training_complete(args)
+
+    if not training_complete:
+        # Run main program with specified arguments
+        training_base_directory, best_dict = main(args)
+    else:
+        best_dict_path = os.path.join(training_base_directory, 'best_stats.json')
+        if os.path.exists(best_dict_path):
+            with open(best_dict_path, 'r') as f:
+                best_dict = json.load(f)
+        else:
+            raise ValueError('main.py one_train_test_run() best_dict:' + best_dict_path + ' does not exist! Cannot load final results.')
+    # if os.path.exists()
+    testing_best_dict = {}
+    testing_dest_dir = ''
+    preset_testing_dest_dir = ''
+    if args.max_train_actions is not None:
+        if args.resume:
+            # testing mode will always start from scratch
+            args.resume = None
+        print('Training Complete! Dir: ' + training_base_directory)
+        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
+        print('testing snapshot: ' + str(testing_snapshot))
+        args.snapshot_file = testing_snapshot
+        args.random_seed = 1238
+        args.is_testing = True
+        args.save_visualizations = True
+        args.max_test_trials = 100
+        testing_base_directory, testing_best_dict = main(args)
+        # move the testing data into the training directory
+        testing_dest_dir = shutil.move(testing_base_directory, training_base_directory)
+        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+        # os.symlink(testing_dest_dir, training_base_directory)
+        if not args.place:
+            # run preset arrangements for pushing and grasping
+            pargs = copy.deepcopy(args)
+            pargs.test_preset_cases = True
+            pargs.max_test_trials = 10
+            # run testing mode
+            preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+            preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
+            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+            # os.symlink(preset_testing_dest_dir, training_base_directory)
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        # Test action efficiency model too
+        testing_snapshot_action_efficiency = choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=True)
+        if testing_snapshot_action_efficiency != testing_snapshot:
+            print('testing snapshot, prioritizing action efficiency: ' + str(testing_snapshot))
+            args.snapshot_file = testing_snapshot_action_efficiency
+            efficiency_testing_base_directory, eff_testing_best_dict = main(args)
+            # move the testing data into the training directory
+            eff_testing_dest_dir = shutil.move(efficiency_testing_base_directory, training_base_directory)
+
+            if not args.place:
+                # run preset arrangements for pushing and grasping efficiency configuration
+                pargs = copy.deepcopy(args)
+                pargs.test_preset_cases = True
+                pargs.max_test_trials = 10
+                # run testing mode
+                preset_testing_base_directory, preset_testing_best_dict = main(pargs)
+                preset_testing_dest_dir = shutil.move(preset_testing_base_directory, training_base_directory)
+                # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
+                # os.symlink(preset_testing_dest_dir, training_base_directory)
+                print('Challenging Arrangements Preset Testing Complete! Action Efficiency Model Dir: ' + preset_testing_dest_dir)
+                print('Challenging Arrangements Preset Testing results Action Efficiency Model Dir: \n ' + str(preset_testing_best_dict))
+
+            test_diff = eff_testing_best_dict['trial_success_rate_best_value'] - testing_best_dict['trial_success_rate_best_value']
+            if test_diff > 0.0 or (abs(test_diff) < 2.0 and testing_best_dict['action_efficiency_best_value'] - eff_testing_best_dict['action_efficiency_best_value'] > 10.0):
+                # keep the better of the saved models
+                testing_best_dict = eff_testing_best_dict
+                testing_dest_dir = eff_testing_dest_dir
+
+
+        if not args.place:
+            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
+            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
+
+        print('Random Testing Complete! Dir: ' + testing_dest_dir)
+        print('Random Testing results: \n ' + str(testing_best_dict))
+            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+
+    print('Training Complete! Dir: ' + training_base_directory)
+    print('Training results: \n ' + str(best_dict))
+    return training_base_directory, best_dict, testing_dest_dir, testing_best_dict
+
+
+def ablation(args):
+
+    ablation_dir = utils.mkdir_p(os.path.join('logs', 'ablation'))
+    ablation_summary_json = os.path.join(ablation_dir, 'ablation.json')
+    ablation_summary = {}
+    if os.path.exists(ablation_summary_json):
+        with open(ablation_summary_json, 'r') as f:
+            ablation_summary.update(json.load(f))
+    args_run_one = copy.deepcopy(args)
+
+    run_name = 'two step training (no task progress) Baseline case'
+    args_run_one.no_height_reward = True
+    # export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_z_height --max_train_actions 10000
+    # --no_height_reward
+    training_base_directory, best_dict, training_dest_dir, testing_best_dict = one_train_test_run(args_run_one)
+    preset_training_dest_dir = shutil.move(training_base_directory, ablation_dir)
+
+    # SPOT, no masking, no SPOT-Q "No Reversal" (basic task progress)
+    # export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_z_height --max_train_actions 10000
+    # --no_height_reward
+
+    # SPOT, no masking, Trial Reward
+
+    # SPOT, masking,
+    args_run_one.common_sense = True
+
+    # SPOT, masking, FULL FEATURED RUN
+    args_run_one.common_sense = True
 
 
 if __name__ == '__main__':
@@ -1503,12 +1709,14 @@ if __name__ == '__main__':
     parser.add_argument('--transfer_grasp_to_place', dest='transfer_grasp_to_place', action='store_true', default=False,  help='Load the grasping weights as placing weights.')
     parser.add_argument('--check_z_height', dest='check_z_height', action='store_true', default=False,                    help='use check_z_height instead of check_stacks for any stacks')
     # TODO(ahundt) determine a way to deal with the side effect
-    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers rewards for the whole trial, not just next step. ')
+    parser.add_argument('--trial_reward', dest='trial_reward', action='store_true', default=False,                        help='Experience replay delivers SPOT Trial rewards for the whole trial, not just next step. Decay rate is future_reward_discount.')
+    parser.add_argument('--discounted_reward', dest='discounted_reward', action='store_true', default=False,                        help='Experience replay delivers a standard discounted reward aka decaying reward, with the decay rate set by current_reward_t = future_reward_discount * future_reward_t_plus_1, the final reward is set by the regular spot (non-trial) reward. With this parameter we suggest setting --future_reward_discount 0.9')
     parser.add_argument('--disable_two_step_backprop', dest='disable_two_step_backprop', action='store_true', default=False,                        help='There is a local two time step training and backpropagation which does not precisely match trial rewards, this flag disables it. ')
     parser.add_argument('--check_z_height_goal', dest='check_z_height_goal', action='store', type=float, default=4.0,          help='check_z_height goal height, a value of 2.0 is 0.1 meters, and a value of 4.0 is 0.2 meters')
     parser.add_argument('--check_z_height_max', dest='check_z_height_max', action='store', type=float, default=6.0,          help='check_z_height max height above which a problem is detected, a value of 2.0 is 0.1 meters, and a value of 6.0 is 0.4 meters')
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
+    parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
 
 
     # -------------- Testing options --------------
@@ -1521,10 +1729,12 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
+    parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
 
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
+    parser.add_argument('--num_dilation', dest='num_dilation', type=int, action='store', default=0,                       help='Number of dilations to apply to efficientnet, each increment doubles output resolution and increases computational expense.')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
     parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
@@ -1532,36 +1742,7 @@ if __name__ == '__main__':
     # Parse args
     args = parser.parse_args()
 
-    # Run main program with specified arguments
-    training_base_directory, best_dict = main(args)
-    # if os.path.exists()
-    if args.max_train_actions is not None:
-        testing_snapshot = choose_testing_snapshot(training_base_directory, best_dict)
-        args.snapshot_file = testing_snapshot
-        args.random_seed = 1238
-        args.is_testing = True
-        args.save_visualizations = True
-        args.max_test_trials = 100
-        testing_base_directory, testing_best_dict = main(args)
-        # move the testing data into the training directory
-        training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-        # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-        # os.symlink(training_dest_dir, training_base_directory)
-        if not args.place:
-            # run preset arrangements for pushing and grasping
-            args.test_preset_cases = True
-            args.max_test_trials = 10
-            # run testing mode
-            preset_testing_base_directory, preset_testing_best_dict = main(args)
-            preset_training_dest_dir = shutil.move(testing_base_directory, training_base_directory)
-            # TODO(ahundt) figure out if this symlink caused a crash, fix bug and re-enable
-            # os.symlink(preset_training_dest_dir, training_base_directory)
-            print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_base_directory)
-            print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
-
-        print('Random Testing Complete! Dir: ' + training_dest_dir)
-        print('Random Testing results: \n ' + str(testing_best_dict))
-            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
-
-    print('Training Complete! Dir: ' + training_base_directory)
-    print('Training results: \n ' + str(best_dict))
+    if not args.ablation:
+        one_train_test_run(args)
+    else:
+        ablation(args)

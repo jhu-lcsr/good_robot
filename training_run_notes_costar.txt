@@ -1,13 +1,13 @@
 
-              
-saving plot: 2020-01-28-13-38-32_Sim-Stack-Trial-Reward-Training-Sim-Stack-Trial-Reward-Training_success_plot.png 
+
+saving plot: 2020-01-28-13-38-32_Sim-Stack-Trial-Reward-Training-Sim-Stack-Trial-Reward-Training_success_plot.png
 export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --tcp_port 19980 --place --future_reward_discount 0.65 --nn densenet
 
 
 STACKING COMMON SENSE DENSENET, trial reward, check_z_height
 -------------------------------------------------------------
-costar@costar-desktop|~/src/real_good_robot on fast_sim_thread!?                                                                               
-export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65                                             
+costar@costar-desktop|~/src/real_good_robot on fast_sim_thread!?
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 GPU 0, Tab 0, port 19990, commit 2353c4a9ca39438eca18855b8da68d64a7258706
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-01-30-13-41-13_Sim-Stack-Trial-Reward-Common-Sense-Training
 
@@ -16,16 +16,16 @@ Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f103
 STACKING, DENSENET, NO COMMON SENSE, trial reward, check_z_height
 -------------------------------------------------------------
 GPU 1, Tab 1, port 19998, commit 2353c4a9ca39438eca18855b8da68d64a7258706
-export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65     
+export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-01-30-13-42-19_Sim-Stack-Trial-Rewa
-rd-Training       
+rd-Training
 
 
 
 STACKING COMMON SENSE DENSENET, trial reward, check_z_height
 -------------------------------------------------------------
-costar@costar-desktop|~/src/real_good_robot on fast_sim_thread!?                                                                               
-export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65                                             
+costar@costar-desktop|~/src/real_good_robot on fast_sim_thread!?
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 GPU 0, Tab 0, port 19990, commit 0e0a4749fc5560d64e3129d1f269fc5fc7e0dc32
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-01-30-13-41-13_Sim-Stack-Trial-Reward-Common-Sense-Training
 
@@ -39,7 +39,7 @@ note: alternating slowed down learning and has thus been removed
 STACKING, DENSENET, NO COMMON SENSE, trial reward, check_z_height -- ABSOLUTE BEST RUN AS OF 2020-02-02
 -------------------------------------------------------------
 GPU 1, Tab 1, port 19998, commit b3661e21bf715f93f23833583e6ee5e9ffb607aa
-export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65     
+export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-01-18-56-14_Sim-Stack-Trial-Reward-Training
 
 stats for training:
@@ -53,17 +53,17 @@ Max trial success rate: 0.7904761904761904, at action iteration: 12989. (total o
 
 
 STACKING COMMON SENSE DENSENET, trial reward, check_z_height -- This Did very well but not quite as well as above
--------------------------------------------------------------    
-GPU 0, Tab 0, port 19990, commit b3661e21bf715f93f23833583e6ee5e9ffb607aa                                                                        
-export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65                                             
+-------------------------------------------------------------
+GPU 0, Tab 0, port 19990, commit b3661e21bf715f93f23833583e6ee5e9ffb607aa
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-01-18-38-22_Sim-Stack-Trial-Reward-Common-Sense-Training
 
 
 
 STACKING COMMON SENSE DENSENET, trial reward, check_z_height -- COMMON SENSE TRAINS ARGMAX VALUE 0 WHEN IT IS A GEOMETRICALLY KNOWN FAILURE
--------------------------------------------------------------    
+-------------------------------------------------------------
 GPU 0, Tab 0, port 19990, commit bfeaf0326812af89093a72c97e2e43506cb9ef4c, "main.py trainer.py utils_torch.py COMMON SENSE TRAIN GEOMETRIC ARGMAX FAILURE"
-export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65                                             
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-03-11-49-57_Sim-Stack-Trial-Reward-Common-Sense-Training
 
 
@@ -74,7 +74,7 @@ SPOT REWARD UPDATE, spot reward now gives full double credit to final time step 
 STACKING, DENSENET, NO COMMON SENSE, trial reward, check_z_height, IMPORTANT GOES IN PAPER
 -------------------------------------------------------------
 GPU 1, Tab 1, port 19998, commit 786a5fc256a8c9eb1b1edf39f6a4f3ce274dd455, "trainer.py MAJOR SPOT REWARD CHANGE, 2X FINAL REWARD ON LAST TIMESTEP
-export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65   
+export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-03-16-58-06_Sim-Stack-Trial-Reward-Training
 
     > TESTING RUN Random Arrangements
@@ -85,10 +85,10 @@ Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f103
     > Video: recording_2020_02_20-17_59-55.avi
     > Results: {'trial_success_rate_best_value': 0.97, 'trial_success_rate_best_index': 1567, 'grasp_success_rate_best_value': 0.8146002317497103, 'grasp_success_rate_best_index': 1567, 'place_success_rate_best_value': 0.7886524822695036, 'place_success_rate_best_index': 1567, 'action_efficiency_best_value': 0.3752393107849394, 'action_efficiency_best_index': 1569}
 
-STACKING COMMON SENSE DENSENET, trial reward, check_z_height -- COMMON SENSE TRAINS ARGMAX VALUE 0 WHEN IT IS A GEOMETRICALLY KNOWN FAILURE + double credit 
--------------------------------------------------------------    
+STACKING COMMON SENSE DENSENET, trial reward, check_z_height -- COMMON SENSE TRAINS ARGMAX VALUE 0 WHEN IT IS A GEOMETRICALLY KNOWN FAILURE + double credit
+-------------------------------------------------------------
 GPU 0, Tab 0, port 19990, commit 786a5fc256a8c9eb1b1edf39f6a4f3ce274dd455, "main.py trainer.py utils_torch.py COMMON SENSE TRAIN GEOMETRIC ARGMAX FAILURE" + "trainer.py MAJOR SPOT REWARD CHANGE, 2X FINAL REWARD ON LAST TIMESTEP
-export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65                                             
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training
 
     > TESTING RUN
@@ -115,9 +115,12 @@ GPU 0, Tab 0, port 19998, right v-rep window
 
 
 STACKING COMMON SENSE DENSENET WITH RANDOM PLACEMENTS OF OBJECTS STUCK TO GRIPPER DUE TO SIMULATOR BUGS
-----------------------------------------                                                              
-± export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65  
+----------------------------------------
+± export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65
 commit: 5c78490ae6f25cc257ac5fa2030118bc0644e9e8
+Comment: we manually uncommented the PixelNet() call in trainer.py and commented reinforcement_net()
+RESUME with no two step backprop: ± export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --tcp_port 20000 --future_reward_discount 0.65 --max_train_actions 10000 --nn efficientnet --disable_two_step_backprop --random_actions --resume '/home/ahundt/src/real_good_robot/logs/2020-05-04-12-08-15_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME commit: 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
 logging session: logs/2020-02-07-14-35-59_Sim-Stack-Trial-Reward-Common-Sense
 GPU 1, Tab 1, port 19990, left v-rep window
 
@@ -137,7 +140,7 @@ GPU 0, Tab 9, port 19998, right v-rep window
     > Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-20-19-14-08_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing
     > Testing Results: {'trial_success_rate_best_value': 0.24, 'trial_success_rate_best_index': 2680, 'grasp_success_rate_best_value': 0.554670528602462, 'grasp_success_rate_best_index': 2680, 'place_success_rate_best
 _value': 0.4846153846153846, 'place_success_rate_best_index': 2680, 'action_efficiency_best_value': 0.03805970149253731, 'action_efficiency_best_index': 2680}
-    > GPU 0, Tab 8, port 19990, left v-rep window, 
+    > GPU 0, Tab 8, port 19990, left v-rep window,
 
 
 PUSHING AND GRASPING WITH ALL FEATURES & SAVE ALL MODELS ACCORDING TO BEST STATS - Feb 12
@@ -224,7 +227,7 @@ REAL, PUSHING AND GRASPING, COMMON SENSE, SPOT - FEB 19 - LONG AND GOOD RUN
 export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65
 Commit: 67b792c6a08309c8406de30804d1fe147c9d967f
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-19-15-33-05_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
- > OUTDATED 
+ > OUTDATED
  > Commit: bb5ae93d373a3bbc40786cc23f76eed0ae2ad233
  > OUTDATED DUE TO PAUSE BEFORE FIRST TRIAL IS OVER BUG: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-19-14-28-23_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
  > OUTDATED DUE TO PAUSE BEFORE FIRST TRIAL IS OVER BUG: Resume command: export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-19-14-28-23_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
@@ -278,14 +281,14 @@ SIM TO REAL TESTING STACKING - 9 of 10 stack successes.
 ===================
 costar@costar-desktop|/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot on revert_pixelnet!                                                                                       [0/95245]
 export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --place --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 10 --snapshot_file '/home/costar/src/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement-best-stack-rate.pth'
-Pre-trained model snapshot loaded from: /home/costar/src/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement-best-stack-rate.pth                                                                                   
+Pre-trained model snapshot loaded from: /home/costar/src/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement-best-stack-rate.pth
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-17-52-17_Real-Stack-SPOT-Trial-Reward-Common-Sense-Testing
 2020-02-22-17-52-17_Real-Stack-SPOT-Trial-Reward-Common-Sense-Testing
 {"action_efficiency_best_index": 183, "action_efficiency_best_value": 0.29508196721311475, "grasp_success_rate_best_index": 183, "grasp_success_rate_best_value": 0.4263565891472868, "place_success_rate_best_index": 183, "place_success_rate_best_value": 0.7818181818181819, "trial_success_rate_best_index": null, "trial_success_rate_best_value": -Infinity}
 
 TEST-V2, we applied WD-40 to the gripper, but LR still too low
 export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --place --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 10 --snapshot_file '/home/costar/src/real_good_robot/logs/2020-02-22-Sim-to-Real-2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement-best-stack-rate.pth'
-Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing                                                                                                                                                                                                                 
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing
 
 TEST-V3
 {'trial_success_rate_best_value': 0.9, 'trial_success_rate_best_index': 101, 'grasp_success_rate_best_value': 0.8035714285714286, 'grasp_success_rate_best_index': 101, 'place_success_rate_best_value': 0.8043478260869565, 'place_success_rate_best_index': 101, 'action_efficiency_best_value': 0.594059405940594, 'action_efficiency_best_index': 103}
@@ -297,6 +300,18 @@ export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_re
 from femur: 2020-02-16-21-33-59_Sim-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
 Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing
 Grasp Count: 52, grasp success rate: 0.34615384615384615
+
+V2 testing 2020-02-24-0001
+export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65   --is_testing --random_seed 1238 --max_test_trials 1 --snapshot_file '/home/costar/Downloads/snapshot.reinforcement_grasp_action_efficiency_best_value.pth'
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-24-01-03-39_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing
+Max grasp success rate: 0.21621621621621623, at action iteration: 104. (total of 106 actions, max excludes first 104 actions)
+Max grasp action efficiency: 0.15384615384615385, at action iteration: 104. (total of 107 actions, max excludes first 104 actions)
+saving plot: 2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing-Sim-to-Real-Pushing-And-Grasping-SPOT-Q_success_plot.png
+saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+{"grasp_action_efficiency_best_index": 104, "grasp_action_efficiency_best_value": 0.15384615384615385, "grasp_success_rate_best_index": 104, "grasp_success_rate_best_value": 0.21621621621621623}
+
+(this first run ended early, not sure what happened. - Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-24-01-03-39_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing)
 
 
 
@@ -314,13 +329,13 @@ export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_re
 RESUME: export CUDA_VISIBLE_DEVICES="0" && python main.py --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --future_reward_discount 0.65 --resume  '/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training'
 
 Max trial success rate: 1.0, at action iteration: 682. (total of 1032 actions, max excludes first 500 actions)
-Max grasp success rate: 0.6054421768707483, at action iteration: 774. (total of 1032 actions, max excludes first 500 actions)                            
+Max grasp success rate: 0.6054421768707483, at action iteration: 774. (total of 1032 actions, max excludes first 500 actions)
 Max grasp action efficiency: 0.534, at action iteration: 774. (total of 1033 actions, max excludes first 500 actions)
 saving plot: 2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training-Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training_success_plot.png
 saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/data/best_stats.json
 saving best stats to: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/best_stats.json
 Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training
-Training results:                                                                                                                                                                        
+Training results:
  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 682, 'grasp_success_rate_best_value': 0.6054421768707483, 'grasp_success_rate_best_index': 774, 'grasp_action_efficiency_b
 est_value': 0.534, 'grasp_action_efficiency_best_index': 774}
 
@@ -332,6 +347,244 @@ Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f103
 
 
 
+=============================================================
+2020-04 and 2020-05
+=============================================================
+
+Tab 7: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19990_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+Tab 8: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+
+
+
+SIM STACK DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD - 2020-04-25-19-59-01
+----------------------------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19990 --place --check_z_height --max_train_actions 10000 --no_height_reward --disable_situation_removal
+RESUME:
+Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-04_Sim-Stack-Two-Step-Reward-Training
+IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-19-59-01_Sim-Stack-Two-Step-Reward-Training
+± cat logs/2020-04-25-21-41-04_Sim-Stack-Two-Step-Reward-Training/2020-04-27-17-44-27_Sim-Stack-Two-Step-Reward-Testing/best_stats.json
+{"action_efficiency_best_index": 3991, "action_efficiency_best_value": 0.019543973941368076, "grasp_success_rate_best_index": 3991, "grasp_success_rate_best_value": 0.9404958677685951, "place_success_rate_best_index": 3991, "place_success_rate_best_value": 0.5837526959022286, "trial_success_rate_best_index": 3991, "trial_success_rate_best_value": 0.13}%
+GPU 0, Tab 4, port 19990, left v-rep window
+
+
+SIM ROW DENSENET - OLD ALGORITHM - WITH NO COMMON SENSE, NO TRIAL REWARD - NO HEIGHT REWARD - 2020-04-25-20-00-41
+--------------------------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --tcp_port 19998 --place --check_row --max_train_actions 10000 --no_height_reward --disable_situation_removal
+Commit: de5f639ae814bcb1870abe3d8190bebf84abe1ec
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-21-41-35_Sim-Rows-Two-Step-Reward-Training
+IGNORE, FORGOT TO DISABLE SITUATION REMOVAL: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-25-20-00-41_Sim-Rows-Two-Step-Reward-Training
+± cat logs/2020-04-25-21-41-35_Sim-Rows-Two-Step-Reward-Training/2020-04-27-17-25-31_Sim-Rows-Two-Step-Reward-Testing/best_stats.json
+{"action_efficiency_best_index": 2124, "action_efficiency_best_value": 0.00847457627118644, "grasp_success_rate_best_index": 2124, "grasp_success_rate_best_value": 0.5886075949367089, "place_success_rate_best_index": 2124, "place_success_rate_best_value": 0.2507204610951009, "trial_success_rate_best_index": 2124, "trial_success_rate_best_value": 0.13}
+GPU 1, Tab 5, port 19998, right v-rep window
+
+
+
+
+
+
+
+
+XXXX IGNORE XXXX SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-04-28-16-15-22
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000
+RUN HAD PROBLEMS: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-28-16-15-22_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Commit: cf8fdeb86eed278fe9cb9b863662e2eaa327ebea
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+XXXX IGNORE XXXX SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-04-28-16-16-15
+--------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --save_visualizations --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 10000
+RUN HAD PROBLEMS: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-04-28-16-16-15_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Commit: cf8fdeb86eed278fe9cb9b863662e2eaa327ebea
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-05-01-21-47-56
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000
+RESUME 20k: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-47-56_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Commit (crash): dae67d0f89fba1917e4fb89fc82f8f6171330f1f
+Commit (resume): 2f9f569f0c9bfd00df480a9dbce1dba8d43b5020
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - costar 2020-05-01-21-48-39
+--------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 10000
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+RESUME 20k: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+RESUME: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 10000 --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-01-21-48-39_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+RESUME2: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 10000 --random_actions --resume '/home/ahundt/src/real_good_robot/logs/2020-05-03-20-04-47_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training'
+Commit (crash): dae67d0f89fba1917e4fb89fc82f8f6171330f1f
+Commit (resume): 2f9f569f0c9bfd00df480a9dbce1dba8d43b5020
+Commit (resume2): 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - costar
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop
+2020-05-05-14-26-12_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Commit: 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - NO TWO STEP BACKPROP - SORT TRIAL REWARD - RANDOM ACTIONS - costar
+----------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 10000 --disable_two_step_backprop --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-05-16-44-34_Sim-Stack-SPOT-Trial-Reward-Commo
+Commit: 3ba0b91c5accac6387345c62d5a4e8b7ff9769cd
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+
+
+
+
+SIM STACK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.25, 1, 1 - costar 2020-05-06
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+'/home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME: export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume '/home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training'
+Commit: d4e776ffb89f6d916ca7ff96ebaf717bfdd45db5
+Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+Max trial success rate: 0.89, at action iteration: 4489. (total of 4491 actions, max excludes first 4489 actions)
+Max grasp success rate: 0.6816311260755705, at action iteration: 4489. (total of 4491 actions, max excludes first 4489 actions)
+Max place success rate: 0.6521739130434783, at action iteration: 4489. (total of 4492 actions, max excludes first 4489 actions)
+Max action efficiency: 0.12029405212742258, at action iteration: 4491. (total of 4492 actions, max excludes first 4489 actions)
+saving plot: 2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing-Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+Random Testing Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training/2020-05-10-01-20-13_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Testing
+Random Testing results:
+ {'trial_success_rate_best_value': 0.89, 'trial_success_rate_best_index': 4489, 'grasp_success_rate_best_value': 0.6816311260755705, 'grasp_success_rate_best_index': 4489, 'place_success_rate_best_value': 0.6521739130434783, 'place_success_rate_best_index': 4489, 'action_efficiency_best_value': 0.12029405212742258, 'action_efficiency_best_index': 4491}
+Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training
+Training results:
+ {'trial_success_rate_best_value': 0.7692307692307693, 'trial_success_rate_best_index': 8827, 'grasp_success_rate_best_value': 0.8487084870848709, 'grasp_success_rate_best_index': 7472, 'place_success_rate_best_value': 0.8325991189427313, 'place_success_rate_best_index': 11194, 'action_efficiency_best_value': 0.552, 'action_efficiency_best_index': 11183}
+
+MANUAL TESTING RUN ON action_efficiency_best_index
+
+    > export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --random_actions --snapshot_file '/home/costar/src/real_good_robot/logs/2020-05-06-10-03-58_Sim-Stack-SPOT-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement_action_efficiency_best_index.pth' --is_testing --save_visualizations --max_test_trials 100 --random_seed 1238
+    > Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-17-48-13_Sim-Stack-SPOT-Trial-Reward-Masked-Testing
+    > Commit: 13068e53c269b01b1385a3b185d38b006eca762b
+    > TODO(ahundt) move the testing directory into the training directory once complete
+    > TODO(ahundt) rerun this, the simulation became unstable because of placing out of arm workspace
+    >
+    >                                                                                  
+    > Testing iteration: 1665                                                                                                                                                             
+    > prev_height: 0.0 max_z: 0.0511079157217398 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<                           
+    > Current count of pixels with stuff: 5131.0 threshold below which the scene is considered empty: 10                                                        
+    > Change detected: True (value: 5239)                                                                                                                                                                                                                                                                     
+    > Trainer.get_label_value(): Current reward: 4.139246 Current reward multiplier: 4.139246 Predicted Future reward: 5.071979 Expected reward: 4.139246 + 0.650000 x 5.071979 = 7.436033
+    > trial_complete_indices: [   6.   29.   41.   59.   67.   85.   91.  101.  109.  135.  143.  169.                                                         
+    > 179.  187.  192.  208.  214.  226.  265.  280.  291.  313.  323.  329.                                                                                                                                                                                                                                
+    > 342.  351.  361.  383.  387.  420.  439.  450.  477.  485.  506.  524.                                                                                                                                                                                                                                
+    > 533.  546.  576.  624.  647.  673.  681.  691.  701.  711.  729.  741.                                                                                                            
+    > 752.  777.  793.  842.  872.  893.  908.  918.  930.  936.  948.  976.                                                                                                                                                                                                                                
+    > 993. 1001. 1016. 1041. 1049. 1072. 1078. 1084. 1094. 1102. 1133. 1141.                                                                                                            
+    > 1149. 1168. 1174. 1184. 1210. 1221. 1245. 1255. 1271. 1278. 1293. 1297.                                                                                  
+    > 1311. 1325. 1331. 1342. 1352. 1360. 1369. 1376. 1386. 1390. 1496. 1512.                                                                                                                                                                                                                                
+    > 1522. 1541. 1545. 1636. 1665.]                                                                                                                           
+    > Max trial success rate: 0.98, at action iteration: 1662. (total of 1664 actions, max excludes first 1662 actions)                                                                                                                                                                                       
+    > Max grasp success rate: 0.5967117988394585, at action iteration: 1662. (total of 1664 actions, max excludes first 1662 actions)                                                                                                                                                                         
+    > Max place success rate: 0.7615262321144675, at action iteration: 1662. (total of 1665 actions, max excludes first 1662 actions)                                                     
+    > Max action efficiency: 0.36101083032490977, at action iteration: 1664. (total of 1665 actions, max excludes first 1662 actions)                         
+    > saving plot: 2020-05-12-17-48-13_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Sim-Stack-SPOT-Trial-Reward-Masked-Testing_success_plot.png                                                                                                                                                                 
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-17-48-13_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json                                                                                                                       
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-17-48-13_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/best_stats.json                                                                                                                            
+    > Trial logging complete: 101 --------------------------------------------------------------      
+
+
+SIM ROW - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.25, 1, 1 - costar 2020-05-06
+----------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+'/home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training'
+RESUME: ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Commit: d4e776ffb89f6d916ca7ff96ebaf717bfdd45db5
+Commit (resume): 7dbec777fd08d9e66b53ec72564880cebdb452e1
+Commit (resume2): 67bf4b2a56a4aac72a460d5d8598d38a2daac0fd
+Commit (resume3 - check for full row on every place): c6c4b401fe719aae89966adaf9ed5ca24cf95fde
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+Max trial success rate: 0.67, at action iteration: 2523. (total of 2525 actions, max excludes first 2523 actions)
+Max grasp success rate: 0.63566388710712, at action iteration: 2523. (total of 2525 actions, max excludes first 2523 actions)
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:178: RuntimeWarning: Mean of empty slice.
+  success_rate[i] = successes.mean()
+/home/costar/.local/lib/python3.6/site-packages/numpy/core/_methods.py:161: RuntimeWarning: invalid value encountered in double_scalars
+  ret = ret.dtype.type(ret / rcount)
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:180: RuntimeWarning: invalid value encountered in double_scalars
+  var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+Max action efficiency: 0.26634958382877527, at action iteration: 2525. (total of 2526 actions, max excludes first 2523 actions)
+saving plot: 2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing-Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
+Random Testing Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training/2020-05-10-00-30-05_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Testing
+Random Testing results:
+ {'trial_success_rate_best_value': 0.67, 'trial_success_rate_best_index': 2523, 'grasp_success_rate_best_value': 0.63566388710712, 'grasp_success_rate_best_index': 2523, 'place_success_rate_best_value': -inf, 'place_success_rate_best_index': None, 'action_efficiency_best_value': 0.26634958382877527, 'action_efficiency_best_index': 2525}
+Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training
+Training results:
+ {'trial_success_rate_best_value': 0.5045871559633027, 'trial_success_rate_best_index': 12648, 'grasp_success_rate_best_value': 0.7074829931972789, 'grasp_success_rate_best_index': 12492, 'place_success_rate_best_value': 0.8138297872340425, 'place_success_rate_best_index': 11971, 'action_efficiency_best_value': 0.696, 'action_efficiency_best_index': 12624}
+
+MANUAL TESTING RUN ON action_efficiency_best_index
+
+    > export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --is_testing --max_test_trials 100 --random_seed 1238 --snapshot_file '/home/costar/src/real_good_robot/logs/2020-05-06-09-59-31_Sim-Rows-SPOT-Trial-Reward-Common-Sense-Training/models/snapshot.reinforcement_action_efficiency_best_index.pth'
+    > Commit: 13068e53c269b01b1385a3b185d38b006eca762b
+    > Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-18-04-15_Sim-Rows-SPOT-Trial-Reward-Masked-Testing
+    >                                                                                                                                                               
+    > TRIAL 100 SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                                                                                           
+    > prev_height: 0.0 max_z: 0.05112534729294889 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<                                                                                                                                                                           
+    > STACK:  trial: 101 actions/partial: 6.153191489361702  actions/full stack: 16.431818181818183 (lower is better)  Grasp Count: 866, grasp success rate: 0.6812933025404158 place_on_stack_rate: 0.4051724137931034 place_attempts: 580  partial_stack_successes: 235  stack_successes: 88 trial_success_r
+    > ate: 0.8712871287128713 stack goal: [2 1 3] current_height: 4                                                                                                                                                                                                                                           
+    > Time elapsed: 26.519145                                                                                                                  
+    > Trainer iteration: 1445 complete                                                                                                                                                                                                                                                                        
+    >                                                                                                                                                                                                                                                                                                         
+    > Testing iteration: 1446                                                                                                                                                                                                                                                                                 
+    > prev_height: 0.0 max_z: 0.05111105777395382 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<< 
+    > Current count of pixels with stuff: 2593.0 threshold below which the scene is considered empty: 900                           
+    > Change detected: True (value: 4472)                                                                                           
+    > Trainer.get_label_value(): Current reward: 4.000000 Current reward multiplier: 4.000000 Predicted Future reward: 6.469117 Expected reward: 4.000000 + 0.650000 x 6.469117 = 8.204926
+    > trial_complete_indices: [   8.   12.   19.   24.   28.   32.   34.   53.   65.   71.   77.  102.                                                                                    
+    > 107.  113.  127.  185.  189.  193.  197.  199.  226.  230.  233.  239.                                                                                                            
+    > 255.  268.  296.  300.  305.  308.  317.  327.  331.  335.  410.  424.                                                      
+    > 430.  448.  463.  467.  489.  550.  555.  559.  568.  572.  578.  588.                                                                                                            
+    > 724.  746.  750.  765.  771.  780.  825.  836.  853.  855.  862.  866.                                                                                                            
+    > 878.  921.  925.  927.  931.  935.  971.  984.  990. 1016. 1074. 1107.                                                                                                            
+    > 1115. 1133. 1138. 1146. 1150. 1156. 1166. 1172. 1186. 1199. 1203. 1259.                                                      
+    > 1274. 1280. 1286. 1290. 1292. 1298. 1318. 1331. 1338. 1342. 1353. 1361.                                                                                                            
+    > 1365. 1389. 1419. 1442. 1446.]                                                                                                                                                     
+    > Max trial success rate: 0.86, at action iteration: 1443. (total of 1445 actions, max excludes first 1443 actions)                                                                                                                                                                                       
+    > Max grasp success rate: 0.6809248554913295, at action iteration: 1443. (total of 1445 actions, max excludes first 1443 actions)                                                                                                                                                                         
+    > Max place success rate: 0.7582037996545768, at action iteration: 1445. (total of 1446 actions, max excludes first 1443 actions)                                                                                                                                                                         Max action efficiency: 0.3700623700623701, at action iteration: 1445. (total of 1446 actions, max excludes first 1443 actions)
+    > saving plot: 2020-05-12-18-04-15_Sim-Rows-SPOT-Trial-Reward-Masked-Testing-Sim-Rows-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-18-04-15_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-12-18-04-15_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > Trial logging complete: 101 --------------------------------------------------------------
 
 
 
@@ -344,6 +597,140 @@ Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f103
 
 
 
+
+
+SIM STACK - SPOT-Q-MASKED - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-13
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+RESUME: export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume  /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Commit: ccf30348e265a471080b3ee906065e059f6e8573
+Commmit (resume, for testing, training complete): 41d2eaff3dc0f3572cecf43805de8582d62d9b31
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+    > Testing run prioritize trial success
+    > STACK:  trial: 101 actions/partial: 4.525547445255475  actions/full stack: 18.979591836734695 (lower is better)  Grasp Count: 1090, grasp success rate: 0.7018348623853211 place_on_stack_rate: 0.5379581151832461 place_attempts: 764  partial_stack_successes: 411  stack_successes: 98 trial_success_rate: 0.9702970297029703 stack goal: None current_height: 2.0596242913479084
+    > trial_complete_indices: [  23.   29.   83.   87.   93.   98.  122.  154.  165.  188.  205.  213.
+    > 227.  233.  239.  279.  285.  294.  300.  334.  350.  359.  367.  437.
+    > 441.  447.  453.  642.  651.  669.  676.  685.  690.  696.  703.  727.
+    > 733.  750.  763.  769.  778.  784.  790.  805.  861.  911.  924.  931.
+    > 965.  972.  980.  996. 1009. 1015. 1023. 1108. 1115. 1127. 1142. 1173.
+    > 1179. 1186. 1208. 1268. 1274. 1294. 1307. 1313. 1325. 1329. 1335. 1377.
+    > 1381. 1415. 1453. 1472. 1484. 1503. 1511. 1517. 1526. 1537. 1546. 1554.
+    > 1605. 1612. 1622. 1630. 1676. 1707. 1716. 1740. 1747. 1753. 1775. 1803.
+    > 1814. 1822. 1836. 1851. 1859.]
+    > Max trial success rate: 0.97, at action iteration: 1856. (total of 1858 actions, max excludes first 1856 actions)
+    > Max grasp success rate: 0.7022058823529411, at action iteration: 1856. (total of 1858 actions, max excludes first 1856 actions)
+    > Max place success rate: 0.7451235370611183, at action iteration: 1856. (total of 1859 actions, max excludes first 1856 actions)
+    > Max action efficiency: 0.32004310344827586, at action iteration: 1858. (total of 1859 actions, max excludes first 1856 actions)
+    > saving plot: 2020-05-17-13-07-19_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Sim-Stack-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-13-07-19_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-13-07-19_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-05-17-13-07-19_Sim-Stack-SPOT-Trial-Reward-Masked-Testing
+    > Random Testing results:
+    > {'trial_success_rate_best_value': 0.97, 'trial_success_rate_best_index': 1856, 'grasp_success_rate_best_value': 0.7022058823529411, 'grasp_success_rate_best_index': 1856, 'place_success_rate_best_value': 0.7451235370611183, 'place_success_rate_best_index': 1856, 'action_efficiency_best_value': 0.32004310344827586, 'action_efficiency_best_index': 1858}
+    > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+    > Training results:
+    > {'action_efficiency_best_index': 10008, 'action_efficiency_best_value': 0.684, 'grasp_success_rate_best_index': 15783, 'grasp_success_rate_best_value': 0.8834586466165414, 'place_success_rate_best_index': 17570, 'place_success_rate_best_value': 0.8616071428571429, 'trial_success_rate_best_index': 10011, 'trial_success_rate_best_value': 0.8507462686567164}
+
+
+
+SIM ROW - SPOT-Q-MASKED - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-13
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training
+Commit: ccf30348e265a471080b3ee906065e059f6e8573
+Commmit (resume, for testing, training complete): 41d2eaff3dc0f3572cecf43805de8582d62d9b31
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+    > Testing run prioritize trial successes
+    > STACK:  trial: 101 actions/partial: 6.809885931558935  actions/full stack: 18.852631578947367 (lower is better)  Grasp Count: 1085, grasp success rate: 0.6552995391705069 place_on_stack_rate: 0.37252124645892354 place_attempts: 706  partial_stack_successes: 263  stack_successes: 95 trial_success_rate: 0.9405940594059405 stack goal: [2] current_height: 1
+    > trial_complete_indices: [   6.   10.   18.   28.   58.   62.   69.   87.   94.  102.  108.  115.
+    >   121.  175.  181.  186.  188.  196.  201.  208.  217.  219.  228.  258.
+    >   269.  296.  340.  346.  350.  354.  366.  469.  474.  478.  490.  494.
+    >   505.  521.  547.  557.  599.  628.  648.  676.  680.  684.  740.  772.
+    >   783.  794.  799.  812.  817.  908.  916.  925.  931.  940.  947.  953.
+    >   966.  981.  991. 1000. 1066. 1146. 1154. 1188. 1196. 1200. 1294. 1308.
+    >  1312. 1320. 1324. 1338. 1344. 1381. 1389. 1397. 1401. 1417. 1441. 1481.
+    >  1485. 1491. 1546. 1582. 1588. 1595. 1601. 1648. 1664. 1706. 1720. 1727.
+    >  1729. 1767. 1769. 1785. 1790.]
+    > Max trial success rate: 0.94, at action iteration: 1787. (total of 1789 actions, max excludes first 1787 actions)
+    > Max grasp success rate: 0.6555863342566943, at action iteration: 1787. (total of 1789 actions, max excludes first 1787 actions)
+    > Max action efficiency: 0.37604924454392835, at action iteration: 1789. (total of 1790 actions, max excludes first 1787 actions)
+    > saving plot: 2020-05-17-13-08-59_Sim-Rows-SPOT-Trial-Reward-Masked-Testing-Sim-Rows-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-13-08-59_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-13-08-59_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training/2020-05-17-13-08-59_Sim-Rows-SPOT-Trial-Reward-Masked-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 0.94, 'trial_success_rate_best_index': 1787, 'grasp_success_rate_best_value': 0.6555863342566943, 'grasp_success_rate_best_index': 1787, 'place_success_rate_best_value': -inf, 'place_success_rate_best_index': None, 'action_efficiency_best_value': 0.37604924454392835, 'action_efficiency_best_index': 1789}
+    > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training
+    > Training results:
+    >  {'action_efficiency_best_index': 12997, 'action_efficiency_best_value': 0.672, 'grasp_success_rate_best_index': 17482, 'grasp_success_rate_best_value': 0.6845637583892618, 'place_success_rate_best_index': 12935, 'place_success_rate_best_value': 0.8296703296703297, 'trial_success_rate_best_index': 12367, 'trial_success_rate_best_value': 0.5662650602409639}
+
+
+
+    > Testing run prioritizing action efficiency
+    > STACK:  trial: 101 actions/partial: 6.560975609756097  actions/full stack: 17.543478260869566 (lower is better)  Grasp Count: 1018, grasp success rate: 0.5943025540275049 place_on_stack_rate: 0.412751677852349 place_attempts: 596  partial_stack_successes: 246  stack_successes: 92 trial_success_rate: 0.9108910891089109 stack goal: [0 2] current_height: 2
+    > trial_complete_indices: [  16.   23.   31.   58.   76.   81.  100.  104.  157.  168.  172.  252.
+    >   262.  266.  271.  360.  393.  397.  405.  411.  415.  423.  432.  437.
+    >   445.  460.  473.  571.  579.  588.  592.  599.  619.  626.  632.  747.
+    >   753.  769.  782.  788.  794.  816.  877.  887.  897.  903.  905.  974.
+    >   978.  986.  994. 1005. 1012. 1016. 1020. 1026. 1039. 1043. 1088. 1137.
+    >  1139. 1148. 1155. 1164. 1172. 1183. 1233. 1242. 1253. 1257. 1264. 1275.
+    >  1287. 1290. 1297. 1309. 1313. 1317. 1322. 1342. 1350. 1354. 1359. 1402.
+    >  1443. 1452. 1458. 1462. 1469. 1473. 1482. 1489. 1495. 1504. 1506. 1518.
+    >  1523. 1532. 1541. 1569. 1613.]
+    > Max trial success rate: 0.92, at action iteration: 1610. (total of 1612 actions, max excludes first 1610 actions)
+    > Max grasp success rate: 0.5950738916256157, at action iteration: 1610. (total of 1612 actions, max excludes first 1610 actions)
+    > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:178: RuntimeWarning: Mean of empty slice.
+    >   success_rate[i] = successes.mean()
+    > /home/costar/.local/lib/python3.6/site-packages/numpy/core/_methods.py:161: RuntimeWarning: invalid value encountered in double_scalars
+    >   ret = ret.dtype.type(ret / rcount)
+    > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:180: RuntimeWarning: invalid value encountered in double_scalars
+    >   var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+    > Max action efficiency: 0.3875776397515528, at action iteration: 1610. (total of 1613 actions, max excludes first 1610 actions)
+    > saving plot: 2020-05-17-22-05-52_Sim-Rows-SPOT-Trial-Reward-Masked-Testing-Sim-Rows-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-22-05-52_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-17-22-05-52_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training/2020-05-17-22-05-52_Sim-Rows-SPOT-Trial-Reward-Masked-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 0.92, 'trial_success_rate_best_index': 1610, 'grasp_success_rate_best_value': 0.5950738916256157, 'grasp_success_rate_best_index': 1610, 'place_success_rate_best_value': -inf, 'place_success_rate_best_index': None, 'action_efficiency_best_value': 0.3875776397515528, 'action_efficiency_best_index': 1610}
+    > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training
+    > Training results:
+    >  {'action_efficiency_best_index': 12997, 'action_efficiency_best_value': 0.672, 'grasp_success_rate_best_index': 17482, 'grasp_success_rate_best_value': 0.6845637583892618, 'place_success_rate_best_index': 12935, 'place_success_rate_best_value':
+    > 0.8296703296703297, 'trial_success_rate_best_index': 12367, 'trial_success_rate_best_value': 0.5662650602409639}
+
+
+
+
+
+
+
+
+SIM STACK - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-18
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-18-19-56-49_Sim-Stack-SPOT-Trial-Reward-Training
+Commit: e99391ae3c0921bd95b5b5d2a7d6e992efa69d63
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+SIM ROW - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-18
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-18-19-57-17_Sim-Rows-SPOT-Trial-Reward-Training
+Commit: e99391ae3c0921bd95b5b5d2a7d6e992efa69d63
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
+=============================================================
+=============================================================
 
 
 TODO:
@@ -365,5 +752,5 @@ saving plot: 2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testin
 saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing/data/best_stats.json
 saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing/best_stats.json
 Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-02-23-22-16-15_Real-Rows-SPOT-Trial-Reward-Common-Sense-Testing
-Training results: 
+Training results:
  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 67, 'grasp_success_rate_best_value': 0.6829268292682927, 'grasp_success_rate_best_index': 68, 'place_success_rate_best_value': 0.8888888888888888, 'place_success_rate_best_index': 68, 'action_efficiency_best_value': 1.0746268656716418, 'action_efficiency_best_index': 69}
