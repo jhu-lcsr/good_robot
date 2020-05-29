@@ -15,9 +15,9 @@ try:
     from efficientnet_pytorch import EfficientNet
 except ImportError:
     print('efficientnet_pytorch is not available, using densenet. '
-          'Try installing https://github.com/ahundt/EfficientNet-PyTorch for all features:'
+          'Try installing https://github.com/ahundt/EfficientNet-PyTorch for all features (recommended): '
           '    pip3 install --user --upgrade git+https://github.com/ahundt/EfficientNet-PyTorch.git'
-          'A version of EfficientNets without dilation can be installed with the command:'
+          'A version of EfficientNets without dilation can be installed with the command (not recommended):'
           '    pip3 install efficientnet-pytorch --user --upgrade'
           'See https://github.com/lukemelas/EfficientNet-PyTorch for details')
     efficientnet_pytorch = None

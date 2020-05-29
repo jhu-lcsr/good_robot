@@ -1,0 +1,63 @@
+
+
+
+
+
+
+Tab 7: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19990_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+Tab 8: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+
+Tab 9: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19999_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+Tab 10: ~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_20000_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+
+
+
+
+
+SIM STACK - Task Progress aka progress only - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-28
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /home/ahundt/src/real_good_robot/logs/2020-05-28-12-09-32_Sim-Stack-SPOT-Trial-Reward-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-28-12-09-32_Sim-Stack-SPOT-Trial-Reward-Training
+Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+SIM ROW - Task Progress aka progress only - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-28
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /home/ahundt/src/real_good_robot/logs/2020-05-28-12-10-18_Sim-Rows-SPOT-Trial-Reward-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-28-12-10-18_Sim-Rows-SPOT-Trial-Reward-Training
+Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
+GPU 1, Tab 1, port 19998, center left v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+
+
+
+SIM STACK - Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-28
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+RESUME: export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward --resume /home/ahundt/src/real_good_robot/logs/2020-05-28-12-11-00_Sim-Stack-SPOT-Trial-Reward-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-28-12-11-00_Sim-Stack-SPOT-Trial-Reward-Training
+Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
+GPU 2, Tab 2, port 19999, left v-rep window, v-rep tab 9
+
+
+
+
+SIM ROW - Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-28
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+RESUME: ± export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward --resume /home/ahundt/src/real_good_robot/logs/2020-05-28-12-11-38_Sim-Rows-SPOT-Trial-Reward-Training
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-28-12-11-38_Sim-Rows-SPOT-Trial-Reward-Training
+Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
+GPU 3, Tab 3, port 19999, center left v-rep window, v-rep tab 10
