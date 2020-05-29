@@ -1063,7 +1063,7 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 # save the best model based on all tracked plotting metrics.
                 for k, v in best_dict.items():
-                    if k in prev_best_dict:
+                    if k in prev_best_dict and prev_best_dict[k] is not None:
                         if v > prev_best_dict[k]:
                             best_model_name = method + '_' + k
                             logger.save_model(trainer.model, best_model_name)
