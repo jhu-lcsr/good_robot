@@ -720,6 +720,39 @@ GPU 1, Tab 1, port 19999, middle v-rep window, v-rep tab 8
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+SIM STACK - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-29
+---------------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-29-11-03-34_Sim-Stack-Two-Step-Reward-Training
+Commit: f8c4d93db4a48b905b8995188de357e92171ae10
+GPU 0, Tab 0, port 19965, left v-rep window, v-rep tab 7
+
+
+SIM ROW - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05- TODO
+-------------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+Creating data logging session: TODO
+Commit: 7cbb47979cdb12b2e1125fd777a6617b0d5192f9
+GPU 1, Tab 1, port 19999, right v-rep window, v-rep tab 8
+
+
+
+
+
+
+
 TODO:
 "No Reversal" (maybe rename basic progress)
 
