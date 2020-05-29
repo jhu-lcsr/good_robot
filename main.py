@@ -1063,14 +1063,17 @@ def main(args):
                 logger.save_backup_model(trainer.model, method)
                 # save the best model based on all tracked plotting metrics.
                 for k, v in best_dict.items():
-                    if k in prev_best_dict and prev_best_dict[k] is not None:
-                        if v > prev_best_dict[k]:
+                    if k in prev_best_dict and (prev_best_dict[k] is None or v > prev_best_dict[k]):
                             best_model_name = method + '_' + k
                             logger.save_model(trainer.model, best_model_name)
                             best_stats_file = os.path.join(logger.models_directory, best_model_name + '.json')
                             print('Saving new best model with stats in: ' + best_stats_file)
                             with open(best_stats_file, 'w') as f:
                                 json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+                            current_stats_file = os.path.join(logger.models_directory, best_model_name + '_current_stats.json')
+                            print('Saving new best model current stats in: ' + current_stats_file)
+                            with open(best_stats_file, 'w') as f:
+                                json.dump(current_stats_file, f, cls=utils.NumpyEncoder, sort_keys=True)
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
