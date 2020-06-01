@@ -263,7 +263,7 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
 def plot_it(log_dir, title, window=1000, colors=None,
             alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True,
             apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
-            label=None, categories=None, ylabel=None, save=True):
+            label=None, categories=None, ylabel=None, save=True, save_dir=''):
 
     # set the global plot font to Times New Roman https://stackoverflow.com/a/40734893
     plt.rcParams["font.family"] = "Times New Roman"
@@ -384,7 +384,17 @@ def plot_it(log_dir, title, window=1000, colors=None,
     # we save the best stats and the generated plots in multiple locations for user convenience and backwards compatibility
     file_format = '.png'
     save_file = os.path.basename(log_dir + '-' + title).replace(':', '-').replace('.', '-').replace(',', '').replace(' ', '-') + '_success_plot'
+    # plt.show()
+    # print('title: ' + str(title) + ' label: ' + str(label))
     if save:
+        if save_dir:
+            log_dir = os.path.join(save_dir, save_file)
+            dir_to_create = os.path.join(log_dir, 'data')
+            if not os.path.exists(dir_to_create):
+                utils.mkdir_p(dir_to_create)
+            trial_success_path = os.path.join(log_dir, '%s.log.csv' % save_file)
+            print('saving trial success: ' + str(trial_success_path))
+            np.savetxt(trial_success_path, trial_success_rate, delimiter=', ', header=label)
         print('saving plot: ' + save_file + file_format)
         plt.savefig(save_file + file_format, dpi=300, optimize=True)
         log_dir_fig_file = os.path.join(log_dir, save_file)
@@ -410,6 +420,7 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
         labels = dirs
     kwargs['categories'] = [category]
     best_dicts = {}
+    current_dicts = {}
     if colors is None:
         cmap = plt.get_cmap('viridis')
         colors = [[cmap(i / len(dirs))] * 4 for i, run_dir in enumerate(dirs)]
@@ -418,15 +429,17 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
         kwargs['label'] = labels[i]
         kwargs['colors'] = colors[i]
         kwargs['save'] = i == len(dirs)-1
-        best_dicts[run_dir], _ = plot_it(run_dir, title, **kwargs)
-    return best_dicts # for some reason
+        # kwargs['save'] = True
+        print('plotting fig: ' + str(i) + ' label: ' + str(labels[i]))
+        best_dicts[run_dir], current_dicts[run_dir] = plot_it(run_dir, title, **kwargs)
+    return best_dicts, current_dicts # for some reason
 
 
 if __name__ == '__main__':
     # window = 1000
     max_iter = None
-    window = 1000
-    plot_it('/home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
+    window = 500
+    plot_it('/home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q', max_iter=None, window=None, save_dir='./paper_figures/')
 
     # plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
     # plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
@@ -442,6 +455,16 @@ if __name__ == '__main__':
     #                                   'Standard'],
     #                           max_iter=3000, window=window,
     #                           ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better')
+    best_dict, current_dict = plot_compare(['./logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training',
+                              './logs/2020-05-23-14-31-09_Sim-Stack-SPOT-Trial-Reward-Masked-Training',
+                              './logs/2020-05-18-19-56-49_Sim-Stack-SPOT-Trial-Reward-Training'],
+                              title='Effect of SPOT-Q on Early Training Progress',
+                              labels=['Mask with SPOT-Q',
+                                      'Mask no SPOT-Q',
+                                      'No Mask, no SPOT-Q (Standard)'],
+                              max_iter=None, window=window,
+                              ylabel='Mean Trial Success Rate Over ' + str(window) + ' Actions\nHigher is Better',
+                              save_dir='./paper_figures/')
 
     ##############################################################
     # window = 200
