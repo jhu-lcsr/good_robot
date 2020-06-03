@@ -392,9 +392,30 @@ def plot_it(log_dir, title, window=1000, colors=None,
             dir_to_create = os.path.join(log_dir, 'data')
             if not os.path.exists(dir_to_create):
                 utils.mkdir_p(dir_to_create)
-            trial_success_path = os.path.join(log_dir, '%s.log.csv' % save_file)
-            print('saving trial success: ' + str(trial_success_path))
-            np.savetxt(trial_success_path, trial_success_rate, delimiter=', ', header=label)
+            dir_to_create = os.path.join(log_dir, 'transitions')
+            if not os.path.exists(dir_to_create):
+                utils.mkdir_p(dir_to_create)
+        
+        if 'trial_success' in categories and os.path.isfile(trial_success_file) and trial_successes.size > 0:
+            trial_success_path = os.path.join(log_dir, 'transitions', 'trial-success-rate.log.csv')
+            print('saving trial success rate: ' + str(trial_success_path))
+            np.savetxt(trial_success_path, trial_success_rate, delimiter=', ', header='trial_success_rate')
+
+        if 'grasp_success' in categories:
+            grasp_success_path = os.path.join(log_dir, 'transitions', 'grasp-success-rate.log.csv')
+            print('saving grasp success rate: ' + str(grasp_success_path))
+            np.savetxt(grasp_success_path, grasp_rate, delimiter=', ', header='grasp_success_rate')
+
+        if 'place_success' in categories:
+            place_success_path = os.path.join(log_dir, 'transitions', 'place-success-rate.log.csv')
+            print('saving place success rate: ' + str(place_success_path))
+            np.savetxt(place_success_path, place_rate, delimiter=', ', header='place_success_rate')
+
+        if 'action_efficiency' in categories:
+            action_efficiency_path = os.path.join(log_dir, 'transitions', 'action-efficiency.log.csv')
+            print('saving action efficiency: ' + str(action_efficiency_path))
+            np.savetxt(action_efficiency_path, eff, delimiter=', ', header='action_efficiency')
+
         print('saving plot: ' + save_file + file_format)
         plt.savefig(save_file + file_format, dpi=300, optimize=True)
         log_dir_fig_file = os.path.join(log_dir, save_file)
