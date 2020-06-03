@@ -1009,7 +1009,7 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 SIM ROW - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
-Creating data logging session:
+Creating data logging session: /home/costar/src/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training
 Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
