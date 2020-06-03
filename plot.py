@@ -355,9 +355,9 @@ def plot_it(log_dir, title, window=1000, colors=None,
 
     if 'action_efficiency' in categories:
         plt.plot(mult*eff, color=colors[2], label=label or 'Action Efficiency')
-        plt.fill_between(np.arange(1, eff.shape[0]+1),
-                         mult*eff_lower, mult*eff_upper,
-                         color=colors[2], alpha=alpha)
+        # plt.fill_between(np.arange(1, eff.shape[0]+1),
+        #                  mult*eff_lower, mult*eff_upper,
+        #                  color=colors[2], alpha=alpha)
     if 'grasp_success' in categories:
         plt.plot(mult*grasp_rate, color=colors[0], label=label or 'Grasp Success Rate')
         # plt.fill_between(np.arange(1, grasp_rate.shape[0]+1),
