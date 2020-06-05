@@ -768,7 +768,7 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=4):
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=8):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
