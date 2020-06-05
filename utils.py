@@ -772,6 +772,8 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
+        if x.size == 0 or y.size == 0:
+            return False, 0
 
         # get best fit line y=mx+b
         m, b = np.polyfit(x, y, 1)

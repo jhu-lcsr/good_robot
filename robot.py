@@ -1907,6 +1907,10 @@ class Robot(object):
         successful_block_indices = []
         xs = pos[block_indices][:, 0]
         ys = pos[block_indices][:, 1]
+        if xs.size == 0 or ys.size == 0:
+            # there is nothing to fit, 
+            # not successful, row size 0, and empty block indices
+            return False, 0, successful_block_indices
         # print('xs: {}'.format(xs))
         # print('ys: {}'.format(ys))
         m, b = utils.polyfit(xs, ys, 1)
