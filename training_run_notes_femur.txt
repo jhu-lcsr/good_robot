@@ -704,6 +704,38 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-22-
 Commit: 2d5e56817c0d20120b31261778bdfc1011b1d623 same as tag v0.16.0
 GPU 2, Tab 2, port 20000, right v-rep window, v-rep tab 9
 
+    > TODO(ahundt) consider trying an extra test run
+    > note "best stats" look better than reality because about 2 trials ended in a 500 action span.
+    > Training "best stats" {"action_efficiency_best_index": 15291, "action_efficiency_best_value": 0.468, "grasp_success_rate_best_index": 9853, "grasp_success_rate_best_value": 0.953125, "place_success_rate_best_index": 19470, "place_success_rate_best_value": 0.7723214285714286, "trial_success_rate_best_index": 19128, "trial_success_rate_best_value": 0.6888888888888889}
+    > % /home/ahundt/src/real_good_robot/logs/2020-05-22-20-49-56_Sim-Stack-Two-Step-Reward-Training/ only 2 trials completed successfully during 20k actions of training with a max training efficiency of 1%.
+    > Training iteration: 20006
+    > prev_height: 0.0 max_z: 0.05113055666990403 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > Current count of pixels with stuff: 4531.0 threshold below which the scene is considered empty: 300
+    > WARNING variable mismatch num_trials + 1: 128 nonlocal_variables[stack].trial: 126
+    > Change detected: True (value: 534)
+    > Primitive confidence scores: 1.406690 (push), 2.592584 (grasp), 2.803117 (place)
+    > Strategy: exploit (exploration probability: 0.010000)
+    > Action: place at (0, 104, 103)
+    > Executing: Place at (-0.518000, -0.016000, 0.051012) angle: 0.000000
+    > gripper position: 0.005653828382492065
+    > gripper position: 0.0055609047412872314
+    > gripper position: 0.005279242992401123
+    > Trainer.get_label_value(): Current reward: 1.000000 Current reward multiplier: 1.000000 Predicted Future reward: 2.803117 Expected reward: 1.000000 + 0.650000 x 2.803117 = 2.822026
+    > Running two step backprop()
+    > Training loss: 0.004022
+    > current_position: [-0.52026516 -0.01241153  0.07798614]
+    > current_obj_z_location: 0.10798614352941513
+    > goal_position: 0.11101188566865967 goal_position_margin: 0.31101188566865967
+    > has_moved: True near_goal: True place_success: True
+    > prev_height: 0.0 max_z: 0.1031934318821809 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > prev_height: 1.0232359626064527 max_z: 2.063868637643618 goal_success: True needed to reset: False max_workspace_height: 0.6232359626064526 <<<<<<<<<<<
+    > check_stack() stack_height: 2.063868637643618 stack matches current goal: True partial_stack_success: True Does the code think a reset is needed: False
+    > STACK:  trial: 126 actions/partial: 2.941773268636965  actions/full stack: 20007.0 (lower is better)  Grasp Count: 10612, grasp success rate: 0.8646814926498304 place_on_stack_rate: 0.7427916120576671 place_
+    > attempts: 9156  partial_stack_successes: 6801  stack_successes: 1 trial_success_rate: 0.007936507936507936 stack goal: None current_height: 2.063868637643618
+    > Experience replay 18488: history timestep index 205, action: push, surprise value: 1.354873
+    > Training loss: 0.000761
+    > Time elapsed: 22.195343
+    > Trainer iteration: 20006 complete
 
 
 SIM ROW - "Baseline" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-25
@@ -715,7 +747,31 @@ Commit: a534735959ec2747c3b134a6d3067135a5c7bd75 same as tag v0.16.0
 GPU 1, Tab 1, port 19999, middle v-rep window, v-rep tab 8
 
 
-
+    > First trial took 1200 actions, manually resetting to the next trial didn't improve, so rounding down to 0.
+    > Testing iteration: 1206
+    > prev_height: 0.0 max_z: 0.051105897527620084 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > Current count of pixels with stuff: 1804.0 threshold below which the scene is considered empty: 900
+    > Change detected: True (value: 523)
+    > Primitive confidence scores: 1.369749 (push), 3.314228 (grasp), 2.010027 (place)
+    > Action: place at (12, 39, 215)
+    > Executing: Place at (-0.294000, -0.146000, 0.001007) angle: 4.712389
+    > gripper position: 0.0044525861740112305
+    > gripper position: 0.0043984055519104
+    > gripper position: 0.0042927563190460205
+    > Trainer.get_label_value(): Current reward: 1.000000 Current reward multiplier: 1.000000 Predicted Future reward: 3.314228 Expected reward: 1.000000 + 0.650000 x 3.314228 = 3.154248
+    > Running two step backprop()
+    > Training loss: 0.012545
+    > current_position: [-0.2937963 -0.1476554  0.0259938]
+    > current_obj_z_location: 0.05599379979074001
+    > goal_position: 0.021007411514566848 goal_position_margin: 0.22100741151456685
+    > has_moved: True near_goal: True place_success: True
+    > prev_height: 0.0 max_z: 0.0511212507029354 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > check_row: True | row_size: 2 | blocks: ['blue' 'green']
+    > check_stack() stack_height: 2 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: True
+    > main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: 3 and current workspace stack height: 2
+    > STACK:  trial: 1 actions/partial: 402.3333333333333  actions/full stack: inf (lower is better)  Grasp Count: 605, grasp success rate: 0.996694214876033 place_on_stack_rate: 0.0049833887043189366 place_attemp
+    > ts: 602  partial_stack_successes: 3  stack_successes: 0 trial_success_rate: inf stack goal: [0 2 1 3] current_height: 2
+    > Time elapsed: 15.938629
 
 
 
@@ -744,7 +800,37 @@ SIM ROW - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE
 -------------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
 Creating data logging session: TODO
-Commit: 7cbb47979cdb12b2e1125fd777a6617b0d5192f9
+Commit: 12d9481717486342dbfcaff191ddb1428f102406
+GPU 1, Tab 1, port 19999, right v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SIM STACK - "instant Task Progress aka progress only aka Rp" - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-30
+---------------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 20000 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-22-11-28_Sim-Stack-Two-Step-Reward-Training
+Commit: 12d9481717486342dbfcaff191ddb1428f102406
+GPU 2, Tab 2, port 20000, left v-rep window, v-rep tab 7
+
+
+SIM ROW - "instant Task Progress aka progress only aka Rp" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-30
+-------------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training
+Commit: 12d9481717486342dbfcaff191ddb1428f102406
 GPU 1, Tab 1, port 19999, right v-rep window, v-rep tab 8
 
 

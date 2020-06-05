@@ -635,8 +635,10 @@ GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
     > Training results:
     > {'action_efficiency_best_index': 10008, 'action_efficiency_best_value': 0.684, 'grasp_success_rate_best_index': 15783, 'grasp_success_rate_best_value': 0.8834586466165414, 'place_success_rate_best_index': 17570, 'place_success_rate_best_value': 0.8616071428571429, 'trial_success_rate_best_index': 10011, 'trial_success_rate_best_value': 0.8507462686567164}
 
+    > *********** 100% trial success testing **********
     > Testing run prioritizing action efficiency: 
     > {"action_efficiency_best_index": 1325, "action_efficiency_best_value": 0.4580498866213152, "grasp_success_rate_best_index": 1323, "grasp_success_rate_best_value": 0.7697456492637216, "place_success_rate_best_index": 1325, "place_success_rate_best_value": 0.7885615251299827, "trial_success_rate_best_index": 1323, "trial_success_rate_best_value": 1.0}
+    > *********** 100% trial success testing **********
 
 
 SIM ROW - SPOT-Q-MASKED - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-13
@@ -847,6 +849,8 @@ Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
+    > /home/costar/src/real_good_robot/logs/2020-05-24-09-36-39_Sim-Rows-SPOT-Trial-Reward-Masked-Training/2020-05-28-03-27-32_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > {"action_efficiency_best_index": 1189, "action_efficiency_best_value": 0.4894869638351556, "grasp_success_rate_best_index": 1189, "grasp_success_rate_best_value": 0.7434402332361516, "place_success_rate_best_index": 1189, "place_success_rate_best_value": 0.8452380952380952, "trial_success_rate_best_index": 1189, "trial_success_rate_best_value": 0.93}
 
 
 
@@ -856,21 +860,172 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
-SIM STACK - Task Progress aka progress only - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-27
+
+
+
+SIM STACK - Task Progress aka progress TRIAL - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-27
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training
 Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > Running two step backprop()
+    > Primitive confidence scores: 0.926641 (push), 2.734785 (grasp), 6.851398 (place)
+    > Action: grasp at (0, 103, 151)
+    > Training loss: 0.528587
+    > Executing: grasp at (-0.422000, -0.018000, 0.001003) orientation: 0.000000
+    > gripper position: 0.03009691834449768
+    > gripper position: 0.0258101224899292
+    > gripper position: 0.0006317198276519775
+    > gripper position: -0.02364581823348999
+    > gripper position: -0.04264447093009949
+    > Grasp successful: False
+    > prev_height: 0.0 max_z: 0.051131368098522104 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > prev_height: 1.0 max_z: 1.022627361970442 goal_success: False needed to reset: False max_workspace_height: 0.6 <<<<<<<<<<<
+    > check_stack() stack_height: 1.022627361970442 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 4.434782608695652  actions/full stack: 18.545454545454547 (lower is better)  Grasp Count: 1082, grasp success rate: 0.6977818853974121 place_on_stack_rate: 0.5490716180371353 place_attempts: 754  partial_stack_successes: 414  stack_successes: 99 trial_success_rate: 0.9801980198019802 stack goal: None current_height: 1.022627361970442
+    > trial_complete_indices: [  10.   16.   26.   66.   72.  118.  124.  128.  136.  186.  235.  241.
+    >   252.  263.  382.  411.  444.  454.  458.  491.  529.  566.  579.  586.
+    >   671.  680.  781.  787.  795.  827.  875.  883.  891.  919.  931.  942.
+    >   957.  974.  982.  997. 1001. 1009. 1019. 1031. 1044. 1066. 1107. 1134.
+    >  1155. 1163. 1169. 1192. 1201. 1219. 1225. 1248. 1254. 1281. 1301. 1311.
+    >  1317. 1345. 1351. 1390. 1394. 1404. 1415. 1421. 1431. 1452. 1458. 1469.
+    >  1475. 1485. 1522. 1542. 1549. 1563. 1578. 1585. 1609. 1620. 1642. 1646.
+    >  1658. 1669. 1679. 1705. 1711. 1717. 1725. 1736. 1742. 1748. 1762. 1785.
+    >  1793. 1806. 1813. 1818. 1835.]
+    > Max trial success rate: 0.98, at action iteration: 1832. (total of 1834 actions, max excludes first 1832 actions)
+    > Max grasp success rate: 0.6981481481481482, at action iteration: 1832. (total of 1834 actions, max excludes first 1832 actions)
+    > Max place success rate: 0.7861885790172642, at action iteration: 1834. (total of 1835 actions, max excludes first 1832 actions)
+    > Max action efficiency: 0.324235807860262, at action iteration: 1834. (total of 1835 actions, max excludes first 1832 actions)
+    > saving plot: 2020-05-31-05-18-07_Sim-Stack-SPOT-Trial-Reward-Testing-Sim-Stack-SPOT-Trial-Reward-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-31-05-18-07_Sim-Stack-SPOT-Trial-Reward-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-31-05-18-07_Sim-Stack-SPOT-Trial-Reward-Testing/best_stats.json
+    > Choosing a snapshot from the following options:{'trial_success_rate_best_value': 0.8157894736842105, 'trial_success_rate_best_index': 10807, 'grasp_success_rate_best_value': 0.8550185873605948, 'grasp_success_rate_best_index': 10825, 'place_success_rate_best_value': 0.7741935483870968, 'place_success_rate_best_index': 13745, 'action_efficiency_best_value': 0.384, 'action_efficiency_best_index': 10746}
+    > Evaluating trial_success_rate_best_value
+    > Shapshot chosen: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth
+    > Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training/2020-05-31-05-18-07_Sim-Stack-SPOT-Trial-Reward-Testing
+    > Random Testing results: 
+    >  {'trial_success_rate_best_value': 0.98, 'trial_success_rate_best_index': 1832, 'grasp_success_rate_best_value': 0.6981481481481482, 'grasp_success_rate_best_index': 1832, 'place_success_rate_best_value': 0.7861885790172642, 'place_success_rate_best_index': 1834, 'action_efficiency_best_value': 0.324235807860262, 'action_efficiency_best_index': 1834}
+    > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training
+    > Training results: 
+    >  {'trial_success_rate_best_value': 0.8157894736842105, 'trial_success_rate_best_index': 10807, 'grasp_success_rate_best_value': 0.8550185873605948, 'grasp_success_rate_best_index': 10825, 'place_success_rate_best_value': 0.7741935483870968, 'place_success_rate_best_index': 13745, 'action_efficiency_best_value': 0.384, 'action_efficiency_best_index': 10746}
 
 
 
-SIM ROW - Task Progress aka progress only - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-23
+XXXX BAD RUN XXXX - SIM ROW - Task Progress aka progress only - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-23
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
-Creating data logging session: TODO
+RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training 
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training
 Commit: a534735959ec2747c3b134a6d3067135a5c7bd75  release tag:v0.16.0
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+    > The simulator state went bad in this run (not the training algorithm), probably the sim causing the robot arm to go elbow down and the row detector to see false positives, and the good models were thus overwritten. This run cannot be used in results.
+    XXXX The trial_success_rate_best_value is fantastic at 1.0, so we will look for the best grasp_success_rate_best_value.                                                                                         
+    XXXX The trial_success_rate_best_value is fantastic at 1.0, so we will look for the best action_efficiency_best_value.                                                                                          Shapshot chosen: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth                                                                                                                                                                                                       
+    XXXX Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training/2020-06-01-00-55-27_Sim-Rows-SPOT-Trial-Reward-Testing                                                                                                                                                                           
+    XXXX Random Testing results:                                                                                                                                                                                     
+    XXXX {'trial_success_rate_best_value': 0.74, 'trial_success_rate_best_index': 2430, 'grasp_success_rate_best_value': 0.6106719367588933, 'grasp_success_rate_best_index': 2430, 'place_success_rate_best_value' : 0.7897042716319824, 'place_success_rate_best_index': 2430, 'action_efficiency_best_value': 0.2, 'action_efficiency_best_index': 2430}                                                                    
+    XXXX Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training                                                    
+    XXXX Training results:                                                                                                                                                                   
+    XXXX  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 15761, 'grasp_success_rate_best_value': 0.9960159362549801, 'grasp_success_rate_best_index': 15763, 'place_success_rate_best_value': 0.7959183673469388, 'place_success_rate_best_index': 12706, 'action_efficiency_best_value': 0.588, 'action_efficiency_best_index': 10820}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SIM STACK - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-31
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-31-17-25-41_Sim-Stack-SPOT-Trial-Reward-Masked-Training                                     
+Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > Running two step backprop()
+    > Primitive confidence scores: 0.580019 (push), 4.184012 (grasp), 8.394482 (place)
+    > Action: grasp at (0, 73, 119)
+    > Training loss: 0.248444
+    > Executing: grasp at (-0.486000, -0.078000, 0.001000) orientation: 0.000000
+    > gripper position: 0.03083541989326477
+    > gripper position: 0.026231884956359863
+    > gripper position: 0.0011520087718963623
+    > gripper position: -0.023060262203216553
+    > gripper position: -0.04178208112716675
+    > gripper position: -0.044988662004470825
+    > Grasp successful: False
+    > prev_height: 0.0 max_z: 0.05113248210487194 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > prev_height: 1.0 max_z: 1.0226496420974387 goal_success: False needed to reset: False max_workspace_height: 0.6 <<<<<<<<<<<
+    > check_stack() stack_height: 1.0226496420974387 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 3.913793103448276  actions/full stack: 13.485148514851485 (lower is better)  Grasp Count: 801, grasp success rate: 0.700374531835206 place_on_stack_rate: 0.6203208556149733 place_attempts: 561  partial_stack_successes: 348  stack_successes: 101 trial_success_rate: 1.0 stack goal: None current_height: 1.0226496420974387
+    > trial_complete_indices: [   9.   38.   51.   64.   79.   87.   94.   98.  102.  108.  122.  162.
+    >   171.  190.  198.  210.  219.  225.  229.  235.  241.  259.  273.  295.
+    >   305.  311.  331.  354.  360.  368.  380.  386.  404.  419.  427.  451.
+    >   469.  475.  511.  522.  528.  538.  561.  575.  579.  587.  612.  622.
+    >   642.  648.  660.  678.  689.  696.  708.  723.  768.  777.  798.  812.
+    >   821.  827.  833.  839.  850.  858.  885.  895.  911.  931.  937.  958.
+    >   966.  980.  991.  995. 1002. 1073. 1090. 1103. 1115. 1170. 1189. 1199.
+    >  1209. 1217. 1225. 1231. 1244. 1261. 1272. 1280. 1287. 1291. 1300. 1309.
+    >  1329. 1341. 1348. 1354. 1361.]
+    > Max trial success rate: 1.0, at action iteration: 1358. (total of 1360 actions, max excludes first 1358 actions)
+    > Max grasp success rate: 0.7008760951188986, at action iteration: 1358. (total of 1360 actions, max excludes first 1358 actions)
+    > Max place success rate: 0.7625, at action iteration: 1358. (total of 1361 actions, max excludes first 1358 actions)
+    > Max action efficiency: 0.44624447717231225, at action iteration: 1360. (total of 1361 actions, max excludes first 1358 actions)
+    > saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/trial-success-rate.log.csv
+    > saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/grasp-success-rate.log.csv
+    > saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/place-success-rate.log.csv
+    > saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/action-efficiency.log.csv
+    > saving plot: 2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Sim-Stack-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+    > Random Testing Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-31-17-25-41_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-05-01-08-01_Sim-Stack-SPOT-Trial-Reward-Masked-Testing
+    > Random Testing results: 
+    > *********** 100% trial success testing **********
+    >  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 1358, 'grasp_success_rate_best_value': 0.7008760951188986, 'grasp_success_rate_best_index': 1358, 'place_success_rate_best_value': 0.7625, 'place_success_rate_best_index': 1358, 'action_efficiency_best_value': 0.44624447717231225, 'action_efficiency_best_index': 1360}
+    > *********** 100% trial success testing **********
+    > Training Complete! Dir: /home/costar/src/real_good_robot/logs/2020-05-31-17-25-41_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+    > Training results: 
+    >  {'action_efficiency_best_index': 16175, 'action_efficiency_best_value': 0.564, 'grasp_success_rate_best_index': 13985, 'grasp_success_rate_best_value': 0.9233716475095786, 'place_success_rate_best_index': 19993, 'place_success_rate_best_value': 0.8340807174887892, 'trial_success_rate_best_index': 12586, 'trial_success_rate_best_value': 0.8125}
+
+
+
+
+SIM ROW - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - RANDOM ACTIONS -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-31
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: 
+Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
@@ -884,8 +1039,131 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
-=============================================================
-=============================================================
+
+
+
+
+
+
+
+
+
+
+SIM ROW - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
+Creating data logging session: /home/costar/src/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training
+Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+
+
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > Running two step backprop()
+    > Primitive confidence scores: 5.168270 (push), 7.431992 (grasp), 9.176738 (place)
+    > Action: grasp at (11, 71, 104)
+    > Training loss: 0.093161
+    > Executing: grasp at (-0.516000, -0.082000, 0.051029) orientation: 4.319690
+    > gripper position: 0.0376565158367157
+    > gripper position: 0.028479814529418945
+    > gripper position: 0.006529122591018677
+    > gripper position: 0.004047483205795288
+    > Grasp successful: False
+    > prev_height: 0.0 max_z: 0.0511084382068845 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > check_row() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically
+    > check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 3.3846153846153846  actions/full stack: 7.111111111111111 (lower is better)  Grasp Count: 384, grasp success rate: 0.8385416666666666 place_on_stack_rate: 0.65 place_attempts: 320  partial_stack_successes: 208  stack_successes: 99 trial_success_rate: 0.9801980198019802 stack goal: [0] current_height: 1
+    > trial_complete_indices: [  7.  13.  17.  23.  32.  36.  40.  57.  65.  67.  71.  77.  83.  87.
+    >   91.  95.  97. 101. 126. 131. 138. 144. 150. 156. 160. 162. 166. 170.
+    >  173. 177. 185. 189. 195. 199. 212. 221. 225. 227. 231. 237. 242. 249.
+    >  253. 257. 261. 265. 271. 275. 277. 282. 287. 294. 420. 434. 438. 444.
+    >  449. 451. 459. 463. 471. 478. 482. 486. 493. 499. 503. 509. 515. 522.
+    >  530. 532. 537. 541. 545. 549. 553. 557. 563. 595. 599. 601. 611. 615.
+    >  621. 623. 631. 635. 641. 645. 649. 653. 672. 676. 680. 682. 686. 688.
+    >  693. 697. 703.]
+    > Max trial success rate: 0.98, at action iteration: 700. (total of 702 actions, max excludes first 700 actions)
+    > Max grasp success rate: 0.8403141361256544, at action iteration: 700. (total of 702 actions, max excludes first 700 actions)
+    > Max place success rate: 0.8463949843260188, at action iteration: 700. (total of 703 actions, max excludes first 700 actions)
+    > Max action efficiency: 0.8657142857142858, at action iteration: 702. (total of 703 actions, max excludes first 700 actions)
+    > saving plot: 2020-06-05-09-17-42_Sim-Rows-Two-Step-Reward-Testing-Sim-Rows-Two-Step-Reward-Testing_success_plot.png
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-09-17-42_Sim-Rows-Two-Step-Reward-Testing/data/best_stats.json
+    > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-09-17-42_Sim-Rows-Two-Step-Reward-Testing/best_stats.json
+    > Choosing a snapshot from the following options:{'trial_success_rate_best_value': 0.7482517482517482, 'trial_success_rate_best_index': 19558, 'grasp_success_rate_best_value': 0.8122743682310469, 'grasp_success_rate_best_index': 19556, 'place_success_rate_best_value': 0.8878923766816144, 'place_success_rate_best_index': 19597, 'action_efficiency_best_value': 1.344, 'action_efficiency_best_index': 19459}
+    > Evaluating trial_success_rate_best_value
+    > Shapshot chosen: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_place_success_rate_best_value.pth
+    > Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/2020-06-05-09-17-42_Sim-Rows-Two-Step-Reward-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 0.98, 'trial_success_rate_best_index': 700, 'grasp_success_rate_best_value': 0.8403141361256544, 'grasp_success_rate_best_index': 700, 'place_success_rate_best_value': 0.8463949843260188, 'place_success_rate_best_index': 700, 'action_efficiency_best_value': 0.8657142857142858, 'action_efficiency_best_index': 702}
+    > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training
+    > Training results:
+    >  {'trial_success_rate_best_value': 0.7482517482517482, 'trial_success_rate_best_index': 19558, 'grasp_success_rate_best_value': 0.8122743682310469, 'grasp_success_rate_best_index': 19556, 'place_success_rate_best_value': 0.8878923766816144, 'place_success_rate_best_index': 19597, 'action_efficiency_best_value': 1.344, 'action_efficiency_best_index': 19459}
+
+
+
+
+
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+SIM TO REAL ROBOT TEST COMMANDS 2020-06-05
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+
+
+
+
+
+SIM TO REAL TESTING ROW - TEST - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_place_success_rate_best_value.pth
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_place_success_rate_best_value.pth
+
+
+
+SIM TO REAL TESTING STACK - TEST - SPOT-Q-MASKED - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-13 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8  --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+
+
+
+
+
+
+
+
+
+SIM TO REAL STACK - Task Progress aka progress only - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - workstation named spot 2020-05-30 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /home/costar/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+
+"/home/ahundt/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training-Sim-Stack-Two-Step-Reward-Training_success_plot
+SIM Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/2020-06-03-03-08-00_Sim-Stack-Two-Step-Reward-Testing
+SIM Random Testing results:{'trial_success_rate_best_value': 0.98, 'trial_success_rate_best_index': 1234, 'grasp_success_rate_best_value': 0.8335854765506808, 'grasp_success_rate_best_index': 1235, 'place_success_rate_best_value': 0.7426086956521739, 'place_success_rate_best_index': 1236, 'action_efficiency_best_value': 0.5153970826580226, 'action_efficiency_best_index': 1236}
+
+
+
+SIM TO REAL ROW - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - workstation named spot 2020-05-30 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19998 --place --future_reward_discount 0.65  --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /home/costar/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/2020-06-03-07-00-00_Sim-Rows-Two-Step-Reward-Testing
+SIM Random Testing results: {'trial_success_rate_best_value': 0.97, 'trial_success_rate_best_index': 1120, 'grasp_success_rate_best_value': 0.823051948051948, 'grasp_success_rate_best_index': 1120, 'place_success_rate_best_value': 0.8950495049504951, 'place_success_rate_best_index': 1120, 'action_efficiency_best_value': 0.5303571428571429, 'action_efficiency_best_index': 1122}
+SIM Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training
+
+"/home/costar/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+"/home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+
+
+
+
+
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
 TODO:
