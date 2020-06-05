@@ -214,6 +214,7 @@ Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 2, Tab 2, port 19999, left v-rep window, v-rep tab 9
 
 
+    > {"action_efficiency_best_index": 7161, "action_efficiency_best_value": 0.07710574102528286, "grasp_success_rate_best_index": 7159, "grasp_success_rate_best_value": 0.8780807551127425, "place_success_rate_best_index": 7159, "place_success_rate_best_value": 0.6434548714883442, "trial_success_rate_best_index": 7159, "trial_success_rate_best_value": 0.9}
 
 
 SIM ROW - Basic Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
@@ -224,12 +225,26 @@ Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 3, Tab 3, port 20000, center left v-rep window, v-rep tab 10
 
 
+    > Complete first test run trial success rate best value model:
+    > {"action_efficiency_best_index": 2092, "action_efficiency_best_value": 0.28995215311004785, "grasp_success_rate_best_index": 2090, "grasp_success_rate_best_value": 0.8680926916221033, "place_success_rate_best_index": 2090, "place_success_rate_best_value": 0.5927835051546392, "trial_success_rate_best_index": 2090, "trial_success_rate_best_value": 0.94}
+    > Max trial success rate: 0.94, at action iteration: 2090. (total of 2092 actions, max excludes first 2090 actions)                         
+    > Max grasp success rate: 0.8680926916221033, at action iteration: 2090. (total of 2092 actions, max excludes first 2090 actions)           Max place success rate: 0.5927835051546392, at action iteration: 2090. (total of 2091 actions, max excludes first 2090 actions)           
+    > Max action efficiency: 0.28995215311004785, at action iteration: 2092. (total of 2093 actions, max excludes first 2090 actions)           
+    > saving plot: 2020-06-03-06-28-31_Sim-Rows-Two-Step-Reward-Testing-Sim-Rows-Two-Step-Reward-Testing_success_plot.png                       saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-03-06-28-31_Sim-Rows-Two-Step-Reward-Testing/data/best_stats.json     
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-03-06-28-31_Sim-Rows-Two-Step-Reward-Testing/best_stats.json          
+    > Trial logging complete: 101 --------------------------------------------------------------
 
 
 
-
-
-
+    > *Partially* complete second test run, best action efficiency model:
+    > -------------------------------------
+    > Max trial success rate: 0.9710144927536232, at action iteration: 1741. (total of 1743 actions, max excludes first 1741 actions)
+    > Max grasp success rate: 0.9186176142697882, at action iteration: 1741. (total of 1743 actions, max excludes first 1741 actions)           
+    > Max place success rate: 0.6415552855407047, at action iteration: 1741. (total of 1742 actions, max excludes first 1741 actions)
+    > Max action efficiency: 0.24813325674899483, at action iteration: 1743. (total of 1744 actions, max excludes first 1741 actions)
+    > saving plot: 2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing-Sim-Rows-Two-Step-Reward-Testing_success_plot.png                       
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing/data/best_stats.json     saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing/best_stats.json          
+    > Trial logging complete: 70 -------------------------------------------------------------- 
 
 
 
@@ -277,7 +292,7 @@ GPU 1, Tab 1, port 19998, center left v-rep window, v-rep tab 8
 SIM STACK - Task Progress SPOT-Q MASKED - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-06-03
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
-Creating data logging session: 
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-04-11-18-49_Sim-Stack-Two-Step-Reward-Masked-Training
 Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 2, Tab 2, port 19999, right center v-rep window, v-rep tab 9
 
@@ -287,7 +302,7 @@ GPU 2, Tab 2, port 19999, right center v-rep window, v-rep tab 9
 SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-06-03
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
-Creating data logging session: 
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-03-23-18-31_Sim-Rows-Two-Step-Reward-Masked-Training
 Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 3, Tab 3, port 20000, right v-rep window, v-rep tab 10
 
@@ -297,3 +312,25 @@ GPU 3, Tab 3, port 20000, right v-rep window, v-rep tab 10
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+Pass 3
+============================================================
+
+
+
+SIM ROW - Basic Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-17-46-01_Sim-Rows-Two-Step-Reward-Training
+Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
+GPU 3, Tab 3, port 20000, center left v-rep window, v-rep tab 10
