@@ -782,7 +782,7 @@ class Trainer(object):
                 # prediction_vis[prediction_vis < 0] = 0 # assume probability
                 # prediction_vis[prediction_vis > 1] = 1 # assume probability
                 # Reduce the dynamic range so the visualization looks better
-                prediction_vis = prediction_vis/scale_factor
+                prediction_vis = prediction_vis/np.max(prediction_vis)
                 prediction_vis = np.clip(prediction_vis, 0, 1)
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
