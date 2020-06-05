@@ -1103,23 +1103,67 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
-=============================================================
-=============================================================
-REAL ROBOT TEST COMMANDS 2020-06-05
-=============================================================
-=============================================================
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+SIM TO REAL ROBOT TEST COMMANDS 2020-06-05
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
-REAL TEST - SIM ROW - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
+
+
+
+
+SIM TO REAL TESTING ROW - TEST - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30 - test on costar 2020-06-05
 ----------------------------------------------------------------------------------------
 
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_place_success_rate_best_value.pth
 /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-01-13-03-15_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_place_success_rate_best_value.pth
 
 
 
+SIM TO REAL TESTING STACK - TEST - SPOT-Q-MASKED - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-13 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8  --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
 
-=============================================================
-=============================================================
+
+
+
+
+
+
+
+
+SIM TO REAL STACK - Task Progress aka progress only - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - workstation named spot 2020-05-30 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /home/costar/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+
+"/home/ahundt/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training-Sim-Stack-Two-Step-Reward-Training_success_plot
+SIM Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-09-38_Sim-Stack-Two-Step-Reward-Training/2020-06-03-03-08-00_Sim-Stack-Two-Step-Reward-Testing
+SIM Random Testing results:{'trial_success_rate_best_value': 0.98, 'trial_success_rate_best_index': 1234, 'grasp_success_rate_best_value': 0.8335854765506808, 'grasp_success_rate_best_index': 1235, 'place_success_rate_best_value': 0.7426086956521739, 'place_success_rate_best_index': 1236, 'action_efficiency_best_value': 0.5153970826580226, 'action_efficiency_best_index': 1236}
+
+
+
+SIM TO REAL ROW - Task Progress aka progress only - REWARD SCHEDULE 0.1, 1, 1 - workstation named spot 2020-05-30 - test on costar 2020-06-05
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19998 --place --future_reward_discount 0.65  --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --snapshot_file /home/costar/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/2020-06-03-07-00-00_Sim-Rows-Two-Step-Reward-Testing
+SIM Random Testing results: {'trial_success_rate_best_value': 0.97, 'trial_success_rate_best_index': 1120, 'grasp_success_rate_best_value': 0.823051948051948, 'grasp_success_rate_best_index': 1120, 'place_success_rate_best_value': 0.8950495049504951, 'place_success_rate_best_index': 1120, 'action_efficiency_best_value': 0.5303571428571429, 'action_efficiency_best_index': 1122}
+SIM Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training
+
+"/home/costar/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+"/home/ahundt/src/real_good_robot/logs/2020-05-30-13-10-52_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth"
+
+
+
+
+
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+=============================================================<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
 TODO:
