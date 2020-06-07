@@ -90,7 +90,7 @@ def main(args):
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         if args.place:
             # The object sets differ for stacking, so add a bit to min z.
-            workspace_limits[2][0] += 0.02
+            workspace_limits[2][0] += 0.01
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
