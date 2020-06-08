@@ -705,7 +705,7 @@ def main(args):
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
-                             (check_row and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
+                             (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
