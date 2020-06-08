@@ -213,7 +213,7 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-
 Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 2, Tab 2, port 19999, left v-rep window, v-rep tab 9
 
-
+    > '/home/ahundt/src/real_good_robot/logs/2020-05-30-13-11-57_Sim-Stack-Two-Step-Reward-Training/2020-06-02-19-24-53_Sim-Stack-Two-Step-Reward-Testing'
     > {"action_efficiency_best_index": 7161, "action_efficiency_best_value": 0.07710574102528286, "grasp_success_rate_best_index": 7159, "grasp_success_rate_best_value": 0.8780807551127425, "place_success_rate_best_index": 7159, "place_success_rate_best_value": 0.6434548714883442, "trial_success_rate_best_index": 7159, "trial_success_rate_best_value": 0.9}
 
 
@@ -354,8 +354,9 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-04-
 Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 2, Tab 2, port 19999, right center v-rep window, v-rep tab 9
 
-
-
+    > '/home/ahundt/src/real_good_robot/logs/2020-06-04-11-18-49_Sim-Stack-Two-Step-Reward-Masked-Training/2020-06-07-19-54-35_Sim-Stack-Two-Step-Reward-Masked-Testing'
+    > {"action_efficiency_best_index": 2284, "action_efficiency_best_value": 0.25241016652059595, "grasp_success_rate_best_index": 2282, "grasp_success_rate_best_value": 0.7245283018867924, "place_success_rate_best_index": 2282, "place_success_rate_best_value": 0.6659707724425887, "trial_success_rate_best_index": 2282, "trial_success_rate_best_value": 0.94}
+    > TODO(ahundt) maybe run one extra test with place success rate, since it appears there was a glitch in the action efficiency records.
 
 SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 0.1, 1, 1 - workstation named spot 2020-06-03
 ----------------------------------------------------------------------------------------
@@ -365,7 +366,33 @@ Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
 GPU 3, Tab 3, port 20000, right v-rep window, v-rep tab 10
 
 
-
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > Grasp successful: False
+    > prev_height: 0.0 max_z: 0.051105467279345854 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > check_row: True | row_size: 3 | blocks: ['blue' 'green' 'red']
+    > check_stack() stack_height: 3 stack matches current goal: True partial_stack_success: True Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 2.911214953271028  actions/full stack: 6.23 (lower is better)  Grasp Count: 333, grasp success rate: 0.8738738738738738 place_on_stack_rate: 0.7379310344827587 place_attempts: 290  partial_stack_successes: 214  stack_successes: 100 trial_success_rate: 0.9900990099009901 stack goal: [0 2] current_height: 3
+    > trial_complete_indices: [  4.   8.  10.  12.  17.  40.  54.  61.  65.  71.  78.  82.  87.  91.
+    >   95.  99. 101. 105. 111. 117. 123. 127. 131. 135. 143. 147. 151. 155.
+    >  159. 169. 173. 177. 181. 190. 196. 200. 206. 210. 214. 220. 225. 232.
+    >  240. 244. 252. 256. 260. 268. 272. 299. 303. 315. 325. 330. 334. 336.
+    >  343. 349. 351. 356. 364. 368. 370. 374. 378. 403. 414. 418. 420. 428.
+    >  432. 436. 440. 442. 446. 450. 458. 464. 479. 490. 535. 538. 542. 546.
+    >  554. 556. 562. 568. 577. 579. 581. 585. 589. 591. 595. 599. 605. 609.
+    >  616. 618. 622.]
+    > Max trial success rate: 0.98, at action iteration: 619. (total of 621 actions, max excludes first 619 actions)
+    > Max grasp success rate: 0.8761329305135952, at action iteration: 619. (total of 621 actions, max excludes first 619 actions)
+    > Max place success rate: 0.7612456747404844, at action iteration: 621. (total of 622 actions, max excludes first 619 actions)
+    > Max action efficiency: 0.9693053311793215, at action iteration: 621. (total of 622 actions, max excludes first 619 actions)
+    > saving plot: 2020-06-07-20-09-08_Sim-Rows-Two-Step-Reward-Masked-Testing-Sim-Rows-Two-Step-Reward-Masked-Testing_success_plot.png
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-07-20-09-08_Sim-Rows-Two-Step-Reward-Masked-Testing/data/best_stats.json
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-07-20-09-08_Sim-Rows-Two-Step-Reward-Masked-Testing/best_stats.json
+    > Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-03-23-18-31_Sim-Rows-Two-Step-Reward-Masked-Training/2020-06-07-17-17-16_Sim-Rows-Two-Step-Reward-Masked-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 0.98, 'trial_success_rate_best_index': 614, 'grasp_success_rate_best_value': 0.9190031152647975, 'grasp_success_rate_best_index': 614, 'place_success_rate_best_value': 0.7627118644067796, 'place_success_rate_best_index': 615, 'action_efficiency_best_value': 1.01628664495114, 'action_efficiency_best_index': 616}
+    > Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-03-23-18-31_Sim-Rows-Two-Step-Reward-Masked-Training
+    > Training results:
+    >  {'trial_success_rate_best_value': 0.8034188034188035, 'trial_success_rate_best_index': 19062, 'grasp_success_rate_best_value': 0.8321167883211679, 'grasp_success_rate_best_index': 17961, 'place_success_rate_best_value': 0.9090909090909091, 'place_success_rate_best_index': 19959, 'action_efficiency_best_value': 1.26, 'action_efficiency_best_index': 19903}
 
 
 
@@ -386,9 +413,45 @@ Pass 3
 
 
 
-SIM ROW - Basic Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-30
+SIM ROW - Basic Situation Removal - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-06-07
 ----------------------------------------------------------------------------------------
-export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-17-46-01_Sim-Rows-Two-Step-Reward-Training
-Commit: 12d9481717486342dbfcaff191ddb1428f102406  release tag:v0.16.1
-GPU 3, Tab 3, port 20000, center left v-rep window, v-rep tab 10
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-07-14-06-58_Sim-Rows-Two-Step-Reward-Training
+Commit: 84d192f5e33a8da14b5da245f6649bed9f816884  release tag:v0.16.2
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 1, 1, 1 - workstation named spot 2020-06-07
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-07-14-07-53_Sim-Rows-Two-Step-Reward-Masked-Training
+Commit: 169ee86203c2a360b14fac69bd4b5cef86de3e83  release tag:push_r_weight_1.0_v0
+GPU 1, Tab 1, port 19998, center left v-rep window, v-rep tab 8
+
+
+
+
+
+
+
+
+
+
+SIM STACK - Task Progress SPOT-Q MASKED - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - EFFICIENTNET 1 dilation - workstation named spot 2020-06-03
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --tcp_port 19999 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --nn efficientnet --num_dilation 1
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-04-11-18-49_Sim-Stack-Two-Step-Reward-Masked-Training
+Commit: 84d192f5e33a8da14b5da245f6649bed9f816884  release tag:v0.16.2
+GPU 2, Tab 2, port 19999, right center v-rep window, v-rep tab 9
+
+
+
+
+SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 0.1, 1, 1 - EFFICIENTNET 1 dilation - workstation named spot 2020-06-03
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 20000 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --nn efficientnet --num_dilation 1
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-03-23-18-31_Sim-Rows-Two-Step-Reward-Masked-Training
+Commit: 84d192f5e33a8da14b5da245f6649bed9f816884  release tag:v0.16.2
+GPU 3, Tab 3, port 20000, right v-rep window, v-rep tab 10
