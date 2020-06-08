@@ -863,7 +863,7 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
-SIM STACK - Task Progress aka progress TRIAL - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-27
+SIM STACK - SPOT STANDARD progress TRIAL aka rtrial - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-27
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
 RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-27-12-35-08_Sim-Stack-SPOT-Trial-Reward-Training
@@ -915,7 +915,7 @@ GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
 
 
-XXXX BAD RUN XXXX - SIM ROW - Task Progress aka progress only - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-23
+XXXX BAD RUN XXXX - SIM ROW - SPOT STANDARD progress TRIAL aka rtrial - TRIAL REWARD - RANDOM ACTIONS - SORT TRIAL REWARD -  REWARD SCHEDULE 0.1, 1, 1 - costar 2020-05-23
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
 RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-28-10-46-31_Sim-Rows-SPOT-Trial-Reward-Training 
