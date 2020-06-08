@@ -90,7 +90,8 @@ def main(args):
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         if args.place:
             # The object sets differ for stacking, so add a bit to min z.
-            workspace_limits[2][0] += 0.01
+            # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way. 
+            workspace_limits[2][0] += 0.02
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
