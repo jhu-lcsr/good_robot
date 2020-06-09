@@ -400,7 +400,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             dir_to_create = os.path.join(log_dir, 'transitions')
             if not os.path.exists(dir_to_create):
                 utils.mkdir_p(dir_to_create)
-        
+
         if 'trial_success' in categories and os.path.isfile(trial_success_file) and trial_successes.size > 0:
             trial_success_path = os.path.join(log_dir, 'transitions', 'trial-success-rate.log.csv')
             print('saving trial success rate: ' + str(trial_success_path))
