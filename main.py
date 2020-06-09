@@ -9,7 +9,6 @@ import threading
 import argparse
 import torch
 from torch.autograd import Variable
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
 import cv2
@@ -27,6 +26,8 @@ import plot
 import json
 import copy
 import shutil
+import matplotlib
+import matplotlib.pyplot as plt
 
 
 def run_title(args):
@@ -1672,6 +1673,9 @@ def ablation(args):
 
 
 if __name__ == '__main__':
+
+    # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
+    matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')

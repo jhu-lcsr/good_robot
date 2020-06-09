@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
@@ -461,6 +462,8 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
 
 
 if __name__ == '__main__':
+    # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
+    matplotlib.use('Agg')
     # window = 1000
     max_iter = None
     window = 500
