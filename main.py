@@ -91,7 +91,7 @@ def main(args):
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         if args.place:
             # The object sets differ for stacking, so add a bit to min z.
-            # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way. 
+            # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way.
             workspace_limits[2][0] += 0.02
 
         # Original visual pushing graping paper workspace definition
@@ -1628,14 +1628,13 @@ def one_train_test_run(args):
                 testing_best_dict = eff_testing_best_dict
                 testing_dest_dir = eff_testing_dest_dir
 
-
         if not args.place:
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
         print('Random Testing Complete! Dir: ' + testing_dest_dir)
         print('Random Testing results: \n ' + str(testing_best_dict))
-            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+        #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
 
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
