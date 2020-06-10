@@ -1019,6 +1019,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
+                logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                 best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
@@ -1112,6 +1113,7 @@ def main(args):
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
+                        logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
                         print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
                             ' is below the allowed decline of ' + str(allowed_decline) +

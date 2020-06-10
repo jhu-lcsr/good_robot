@@ -163,6 +163,7 @@ class Trainer(object):
         self.grasp_success_log = []
         self.color_success_log = []
         self.change_detected_log = []
+        self.load_snapshot_file_iteration_log = []
         if place:
             self.stack_height_log = []
             self.partial_stack_success_log = []
@@ -183,6 +184,8 @@ class Trainer(object):
         print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
         if self.use_cuda:
             self.model = self.model.cuda()
+        self.load_snapshot_file_iteration_log.append([self.iteration])
+        return len(self.load_snapshot_file_iteration_log)
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
@@ -224,6 +227,9 @@ class Trainer(object):
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
             self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), **kwargs).astype(np.int64)
             self.clearance_log = self.clearance_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'load_snapshot_file_iteration.log.txt')):
+            self.load_snapshot_file_iteration_log = np.loadtxt(os.path.join(transitions_directory, 'load_snapshot_file_iteration.log.txt'), **kwargs).astype(np.int64)
+            self.load_snapshot_file_iteration_log = self.load_snapshot_file_iteration_log.tolist()
         self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), **kwargs)
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log = self.trial_log.tolist()
@@ -480,7 +486,6 @@ class Trainer(object):
                 place_predictions = np.ma.masked_array(place_predictions)
 
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
-
 
     def end_trial(self):
         self.clearance_log.append([self.iteration])
