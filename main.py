@@ -9,7 +9,6 @@ import threading
 import argparse
 import torch
 from torch.autograd import Variable
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
 import cv2
@@ -27,6 +26,8 @@ import plot
 import json
 import copy
 import shutil
+import matplotlib
+import matplotlib.pyplot as plt
 
 
 def run_title(args):
@@ -90,6 +91,7 @@ def main(args):
         workspace_limits = np.asarray([[0.376, 0.824], [-0.264, 0.184], [-0.07, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
         if args.place:
             # The object sets differ for stacking, so add a bit to min z.
+            # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way.
             workspace_limits[2][0] += 0.02
 
         # Original visual pushing graping paper workspace definition
@@ -1017,6 +1019,7 @@ def main(args):
                 logger.write_to_log('iteration', np.array([trainer.iteration]))
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
+                logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                 best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
@@ -1110,6 +1113,7 @@ def main(args):
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
+                        logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
                         print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
                             ' is below the allowed decline of ' + str(allowed_decline) +
@@ -1626,14 +1630,13 @@ def one_train_test_run(args):
                 testing_best_dict = eff_testing_best_dict
                 testing_dest_dir = eff_testing_dest_dir
 
-
         if not args.place:
             print('Challenging Arrangements Preset Testing Complete! Dir: ' + preset_testing_dest_dir)
             print('Challenging Arrangements Preset Testing results: \n ' + str(preset_testing_best_dict))
 
         print('Random Testing Complete! Dir: ' + testing_dest_dir)
         print('Random Testing results: \n ' + str(testing_best_dict))
-            #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
+        #  --is_testing --random_seed 1238 --snapshot_file '/home/ahundt/src/real_good_robot/logs/2020-02-02-20-29-27_Sim-Push-and-Grasp-Two-Step-Reward-Training/models/snapshot.reinforcement.pth'  --max_test_trials 10 --test_preset_cases
 
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
@@ -1671,6 +1674,9 @@ def ablation(args):
 
 
 if __name__ == '__main__':
+
+    # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
+    matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')

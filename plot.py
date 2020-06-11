@@ -1,6 +1,7 @@
 import os
 import json
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from glob import glob
@@ -133,7 +134,9 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
             # print('extra zeros: ' + str(np.sum(grasps[i:window])))
             grasp_count =  grasps[start:min(start+window, grasps.shape[0])].sum()
         success_rate[i] = float(successes.sum()) / float(grasp_count) if grasp_count > 0 else 0.0
-        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]))
+        # use np.divide to prevent dividing by zero
+        var = np.divide(var, successes.shape[0], out=np.zeros_like(var), where=var!=0)
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
@@ -177,7 +180,9 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
             successes = np.concatenate([successes, np.zeros(window - i)], axis=0)
         success_rate[i] = successes.mean()
         success_rate[np.isnan(success_rate)] = 0
-        var = np.sqrt(success_rate[i] * (1 - success_rate[i]) / successes.shape[0])
+        var = np.sqrt(success_rate[i] * (1 - success_rate[i]))
+        # use np.divide to prevent dividing by zero
+        var = np.divide(var, successes.shape[0], out=np.zeros_like(var), where=var!=0)
         lower[i] = success_rate[i] + 3*var
         upper[i] = success_rate[i] - 3*var
     lower = np.clip(lower, 0, 1)
@@ -395,7 +400,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             dir_to_create = os.path.join(log_dir, 'transitions')
             if not os.path.exists(dir_to_create):
                 utils.mkdir_p(dir_to_create)
-        
+
         if 'trial_success' in categories and os.path.isfile(trial_success_file) and trial_successes.size > 0:
             trial_success_path = os.path.join(log_dir, 'transitions', 'trial-success-rate.log.csv')
             print('saving trial success rate: ' + str(trial_success_path))
@@ -457,10 +462,13 @@ def plot_compare(dirs, title, colors=None, labels=None, category='trial_success'
 
 
 if __name__ == '__main__':
+    # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
+    matplotlib.use('Agg')
     # window = 1000
     max_iter = None
     window = 500
-    plot_it('/home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q', max_iter=None, window=None, save_dir='./paper_figures/')
+    # plot_it('/home/costar/src/real_good_robot/logs/2020-02-24-01-16-21_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q', max_iter=None, window=None, save_dir='./paper_figures/')
+    plot_it('/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-21-00_Sim-Rows-SPOT-Trial-Reward-Masked-Training/2020-05-17-13-08-59_Sim-Rows-SPOT-Trial-Reward-Masked-Testing', title='Rows Rtrial + SPOT-Q', window=1785, max_iter=None)
 
     # plot_it('/home/costar/src/real_good_robot/logs/2020-02-22-19-54-28_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing', 'Sim to Real Pushing And Grasping, SPOT-Q',max_iter=None, window=None)
     # plot_it('/home/costar/src/real_good_robot/logs/2020-02-23-11-43-55_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Training/2020-02-23-18-51-58_Real-Push-and-Grasp-SPOT-Trial-Reward-Common-Sense-Testing','Real Push and Grasp, SPOT-Q, Training', max_iter=None,window=None)
