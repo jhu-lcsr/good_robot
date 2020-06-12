@@ -122,6 +122,7 @@ class Trainer(object):
                 self.criterion = self.criterion.cuda()
 
         self.load_snapshot_file_iteration_log = []
+        self.iteration = 0
         # Load pre-trained model
         if snapshot_file:
 
@@ -144,7 +145,6 @@ class Trainer(object):
             weight_decay = 0
         # Initialize optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
-        self.iteration = 0
 
         # Initialize lists to save execution info and RL variables
         # executed action log includes the action, push grasp or place, and the best pixel index
