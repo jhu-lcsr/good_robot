@@ -121,6 +121,7 @@ class Trainer(object):
             if self.use_cuda:
                 self.criterion = self.criterion.cuda()
 
+        self.load_snapshot_file_iteration_log = []
         # Load pre-trained model
         if snapshot_file:
 
@@ -163,7 +164,6 @@ class Trainer(object):
         self.grasp_success_log = []
         self.color_success_log = []
         self.change_detected_log = []
-        self.load_snapshot_file_iteration_log = []
         if place:
             self.stack_height_log = []
             self.partial_stack_success_log = []
