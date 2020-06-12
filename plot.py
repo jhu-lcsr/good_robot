@@ -411,7 +411,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             print('saving grasp success rate: ' + str(grasp_success_path))
             np.savetxt(grasp_success_path, grasp_rate, delimiter=', ', header='grasp_success_rate')
 
-        if 'place_success' in categories:
+        if place and 'place_success' in categories:
             place_success_path = os.path.join(log_dir, 'transitions', 'place-success-rate.log.csv')
             print('saving place success rate: ' + str(place_success_path))
             np.savetxt(place_success_path, place_rate, delimiter=', ', header='place_success_rate')
