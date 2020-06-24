@@ -121,6 +121,8 @@ class Trainer(object):
             if self.use_cuda:
                 self.criterion = self.criterion.cuda()
 
+        self.load_snapshot_file_iteration_log = []
+        self.iteration = 0
         # Load pre-trained model
         if snapshot_file:
 
@@ -143,7 +145,6 @@ class Trainer(object):
             weight_decay = 0
         # Initialize optimizer
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
-        self.iteration = 0
 
         # Initialize lists to save execution info and RL variables
         # executed action log includes the action, push grasp or place, and the best pixel index
@@ -183,6 +184,8 @@ class Trainer(object):
         print('Pre-trained model snapshot loaded from: %s' % (snapshot_file))
         if self.use_cuda:
             self.model = self.model.cuda()
+        self.load_snapshot_file_iteration_log.append([self.iteration])
+        return len(self.load_snapshot_file_iteration_log)
 
     # Pre-load execution info and RL variables
     def preload(self, transitions_directory):
@@ -224,6 +227,9 @@ class Trainer(object):
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
             self.clearance_log = np.loadtxt(os.path.join(transitions_directory, 'clearance.log.txt'), **kwargs).astype(np.int64)
             self.clearance_log = self.clearance_log.tolist()
+        if os.path.exists(os.path.join(transitions_directory, 'load_snapshot_file_iteration.log.txt')):
+            self.load_snapshot_file_iteration_log = np.loadtxt(os.path.join(transitions_directory, 'load_snapshot_file_iteration.log.txt'), **kwargs).astype(np.int64)
+            self.load_snapshot_file_iteration_log = self.load_snapshot_file_iteration_log.tolist()
         self.trial_log = np.loadtxt(os.path.join(transitions_directory, 'trial.log.txt'), **kwargs)
         self.trial_log = self.trial_log[0:self.iteration]
         self.trial_log = self.trial_log.tolist()
@@ -480,7 +486,6 @@ class Trainer(object):
                 place_predictions = np.ma.masked_array(place_predictions)
 
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
-
 
     def end_trial(self):
         self.clearance_log.append([self.iteration])
@@ -768,7 +773,7 @@ class Trainer(object):
             self.optimizer.step()
 
 
-    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=4):
+    def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=8):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
         num_rotations = predictions.shape[0]
@@ -782,7 +787,7 @@ class Trainer(object):
                 # prediction_vis[prediction_vis < 0] = 0 # assume probability
                 # prediction_vis[prediction_vis > 1] = 1 # assume probability
                 # Reduce the dynamic range so the visualization looks better
-                prediction_vis = prediction_vis/scale_factor
+                prediction_vis = prediction_vis/np.max(prediction_vis)
                 prediction_vis = np.clip(prediction_vis, 0, 1)
                 prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)

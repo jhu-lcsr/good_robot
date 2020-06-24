@@ -146,8 +146,8 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
             depth_heightmap = np.clip(depth_heightmap, 0, None)
             if min_z < -0.005:
                 print('WARNING: get_heightmap() depth_heightmap contains negative heights with min ' + str(min_z) + ', '
-                    'saved depth heightmap png files may be invalid!'
-                    'See README.md for instructions to collect the depth heightmap again.'
+                    'saved depth heightmap png files may be invalid! '
+                    'See README.md for instructions to collect the depth heightmap again. '
                     'Clipping the minimum to 0 for now.')
 
     # Create orthographic top-down-view RGB-D color heightmaps
@@ -772,6 +772,8 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
+        if x.size == 0 or y.size == 0:
+            return False, 0
 
         # get best fit line y=mx+b
         m, b = np.polyfit(x, y, 1)
