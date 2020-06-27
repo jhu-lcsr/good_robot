@@ -1,6 +1,6 @@
-# "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping
+# "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer
 
-[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Nicholas Greene, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
 Click the image to watch the video:
 
@@ -8,7 +8,7 @@ Click the image to watch the video:
 
 ## Paper, Abstract, and Citations
 
-```
+```bibtex
 @misc{hundt2019good,
     title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer},
     author={Andrew Hundt and Benjamin Killeen and Nicholas Greene and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
