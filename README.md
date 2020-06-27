@@ -4,14 +4,14 @@
 
 Click the image to watch the video:
 
-[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/p2iTSEJ-f_A/0.jpg)](https://youtu.be/p2iTSEJ-f_A)
+[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/MbCuEZadkIw/0.jpg)](https://youtu.be/MbCuEZadkIw)
 
 ## Paper, Abstract, and Citations
 
 ```
 @misc{hundt2019good,
-    title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping},
-    author={Andrew Hundt and Benjamin Killeen and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
+    title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer},
+    author={Andrew Hundt and Benjamin Killeen and Nicholas Greene and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
     year={2019},
     eprint={1909.11730},
     archivePrefix={arXiv},
@@ -20,11 +20,15 @@ Click the image to watch the video:
 }
 ```
 
-Abstract— In order to learn effectively, robots must be able to extract the intangible context by which task progress and mistakes are defined. In the domain of reinforcement learning, much of this information is provided by the reward function. Hence, reward shaping is a necessary part of how we can achieve state-of-the-art results on complex, multi-step tasks. However, comparatively little work has examined how reward shaping should be done so that it captures task context, particularly in scenarios where the task is long-horizon and failure is highly consequential. Our Schedule for Positive Task (SPOT) reward trains our Efficient Visual Task (EVT) model to solve problems that require an understanding of both task context and workspace constraints of multi-step block arrangement tasks. In simulation EVT can completely clear adversarial arrangements of objects by pushing and grasping in 99% of cases vs an 82% baseline in prior work. For random arrangements EVT clears 100% of test cases at 86% action efficiency vs 61% efficiency in prior work. EVT + SPOT is also able to demonstrate context understanding and complete stacks in 74% of trials compared to a base- line of 5% with EVT alone. To our knowledge, this is the first instance of a Reinforcement Learning based algorithm successfully completing such a challenge. Code is available at https://github.com/jhu-lcsr/costar visual stacking.
+Abstract— Current Reinforcement Learning (RL) algorithms struggle with long-horizon tasks where time can be wasted exploring dead ends and task progress may be easily reversed. We develop the SPOT framework, which explores within action safety zones, learns about unsafe regions without exploring them, and prioritizes experiences that reverse earlier progress to learn with remarkable efficiency.
 
-## Training CoSTAR Visual Stacking
+The SPOT framework successfully completes simulated trials of a variety of tasks, improving a baseline trial success rate from 13% to 100% when stacking 4 cubes, from 13% to 99% when creating rows of 4 cubes, and from 84% to 95% when clearing toys arranged in adversarial patterns. Efficiency with respect to actions per trial typically improves by 30% or more, while training takes just 1-20k actions, depending on the task.
 
-Details of our specific training and test runs, command line commands, pre-trained models, and logged data with images are on the [costar visual stacking github releases page](https://github.com/jhu-lcsr/costar_visual_stacking/releases).
+Furthermore, we demonstrate direct sim to real transfer. We are able to create real stacks in 100% of trials with 61% efficiency and real rows in 100% of trials with 59% efficiency by directly loading the simulation-trained model on the real robot with no additional real-world fine-tuning. To our knowledge, this is the first instance of reinforcement learning with successful sim to real transfer applied to long term multi-step tasks such as block-stacking and row-making with consideration of progress reversal. Code is available at https://github.com/jhu-lcsr/good_robot.
+
+## Training Row Making, Stack Making, and Table Clearing Tasks
+
+Details of our specific training and test runs, command line commands, pre-trained models, and logged data with images are on the [good_robot github releases page](https://github.com/jhu-lcsr/good_robot/releases).
 
 ### Starting the V-REP Simulation
 
@@ -42,18 +46,29 @@ cd ~/src/real_good_robot
 #### Cube Stack Training
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --trial_reward
 ```
 
-To use trial SPOT also add `--trial_reward` to this command.
-to use the "common sense" dynamic action space regions add `--common_sense` to this command.
+All training results will go in the `path/to/good_robot/logs/<training_run>` folder.
+To use SPOT Progress Reward remove `--trial_reward` from this command.
+To disable the "common sense" dynamic action space regions remove `--common_sense` from this command.
+This command will automatically run in test mode once training is complete, and the testing results directory will be moved into the training results directory.
 
-#### Cube Stack Testing
+#### Manual Cube Stack Testing
 
 Remember to first train the model or download the snapshot file from the release page (ex: [v0.12 release](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0)) and update the command line `--snapshot_file FILEPATH`:
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --place --load_snapshot --snapshot_file ~/Downloads/snapshot.reinforcement-best-stack-rate.pth --random_seed 1238 --is_testing --save_visualizations --disable_situation_removal
+```
+
+#### Sim to Real Stack Testing
+
+You will need a fully configured real robot, we have some instructions in this readme.
+You will also need to update the snapshot file path to wherever your version is:
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8  --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --save_visualizations --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
 ```
 
 ### Row of 4 Cubes
@@ -69,13 +84,24 @@ Row Testing Video:
 #### Row Training
 
 ```bash
-export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place --check_row
+CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
 ```
 
-#### Row Testing
+Testing will automatically run after training is complete.
+
+#### Manual Row Testing
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --place --check_row --is_testing  --tcp_port 19996 --load_snapshot --snapshot_file '/home/costar/Downloads/snapshot-backup.reinforcement-best-stack-rate.pth' --random_seed 1238 --disable_situation_removal --save_visualizations
+```
+
+#### Sim to Real Row Testing
+
+You will need a fully configured real robot, we have some instructions in this readme.
+You will also need to update the snapshot file path to wherever your version is:
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --check_z_height --place --future_reward_discount 0.65  --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --save_visualizations --common_sense --snapshot_file "/home/costar/src/real_good_robot/logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth"
 ```
 
 ### Push + Grasp
@@ -115,6 +141,12 @@ After Running the test you need to summarize the results:
 ```bash
 python3 evaluate.py --session_directory /home/ahundt/src/costar_visual_stacking/logs/2019-09-16.02:11:25  --method reinforcement --num_obj_complete 6 --preset
 ```
+
+### Troubleshooting
+
+During training, be sure to check the simulator doesn't encounter physics bugs, such as blocks permanently bonded to the gripper.
+If this happens, you will notice one action will never succeed, and the other might always succeed, and multi-step tasks will no longer progress.
+If you catch it quickly, you can directly remove the object in the simulator with the scene editing tools, or simply stop the simulation and the training function should detect the problem and reset.
 
 ## Data Collection and Data Release Checklist (v0.1, checklist creation is in progress)
 

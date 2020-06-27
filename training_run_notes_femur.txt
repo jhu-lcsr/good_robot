@@ -788,12 +788,63 @@ GPU 1, Tab 1, port 19999, middle v-rep window, v-rep tab 8
 
 
 
-SIM STACK - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-29
+XXX do not use - SIM STACK - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION EXPLORATION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-29
 ---------------------------------------------------------------------------------------------
 ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --no_height_reward
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-29-11-03-34_Sim-Stack-Two-Step-Reward-Training
 Commit: f8c4d93db4a48b905b8995188de357e92171ae10
 GPU 0, Tab 0, port 19965, left v-rep window, v-rep tab 7
+
+We had hard disk io problems on this run, leading to many resets during training.
+
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > Running two step backprop()
+    > Primitive confidence scores: 1.256993 (push), 2.075450 (grasp), 1.718884 (place)
+    > Action: grasp at (4, 24, 199)
+    > Training loss: 0.485695
+    > Executing: grasp at (-0.326000, -0.176000, 0.001006) orientation: 1.570796
+    > gripper position: 0.03197145462036133
+    > gripper position: 0.026409685611724854
+    > gripper position: 0.0013526976108551025
+    > gripper position: -0.023178979754447937
+    > gripper position: -0.041759684681892395
+    > Grasp successful: False
+    > prev_height: 0.0 max_z: 0.051128429751611595 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > prev_height: 1.0 max_z: 1.0225685950322319 goal_success: False needed to reset: False max_workspace_height: 0.6 <<<<<<<<<<<
+    > check_stack() stack_height: 1.0225685950322319 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 6.061032863849765  actions/full stack: 40.34375 (lower is better)  Grasp Count: 758, grasp success rate: 0.7031662269129287 place_on_stack_rate: 0.399624765478424 place_attempts: 533  partial_stack_successes: 213  stack_successes: 32 trial_success_rate: 0.31683168316831684 stack goal: None current_height: 1.0225685950322319
+    > trial_complete_indices: [  45.  130.  134.  164.  200.  207.  215.  252.  260.  261.  262.  284.
+    >   302.  309.  313.  323.  339.  356.  392.  396.  397.  398.  399.  400.
+    >   431.  447.  448.  457.  473.  481.  499.  507.  515.  528.  536.  552.
+    >   553.  555.  557.  566.  580.  609.  638.  686.  688.  689.  690.  697.
+    >   698.  699.  719.  761.  826.  828.  841.  845.  846.  847.  848.  849.
+    >   850.  851.  852.  853.  854.  855.  856.  857.  858.  859.  860.  861.
+    >   862.  863.  866.  870.  896.  909.  910.  927.  964.  974.  977. 1001.
+    >  1024. 1026. 1048. 1057. 1064. 1074. 1082. 1088. 1102. 1114. 1120. 1145.
+    >  1163. 1213. 1222. 1272. 1290.]
+    > Max trial success rate: 0.32, at action iteration: 1287. (total of 1289 actions, max excludes first 1287 actions)
+    > Max grasp success rate: 0.7037037037037037, at action iteration: 1287. (total of 1289 actions, max excludes first 1287 actions)
+    > Max place success rate: 0.6842105263157895, at action iteration: 1287. (total of 1290 actions, max excludes first 1287 actions)
+    > Max action efficiency: 0.1351981351981352, at action iteration: 1287. (total of 1290 actions, max excludes first 1287 actions)
+    > saving trial success rate: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/transitions/trial-success-rate.log.csv
+    > saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/transitions/grasp-success-rate.log.csv
+    > saving place success rate: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/transitions/place-success-rate.log.csv
+    > saving action efficiency: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/transitions/action-efficiency.log.csv
+    > saving plot: 2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing-Sim-Stack-Two-Step-Reward-Testing_success_plot.png
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/data/best_stats.json
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing/best_stats.json
+    > Choosing a snapshot from the following options:{'trial_success_rate_best_value': 0.5454545454545454, 'action_efficiency_best_value': 0.324, 'grasp_success_rate_best_index': 17743, 'place_success_rate_best_index': 15811, 'place_success_rate_best_value': 0.7477064220183486, 'action_efficiency_best_index': 9542, 'grasp_success_rate_best_value': 0.8901515151515151, 'trial_success_rate_best_index': 15666}
+    > Evaluating trial_success_rate_best_value
+    > Shapshot chosen: /home/ahundt/src/real_good_robot/logs/2020-05-29-11-03-34_Sim-Stack-Two-Step-Reward-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth
+    > Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-29-11-03-34_Sim-Stack-Two-Step-Reward-Training/2020-06-07-13-32-32_Sim-Stack-Two-Step-Reward-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 0.32, 'action_efficiency_best_value': 0.1351981351981352, 'grasp_success_rate_best_index': 1287, 'place_success_rate_best_index': 1287, 'place_success_rate_best_value': 0.6842105263157895, 'action_efficiency_best_index': 1287, 'grasp_success_rate_best_value': 0.7037037037037037, 'trial_success_rate_best_index': 1287}
+    > Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-29-11-03-34_Sim-Stack-Two-Step-Reward-Training
+    > Training results:
+    >  {'trial_success_rate_best_value': 0.5454545454545454, 'action_efficiency_best_value': 0.324, 'grasp_success_rate_best_index': 17743, 'place_success_rate_best_index': 15811, 'place_success_rate_best_value': 0.7477064220183486, 'action_efficiency_best_index': 9542, 'grasp_success_rate_best_value': 0.8901515151515151, 'trial_success_rate_best_index': 15666}
+
+    ± '/home/ahundt/src/real_good_robot/logs/2020-06-08-16-05-39_Sim-Stack-Two-Step-Reward-Testing/best_stats.json'
+    {"action_efficiency_best_index": 8960, "action_efficiency_best_value": 0.04018754186202277, "grasp_success_rate_best_index": 8959, "grasp_success_rate_best_value": 0.8608226007478189, "place_success_rate_best_index": 8960, "place_success_rate_best_value": 0.7477086348287506, "trial_success_rate_best_index": 8958, "trial_success_rate_best_value": 0.8405797101449275}
 
 
 SIM ROW - "SITUATION REMOVAL" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05- TODO
@@ -825,15 +876,54 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-
 Commit: 12d9481717486342dbfcaff191ddb1428f102406
 GPU 2, Tab 2, port 20000, left v-rep window, v-rep tab 7
 
+RESUME ON GPU 0: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --tcp_port 19965 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --resume /home/ahundt/src/real_good_robot/logs/2020-05-30-22-11-28_Sim-Stack-Two-Step-Reward-Training/
 
-SIM ROW - "instant Task Progress aka progress only aka Rp" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-30
+
+XXX do not use - SIM ROW - "instant Task Progress aka progress only aka Rp" - Mixed RANDOM ACTION, 2D ACTION - REWARD SCHEDULE 0.1, 1, 1 - femur 2020-05-30
 -------------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --place --tcp_port 19999 --future_reward_discount 0.65 --max_train_actions 20000 --random_actions
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training
+COMPUTER WENT DOWN: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training
+Followup run: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-04-14-03-44_Sim-Stack-Two-Step-Reward-Training
 Commit: 12d9481717486342dbfcaff191ddb1428f102406
 GPU 1, Tab 1, port 19999, right v-rep window, v-rep tab 8
 
+there were disk io problems during this training run, leading to many resets & lost data.
 
+    > Trial logging complete: 101 --------------------------------------------------------------
+    > prev_height: 0.0 max_z: 0.05112180110319438 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > check_row: True | row_size: 2 | blocks: ['green' 'yellow']
+    > check_stack() stack_height: 2 stack matches current goal: True partial_stack_success: True Does the code think a reset is needed: False
+    > STACK:  trial: 101 actions/partial: 5.116161616161616  actions/full stack: 10.552083333333334 (lower is better)  Grasp Count: 589, grasp success rate: 0.7198641765704584 place_on_stack_rate: 0.4669811320754717 place_attempts: 424  partial_stack_successes: 198  stack_successes: 96 trial_success_rate: 0.9504950495049505 stack goal: [1 2] current_height: 2
+    > trial_complete_indices: [   3.    8.   12.   19.   24.   28.   33.   47.   52.   64.   70.   74.
+    >   224.  231.  237.  243.  247.  249.  259.  267.  271.  278.  290.  302.
+    >   307.  310.  315.  320.  322.  326.  331.  334.  336.  343.  347.  349.
+    >   356.  358.  373.  376.  384.  396.  406.  525.  531.  556.  560.  569.
+    >   575.  577.  583.  589.  603.  609.  621.  642.  649.  653.  658.  665.
+    >   671.  673.  677.  688.  697.  706.  712.  753.  755.  759.  792.  797.
+    >   801.  805.  807.  809.  813.  825.  829.  852.  856.  864.  868.  872.
+    >   882.  895.  900.  907.  911.  913.  922.  927.  934.  947.  959.  963.
+    >   989.  993. 1003. 1007. 1012.]
+    > Max trial success rate: 0.95, at action iteration: 1009. (total of 1011 actions, max excludes first 1009 actions)
+    > Max grasp success rate: 0.7223168654173765, at action iteration: 1010. (total of 1011 actions, max excludes first 1009 actions)
+    > Max place success rate: 0.8632075471698113, at action iteration: 1011. (total of 1012 actions, max excludes first 1009 actions)
+    > Max action efficiency: 0.576808721506442, at action iteration: 1011. (total of 1012 actions, max excludes first 1009 actions)
+    > saving trial success rate: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/transitions/trial-success-rate.log.csv
+    > saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/transitions/grasp-success-rate.log.csv
+    > saving place success rate: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/transitions/place-success-rate.log.csv
+    > saving action efficiency: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/transitions/action-efficiency.log.csv
+    > saving plot: 2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing-Sim-Rows-Two-Step-Reward-Testing_success_plot.png
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/data/best_stats.json
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing/best_stats.json
+    > Choosing a snapshot from the following options:{'grasp_success_rate_best_value': 0.8122743682310469, 'action_efficiency_best_index': 19045, 'grasp_success_rate_best_index': 15802, 'action_efficiency_best_value': 1.104, 'place_success_rate_best_index': 18289, 'trial_success_rate_best_index': 19892, 'place_success_rate_best_value': 0.8916256157635468, 'trial_success_rate_best_value': 0.7033898305084746}
+    > Evaluating trial_success_rate_best_value
+    > The trial_success_rate_best_value is fantastic at 0.7033898305084746, so we will look for the best action_efficiency_best_value.
+    > Shapshot chosen: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+    > Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training/2020-06-09-19-33-43_Sim-Rows-Two-Step-Reward-Testing
+    > Random Testing results:
+    >  {'grasp_success_rate_best_value': 0.7223168654173765, 'action_efficiency_best_index': 1011, 'grasp_success_rate_best_index': 1010, 'action_efficiency_best_value': 0.576808721506442, 'place_success_rate_best_index': 1011, 'trial_success_rate_best_index': 1009, 'place_success_rate_best_value': 0.8632075471698113, 'trial_success_rate_best_value': 0.95}
+    > Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-05-30-21-42-56_Sim-Rows-Two-Step-Reward-Training
+    > Training results:
+    >  {'grasp_success_rate_best_value': 0.8122743682310469, 'action_efficiency_best_index': 19045, 'grasp_success_rate_best_index': 15802, 'action_efficiency_best_value': 1.104, 'place_success_rate_best_index': 18289, 'trial_success_rate_best_index': 19892, 'place_success_rate_best_value': 0.8916256157635468, 'trial_success_rate_best_value': 0.7033898305084746}
 
 
 

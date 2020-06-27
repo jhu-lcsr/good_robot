@@ -1187,6 +1187,8 @@ Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_g
 Testing results: 
  {'trial_success_rate_best_value': 0.8, 'trial_success_rate_best_index': 116, 'grasp_success_rate_best_value': 0.581081081081081, 'grasp_success_rate_best_index': 116, 'place_success_rate_best_value': 0.8837209302325582, 'place_success_rate_best_index': 116, 'action_efficiency_best_value': 0.5172413793103449, 'action_efficiency_best_index': 118}
 After manual correction of trial successes based on the video and actual stack heights (grasp/place may still need a tiny adjustment):
+Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-05-19-42-28_Real-Stack-Two-Step-Reward-Testing
+Testing results: 
  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 116, 'grasp_success_rate_best_value': 0.581081081081081, 'grasp_success_rate_best_index': 116, 'place_success_rate_best_value': 0.8837209302325582, 'place_success_rate_best_index': 116, 'action_efficiency_best_value': 0.5172413793103449, 'action_efficiency_best_index': 118}
 
 
@@ -1371,7 +1373,55 @@ Commit: 3124bb5ed5db5b21a29b95b958962a1f4a1388e7  release tag:v0.16.3
 RESUME Commit: a923d4d02f13998824a81fd53e8716f07ed8ba38  a couple commits after v0.16.3
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
-Note the sim bullet physics encountered an error where the gripper shook continuously with a velocity error, and the gripper didn't respond around 9220-9600 actions in, so we stopped the sim, cut off the actions before 9220, and resumed.
+Note the sim bullet physics encountered an error where the gripper shook continuously with a velocity error, and the gripper didn't respond around 9220-9600 actions in, so we stopped the sim, cut off the actions before 9157, and resumed.
+
+Trial logging complete: 101 --------------------------------------------------------------
+Running two step backprop()
+Primitive confidence scores: 1.157308 (push), 6.873050 (grasp), 4.287281 (place)
+Action: grasp at (2, 152, 120)
+Training loss: 3.098692
+Executing: grasp at (-0.484000, 0.080000, 0.050979) orientation: 0.785398
+gripper position: 0.05314567685127258
+gripper position: 0.03554174304008484
+gripper position: 0.012224435806274414
+gripper position: 0.005477994680404663
+gripper position: 0.004845559597015381
+gripper position: 0.0046235620975494385
+gripper position: 0.0028651803731918335
+Grasp successful: True
+prev_height: 0.0 max_z: 0.051104635732064876 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+prev_height: 1.0 max_z: 1.0220927146412975 goal_success: False needed to reset: False max_workspace_height: 0.6 <<<<<<<<<<<
+check_stack() stack_height: 1.0220927146412975 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False
+STACK:  trial: 101 actions/partial: 3.9243697478991595  actions/full stack: 14.443298969072165 (lower is better)  Grasp Count: 789, grasp success rate: 0.7807351077313055 place_on_stack_rate: 0.5833333333333334 place_attempts: 612  partial_stack_successes: 357  stack_successes: 97 trial_success_rate: 0.9603960396039604 stack goal: None current_height: 1.0220927146412975
+trial_complete_indices: [  10.   16.   24.   30.   36.   43.   52.   64.   76.   84.   90.   97.
+  101.  107.  115.  132.  138.  146.  164.  168.  178.  184.  202.  224.
+  229.  239.  252.  258.  266.  272.  282.  288.  326.  349.  358.  374.
+  378.  401.  407.  421.  430.  436.  444.  450.  467.  478.  490.  495.
+  534.  544.  552.  563.  572.  584.  597.  614.  622.  628.  812.  832.
+  847.  860.  872.  881.  899.  953.  959.  970.  978.  988. 1000. 1011.
+ 1017. 1025. 1049. 1053. 1058. 1064. 1069. 1082. 1088. 1094. 1197. 1214.
+ 1225. 1233. 1242. 1249. 1266. 1273. 1287. 1295. 1303. 1321. 1327. 1334.
+ 1361. 1370. 1379. 1387. 1400.]
+Max trial success rate: 0.96, at action iteration: 1397. (total of 1399 actions, max excludes first 1397 actions)
+Max grasp success rate: 0.7814485387547649, at action iteration: 1398. (total of 1399 actions, max excludes first 1397 actions)
+Max place success rate: 0.7892156862745098, at action iteration: 1399. (total of 1400 actions, max excludes first 1397 actions)
+Max action efficiency: 0.41660701503221187, at action iteration: 1399. (total of 1400 actions, max excludes first 1397 actions)
+saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/trial-success-rate.log.csv
+saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/grasp-success-rate.log.csv
+saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/place-success-rate.log.csv
+saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/action-efficiency.log.csv
+saving plot: 2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Sim-Stack-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-12-17-08-24_Sim-Stack-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-12-11-00-59_Sim-Stack-SPOT-Trial-Reward-Masked-Testing
+Random Testing results:
+*********** 100% trial success testing **********
+ {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 1204, 'grasp_success_rate_best_value': 0.8595679012345679, 'grasp_success_rate_best_index': 1204, 'place_success_rate_best_value': 0.7612208258527827, 'place_success_rate_best_index': 1206, 'action_efficiency_best_value': 0.5083056478405316, 'action_efficiency_best_index': 1206}
+*********** 100% trial success testing **********
+Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Training results:
+ {'action_efficiency_best_index': 13181, 'action_efficiency_best_value': 0.66, 'grasp_success_rate_best_index': 13210, 'grasp_success_rate_best_value': 0.9233716475095786, 'place_success_rate_best_index': 10312, 'place_success_rate_best_value': 0.8626609442060086, 'trial_success_rate_best_index': 9059, 'trial_success_rate_best_value': 0.8928571428571429}
+
 
 
 
@@ -1385,9 +1435,9 @@ Commit: a923d4d02f13998824a81fd53e8716f07ed8ba38  a couple commits after v0.16.3
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
-
-
-
+    > Testing results:
+    > '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-09-15-18-36_Sim-Rows-SPOT-Trial-Reward-Masked-Training/2020-06-13-16-58-42_Sim-Rows-SPOT-Trial-Reward-Masked-Testing/best_stats.json' 
+    > {"action_efficiency_best_index": 1989, "action_efficiency_best_value": 0.29894313034725717, "grasp_success_rate_best_index": 1987, "grasp_success_rate_best_value": 0.5405405405405406, "place_success_rate_best_index": null, "place_success_rate_best_value": -Infinity, "trial_success_rate_best_index": 1987, "trial_success_rate_best_value": 0.91}
 
 
 
