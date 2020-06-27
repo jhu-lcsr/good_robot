@@ -46,18 +46,29 @@ cd ~/src/real_good_robot
 #### Cube Stack Training
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --trial_reward
 ```
 
-To use trial SPOT also add `--trial_reward` to this command.
-to use the "common sense" dynamic action space regions add `--common_sense` to this command.
+All training results will go in the `path/to/good_robot/logs/<training_run>` folder.
+To use SPOT Progress Reward remove `--trial_reward` from this command.
+To disable the "common sense" dynamic action space regions remove `--common_sense` from this command.
+This command will automatically run in test mode once training is complete, and the testing results directory will be moved into the training results directory.
 
-#### Cube Stack Testing
+#### Manual Cube Stack Testing
 
 Remember to first train the model or download the snapshot file from the release page (ex: [v0.12 release](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0)) and update the command line `--snapshot_file FILEPATH`:
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --place --load_snapshot --snapshot_file ~/Downloads/snapshot.reinforcement-best-stack-rate.pth --random_seed 1238 --is_testing --save_visualizations --disable_situation_removal
+```
+
+#### Sim to Real Stack Testing
+
+You will need a fully configured real robot, we have some instructions in this readme.
+You will also need to update the snapshot file path to wherever your version is:
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8  --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --save_visualizations --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
 ```
 
 ### Row of 4 Cubes
@@ -73,13 +84,24 @@ Row Testing Video:
 #### Row Training
 
 ```bash
-export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --place --check_row
+CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
 ```
 
-#### Row Testing
+Testing will automatically run after training is complete.
+
+#### Manual Row Testing
 
 ```bash
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --place --check_row --is_testing  --tcp_port 19996 --load_snapshot --snapshot_file '/home/costar/Downloads/snapshot-backup.reinforcement-best-stack-rate.pth' --random_seed 1238 --disable_situation_removal --save_visualizations
+```
+
+#### Sim to Real Row Testing
+
+You will need a fully configured real robot, we have some instructions in this readme.
+You will also need to update the snapshot file path to wherever your version is:
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --check_z_height --place --future_reward_discount 0.65  --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --save_visualizations --common_sense --snapshot_file "/home/costar/src/real_good_robot/logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth"
 ```
 
 ### Push + Grasp
@@ -119,6 +141,12 @@ After Running the test you need to summarize the results:
 ```bash
 python3 evaluate.py --session_directory /home/ahundt/src/costar_visual_stacking/logs/2019-09-16.02:11:25  --method reinforcement --num_obj_complete 6 --preset
 ```
+
+### Troubleshooting
+
+During training, be sure to check the simulator doesn't encounter physics bugs, such as blocks permanently bonded to the gripper.
+If this happens, you will notice one action will never succeed, and the other might always succeed, and multi-step tasks will no longer progress.
+If you catch it quickly, you can directly remove the object in the simulator with the scene editing tools, or simply stop the simulation and the training function should detect the problem and reset.
 
 ## Data Collection and Data Release Checklist (v0.1, checklist creation is in progress)
 
