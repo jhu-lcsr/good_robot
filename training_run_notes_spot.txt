@@ -744,6 +744,64 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-26-
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
 
 
+    > Trial logging complete: 110 --------------------------------------------------------------
+    > Running two step backprop()
+    > Primitive confidence scores: 0.746463 (push), 1.726852 (grasp)
+    > Action: grasp at (4, 92, 83)
+    > Training loss: 0.057178
+    > prev_height: 0.0 max_z: 0.05111149809658745 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+    > Grasp Count: 986, grasp success rate: 0.513184584178499
+    > trial_complete_indices: [  6.  13.  17.  28.  39.  54.  61.  70.  79.  85.  96. 106. 118. 132.
+    >  146. 156. 163. 170. 178. 187. 192. 199. 207. 210. 212. 218. 222. 229.
+    >  233. 240. 250. 264. 279. 286. 296. 308. 322. 337. 349. 360. 370. 377.
+    >  390. 398. 404. 415. 424. 430. 438. 444. 454. 463. 473. 481. 487. 495.
+    >  503. 508. 516. 523. 530. 535. 541. 546. 551. 556. 562. 566. 575. 583.
+    >  593. 606. 615. 628. 641. 651. 660. 670. 682. 688. 698. 714. 730. 744.
+    >  756. 767. 775. 781. 805. 813. 821. 827. 836. 847. 854. 860. 865. 871.
+    >  880. 889. 897. 909. 916. 924. 936. 942. 953. 965. 979. 990.]
+    > Max trial success rate: 1.0, at action iteration: 987. (total of 989 actions, max excludes first 987 actions)
+    > max trial successes: 110.0
+    > individual_arrangement_trial_success_rate: [1.  1.  0.9 1.  1.  1.  1.  1.  1.  1.  0.9]
+    > senarios_100_percent_complete: 9
+    > Max grasp success rate: 0.513733468972533, at action iteration: 987. (total of 989 actions, max excludes first 987 actions)
+    > Max grasp action efficiency: 0.5116514690982776, at action iteration: 987. (total of 990 actions, max excludes first 987 actions)
+    > saving trial success rate: /home/ahundt/src/real_good_robot/logs/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements/transitions/trial-success-rate.log.csv
+    > saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements/transitions/grasp-success-rate.log.csv
+    > saving action efficiency: /home/ahundt/src/real_good_robot/logs/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements/transitions/action-efficiency.log.csv
+    > saving plot: 2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements-Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements_success_plot.png
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements/data/best_stats.json
+    > saving best stats to: /home/ahundt/src/real_good_robot/logs/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements/best_stats.json
+    > Challenging Arrangements Preset Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-26-15-10-40_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements
+    > Challenging Arrangements Preset Testing results:
+    >  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 987, 'senarios_100_percent_complete': 9, 'grasp_success_rate_best_value': 0.513733468972533, 'grasp_success_rate_best_index': 987, 'grasp_action_efficiency_best_value': 0.5116514690982776, 'grasp_action_efficiency_best_index': 987}
+    > Choosing a snapshot from the following options:{'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 675, 'grasp_success_rate_best_value': 0.8714285714285714, 'grasp_success_rate_best_index': 4705, 'grasp_action_efficiency_best_value': 0.854, 'grasp_action_efficiency_best_index': 4705}
+    > Evaluating trial_success_rate_best_value
+    > Shapshot chosen: /home/ahundt/src/real_good_robot/logs/2020-06-26-15-10-40_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth
+    > Challenging Arrangements Preset Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-26-15-10-40_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training/2020-06-27-18-18-07_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Challenging-Arrangements
+    > Challenging Arrangements Preset Testing results:
+    >  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 987, 'senarios_100_percent_complete': 9, 'grasp_success_rate_best_value': 0.513733468972533, 'grasp_success_rate_best_index': 987, 'grasp_action_efficiency_best_value': 0.5116514690982776, 'grasp_action_efficiency_best_index': 987}
+    > Random Testing Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-26-15-10-40_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training/2020-06-27-13-00-19_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Testing
+    > Random Testing results:
+    >  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 1133, 'grasp_success_rate_best_value': 0.8499558693733451, 'grasp_success_rate_best_index': 1133, 'grasp_action_efficiency_best_value': 0.8499558693733451, 'grasp_action_efficiency_best_index': 1133}
+    > Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2020-06-26-15-10-40_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training
+    > Training results:
+    >  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 675, 'grasp_success_rate_best_value': 0.8714285714285714, 'grasp_success_rate_best_index': 4705, 'grasp_action_efficiency_best_value': 0.854, 'grasp_action_efficiency_best_index': 4705}
+
+
+
+
+PUSHING AND GRASPING WITH TRIAL REWARD & SAVE ALL MODELS ACCORDING TO BEST STATS - EFFICIENTNET 1 dilation - 2020-06-28
+--------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/toys --num_obj 10 --push_rewards --experience_replay --explore_rate_decay  --tcp_port 19990 --common_sense --trial_reward --future_reward_discount 0.65 --random_actions --max_train_actions 5000 --nn efficientnet --num_dilation 1
+Commit: cca5887217884d862167edbf31ffaf4d1d21a863  release tag:v0.16.5
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2020-06-28-10-45-13_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+
+
+
 
 ANY OBJECT SIM STACK  - Task Progress SPOT-Q MASKED - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - EFFICIENTNET 1 dilation - workstation named spot 2020-06-26
 ----------------------------------------------------------------------------------------
