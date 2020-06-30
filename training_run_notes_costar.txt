@@ -1444,8 +1444,32 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
+==================================================================
+==================================================================
+Post "good robot!" paper
 
 
+
+
+
+SIM STACK - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - SIM STACK - TRIAL REWARD Task Progress SPOT-Q MASKED - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - EFFICIENTNET 1 dilation - workstation named spot 2020-06-26
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --trial_reward --common_sense --nn efficientnet --num_dilation 1
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-28-13-08-38_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Commit: b8798ea07167dff5c8fcf5cd11c3ace2b4a0e22d  
+GPU 0, Tab 0, port 19999, left center v-rep window, v-rep tab 7
+
+
+
+
+
+ANY OBJECT SIM STACK  - Trial Reward SPOT-Q MASKED - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - EFFICIENTNET 1 dilation - workstation named costar 2020-06-28
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/toys --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --trial_reward --nn efficientnet --num_dilation 1
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-30-11-12-07_Sim-Stack-SPOT-Trial-Reward-Masked-Training   
+MAJOR SIMULATOR FAILURE, CANCELLED AND RESTARTED WITH SESSION ABOVE: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-28-13-03-27_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Commit: b8798ea07167dff5c8fcf5cd11c3ace2b4a0e22d  
+GPU 1, Tab 1, port 19998, right center v-rep window, v-rep tab 8
 
 
 
