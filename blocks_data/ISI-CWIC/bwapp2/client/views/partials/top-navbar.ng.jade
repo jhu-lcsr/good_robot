@@ -1,0 +1,114 @@
+//
+   Created by wjwong on 7/26/15.
+// START Top Navbar
+nav.navbar.topnavbar(role="navigation")
+  // START navbar header
+  .navbar-header
+    a.navbar-brand(href="/")
+      .brand-logo(style="font-size:1em; color:white;")
+        span.fa.fa-cubes
+        |  CWC ISI
+        // img src="img/logo.png" alt="App Logo" class="img-responsive" /
+      .brand-logo-collapsed(style="font-size:1.8em; color:white;")
+        span.fa.fa-cubes
+        // img src="img/logo-single.png" alt="App Logo" class="img-responsive" /
+  // END navbar header
+  // START Nav wrapper
+  .nav-wrapper
+    // START Left navbar
+    //-ul.nav.navbar-nav
+      li
+        // Button used to collapse the left sidebar. Only visible on tablet and desktops
+        a.hidden-xs(ng-click="app.layout.isCollapsed = !app.layout.isCollapsed")
+          em.fa.fa-navicon
+        // Button to show/hide the sidebar on mobile. Visible on mobile only.
+        a.visible-xs.sidebar-toggle(toggle-state="aside-toggled", no-persist="no-persist")
+          em.fa.fa-navicon
+    // END Left navbar
+    // START Right Navbar
+    ul.nav.navbar-nav.navbar-right
+      // Search icon
+      //-li
+        a(search-open="")
+          em.icon-magnifier
+      // START Language list
+      //-li
+        a
+        li(dropdown="", is-open="language.listIsOpen")
+          a(dropdown-toggle="")
+            | {{language.selected}}
+            span.caret
+          ul.dropdown-menu.dropdown-menu-right.animated.fadeInUpShort(role="menu")
+            li(ng-repeat="(localeId, langName) in language.available")
+              a(ng-click="language.set(localeId, $event)") {{langName}}
+      // END Language list
+      // START Offsidebar button
+      li.dropdown(ng-show='currentUser.profile.roles.indexOf("admin") >= 0')
+        a.dropdown-toggle(data-toggle="dropdown", href="#")
+          //-i.glyphicon.glyphicon-search
+          | States&nbsp;
+          b.caret
+        ul.dropdown-menu(role="menu")
+          li
+            a(href="/genworld")
+              .fa.fa-cubes
+              | &nbsp;Generate
+          li
+            a(href="/genjobs")
+              .fa.fa-inbox
+              | &nbsp;Jobs
+          li
+            a(href="/genpred")
+              .fa.fa-android
+              | &nbsp;Prediction
+          li
+            a(href="/gensimpexp")
+              .fa.fa-flask
+              | &nbsp;Experiment
+          li
+            a(href="/gencmdexp")
+              .fa.fa-terminal
+              | &nbsp;Command
+          li
+            a(href="/gencmdjobs")
+              .fa.fa-terminal
+              | &nbsp;Command Jobs
+        //-li.dropdown(ng-show='currentUser.profile.roles.indexOf("admin") >= 0')
+          a.dropdown-toggle(data-toggle="dropdown", href="#")
+            //-i.glyphicon.glyphicon-search
+            | Create&nbsp;
+            b.caret
+          ul.dropdown-menu(role="menu")
+            li
+              a(href="/worldview")
+                .fa.fa-globe
+                | &nbsp;World
+            //-li
+              a(href="/simpworld")
+                .fa.fa-codepen
+                | &nbsp;Simple
+            //-li
+              a(href="/replay")
+                .fa.fa-video-camera
+                | &nbsp;Replay
+            li
+              a(href="/tasks")
+                .fa.fa-inbox
+                | &nbsp;Tasks
+      li
+        a
+          blaze-template(name="_loginButtons")
+        //-a(toggle-state="offsidebar-open", no-persist="no-persist")
+           em.icon-notebook
+      // END Offsidebar menu
+    // END Right Navbar
+  // END Nav wrapper
+  // START Search form
+  //-form.navbar-form(role="search", action="search.html")
+    .form-group.has-feedback
+      input.form-control(type="text", placeholder="{{ 'topbar.search.PLACEHOLDER' | translate }}")
+      .fa.fa-times.form-control-feedback(search-dismiss="search-dismiss")
+    button.hidden.btn.btn-default(type="submit") Submit
+  // END Search form
+// END Top Navbar
+

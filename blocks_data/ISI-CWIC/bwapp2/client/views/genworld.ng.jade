@@ -1,0 +1,208 @@
+//-**=========================================================
+  * Module: genworld.ng.jade
+  * Created by wjwong on 9/9/15.
+  =========================================================*/
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+.row-fluid.col-sm-12
+  .row.mb-sm(ng-show='!curState.block_meta.blocks')
+    .content.col-sm-4
+      button.btn.btn-default(ng-click='opt.showImages=!opt.showImages')
+        .fa.fa-toggle-on(ng-show='opt.showImages')
+          | &nbsp;On Images
+        .fa.fa-toggle-off(ng-show='!opt.showImages')
+          | &nbsp;Off Images
+      button.btn.btn-default(ng-if='opt.showImages', ng-click='opt.showLogos=!opt.showLogos')
+        .fa.fa-toggle-on(ng-show='opt.showLogos')
+          | &nbsp;On Logos
+        .fa.fa-toggle-off(ng-show='!opt.showLogos')
+          | &nbsp;Off Logos
+  div(ng-show='curState.block_meta.blocks')
+    h4 Active State: {{curState._id}} &nbsp;&nbsp; {{curState.name}}
+    h4 # Moves: {{curState.block_states.length}} &nbsp; # Blocks: {{curState.block_meta.blocks.length}}
+      span(ng-show='curState.type') &nbsp;&nbsp;Type: {{curState.type}}
+    span(ng-repeat='block in curState.block_meta.blocks')
+      | &nbsp;&nbsp;
+      button.btn.btn-xs.btn-default {{block.id}} &nbsp; {{block.name | uppercase}}
+    div
+      button.btn.btn-primary(ng-click='clearMeta()') Reset
+  tabset(ng-show='!curState.block_meta.blocks && !enableUI')
+    tab(heading='Create Block Actions', active=true)
+      .row
+        .content.col-sm-2.mb-sm
+          button.btn.btn-sm.btn-primary(ng-click='setCreateMode()') Create Custom Layout
+        //-.content.col-sm-4
+          form.form-inline.ng-pristine.ng-valid.well(role="form",novalidate, name='importstateform', ng-submit='loadState()')
+            b Import State
+            .form-group
+              input.form-control#sfn(type='file', name='lsf', accept=".json", single, onchange="angular.element(this).scope().stateFileChanged(event)")
+              button.btn.btn-default(type="submit", ng-show='statefilename') Go
+        //-.content.col-sm-4(ng-show='!curState.block_meta.blocks')
+          form.form-inline.ng-pristine.ng-valid.well(role="form",novalidate, name='importmetaform', ng-submit='loadMeta()')
+            b Import Meta
+            .form-group
+              input.form-control#sfn(type='file', name='lsf', accept=".json", single, onchange="angular.element(this).scope().metaFileChanged(event)")
+              button.btn.btn-default(type="submit", ng-show='metafilename') Go
+        .content.col-sm-4
+          form.form-inline.ng-pristine.ng-valid.well(role="form",novalidate, name='importstatesform', ng-submit='loadStates()')
+            b Import STATES
+            .form-group
+              input.form-control#sfn(type='file', name='lsf', accept=".json", single, onchange="angular.element(this).scope().statesFileChanged(event)")
+              button.btn.btn-default(type="submit", ng-show='statesfilename') Go
+    tab(heading='Review Block Actions')
+      .row
+        .content.col-sm-8(style='background-color: white')
+          table.table.table-condensed.table-striped(ng-table='tableStateParams', show-filter='true')
+            tr(ng-repeat='s in $data')
+              td(title="''")
+                button.btn.btn-xs.btn-danger(ng-click='remState(s._id)')
+                  .fa.fa-remove
+              td(title="'ID'", filter="{ _id: 'text'}", sortable="'_id'", ng-click='showState(s._id)')
+                | {{s._id}}
+              td(title="'Name'", filter="{ name: 'text'}", sortable="'name'", ng-click='showState(s._id)')
+                | {{s.name}}
+              td(title="'Created'", sortable="'created'", ng-click='showState(s._id)')
+                | {{s.created | date:"MM/dd/yyyy"}}
+.row-fluid.col-sm-12
+  .row-fluid.col-sm-6
+    h3 Scene
+    div.col-sm-7(ng-show='curState.block_meta.blocks && !enableUI')
+      b(ng-show='curcnt > -1', style='font-size:1.25em') Create Count: {{curcnt}}
+      br
+      b(ng-show='curitr > -1', style='font-size:1.25em') Current State: {{curitr}}
+    //-div.col-sm-5
+      | Move camera by clicking and dragging in scene
+    div.col-sm-12
+      canvas(id="renderCanvasBab", style='width: 480px; height: 360px;')
+      canvas(id="canvas_2D")
+  .row-fluid.col-sm-3(ng-if='!isgen && enableImpSave && curState.block_meta.blocks')
+    div.well
+      form.form-inline.ng-pristine.ng-valid(ng-show='enableImpSave', name='saveImpForm', ng-submit='saveImport(impFilename)')
+        .form-group
+          label Name:
+          input(type='text', ng-model='impFilename')
+        .form-group
+          button.btn.btn-success.btn-sm(type='submit')
+            i.fa.fa-floppy-o
+            |  Save
+          | &nbsp;&nbsp;
+          button.btn.btn-warning.btn-sm(ng-click='cancelImport()')
+            i.fa.fa-remove
+            |  Cancel
+  //-.row-fluid.col-sm-2(ng-if='!isgen && !enableImpSave && curState._id && curState.block_meta.blocks && curState.block_states.length < 20')
+    div.well
+      h4 Create Block Moves
+      button.btn.btn-default.mb-sm(ng-click='opt.limStack = !opt.limStack', style='margin-left: -14px;')
+        .fa.fa-toggle-off(ng-show='!opt.limStack', title='Stacking is unlimited') &nbsp;Off Limit
+        .fa.fa-toggle-on(ng-show='opt.limStack', title='Stacking is limited to 2') &nbsp;On Limit
+      br
+      small(style='color: red') *Appends to moves
+      form.form-inline.ng-pristine.ng-valid(name='moveform', ng-submit='startMove(mvcnt)')
+        .form-group
+          label Iterations:
+          select.form-control(ng-model='mvcnt', ng-init='selmov=[1, 2, 5, 10,19]')
+            option(ng-show='20-curState.block_states.length-v > -1', ng-repeat='v in selmov', value='{{v}}', ng-selected='mvcnt==v') {{v}}
+          br
+        br
+        button.btn.btn-default(ng-show='mvcnt', type='submit') Go
+  .row-fluid.col-sm-3(ng-if='!isgen && !enableImpSave && curState.block_meta.blocks')
+    .row
+      #panelInst.panel.panel-default.notouch.shadowbox(ng-show='enableUI', style='background-color: rgba(255,255,255,0.5)')
+        .panel-heading(ng-class="{'panel-heading-collapsed':panelInst}", style='background-color: rgba(255,255,255,0.0)')
+          strong Navigation
+          paneltool(tool-collapse, ng-init="panelInst=false")
+        .panel-wrapper(collapse="panelInst")
+          .panel-body
+            strong Move Camera: 
+            | Use ARROW keys
+            br
+            strong Point Camera: 
+            | Click and move mouse to pivot camera
+            br
+            strong Move Blocks: 
+            | Click and hold to drag and drop blocks
+            br
+            strong Move Up/Down: 
+            | Hold block, then press SHIFT key
+            br
+            | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; and move mouse up/down
+            br
+            strong Rotate: 
+            | Hold block, then press ALT key
+    .row.well
+      //-button.btn.btn-sm.btn-info.mb-sm(ng-if='!isgen && !enableImpSave && !curState._id && curState.block_meta.blocks', ng-click='startGen()') Create Layout
+      //-br(ng-if='!isgen && !enableImpSave && !curState._id && curState.block_meta.blocks')
+      span(ng-if='enableUI')
+        button.btn.btn-default.mb-sm(ng-click='updatePhysics()')
+          .fa.fa-toggle-on(ng-show='opt.hasPhysics')
+            | &nbsp;On Physics
+          .fa.fa-toggle-off(ng-show='!opt.hasPhysics')
+            | &nbsp;Off Physics
+        | &nbsp; &nbsp;
+        button.btn.btn-sm.btn-info.mb-sm(ng-click='resetCamera()') Reset Camera
+        br
+        button.btn.btn-sm.btn-info.mb-sm(ng-click='saveState()') Capture Frame
+        | &nbsp;&nbsp;
+        button.btn.btn-sm.btn-info.mb-sm(ng-click='resetState()') Reset Frame
+        br
+        label Rotate Cube:
+        select(ng-model = "rotid")
+          option(ng-repeat='b in enabledCubes', value='{{b.id}}') {{b.name}}
+        div(ng-show='rotid')
+          label Axis:
+          select(ng-model = "axs")
+            option(ng-repeat='a in ["X","Y","Z"]', value='{{a}}') {{a}}
+          span(ng-show='axs')
+            input(type='number', ng-model='deg', placeholder='number deg', style='width:20%')
+            button.btn.btn-xs.btn-primary(ng-show='deg' ng-click='rotCube(rotid, axs, deg)') Go
+            | &nbsp;&nbsp;
+          button.btn.btn-xs.btn-danger(ng-click='rotid=0; axs=""; deg=undefined;')
+            i.fa.fa-remove
+        br
+        span(ng-show='enabledCubes.length > 1 && createStateIdx == 0')
+          label *Delete #Cubes:
+          select(ng-model = "delcnt" ng-change="hideCube(delcnt)")
+            option(ng-show='k > 0' ng-repeat='(k,v) in enabledCubes', value='{{k}}') {{k}}
+          br
+          i(style="color:red") *Scene resets on cube delete
+        hr
+      //-form.form-inline.ng-pristine.ng-valid(name='myshowform', ng-submit='showState(sid)')
+        .form-group
+          label Show:
+          input(type='text', ng-model='sid', placeholder='state iteration')
+          input(type="submit", style="position: absolute; left: -9999px; width: 1px; height: 1px;")
+        br
+      //-form.form-inline.ng-pristine.ng-valid(name='mytestform', ng-submit='genStateN({sid: tsid})')
+        .form-group
+          label Test Move:
+          input(type='text', ng-model='tsid', placeholder='state id')
+          input(type="submit", style="position: absolute; left: -9999px; width: 1px; height: 1px;")
+      button.btn.btn-sm.btn-info.mb-sm(ng-click='dlScene()') Get JSON
+      br
+      form.form-inline.ng-pristine.ng-valid(name='myremform', ng-submit='remState(rsid)')
+        .form-group
+          label Remove:
+          input(type='text', ng-model='rsid', placeholder='state id')
+          input(type="submit", style="position: absolute; left: -9999px; width: 1px; height: 1px;")
+    .row
+      button.btn.btn-sm.btn-success(ng-show='sceneExists  && !enableImpSave', ng-click='saveScene()') Save Scene
+  //-.row-fluid.col-sm-6(ng-if='!isgen && !enableImpSave && (curState.next || curState.prev)')
+    div.well
+      h4 Navigate
+      pre {{tableParams}}
+      table.table(ng-table='tableParams', show-filter='false')
+        tr(ng-repeat='id in $data')
+          td(title="'ID'")
+            | {{id}}
+
+.row-fluid.col-sm-12
+  hr
+  .well.row
+    h3 Gallery
+    br
+    #galleryarea
+
+script#didImportFile(type="text/ng-template")
+  form.form-inline.ng-pristine.ng-valid(role="form",novalidate, name='importfiled', ng-submit='closeThisDialog()')
+    .form-group
+      input.form-control#sfn(type='file', name='lsf', accept=".json", single, onchange="angular.element(this).scope().importFileChanged(event)")
+      button.btn.btn-default(type="submit") Go

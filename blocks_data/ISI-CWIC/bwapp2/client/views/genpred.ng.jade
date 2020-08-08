@@ -1,0 +1,105 @@
+//-**=========================================================
+  * Module: genworld.ng.jade
+  * Created by wjwong on 9/9/15.
+  =========================================================*/
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+.row-fluid.col-sm-12
+  div(ng-show='curState.block_meta.blocks')
+    h4 {{curState._id}} &nbsp;&nbsp; {{curState.name}} &nbsp; #Predictions: {{predictions.length}} &nbsp; #Blocks: {{curState.block_meta.blocks.length}}
+    span(ng-repeat='block in curState.block_meta.blocks')
+      | &nbsp;&nbsp;
+      button.btn.btn-xs.btn-default {{block.id}} &nbsp; {{block.name | uppercase}}
+    div
+      button.btn.btn-primary(ng-click='clearMeta()') Reset
+  .content.col-sm-4(ng-show='!(curState.block_meta || curState.block_meta.blocks)')
+    form.form-inline.ng-pristine.ng-valid(role="form",novalidate, name='importstatesform', ng-submit='loadStates()')
+      h3 Load Prediction
+      .form-group
+        input.form-control#sfn(type='file', name='lsf', accept=".json", single, onchange="angular.element(this).scope().statesFileChanged(event)")
+        button.btn.btn-default(type="submit", ng-show='statesfilename') Go
+    //-tab(heading='Review Prediction')
+      .row
+        .content.col-sm-8(style='background-color: white')
+          table.table.table-condensed.table-striped(ng-table='tableStateParams', show-filter='true')
+            tr(ng-repeat='s in $data')
+              td(title="''")
+                button.btn.btn-xs.btn-danger(ng-click='remState(s._id)')
+                  .fa.fa-remove
+              td(title="'ID'", filter="{ _id: 'text'}", sortable="'_id'", ng-click='showState(s._id)')
+                | {{s._id}}
+              td(title="'Name'", filter="{ name: 'text'}", sortable="'name'", ng-click='showState(s._id)')
+                | {{s.name}}
+              td(title="'Created'", sortable="'created'", ng-click='showState(s._id)')
+                | {{s.created | date:"MM/dd/yyyy"}}
+.row(ng-show='diffPredictions.length && curitr !== undefined')
+  .col-sm-12.mb
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title Prediction
+          .pull-right(ng-show='!isgen', style='font-size:1.25em') {{curitr}}/{{diffPredictions.length-1}}
+      span(ng-show='!isgen')
+        form.pull-left(ng-submit='showPrediction(textitr)')
+          input.form-control(style='width:48px', type='text', ng-model='textitr')
+        | &nbsp;&nbsp;
+        button.btn.btn-primary(ng-show='curitr > 0', ng-click='showPrediction(curitr-1)')
+          i.fa.fa-chevron-left
+        | &nbsp;&nbsp;
+        button.btn.btn-primary(ng-show='curitr+1 < predictions.length', ng-click='showPrediction(curitr+1)')
+          i.fa.fa-chevron-right
+        | &nbsp;&nbsp;
+        button.btn.btn-primary(ng-click='clearPrediction()')
+          i.fa.fa-times-circle  Clear
+      br
+      h4 {{utterance}}
+      .col-md-6.mb-lg
+        #start_state
+      .col-md-6.mb-lg
+        #gold_state
+      .col-md-6.mb-lg
+        #predicted_state
+      .col-md-6.mb-lg
+        #diff_state
+
+.row-fluid.col-sm-12(ng-show='diffPredictions.length')
+  hr
+  .well.row
+    h3 Gallery
+      .pull-right(ng-show='!isgen', style='font-size:1.25em') {{diffPredictions.length-1}}
+    br
+    #galleryarea
+
+.row-fluid.col-sm-12
+  .row-fluid.col-sm-6
+    //-div.col-sm-7
+      b(ng-show='curcnt > -1', style='font-size:1.25em') Create Count: {{curcnt}}
+      br
+      b(ng-show='curitr > -1', style='font-size:1.25em') Current State: {{curitr}}
+    div.col-sm-12(ng-show='isgen')
+      canvas(id="renderCanvasBab", style='width: 480px; height: 360px;')
+      canvas(id="canvas_2D")
+  //-.row-fluid.col-sm-3(ng-if='!isgen && enableImpSave && curState.block_meta.blocks')
+    div.well
+      form.form-inline.ng-pristine.ng-valid(ng-show='enableImpSave', name='saveImpForm', ng-submit='saveImport(impFilename)')
+        .form-group
+          label Name:
+          input(type='text', ng-model='impFilename')
+        .form-group
+          button.btn.btn-success.btn-sm(type='submit')
+            .glyphicons.floppy_saved Save
+          | &nbsp;&nbsp;
+          button.btn.btn-warning.btn-sm(ng-click='cancelImport()')
+            .glyphicons.remove_2 Cancel
+  //-.row-fluid.col-sm-3(ng-if='!isgen && !enableImpSave && curState.block_meta.blocks')
+    div.well
+      h4 State
+      button.btn.btn-sm.btn-info.mb-sm(ng-if='!isgen && !enableImpSave && !curState._id && curState.block_meta.blocks', ng-click='startGen()') Create Layout
+      br(ng-if='!isgen && !enableImpSave && !curState._id && curState.block_meta.blocks')
+      button.btn.btn-sm.btn-info.mb-sm(ng-click='dlScene()') Get JSON
+      br
+      form.form-inline.ng-pristine.ng-valid(name='myremform', ng-submit='remState(rsid)')
+        .form-group
+          label Remove:
+          input(type='text', ng-model='rsid', placeholder='state id')
+          input(type="submit", style="position: absolute; left: -9999px; width: 1px; height: 1px;")
+

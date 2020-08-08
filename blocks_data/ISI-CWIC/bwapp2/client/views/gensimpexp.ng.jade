@@ -1,0 +1,99 @@
+//-**=========================================================
+  * Module: gensimpexp.ng.jade
+  * Created by wjwong on 12/16/15.
+  =========================================================*/
+
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+.row-fluid.col-sm-12
+  .row
+    h3(ng-show='isExp') Experiment Mode
+    h3(ng-show='!isExp') Creation Mode
+  div(ng-show='curState.block_meta.blocks')
+    h4 State: {{curState._id}} &nbsp;&nbsp; {{curState.name | uppercase}}
+    h4
+      button.btn.btn-primary(ng-click='clearMeta()') Back
+      | &nbsp;&nbsp;#Blocks: {{curState.block_meta.blocks.length}}
+    span(ng-repeat='block in curState.block_meta.blocks')
+      | &nbsp;&nbsp;
+      button.btn.btn-xs.btn-default {{block.id}} &nbsp; {{block.name | uppercase}}
+    div
+
+  div(ng-show='!curState.block_meta.blocks')
+    .row
+      accordion(ng-class='(isGuest)?"col-sm-8":"col-sm-12"')
+        accordion-group.panel-primary.shadowbox(ng-init="isOpen = true", is-open="isOpen")
+          accordion-heading
+            h4.panel-title Available Scenes
+          .content(ng-class='(isGuest)?"col-sm-12":"col-sm-8 well"')
+            table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsAvail")
+              thead
+                tr
+                  th(ng-if='!isGuest')
+                  th ID
+                  th Name
+                  th Created
+              tbody
+                tr(ng-repeat='s in availExp')
+                  td(ng-if='!isGuest' title="remove")
+                    button.btn.btn-xs.btn-danger(ng-click='remState(s._id)')
+                      .fa.fa-remove
+                  td(title="ID", ng-click='showState(s._id)')
+                    | {{s._id}}
+                  td(title="Name", ng-click='showState(s._id)')
+                    | {{s.name}}
+                  td(title="Created", ng-click='showState(s._id)')
+                    | {{s.created | date:"yyyy/MM/dd HH:mm"}}
+
+          .content.col-sm-4(ng-if='!isGuest')
+            form.form-inline.ng-pristine.ng-valid.well(role="form",novalidate, name='importstatesform', ng-submit='loadStates()')
+              b Import
+              .form-group
+                input.form-control#sfn(type='file', name='lsf', accept=".json", multiple, onchange="angular.element(this).scope().statesFileChanged(event)")
+                button.btn.btn-default(type="submit", ng-show='statesfilename') Go
+.row-fluid.col-sm-12
+  .row-fluid.col-sm-6(ng-show='isgen || curState.block_meta.blocks')
+    h3 Scene
+      button.btn.btn-sm.btn-info.mb-sm(ng-click='reset()') Reset
+    h4(ng-bind-html='utterance')
+    div.col-sm-12
+      canvas(id="renderCanvasBab", style='width: 480px; height: 360px;')
+    div.col-sm-12(ng-if='!isgen && isExp && curState.block_meta.blocks')
+      label Notes:
+      textarea.form-control.mb(type='text', ng-model='notes', style='padding-left: 26px;')
+      button.btn.btn-sm.btn-info.mb-sm(ng-click='dlScene(notes)') Done
+  #panelInst.panel.panel-default.notouch.col-sm-4.shadowbox(ng-show='isExp && curState.block_meta.blocks', style='background-color: rgba(255,255,255,0.5)')
+    .panel-heading(ng-class="{'panel-heading-collapsed':panelInst}", style='background-color: rgba(255,255,255,0.0)')
+      strong Navigation
+      paneltool(tool-collapse, ng-init="panelInst=false")
+    .panel-wrapper(collapse="panelInst")
+      .panel-body
+        //-strong Move Camera: 
+          | Use WASD keys
+          br
+        strong Move Blocks: 
+        | Click and hold to drag and drop blocks
+        br
+        //-strong Point Camera: 
+          | Click and move mouse to pivot camera
+          br
+        strong Move Up/Down: 
+        | Hold block, then press SHIFT key
+        br
+        | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; and move mouse up/down
+        br
+        strong Rotate: 
+        | Hold block, then press ALT key
+
+  .row-fluid.col-sm-3(ng-if='!isgen && enableImpSave && curState.block_meta.blocks')
+    div.well
+      form.form-inline.ng-pristine.ng-valid(ng-show='enableImpSave', name='saveImpForm', ng-submit='saveImport(impFilename)')
+        .form-group
+          label Name:
+          input(type='text', ng-model='impFilename')
+        .form-group
+          button.btn.btn-success.btn-sm(type='submit')
+            .glyphicons.floppy_saved Save
+          | &nbsp;&nbsp;
+          button.btn.btn-warning.btn-sm(ng-click='cancelImport()')
+            .glyphicons.remove_2 Cancel
+

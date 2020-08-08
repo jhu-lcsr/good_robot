@@ -1,0 +1,162 @@
+//-**=========================================================
+  * Module: gencmdtask.ng
+  * Created by wjwong on 2/10/16.
+  =========================================================*/
+.row-fluid(ng-show='!dataloaded')
+  #loadoverlay.container-fluid
+    #loadoverlay-image.text-center(style="position:fixed;top:50%;left:50%; color:#23b7e5;")
+      i.fa.fa-4x.fa-spin.fa-cube
+      h3(style="color:#23b7e5;") Processing...
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+//-need email to proceed
+.container-fluid(ng-if='workerId ==="EMAILLOG"')
+  .abs-center.wd-xl(style="overflow: visible; position: absolute")
+    .panel.widget.b0(style="margin: 10px;")
+      .panel-body.shadowbox(style="border-radius:3px")
+        p.text-center
+          form(novalidate name='myform' class="simple-form")
+            b(style="font-size:1.3em;") Please Enter Email to Start
+            .panel.form-inline
+              label.error(ng-show="myform.email.$error.required", title='Required field', style='color:red;font-size:1.5em;') *
+              label.error(ng-show="myform.email.$error.email", title='Not a valid email', style='color:red;font-size:1.5em;') !
+              input.form-control(type="email", ng-model="workeremail", name='email', minlength='4', required, placeholder="Enter email", style="width:80%")
+              span.error(ng-if='myform.$valid')
+                button.btn.btn-primary.pull-right(type='submit', ng-click='emailLogin(workeremail)') Go
+                
+//-report view
+.container-fluid(ng-if='report  && currentUser.profile.roles[0] == "admin"')
+  .row-fluid.mb-sm
+    h3 Report for Submitter {{workerId | uriCompDec}}
+    label(style='font-size:1.1em') Valid:
+    select(style='font-size:1.5em', ng-model ='opt.repvalid', ng-change='validateReport(opt.repvalid)')
+      option(ng-repeat='n in opt.repvalidlist', value='{{n}}') {{n | uppercase}}
+    | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlScene()') Get Scene JSON
+    | &nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlStates()') Get States JSON
+    | &nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlNotes()') Get Notes JSON
+
+.container-fluid(ng-show='(assignmentId || currentUser.profile.roles[0] == "admin") && workerId !=="EMAILLOG"')
+  accordion(ng-if='taskdata.tasktype == "cmd" && !report')
+    accordion-group.panel-primary(is-open="isOpenDir")
+      accordion-heading
+        h4.panel-title Directions
+      h4(style='margin-top: -14px; margin-bottom: 4px;') Issue commands to move blocks in our system and rate the results.
+      //-.well.col-sm-8.col-sm-offset-2
+        //-(ng-if="curState.type == 'full'")
+        h4(style='margin-top: -14px; margin-bottom: 4px;') Example:
+        img.center-block(src='img/example_full.png')
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') PLACE HOLDER 1
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') PLACE HOLDER 2
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') PLACE HOLDER 3
+        
+      .col-sm-12
+        h4(ng-if='!opt.isValidBrowser', style='color:red')
+          i.fa.fa-exclamation-triangle
+          | &nbsp; GOOGLE CHROME BROWSER Recommended
+        
+  div(ng-show='(opt.bAgreed || workerId ==="EXAMPLE")')
+    accordion(ng-if="curState.block_meta.decoration=='logo' && !report")
+      accordion-group.panel-info(is-open='true')
+        accordion-heading
+          h4.panel-title Logo Key
+        span(ng-repeat='l in logolist', style='display:inline-block;padding-right:6px')
+          img(src='{{l.imgref}}', height='64', width='64')
+          div
+            label {{l.name | uppercase}}
+
+    .row-fluid.well.col-md-12(ng-show='taskdata.tasktype == "cmd"')
+      .col-sm-12.mb(ng-if='submitter')
+        .label.label-warning Read Only
+        i(ng-if='submitter.time', style='font-size: 1.1em') &nbsp;&nbsp;Job submitted on {{submitter.time | date:"MM/dd/yyyy H:m"}}
+      .col-md-6
+        .col-md-12
+          .col-md-12.mb(ng-if='workerId !=="EXAMPLE"')
+            button.btn.btn-primary.btn-xs(ng-show='cmdphase != 3', type='button', ng-model='opt.isBaseView', ng-click='showTransition()')
+              .fa.fa-toggle-off(ng-show='opt.isBaseView')
+                | &nbsp;Showing Baseline
+              .fa.fa-toggle-on(ng-show='!opt.isBaseView')
+                | &nbsp;Showing Change
+            //-span(ng-show='opt.isBaseView') &nbsp; Showing Baseline
+            //-span(ng-show='!opt.isBaseView') &nbsp; Showing Move
+          canvas(id="renderCanvasBab", style='width: 480px; height: 360px;')
+        div(ng-show='cmdphase == 0')
+          h4 {{opt.viewModeCmd | uppercase}}
+          button.btn.btn-primary(ng-click='viewCmd(-1)')
+            i.fa.fa-chevron-left
+            | &nbsp;Back
+        //-command response rate
+        div(ng-show='cmdphase > 0')
+          .col-sm-12(ng-if='taskidx >= maxtask && !submitter')
+            hr
+            button.btn.btn-primary(ng-click='submit()') Submit
+          .col-sm-12(ng-if = 'taskidx < maxtask' )
+            hr
+            div(style='color:orange;font-size:1.1em')
+              //-.fa.fa-exclamation-triangle
+              span(ng-show='cmdphase == 1') &nbsp;Issue Command
+              span(ng-show='cmdphase == 2') &nbsp;Rate Response to Command
+              span(ng-show='cmdphase == 3') &nbsp;Move Block to match Command by CLICK+HOLD then move block to location
+            .col-sm-1
+              h4.pull-left(ng-if='submitter') {{taskidx+1}}/{{maxtask}}
+              h4.pull-left(ng-if='!submitter') {{taskidx+1}}/{{maxtask}}
+            .col-sm-11
+              //-for turk submission
+              form(name='submitForm', action='{{submitTo}}', method='post')
+                input(type="hidden", name="assignmentId", value="{{assignmentId}}")
+                input(type="hidden", name="created", value="{{date}}")
+                //-button.btn.btn-primary(ng-if='turkSubmitTo', type='submit') Submit
+      
+              form.ng-pristine.ng-valid(ng-if='!cmdele && cmdphase == 1' name='annotForm')
+                b.pull-left(ng-show='!opt.command.length || opt.command.length < 14', style='font-size: 16px; color: red; width:4%; float: left')
+                  .fa.fa-asterisk
+                b.pull-left(ng-show='opt.command.length > 13', style='font-size: 16px; color: green; width:4%;').fa.fa-check
+                .form-group.has-feedback.pull-left(style='display:inline-block; width:80%;')
+                  textarea.form-control(type='text', ng-model='opt.command', style='padding-left: 26px;', clear-icon, ng-readonly='submitter')
+                | &nbsp;
+                button.btn.btn-primary(ng-if='!submitter', ng-click='submitCmd(opt.command)') Go
+              div(ng-if='cmdele && cmdphase == 2')
+                h4 {{opt.command | uppercase}}
+                form.ng-pristine.ng-valid.form-inline( name='rateForm')
+                  .form-group(style='margin-right: 10px', title='# of user annotations(commands) per assignment')
+                    select.form-control(ng-model='rating', ng-init='rating=0')
+                      -var txtrate = ['N/A', 'Failed', 'Correct Block', 'Correct Block & Within Quadrant', 'Correct Block & Within a Block', 'Followed Exactly']
+                      each v in [0, 1, 2, 3, 4, 5]
+                        option(value='#{v}', ng-selected='rating==#{v}') #{txtrate[v]}
+                  button.btn.btn-primary(ng-click='setRating(rating)') Rate
+              div(ng-if='cmdphase == 3')
+                h4 {{opt.command | uppercase}}
+                button.btn.btn-primary(ng-click='resetFix()') Reset
+                | &nbsp;&nbsp;
+                button.btn.btn-primary(ng-click='submitFix()') Fixed
+
+      .col-md-6
+        h4 Commands
+        div(ng-repeat='mycmd in cmdlist track by $index', ng-show='$index < taskidx')
+          .col-md-9
+            .form-inline
+              button.btn.btn-xs.btn-danger(ng-show='!submitter && $index == taskidx-1 && cmdphase == 1', style='margin-right:8px;margin-bottom:10px', ng-click='remCmd($index)')
+                i.fa.fa-remove
+              .form-control.mb(style='background-color:#edf1f2' ng-click='viewCmd($index)') 
+                i.fa.fa-eye(ng-show='opt.viewIdx != $index')
+                i.fa.fa-wrench(ng-show='mycmd.fix')
+                i.fa.fa-hand-o-right(ng-show='opt.viewIdx == $index', style='color:orange;font-size:1.3em')
+                | &nbsp;&nbsp;{{mycmd.send.input}}
+          .col-md-3
+            span(ng-show='mycmd.rate == 1')
+              i.fa.fa-ban
+            span(ng-repeat='s in [0,1,2,3,4,5] track by $index', ng-show='mycmd.rate > 1 && $index < mycmd.rate-1')
+              i.fa.fa-star
+
+  h4.text-center(ng-if='!(workerId && hitId) && !submitter') Please accept HIT to start
+  
+.row-fluid.well.col-sm-12(ng-if='!assignmentId && !report')
+  .col-sm-12
+    h3(style='color: red') This Job is unavailable.
+  .col-sm-12
+    h4(ng-if='!opt.isValidBrowser', style='color:red')
+      i.fa.fa-exclamation-triangle
+      | If job is unavailable it may be your browser.
+      | &nbsp; GOOGLE CHROME BROWSER Recommended
+

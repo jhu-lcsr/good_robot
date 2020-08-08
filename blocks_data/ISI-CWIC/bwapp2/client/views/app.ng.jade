@@ -1,0 +1,23 @@
+//-**=========================================================
+  * Module: app.ng.jade
+  * Created by wjwong on 8/6/15.
+  =========================================================*/
+// top navbar
+header.topnavbar-wrapper(ng-include="'client/views/partials/top-navbar.html'")
+// sidebar
+//-aside.aside(ng-include="'client/views/partials/sidebar.html'", ng-controller="SidebarController")
+// offsidebar
+//-aside.offsidebar(ng-include="'client/views/partials/offsidebar.ng.html'")
+// Main section
+.wrapper
+  .row-fluid(ng-show='!dataloaded')
+    #loadoverlay.container-fluid
+      #loadoverlay-image.text-center(style="position:fixed;top:50%;left:50%; color:#23b7e5;")
+        i.fa.fa-4x.fa-spin.fa-cube
+        h3(ng-if='!datamsg' style="color:#23b7e5;") Processing...
+        h3(ng-if='datamsg' style="color:#23b7e5;") {{datamsg}}
+  section(style='margin-left:0px')
+    // Page content
+    .content-wrapper(ui-view="", autoscroll="false", ng-class="app.viewAnimation")
+// Page footer
+// footer ng-include="'client/views/partials/footer.ng.html'"></footer

@@ -1,0 +1,16 @@
+{
+  "name": "server",
+  "version": "0.0.1",
+  "description": "sever side node modules",
+  "main": "null",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "compress": "^0.99.0",
+    "mturk-api": "^1.3.4",
+    "restler": "^3.4.0"
+  }
+}

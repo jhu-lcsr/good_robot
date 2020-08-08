@@ -1,0 +1,37 @@
+{
+  "name": "vendor",
+  "homepage": "https://github.com/danielmarcu/Music",
+  "authors": [
+    "william wong"
+  ],
+  "description": "client vendor components",
+  "main": "",
+  "moduleType": [
+    "amd",
+    "globals",
+    "node"
+  ],
+  "license": "ISC",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular-route": "^1.5.3",
+    "angular-animate": "^1.5.3",
+    "ngstorage": "^0.3.10",
+    "angular-cookies": "^1.5.3",
+    "angular-translate": "^2.11.0",
+    "oclazyload": "^1.0.9",
+    "angular-loading-bar": "^0.9.0",
+    "angular-sanitize": "^1.5.3",
+    "angular-resource": "^1.5.3",
+    "angular-translate-storage-local": "^2.11.0",
+    "angular-translate-storage-cookie": "^2.11.0",
+    "angular-translate-loader-static-files": "^2.11.0"
+  }
+}

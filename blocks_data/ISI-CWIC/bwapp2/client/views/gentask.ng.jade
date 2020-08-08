@@ -1,0 +1,165 @@
+//-**=========================================================
+  * Module: gentask.ng.jade
+  * Created by wjwong on 10/5/15.
+  =========================================================*/
+.row-fluid(ng-show='!dataloaded')
+  #loadoverlay.container-fluid
+    #loadoverlay-image.text-center(style="position:fixed;top:50%;left:50%; color:#23b7e5;")
+      i.fa.fa-4x.fa-spin.fa-cube
+      h3(style="color:#23b7e5;") Processing...
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+.container-fluid(ng-if='!report && assignmentId')
+  accordion(ng-if='taskdata.tasktype == "action"')
+    accordion-group.panel-primary(is-open="isOpenDir")
+      accordion-heading
+        h4.panel-title Directions
+      h4(style='margin-top: -14px; margin-bottom: 4px;') What would you tell a friend to do in a world with objects in the first image in order to obtain the configuration in the second image?  Use each text box to write a distinct full (single/multi) sentence alternative.  Each description must be complete on its own.
+      .well.col-sm-8.col-sm-offset-2(ng-if="curState.type == 'partial'")
+        h4(style='margin-top: -14px; margin-bottom: 4px;') Example:
+        img.center-block(src='img/example_part.png')
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Create a backwards C whose two-block base is just above the U in order to close it and make a circle.  Starting at the top left the blocks are McDonald's, Pepsi, Starbucks in a row.  Twitter and UPS form a vertical line just to their right.  UPS, Stella Artois, and Shell make a diagonal going southwest.  Finally, Mercedes and Shell form the base.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Draw the right side of a circle whose base is two blocks wide and centered above and almost touching the current structure.   Going counter-clockwise the blocks are Mercedes, Shell, Stella Artois, UPS, Twitter, Starbucks, Pepsi and McDonalds.  The top is three blocks wide, the right is two blocks long and Stella sits on a diagonal connecting the base and vertical side.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Draw the middle, right and top sides of the figure eight.  The top is three blocks wide, the middle and right sides are two blocks long with Stella Artois sitting on a diagonal to connect the middle and right sides.  The block positions in clockwise order are McDonald's, Pepsi, Starbucks, Twitter, UPS, Stella Artois, Shell and Mercedes.
+
+      .well.col-sm-8.col-sm-offset-2(ng-if="curState.type == 'full'")
+        h4(style='margin-top: -14px; margin-bottom: 4px;') Example:
+        img.center-block(src='img/example_full.png')
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Draw the number 6 with a flat bottom (4 blocks long), a left side with a 6 block vertical and a thick top of two NE angled lines (3 blocks each).  The vertical is composed of Adidas, BMW, Burger King, Coca-Cola, Esso and Heineken.  The base is Nvidia, Starbucks, Texaco and Twitter.  The two NE lines are Adidas, HP, Pepsi on top and McDonalds, Shell, and Stella Artois on bottom.  Finally, the curve on the top of the loop of the 6 is Mercedes, SRI, Target, Toyota and UPS (left to right).
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Our goal is to arrange the blocks into the shape of the number 6.  First build a very large L which is missing its bottom left corner.  Starting from the top we have Adidas, BMW, Burger King, Coca-Cola, Esso, Heineken - corner - Nvidia, Starbucks, Texaco, and Twitter.  Next form two parallel touching lines going up to the top right: Adidas, HP, Pepsi on top and McDonald’s, Shell, and Stella Artois on bottom.  Finally, to complete the 6, create two perpendicular diagonal lines.  Heineken, Mercedes, SRI and then starting one space to the right: Target, Toyota, and UPS.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Build the number six out of the available blocks.  The top has three rows of two, each offset one block to the left of the previous.  Starting from the top these are Pepsi-Stella, hp-shell, Adidas-McDonalds.  We then have a vertical line: Adidas, BMW, Burger King, Coca-Cola, Esso and Heineken.  The circle of the six is flat on bottom (Nvidia, Starbucks, Texaco, and Twiter) and has a two block long top (SRI and Target).  The connecting diagonals are Mercedes on the left and Toyota + UPS on the right.
+
+      .well.col-sm-8.col-sm-offset-2(ng-if="!curState.type && curState.block_meta.decoration!='blank'")
+        h4(style='margin-top: -14px; margin-bottom: 4px;') Example:
+        img.center-block(src='img/example.png')
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Take block 14 and place it next to block 17. The down right corner of block 14 should touch the upper left corner of block 17.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Slide block 14 straight down until its right corner touches the top left corner of block 17.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Take the block that is on top of block 5. Move it close to block 17. Place it at the same level with block 17 and on the same vertical line as block 5.
+      .well.col-sm-8.col-sm-offset-2(ng-if="!curState.type && curState.block_meta.decoration=='blank'")
+        h4(style='margin-top: -14px; margin-bottom: 4px;') Example:
+        img.center-block(src='img/example_bl.png')
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Move the lone block in the top right of the board to the left of the tower at the back of the table.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') The large cluster has two blocks in a row and a hole in the row behind it. There is a block to the right of the large cluster.  Use it to complete the back row.
+        label.mb-sm(style='color:green;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') The base of the large cluster is three quarters of a square.  Use the block directly to its right to complete the square.
+
+      .col-sm-12
+        h4(ng-if='!opt.isValidBrowser', style='color:red')
+          i.fa.fa-exclamation-triangle
+          | &nbsp; GOOGLE CHROME BROWSER Recommended
+
+        //-h4(style='color:red') DO NOT use the textboxes to create a sequence of events:
+          label.mb-sm(style='color:orange;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Take the block that is on top of block 5.
+          br
+          label.mb-sm(style='color:orange;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Move it close to block 17.
+          br
+          label.mb-sm(style='color:orange;border: 1px solid #dde6e9; border-radius: 4px; padding: 6px 16px;') Place it at the same level with block 17 and on the same vertical line as block 5.
+      //-div.text-center.col-md-12(ng-show='!opt.bAgreed && workerId !=="EXAMPLE"')
+        i.fa.fa-hand-o-right(style='font-size:2em')
+        | &nbsp;&nbsp;
+        button.btn.btn-danger.shadowbox(style='font-size:1.3em', ng-click='opt.bAgreed=true')
+          .fa.fa-square &nbsp;
+          | I will write unique self-contained descriptions in each textbox
+
+  div(ng-show='(opt.bAgreed || workerId ==="EXAMPLE")')
+    accordion(ng-if="curState.block_meta.decoration=='logo'")
+      accordion-group.panel-info(is-open='true')
+        accordion-heading
+          h4.panel-title Logo Key
+        span(ng-repeat='l in logolist', style='display:inline-block;padding-right:6px')
+          img(src='{{l.imgref}}', height='64', width='64')
+          div
+            label {{l.name | uppercase}}
+  
+    .row-fluid.well.col-md-12(ng-if='taskdata.tasktype == "action"')
+      .col-sm-12(ng-if='submitter')
+        .label.label-warning Read Only
+        i(ng-if='submitter.time', style='font-size: 1.1em') &nbsp;&nbsp;Job submitted on {{submitter.time | date:"MM/dd/yyyy H:m"}}
+      .col-md-12
+        .col-md-6
+          #statea
+        .col-md-1(style='width:4%')
+          i.fa.fa-chevron-right(style='font-size:6em;margin-top:2.5em;margin-left: -0.1em;')
+        .col-md-5
+          #stateb
+      .col-sm-12
+        hr
+        div(style='color:red;font-size:1.1em')
+          .fa.fa-exclamation-triangle
+          | Each description MUST describe the action completely.  
+          i(ng-if="!curState.type" style='color:green') Only one block moves per action
+          i(ng-if="curState.type" style='color:green') Accurately describe the actions in the fewest possible separate steps
+          //-span(ng-show='notes.length > 1')
+            | Ensure each alternative description is 
+            b DIFFERENT.
+      h4.pull-left(ng-if='submitter') {{taskidx+1}}/{{taskdata.idxlist.length}}
+      h4.pull-left(ng-if='!submitter') {{taskidx+1}}/{{maxtask}}
+      .col-sm-11
+        form(name='submitForm', action='{{submitTo}}', method='post')
+          input(type="hidden", name="assignmentId", value="{{assignmentId}}")
+          input(type="hidden", name="created", value="{{date}}")
+          //-button.btn.btn-primary(ng-if='turkSubmitTo', type='submit') Submit
+  
+        form.ng-pristine.ng-valid(name='annotForm')
+          div(ng-repeat='note in notes track by $index', ng-if='$index <= curantpass')
+            //-.col-sm-1
+              //-button.btn.btn-xs.btn-danger(title='Remove Description')
+                .fa.fa-remove(ng-click='removeNote($index)')
+            .col-sm-12(ng-if='$index > 0 && notes[$index-1].length > 13')
+              | Create a 
+              b(style='color:red') COMPLETELY NEW ALTERNATIVE
+              |  description of the action. 
+              i(ng-if="!curState.type" style='color:green') Only one block moves per action
+              i(ng-if="curState.type" style='color:green') Accurately describe the actions in the fewest possible separate steps
+            .col-sm-12(ng-show='!$index || ($index > 0 && notes[$index-1].length > 13 && !curState.type) || ($index > 0 && notes[$index-1].length > 75 && curState.type)')
+              b.pull-left(ng-show='!note.length || (!curState.type && note.length < 14) || (curState.type && note.length < 76)', style='font-size: 16px; color: red; width:2%; float: left')
+                .fa.fa-asterisk
+              b.pull-left(ng-show='(!curState.type && note.length > 13) || (curState.type && note.length > 75)', style='font-size: 16px; color: green; width:2%;').fa.fa-check
+              .form-group.has-feedback.pull-left(style='display:inline-block; width:80%;')
+                textarea.form-control(ng-if='submitter || $index < curantpass', type='text', ng-model='notes[$index]', style='padding-left: 26px;', ng-readonly='submitter || $index < curantpass')
+                textarea.form-control(ng-if='!submitter && $index == curantpass', type='text', ng-model='notes[$index]', style='padding-left: 26px;', clear-icon)
+          button.btn.btn-primary(ng-if='taskidx > 0', ng-click='itrAnnot(notes,-1)') Prev
+          button.btn.btn-primary(ng-if='workerId && hitId && notes[curantpass].length > 13 && taskidx+1 >= maxtask && !submitter', ng-click='itrAnnot(notes, 1)') Submit
+          button.btn.btn-primary(ng-if='(workerId && hitId && ((!curState.type && notes[curantpass].length > 13 && taskidx+1 < maxtask) || (curState.type && notes[curantpass].length > 75 && taskidx+1 < maxtask)) || (submitter && taskidx+1 < maxtask))', ng-click='itrAnnot(notes, 1)') Next
+  h4.text-center(ng-if='!(workerId && hitId) && !submitter') Please accept HIT to start
+
+
+.row-fluid.well.col-sm-12(ng-if='!assignmentId && !report')
+  .col-sm-12
+    h3(style='color: red') This Job is unavailable.
+  .col-sm-12
+    h4(ng-if='!opt.isValidBrowser', style='color:red')
+      i.fa.fa-exclamation-triangle
+      | If job is unavailable it may be your browser.
+      | &nbsp; GOOGLE CHROME BROWSER Recommended
+
+//-report view
+.container-fluid(ng-if='report  && currentUser.profile.roles[0] == "admin"')
+  .row-fluid
+    h3 Report for Submitter {{workerId}}
+    label(style='font-size:1.1em') Valid:
+    select(style='font-size:1.5em', ng-model ='opt.repvalid', ng-change='validateReport(opt.repvalid)')
+      option(ng-repeat='n in opt.repvalidlist', value='{{n}}') {{n | uppercase}}
+    | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlScene()') Get Scene JSON
+    | &nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlStates()') Get States JSON
+    | &nbsp;&nbsp;
+    button.btn.btn-primary(ng-click='dlNotes()') Get Notes JSON
+  .col-sm-12(ng-repeat='(nidx,notes) in hitdata.notes[workerId]')
+    .col-sm-12
+      h3.pull-left {{nidx}}
+      .col-sm-6
+        div(id='statea{{nidx}}')
+      .col-sm-5
+        div(id='stateb{{nidx}}')
+    .col-sm-12
+      form.ng-pristine.ng-valid.novalidate(name='reportForm[{{nidx}}]')
+        div.mb-sm(ng-repeat='note in notes track by $index')
+          .col-sm-12
+            b.pull-left(ng-show="reportForm[nidx]['repnote['+$index+']'].$dirty", style='font-size: 16px; color: red; width:2%; float: left')
+              .fa.fa-asterisk
+            .form-group.has-feedback.pull-left(style='display:inline-block; width:80%;')
+              textarea.form-control(type='text', name='repnote[{{$index}}]', ng-model='notes[$index]', style='padding-left: 26px;', clear-icon)
+      button.btn.btn-warning(ng-show='reportForm[nidx].$dirty', ng-click='updateReport(nidx, reportForm[nidx])') Update
+
+    .col-sm-12
+      hr

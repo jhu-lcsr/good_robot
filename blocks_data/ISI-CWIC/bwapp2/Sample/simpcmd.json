@@ -1,0 +1,673 @@
+{
+  "block_state": [
+    {
+      "position": "0.806211,0.100000,-0.576865",
+      "id": 1
+    },
+    {
+      "position": "0.459451,0.100000,-0.464383",
+      "id": 2
+    },
+    {
+      "position": "-0.560387,0.100000,0.473077",
+      "id": 3
+    },
+    {
+      "position": "-0.656367,0.100000,0.763954",
+      "id": 4
+    },
+    {
+      "position": "0.677954,0.100000,-0.289449",
+      "id": 5
+    },
+    {
+      "position": "-0.534474,0.100000,-0.956537",
+      "id": 6
+    },
+    {
+      "position": "0.654410,0.100000,-0.918971",
+      "id": 7
+    },
+    {
+      "position": "-0.475371,0.100000,-0.263634",
+      "id": 8
+    },
+    {
+      "position": "-0.323818,0.100000,0.013138",
+      "id": 9
+    },
+    {
+      "position": "0.197491,0.100000,0.034075",
+      "id": 10
+    },
+    {
+      "position": "0.701009,0.100000,0.124715",
+      "id": 11
+    },
+    {
+      "position": "0.112940,0.100000,0.764330",
+      "id": 12
+    },
+    {
+      "position": "0.428322,0.100000,0.521377",
+      "id": 13
+    },
+    {
+      "position": "0.015566,0.100000,-0.568774",
+      "id": 14
+    },
+    {
+      "position": "0.378033,0.100000,-0.795705",
+      "id": 15
+    },
+    {
+      "position": "-0.685388,0.100000,-0.093589",
+      "id": 16
+    },
+    {
+      "position": "-0.404245,0.100000,0.810147",
+      "id": 17
+    }
+  ],
+  "block_meta": {
+    "decoration": "logo",
+    "blocks": [
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "adidas",
+        "id": 1
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "bmw",
+        "id": 2
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "burger king",
+        "id": 3
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "coca cola",
+        "id": 4
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "esso",
+        "id": 5
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "heineken",
+        "id": 6
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "hp",
+        "id": 7
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "mcdonalds",
+        "id": 8
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "mercedes benz",
+        "id": 9
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "nvidia",
+        "id": 10
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "pepsi",
+        "id": 11
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "shell",
+        "id": 12
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "sri",
+        "id": 13
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "starbucks",
+        "id": 14
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "stella artois",
+        "id": 15
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "target",
+        "id": 16
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": "1"
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": "1"
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": "2"
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": "1"
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": "1"
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": "1"
+            },
+            "side_length": "0.1524"
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "texaco",
+        "id": 17
+      }
+    ]
+  },
+  "name": "experiment 1"
+}

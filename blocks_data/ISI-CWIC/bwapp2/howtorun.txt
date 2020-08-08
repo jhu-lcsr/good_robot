@@ -1,0 +1,5 @@
+./kill.sh [m]eteor
+ps aux | grep meteor
+git pull
+./start.sh
+tail -f nohup.out

@@ -1,0 +1,23 @@
+.abs-center.wd-xl
+  // START panel
+  .text-center.mb-xl
+    .text-lg.mb-lg
+      .fa.fa-bug &#160;&#160;
+      | 4
+      .fa.fa-square-o &nbsp;
+      | 4
+    p.lead.m0 We couldn"t find this page.
+    p The page you are looking for does not exists.
+  ul.list-inline.text-center.text-sm.mb-xl
+    li
+      a.text-muted(href="", ui-sref="root") Go to App
+    li.text-muted |
+    li
+      a.text-muted(href="", ui-sref="page.login") Login
+  .p-lg.text-center
+    span &#169;
+    span(ng-bind="app.year")
+    span -
+    span(ng-bind="app.name")
+    br
+    span(ng-bind="app.description")

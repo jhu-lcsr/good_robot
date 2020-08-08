@@ -1,0 +1,303 @@
+//-**=========================================================
+  * Module: gencmdjobs.ng
+  * Created by wjwong on 2/5/16.
+  =========================================================*/
+toaster-container(toaster-options="{'position-class': 'toast-bottom-right', 'close-button':true}")
+.row-fluid
+  h2 Command Jobs
+  .row
+    .well.col-sm-2(ng-show='!goodHITsData')
+      b HITs Updated
+      br
+      b HITs view need refresh
+      button.btn.btn-warning(ng-click='refreshHITs()')
+        i.fa.fa-refresh
+        |  Refresh HITs
+    .well.col-sm-3
+      label Block Id: 
+      input(ng-model='btid')
+      br
+      label Reason:
+      input(ng-model='btreason')
+      button.btn(ng-show='btid.length && btreason.length', ng-click='blockTurker(btid, btreason)') Go
+    .well.col-sm-6
+      label Live HIT Payment Job Id(s): 
+      input(ng-model='jid', style='width:80%')
+      button.btn(ng-show='jid.length', ng-click='getURLHITs(jid)') Go
+  .row
+    accordion.col-sm-6
+      accordion-group.panel-primary.shadowbox(ng-init="isOpen = true", is-open="isOpen")
+        accordion-heading
+          h4.panel-title
+            i.fa.fa-cubes
+            | &nbsp; Available Command States
+        table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsAvail")
+          thead
+            tr
+              th
+              th ID
+              th Name
+              th Created
+          tbody
+            tr(ng-repeat='s in stateslist')
+              td(title="Remove")
+                button.btn.btn-xs.btn-danger(ng-click='remState(s._id)')
+                  .fa.fa-remove
+              td(title="ID", ng-click='showState(s._id)')
+                | {{s._id}}
+              td(title="Name", ng-click='showState(s._id)')
+                | {{s.name}}
+              td(title="Created", ng-click='showState(s._id)')
+                | {{s.created | date:"yyyy/MM/dd HH:mm"}}
+    .col-sm-6.well.shadowbox(ng-show='curState._id', style='padding:0px;')
+      h4.panel-title.mb(style='padding: 10px 15px; border-top-right-radius: 3px; border-top-left-radius: 3px; border-bottom: 0; font-size: 14px; color: #ffffff; background-color: #5d9cec; border-color: #cfdbe2;')
+        i.fa.fa-edit
+        | &nbsp; Create Job
+      .col-sm-12
+        form.form-inline.ng-pristine.ng-valid(name='createJobForm', ng-submit='taskGen(tasktype, asncnt, antcnt)')
+          .form-group(style='margin-right: 10px')
+            label Type:
+            select.form-control(ng-model='tasktype', ng-init='tasktype="cmd"')
+              each v in ['cmd']
+                option(value='#{v}', ng-selected='tasktype=="#{v}"') #{v}
+          .form-group(style='margin-right: 10px', title='# of Turks to use per bundle of work')
+            label #Assignments:
+            select.form-control(ng-model='asncnt', ng-init='asncnt=3')
+              each v in [1, 2, 3, 4, 5, 6, 7, 8, 9]
+                option(value='#{v}', ng-selected='asncnt==#{v}') #{v}
+          .form-group(style='margin-right: 10px', title='# of user annotations(commands) per assignment')
+            label #Annotations:
+            select.form-control(ng-model='antcnt', ng-init='antcnt=10')
+              each v in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20]
+                option(value='#{v}', ng-selected='antcnt==#{v}') #{v}
+          br
+          button.btn.btn-primary.mb(type='submit') Create
+      .col-sm-12(style='padding-left: 30px;')
+        | ID: 
+        b {{curState._id}}
+        | &nbsp;&nbsp;&nbsp;
+        | Name: 
+        b {{curState.name}}
+        span(ng-show='curState.type') &nbsp;&nbsp;Type:
+          b {{curState.type}}
+        br
+        | # Blocks: {{curState.block_meta.blocks.length}}
+        | &nbsp;&nbsp;&nbsp;
+        | # Moves: {{curState.block_states.length}}
+        | &nbsp;&nbsp;&nbsp;
+        | Created: {{curState.created | date:"yyyy/MM/dd"}}
+      .col-sm-12(style='padding-left: 8px;')
+        canvas(id="renderCanvasBab", style='width: 384px; height: 288px;')
+  hr
+.row
+  .col-sm-12
+    | Get More Data:
+    | &nbsp; {{opt.pageCur}} &nbsp;
+    button.btn.btn-sm.btn-info(ng-click='incBlock(1)' title='Load another {{opt.pageSize}} items')
+      i.fa.fa-plus
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title
+          i.fa.fa-inbox
+          | &nbsp; Jobs
+      .row.mb(style='padding-left:10px')
+        button.btn.btn-default.btn-xs(type='button', ng-model='opt.isLive', btn-checkbox)
+          .fa.fa-toggle-off(ng-show='!opt.isLive')
+            | &nbsp;Sandbox
+          .fa.fa-toggle-on(ng-show='opt.isLive')
+            | &nbsp;Production
+        | &nbsp; 
+        button.btn.btn-default.btn-xs(type='button', ng-model='opt.useQual', btn-checkbox)
+          .fa.fa-toggle-off(ng-show='!opt.useQual')
+            | &nbsp;No Qualifications
+          .fa.fa-toggle-on(ng-show='opt.useQual')
+            | &nbsp;Use Qualifications
+      table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsGrp")
+        thead
+          tr
+            th Created
+            th Job
+            th Cmd
+            th Info
+            th HITs
+        tbody
+          tr(ng-repeat='job in jobmgrlist', ng-if='job.public')
+            td
+              button.btn.btn-xs.btn-danger(ng-click='remJob(job._id)')
+                .fa.fa-remove
+              | &nbsp;&nbsp;
+              button.btn.btn-xs(ng-click='createHIT(job._id)') Create HIT
+              | &nbsp; {{job.created | date:"yyyy/MM/dd HH:mm" }}
+            td(ng-click="stateGo('gencmdtask', {taskId: job._id, assignmentId: 'ASSIGNMENT_ID_NOT_AVAILABLE', workerId: 'EXAMPLE'}, true)")
+              i.fa.fa-eye
+              | &nbsp;{{job._id}}
+            td(title='{{job.cmdid}}', ng-click='showState(job.cmdid)') {{job.cmdid}}
+            td 
+              | Ant:
+              b {{job.antcnt}}
+              | &nbsp;&nbsp;Asn:
+              b {{job.asncnt}}
+            td
+              div.mb-sm(ng-repeat='hit in job.hitlist')
+                button.btn.btn-xs.btn-danger(ng-click='remHIT(job._id, hit)')
+                  .fa.fa-remove
+                | &nbsp;&nbsp;{{hit}} 
+
+//-.row
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-if='jobinfo', ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title
+          i.fa.fa-file-text-o
+          | &nbsp; Job {{jobid}} Information
+      table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsTask")
+        thead
+          tr
+            th
+            th Job
+            th Info
+            th HITs
+        tbody
+          tr(ng-repeat='task in jobinfo')
+            td
+              button.btn.btn-xs(ng-click='createHIT(jobid, task._id)') Create HIT
+            td Ent: {{task.idxlist.length}} &nbsp;&nbsp; Ant: {{task.antcnt}} &nbsp;&nbsp; Asn: {{task.asncnt}}
+.row
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-if='allHITs.active.length', ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title
+          i.fa.fa-flag-checkered
+          | &nbsp; Active HITs
+      table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsTask")
+        thead
+          tr
+            th Created
+            th HIT
+            th Info
+            th Job
+            th Cmd
+            th Turker
+        tbody
+          tr(ng-repeat='task in allHITs.active')
+            td
+              button.btn.btn-xs.btn-danger(ng-click='remHIT(task.jid, "H_"+task.hid)', title='Remove HIT {{task.hid}} from {{task.jid}}')
+                .fa.fa-remove
+              | &nbsp;&nbsp;
+              button.btn.btn-xs(ng-click='shareHIT("H_"+task.hid)', title='Share HIT {{task.hid}}')
+                .fa.fa-share
+              | &nbsp;&nbsp;{{task.time | date:"yyyy/MM/dd HH:mm"}}
+            td
+              a(ng-show='task.islive', href='https://requester.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                b(style='color:green') Live
+              a(ng-show='!task.islive', href='https://requestersandbox.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                span(style='color:grey') Sandbox
+            td Asn: {{task.asnleft}} &nbsp; {{task.reward.Amount | currency: '$'}}
+            td(ng-click="stateGo('gencmdtask',{taskId: task.jid, assignmentId: 'ASSIGNMENT_ID_NOT_AVAILABLE', workerId: 'EXAMPLE'}, true)")
+              i.fa.fa-eye
+              | &nbsp;{{task.jid}}
+            td {{task.cid}}
+            td
+              span(ng-repeat='n in task.names')
+                button.btn.btn-xs.btn-default(ng-click="stateGo('gencmdtask',{taskId: task.jid, workerId: n, hitId: task.hid, report: 1}, true)")
+                  i.fa.fa-eye
+                  | &nbsp;{{n | uriCompDec}}
+                | &nbsp;&nbsp;
+
+.row
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-if='allHITs.done.length', ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title
+          i.fa.fa-flag-checkered
+          | &nbsp; Done HITs
+      table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsTask")
+        thead
+          tr
+            th Done
+            th HIT
+            th Task
+            th Job
+            th Cmd
+            th Turker
+        tbody
+          tr(ng-repeat='task in allHITs.done')
+            td
+              button.btn.btn-xs.btn-primary(title='Download list of links for this HIT', ng-click='dlLinks(task, false)')
+                .fa.fa-download
+              | &nbsp;&nbsp;
+              button.btn.btn-xs.btn-success(title='Download list of VALID links for this HIT', ng-click='dlLinks(task, true)')
+                .fa.fa-thumbs-up
+              | &nbsp;{{task.time | date:"yyyy/MM/dd HH:mm"}}
+            td
+              a(ng-show='task.islive', href='https://requester.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                b(style='color:green') Live
+              a(ng-show='!task.islive', href='https://requestersandbox.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                span(style='color:grey') Sandbox
+            td(ng-click="stateGo('gencmdtask',{taskId: task.jid, assignmentId: 'ASSIGNMENT_ID_NOT_AVAILABLE', workerId: 'EXAMPLE'}, true)")
+              i.fa.fa-eye
+              | &nbsp;{{task.jid}}
+            td {{task.jid}}
+            td {{task.cid}}
+            td
+              span(ng-repeat='n in task.names')
+                button.btn.btn-xs.btn-default(ng-click="stateGo('gencmdtask',{taskId: task.jid, workerId: n, hitId: task.hid, report: 1}, true)")
+                  i.fa.fa-eye
+                  | &nbsp;{{n | uriCompDec}}
+                | &nbsp;&nbsp;
+
+.row
+  accordion.col-sm-12
+    accordion-group.panel-primary.shadowbox(ng-if='allHITs.doneASNs && allHITs.doneASNs.length', ng-init="isOpen = true", is-open="isOpen")
+      accordion-heading
+        h4.panel-title
+          i.fa.fa-flag-checkered
+          | &nbsp; Finished Assignment
+      table.table.table-condensed(ng-show='dataloaded', datatable="ng", dt-options="dtOptionsTask")
+        thead
+          tr
+            th Done
+            th HIT
+            th Job
+            th Turker
+        tbody
+          tr(ng-repeat='task in allHITs.doneASNs')
+            td {{task.time | date:"yyyy/MM/dd HH:mm"}}
+            td
+              a(ng-show='task.islive', href='https://requester.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                b(style='color:green') Live
+              a(ng-show='!task.islive', href='https://requestersandbox.mturk.com/mturk/manageHIT?viewableEditPane=&HITId={{task.hid}}', target='_blank') {{task.hid}}  
+                span(style='color:grey') Sandbox
+            td(ng-click="stateGo('gencmdtask',{taskId: task.jid, assignmentId: 'ASSIGNMENT_ID_NOT_AVAILABLE', workerId: 'EXAMPLE'}, true)")
+              i.fa.fa-eye
+              | &nbsp;{{task.jid}}
+            td
+              button.btn.btn-xs.btn-default(ng-click="stateGo('gencmdtask',{taskId: task.jid, workerId: task.name, hitId: task.hid, report: 1}, true)")
+                i.fa.fa-eye
+                | &nbsp;{{task.name | uriCompDec}}
+
+script#didTurkURLs(type="text/ng-template")
+  form.form-inline.ng-pristine.ng-valid(role="form",novalidate, name='turkurls', ng-submit='closeThisDialog()')
+    //pre {{ngDialogData}}
+    h4 Tasks for Jobs:
+    .form-group(ng-repeat='n in ngDialogData')
+      a(href='{{n.url}}', target='_blank')  J:{{n.jid}} H:{{n.hid}}
+      br
+    //-.form-group
+      input.form-control(type="text", placeholder="Recording Name", required, ng-minlength="4" ng-model='savename', name="name")
+      button.btn.btn-default(ng-show='replayname.$valid', type="submit") Save
+      label.error(style='color:red', ng-show="replayname.name.$error.required", title='Required field') *Required 
+      label.error(style='color:red', ng-show="replayname.name.$error.minlength", title='Must have at least 4 characters') Too short!
+script#didShareURL(type="text/ng-template")
+  form.form-inline.ng-pristine.ng-valid(role="form",novalidate, name='shareurl', ng-submit='closeThisDialog()')
+    //-pre {{ngDialogData}}
+    h4 Job Share Link:
+    .form-group(ng-repeat='n in ngDialogData')
+      a(href='{{n.url}}', target='_blank')  {{n.HITId}}  
+        b(ng-show='n.islive', style='color:green') Live
+        span(ng-show='!n.islive', style='color:grey') Sandbox
+      button.btn.clipbtn(data-clipboard-text="{{n.url}}") 
+        i.fa.fa-copy
+          |  Copy
+      br

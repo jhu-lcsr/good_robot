@@ -1,0 +1,279 @@
+{
+  "_id": "tRxXXeua4QG2zZ2qG",
+  "public": true,
+  "name": "5 float",
+  "created": 1462324516529,
+  "creator": "g4qoijjxwrHnAYK8p",
+  "block_meta": {
+    "decoration": "logo",
+    "blocks": [
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": 1
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": 1
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": 2
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": 1
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": 1
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": 1
+            },
+            "side_length": 0.1524
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "adidas",
+        "id": 1
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": 1
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": 1
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": 2
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": 1
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": 1
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": 1
+            },
+            "side_length": 0.1524
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "bmw",
+        "id": 2
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": 1
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": 1
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": 2
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": 1
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": 1
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": 1
+            },
+            "side_length": 0.1524
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "burger king",
+        "id": 3
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": 1
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": 1
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": 2
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": 1
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": 1
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": 1
+            },
+            "side_length": 0.1524
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "coca cola",
+        "id": 4
+      },
+      {
+        "shape": {
+          "shape_params": {
+            "face_4": {
+              "color": "magenta",
+              "orientation": 1
+            },
+            "face_5": {
+              "color": "yellow",
+              "orientation": 1
+            },
+            "face_6": {
+              "color": "red",
+              "orientation": 2
+            },
+            "face_1": {
+              "color": "blue",
+              "orientation": 1
+            },
+            "face_2": {
+              "color": "green",
+              "orientation": 1
+            },
+            "face_3": {
+              "color": "cyan",
+              "orientation": 1
+            },
+            "side_length": 0.1524
+          },
+          "type": "cube",
+          "size": 0.5
+        },
+        "name": "esso",
+        "id": 5
+      }
+    ]
+  },
+  "block_states": [
+    {
+      "block_state": [
+        {
+          "id": 1,
+          "position": "-0.5,0.1524,0",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 2,
+          "position": "0.12477,0.1524,0.0652",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 3,
+          "position": "-0.15498,0.1524,-0.66126",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 4,
+          "position": "-0.19647,0.1524,0.39911",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 5,
+          "position": "-0.17524,0.1524,-0.11691",
+          "rotation": "0,0,0,1"
+        }
+      ],
+      "enablephysics": false
+    },
+    {
+      "block_state": [
+        {
+          "id": 1,
+          "position": "-0.5,0.07573,0",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 2,
+          "position": "0.12242,0.0763,0.06962",
+          "rotation": "0.002,-0.00785,0.00161,0.99997"
+        },
+        {
+          "id": 3,
+          "position": "0.12039,0.2215,0.13624",
+          "rotation": "0.05276,-0.02077,0.00134,0.99839"
+        },
+        {
+          "id": 4,
+          "position": "-0.19647,0.07573,0.39911",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 5,
+          "position": "-0.17524,0.07573,-0.11691",
+          "rotation": "0,0,0,1"
+        }
+      ],
+      "enablephysics": true
+    },
+    {
+      "block_state": [
+        {
+          "id": 1,
+          "position": "-0.5,0.07573,0",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 2,
+          "position": "-0.48782,0.4603,0.0262",
+          "rotation": "0.002,-0.00785,0.00161,0.99997"
+        },
+        {
+          "id": 3,
+          "position": "-0.48985,0.6055,0.09282",
+          "rotation": "0.05276,-0.02077,0.00134,0.99839"
+        },
+        {
+          "id": 4,
+          "position": "-0.19647,0.07573,0.39911",
+          "rotation": "0,0,0,1"
+        },
+        {
+          "id": 5,
+          "position": "-0.23091,0.16246,0.58072",
+          "rotation": "0,0,0,1"
+        }
+      ],
+      "enablephysics": true
+    }
+  ]
+}
