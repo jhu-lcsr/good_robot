@@ -250,7 +250,8 @@ class PixelNet(nn.Module):
                 interm_feat.append([interm_push_feat, interm_grasp_feat])
 
             # Compute sample grid for rotation AFTER branches
-            affine_mat_after = rot_to_affine_mat(rotate_theta)
+            affine_mat_after = rot_to_affine_mat(rotate_theta, batch_size=input_color_data.size(0))
+
             if self.use_cuda:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size(), align_corners=self.align_corners)
             else:
