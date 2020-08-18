@@ -101,13 +101,13 @@ def init_trunk_weights(model, branch=None):
                 m[1].bias.data.zero_()
 
 
-def rot_to_affine_mat(rotate_theta):
+def rot_to_affine_mat(rotate_theta, batch_size=1):
     affine_mat_after = np.asarray([[np.cos(rotate_theta), np.sin(rotate_theta), 0],[-np.sin(rotate_theta), np.cos(rotate_theta), 0]])
-    affine_mat_after.shape = (2,3,1)
+    affine_mat_after = np.tile(affine_mat_after[np.newaxis], batch_size)
+    affine_mat_after.shape = (2,3,batch_size)
     affine_mat_after = torch.from_numpy(affine_mat_after).permute(2,0,1).float()
 
     return affine_mat_after
-
 
 class PixelNet(nn.Module):
 
@@ -273,7 +273,7 @@ class PixelNet(nn.Module):
         """
         interm_place_feat = None
         # Compute sample grid for rotation BEFORE neural network
-        affine_mat_before = rot_to_affine_mat(-rotate_theta)
+        affine_mat_before = rot_to_affine_mat(-rotate_theta, batch_size=input_color_data.size(0))
         if self.use_cuda:
             flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=requires_grad).cuda(), input_color_data.size(), align_corners=self.align_corners)
         else:
@@ -449,7 +449,7 @@ class reinforcement_net(nn.Module):
                     rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
                     # Compute sample grid for rotation BEFORE neural network
-                    affine_mat_before = rot_to_affine_mat(-rotate_theta)
+                    affine_mat_before = rot_to_affine_mat(-rotate_theta, batch_size=input_color_data.size(0))
                     if self.use_cuda:
                         flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), input_color_data.size())
                     else:
@@ -479,7 +479,7 @@ class reinforcement_net(nn.Module):
                     interm_feat.append(part_interm_feat)
 
                     # Compute sample grid for rotation AFTER branches
-                    affine_mat_after = rot_to_affine_mat(rotate_theta)
+                    affine_mat_after = rot_to_affine_mat(rotate_theta, batch_size=input_color_data.size(0))
                     if self.use_cuda:
                         flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
                     else:
@@ -505,7 +505,7 @@ class reinforcement_net(nn.Module):
             rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
 
             # Compute sample grid for rotation BEFORE branches
-            affine_mat_before = rot_to_affine_mat(-rotate_theta)
+            affine_mat_before = rot_to_affine_mat(-rotate_theta, batch_size=input_color_data.size(0))
             if self.use_cuda:
                 flow_grid_before = F.affine_grid(Variable(affine_mat_before, requires_grad=False).cuda(), input_color_data.size())
             else:
@@ -535,7 +535,7 @@ class reinforcement_net(nn.Module):
             interm_feat.append(part_interm_feat)
 
             # Compute sample grid for rotation AFTER branches
-            affine_mat_after = rot_to_affine_mat(rotate_theta)
+            affine_mat_after = rot_to_affine_mat(rotate_theta, batch_size=input_color_data.size(0))
             if self.use_cuda:
                 flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False).cuda(), interm_push_feat.data.size())
             else:
