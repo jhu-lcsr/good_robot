@@ -23,49 +23,32 @@ class SourceAttention(torch.nn.Module):
         output  = torch.bmm(weights, v) 
         return output 
 
-class DeconvolutionalNetwork(torch.nn.Module):
+
+
+class BaseFusionModule(torch.nn.Module):
     def __init__(self,
-                 input_dim: int,
-                 output_shape: Tuple[int]):
-        super(DeconvolutionalNetwork, self).__init__() 
-        # TODO (elias): deal with bidirectional LSTM 
-        self.input_dim = input_dim
-        self.output_shape = output_shape
+                 image_size,
+                 language_size):
+        super(BaseFusionModule, self).__init__() 
 
-        #self.source_attn = SourceAttention(input_dim, attn_dim) 
-        self.conv1 = torch.nn.ConvTranspose2d(128, 32, 16, padding=0)
-        self.conv2 = torch.nn.ConvTranspose2d(32, 64, 17, padding=0)
-        #self.up2   = torch.nn.Upsample((8, 128, 128))
-        self.conv3 = torch.nn.ConvTranspose2d(64, 128, 33, padding=0)
-        self.activation = torch.nn.ReLU() 
-        # per-pixel output 
-        #self.output= torch.nn.Linear()
+        self.image_size = image_size
+        self.language_size = language_size
+        self.output_dim = image_size + language_size
 
-    def forward(self, encoded):
-        # encoded: [batch, seq_len, input_dim]
-        # for now just take last one
-        # [batch, 1, 1, input_dim]
-        # one channel 
-        print(encoded.data.shape)
-        bsz, seq_len, input_dim = encoded.data.shape
-        encoded = encoded[:,-1,:].unsqueeze(1).unsqueeze(2)
-        # reshape [bsz, 4, 4, input_dim/8]
-        encoded = encoded.reshape((bsz, -1, 1, 1))
-        print(f"encoded before {encoded.shape}") 
-        encoded = self.activation(self.conv1(encoded))
-        print(f"conv 1: {encoded.shape}") 
+    def forward(self, image, language):
+        raise NotImplementedError
 
-        encoded = self.activation(self.conv2(encoded))
-        print(f"conv 2: {encoded.shape}") 
+class ConcatFusionModule(BaseFusionModule): 
+    def __init__(self,
+                 image_size,
+                 language_size):
+        super(ConcatFusionModule, self).__init__(image_size, language_size)
+        self.output_dim = self.image_size + self.language_size
+        print(f"fuser outptu_dim is {self.output_dim}") 
 
-        encoded = self.activation(self.conv3(encoded))
-        print(f"conv 3: {encoded.shape}") 
-
-        print(f"target shape: {self.output_shape}") 
-        sys.exit() 
-        # output: [batch, width, height] 
-        output  = self.output(encoded)
-        output  = output.reshape((bsz, self.output_shape[0], self.output_shape[1]))
+    def forward(self, image, language):
+        output = torch.cat([image, language], dim=1)
+        print(f"fuser real output dim is {output.shape}") 
         return output 
 
 
@@ -76,9 +59,11 @@ class LanguageEncoder(torch.nn.Module):
     over it, returning an output specified by the model.
     """
     def __init__(self,
+                 image_encoder: torch.nn.Module,
                  embedder: torch.nn.Module,
                  encoder: torch.nn.Module,
-                 output_type: str):
+                 fuser: BaseFusionModule,
+                 output_module: torch.nn.Module):
         """
         embedder: a choice of 
         encoder: a choice of LSTM or Transformer 
@@ -86,45 +71,47 @@ class LanguageEncoder(torch.nn.Module):
         """
         super(LanguageEncoder, self).__init__() 
 
+        self.image_encoder = image_encoder
         self.embedder = embedder
         self.encoder = encoder
-        self.output_type = output_type
-
-        if self.output_type == "mask": 
-            self.output_module = DeconvolutionalNetwork(self.encoder.hidden_dim, 64) 
-        else:
-            raise NotImplementedError(f"No output module for choice {output_type}") 
-
+        self.fuser = fuser
+        self.output_module = output_module
 
     def forward(self,
-                language_batch: str) -> torch.Tensor: 
-        embedded = []
-        # TODO (elias): deal with padding 
-        lengths = []
-        for sent in language_batch:
-            embedded_tokens = self.embedder(sent).unsqueeze(0)
-            lengths.append(embedded_tokens.shape[1])
-            embedded.append(embedded_tokens)
+                data_batch: dict) -> torch.Tensor: 
+        language = data_batch["command"]
+        # sort lengths 
+        lengths = data_batch["length"]
+        lengths = [(i,x) for i, x in enumerate(lengths)]
+        lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
+        idxs, lengths = zip(*lengths) 
+        # tensorize lengths 
+        lengths  = torch.tensor(lengths).float() 
+        pos_input = data_batch["previous_position"]
+        # encode image 
+        pos_encoded = self.image_encoder(pos_input) 
+        print(f"image encoded: {pos_encoded.shape}") 
+        if type(language[0]) == str:
+            lang_embedded = self.embedder(language).unsqueeze(0)
+        else:
+            lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0)
+        print(f"embedded {lang_embedded.shape}") 
+        lang_encoded = self.encoder(lang_embedded, lengths) 
+        print(f"encoded {lang_encoded.shape}") 
+        bsz, __ = lang_encoded.shape 
+        __, __, pos_hidden = pos_encoded.shape
+        pos_encoded = pos_encoded.squeeze(1) 
+        # expand image to batch size 
+        pos_encoded = pos_encoded.expand(bsz, pos_hidden)
 
-        max_seq = max(lengths) 
+        image_and_langauge = self.fuser(pos_encoded, lang_encoded)
+        print(f"fused shape {image_and_langauge.shape}") 
 
-        for i, sent in enumerate(embedded):
-            diff = [self.embedded.pad_token.unsqueeze(0) for i in range(max_seq - sent.shape[1])]
-            if len(diff) > 0:
-                diff = torch.cat(diff, dim = 0)
-            else:
-                continue
-            sent = torch.cat([sent, diff], dim = 1)
-            embedded[i] = sent 
+        output = self.output_module(image_and_langauge) 
 
-        embedded = torch.cat(embedded, dim=1)
-        lengths = torch.Tensor(lengths) 
-        print(lengths) 
-        print(embedded.shape)  
-        # [bsz, len, hidden_dim]
-        encoded_tokens, __ = self.encoder(embedded, lengths)
-        output = self.output_module(encoded_tokens)
-        return output 
+        to_ret = {"next_position": output}
+
+        return to_ret
         
 
 

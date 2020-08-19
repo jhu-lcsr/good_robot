@@ -63,7 +63,5 @@ class RandomEmbedder(torch.nn.Module):
             self.embedding_dict[word] = embedding
 
     def forward(self, words):
-        words = self.tokenizer(words) 
         output = [self.embedding_dict[w] if w in self.vocab else self.unk_embedding for w in words ]
-        print(f"len output {len(output)} ") 
         return torch.cat(output, dim = 0) 

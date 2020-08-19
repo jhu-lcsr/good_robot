@@ -5,11 +5,17 @@ from typing import List, Dict
 import torch
 from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
+import logging 
+from tqdm import tqdm 
 
-from language import LanguageEncoder
+from image_encoder import ImageEncoder, DeconvolutionalNetwork
+from language import LanguageEncoder, ConcatFusionModule
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
 
+from data import DatasetReader
+
+logger = logging.getLogger(__name__)
 
 def load_data(path):
     all_data = []
@@ -34,66 +40,135 @@ class LanguageTrainer:
     def __init__(self,
                  train_data: List,
                  val_data: List,
-                 encoder: LanguageEncoder):
+                 encoder: LanguageEncoder,
+                 optimizer: torch.optim.Optimizer,
+                 num_epochs: int): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
         # TODO: get a loss here  
         # self.loss = torch.nn.CrossEn
+        self.optimizer = optimizer 
+        self.num_epochs = num_epochs
+
+        self.loss_fxn = torch.nn.CrossEntropyLoss()
+
+    def train(self):
+        for epoch in range(self.num_epochs): 
+            self.train_epoch(epoch)
+
+    def train_epoch(self, epoch): 
+        print(f"Training epoch {epoch}...") 
+        for batch_trajectory in tqdm(self.train_data): 
+            for batch_instance in batch_trajectory: 
+                print(f"doing batch_instance") 
+                self.optimizer.zero_grad() 
+                outputs = self.encoder(batch_instance) 
+                loss = self.compute_loss(batch_instance, outputs) 
+                loss.backwards() 
+                self.optimizer.step() 
+
+        print(f"Validating epoch {epoch}...") 
+        with self.encoder.eval(): 
+            for dev_batch_instance in tqdm(self.val_data): 
+                val_outputs = self.validate(dev_batch_instance) 
 
 
-    def train_epoch(self): 
-        for row in self.train_data:
-            for j, sent in enumerate(row["notes"]): 
-                sent = [sent["notes"][0]]
-                output = self.encoder(sent) 
+    def validate(self, batch_instance): 
+        return None 
 
-    def validate(self): 
-        pass 
+    def compute_loss(self, inputs, outputs):
+        pred_image = outputs["next_position"]
+        true_image = inputs["next_position"]
+
+        print(pred_image.shape)
+        print(true_image.shape) 
+
+        loss = self.loss_fxn(true_image, pred_image) 
+        return loss 
 
 
 def main(args):
     # load the data 
-    train_data = load_data(args.train_path) 
-    val_data = load_data(args.val_path) 
-    # construct the vocab 
+    logger.info(f"Reading data from {args.train_path}")
+    dataset_reader = DatasetReader(args.train_path,
+                                   args.val_path,
+                                   None,
+                                   batch_by_line = True)
+
+    train_vocab = dataset_reader.read_data("train") 
+    dev_vocab = dataset_reader.read_data("dev") 
+    
+    # construct the vocab and tokenizer 
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
-    vocab = get_vocab(train_data, tokenizer)     
     
     # get the embedder from args 
     if args.embedder == "random":
-        embedder = RandomEmbedder(tokenizer, vocab, args.embedding_dim, trainable=True)
+        embedder = RandomEmbedder(tokenizer, train_vocab, args.embedding_dim, trainable=True)
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
     # get the encoder from args  
     if args.encoder == "lstm":
         encoder = LSTMEncoder(input_dim = args.embedding_dim,
-                              hidden_dim = args.hidden_dim,
-                              num_layers = args.num_layers,
+                              hidden_dim = args.encoder_hidden_dim,
+                              num_layers = args.encoder_num_layers,
                               dropout = args.dropout,
                               bidirectional = args.bidirectional) 
     else:
-        raise NotImplementedError(f"No encoder {args.encoder}") 
-    # construct the model 
-    encoder = LanguageEncoder(embedder, encoder, output_type=args.output_type) 
-    trainer = LanguageTrainer(train_data, val_data, encoder) 
-    trainer.train_epoch() 
-
-
+        raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
+    # construct image encoder 
+    image_encoder = ImageEncoder(input_dim = args.num_blocks,
+                                 n_layers = args.conv_num_layers,
+                                 factor = args.conv_factor,
+                                 dropout = args.dropout)
+    # construct image and language fusion module 
+    fuser = ConcatFusionModule(image_encoder.output_dim, encoder.hidden_dim) 
+    # construct image decoder 
+    output_module = DeconvolutionalNetwork(input_dim = fuser.output_dim, 
+                                           num_blocks = args.num_blocks,
+                                           num_layers = args.deconv_num_layers,
+                                           factor = args.deconv_factor,
+                                           dropout = args.dropout) 
+    # put it all together into one module 
+    encoder = LanguageEncoder(image_encoder = image_encoder, 
+                              embedder = embedder, 
+                              encoder = encoder, 
+                              fuser = fuser, 
+                              output_module = output_module) 
+    # construct optimizer 
+    optimizer = torch.optim.Adam(encoder.parameters())
+    # construct trainer 
+    trainer = LanguageTrainer(train_data = dataset_reader.data["train"], 
+                              val_data = dataset_reader.data["dev"], 
+                              encoder = encoder,
+                              optimizer = optimizer, 
+                              num_epochs = 3) 
+    trainer.train() 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # data 
     parser.add_argument("--train-path", type=str)
     parser.add_argument("--val-path", type=str)
+    parser.add_argument("--num-blocks", type=int, default=20) 
+    # language embedder 
     parser.add_argument("--embedder", type=str, default="random")
     parser.add_argument("--embedding-dim", type=int, default=300) 
+    # language encoder
     parser.add_argument("--encoder", type=str, default="lstm")
-    parser.add_argument("--output-type", type=str, default="mask")
-    parser.add_argument("--hidden-dim", type=int, default=128) 
-    parser.add_argument("--num-layers", type=int, default=2) 
-    parser.add_argument("--dropout", type=float, default=0.2) 
+    parser.add_argument("--encoder-hidden-dim", type=int, default=128) 
+    parser.add_argument("--encoder-num-layers", type=int, default=2) 
     parser.add_argument("--bidirectional", action="store_true") 
+    # image encoder 
+    parser.add_argument("--conv-factor", type=int, default = 4) 
+    parser.add_argument("--conv-num-layers", type=int, default=2) 
+    # image decoder 
+    parser.add_argument("--deconv-factor", type=int, default = 2) 
+    parser.add_argument("--deconv-num-layers", type=int, default=2) 
+    # misc
+    parser.add_argument("--output-type", type=str, default="mask")
+    parser.add_argument("--dropout", type=float, default=0.2) 
 
     args = parser.parse_args()
     main(args) 

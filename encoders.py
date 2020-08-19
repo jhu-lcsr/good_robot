@@ -27,8 +27,23 @@ class LSTMEncoder(torch.nn.Module):
                                                           batch_first=True, 
                                                           enforce_sorted=True) 
         output, __ = self.lstm(embedded)
-        print(output.data.shape)
-        return torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
+        
+        output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
+
+        bsz, seq_len, hidden_dim = output.shape
+        # need indices of last non-pad token 
+        lengths = lengths.long() 
+        lengths = lengths-1
+        batch_inds = torch.tensor([i for i in range(bsz)]).long() 
+        # take first and last 
+        #first = output[:,0,:].unsqueeze(1) 
+        last  = output[batch_inds, lengths, :].unsqueeze(1) 
+        # concat them together  
+        concat = last 
+        #concat = torch.cat([first, last], dim=1)
+        # flatten 
+        concat = concat.reshape((bsz, -1))
+        return concat 
                                                               
 
 class TransformerEncoder(torch.nn.Module): 
