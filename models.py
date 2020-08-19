@@ -111,13 +111,13 @@ def rot_to_affine_mat(rotate_theta, batch_size=1):
 
 class PixelNet(nn.Module):
 
-    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False, num_dilation=1): # , snapshot=None
+    def __init__(self, use_cuda=True, goal_condition_len=0, place=False, network='efficientnet', use_vector_block=False, pretrained=True, align_corners=False, num_dilation=1, num_rotations=16): # , snapshot=None
         super(PixelNet, self).__init__()
         self.use_cuda = use_cuda
         self.place = place
         self.use_vector_block = use_vector_block
         self.upsample_scale = 16
-        self.num_rotations = 16
+        self.num_rotations = num_rotations
         self.network = network
         self.align_corners = align_corners
 
