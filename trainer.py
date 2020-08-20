@@ -443,6 +443,7 @@ class Trainer(object):
             exit(0)
         # Pass input data through model
         output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, goal_condition=goal_condition)
+        print(output_prob.size())
 
         if self.method == 'reactive':
 
