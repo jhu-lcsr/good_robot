@@ -7,12 +7,12 @@ from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 import torch
 
-
-# what is the image size: depth x 64 x 64 
-# block distribution by id: depth x 64 x 64 x n_blocks 
-# operation distribution by id: depth x 64 x 64 x n_ops 
-
 class TrajectoryIterator:
+    """
+    Iterator over trajectory that returns a single timestep from the Trajectory
+    meaning: 1 command, 1 previous position, 1 next position. Commands may be 
+    batched, but positions are not. 
+    """
     def __init__(self, traj):
         self.traj = traj
         self._index = -1
@@ -38,6 +38,11 @@ class TrajectoryIterator:
             raise StopIteration 
 
 class BaseTrajectory:
+    """
+    Trajectories are basic data-loading unit,
+    provide access to all commands with their corresponding previous and next
+    positional images/tuples, as well as metadata. 
+    """
     def __init__(self,
                  line_id: int, 
                  commands: List,
@@ -63,7 +68,11 @@ class BaseTrajectory:
     def __iter__(self):
         return TrajectoryIterator(self)
 
-    def make_3d_positions(self, positions):
+    def make_3d_positions(self, positions, make_z = False):
+        """
+        take (x,y,z) positions and turn them into 1-hot 
+        vector over block ids in a x,y,z coordinate grid 
+        """
         # positions: 1 for each block id 
         def absolute_to_relative(coord, dim): 
             # scale 
@@ -74,34 +83,58 @@ class BaseTrajectory:
             return int(np.around(scaled))
 
         # create a grid d x w x h
-        height, width, depth = 64, 64, 64
-        n_blocks = 20
-        image = np.zeros((depth, width, height, n_blocks)) 
-        # what is block width height depth 
+        if make_z: 
+            height, width, depth = 64, 64, 4
+            n_blocks = 20
+            image = np.zeros((depth, width, height, n_blocks)) 
+            # what is block width height depth 
 
-        for i, position_list in enumerate(positions): 
-            for block_idx, (x, y, z) in enumerate(position_list): 
-                new_x, new_y, new_z = (absolute_to_relative(x, width),
-                                      absolute_to_relative(y, height),
-                                      absolute_to_relative(z, depth) )
+            for i, position_list in enumerate(positions): 
+                for block_idx, (x, y, z) in enumerate(position_list): 
+                    new_x, new_y, new_z = (absolute_to_relative(x, width),
+                                          absolute_to_relative(y, height),
+                                          absolute_to_relative(z, depth) )
 
-                # side length: 0.1524 => 9.7536/64
-                width, height, depth = 10, 10, 10
-                offset = int(width/2)
+                    # side length: 0.1524 => 9.7536/64
+                    width, height = 10, 10 
+                    offset = int(width/2)
+                    print(f"new_z {new_z}") 
 
-                # infilling 
-                for x_val in range(new_x - offset, new_x + offset):
-                    for y_val in range(new_y - offset, new_y + offset):
-                        for z_val in range(new_z - offset, new_z + offset):
-                            try:
-                                image[z_val, x_val, y_val, i] = 1
-                            except IndexError:
-                                # at the edges 
-                                pass 
+                    # infilling 
+                    for x_val in range(new_x - offset, new_x + offset):
+                        for y_val in range(new_y - offset, new_y + offset):
+                            for z_val in range(new_z - offset, new_z + offset):
+                                try:
+                                    image[z_val, x_val, y_val, i] = 1
+                                except IndexError:
+                                    # at the edges 
+                                    pass 
+        else:
+            # TODO (elias): impelement 2.5d here 
+            height, width, depth = 64, 64, 4
+            n_blocks = 20
+            image = np.zeros((depth, width, height, n_blocks)) 
+            for i, position_list in enumerate(positions): 
+                for block_idx, (x, y, z) in enumerate(position_list): 
+                    new_x, new_y = (absolute_to_relative(x, width),
+                                          absolute_to_relative(y, height)) 
+                    # side length: 0.1524 => 9.7536/64
+                    width, height = 10, 10 
+                    offset = int(width/2)
+
+                    # infilling 
+                    for x_val in range(new_x - offset, new_x + offset):
+                        for y_val in range(new_y - offset, new_y + offset):
+                            image[z_val, x_val, y_val] = z
+
+                                
+
+
         image  = torch.tensor(image).float() 
         image = image.unsqueeze(0)
         # empty, batch, n_labels, depth, width, height 
         image = image.permute(0,  4, 1, 2, 3) 
+        sys.exit() 
         return [image]
 
 class SimpleTrajectory(BaseTrajectory):
@@ -135,6 +168,10 @@ class SimpleTrajectory(BaseTrajectory):
         return commands 
 
 class BatchedTrajectory(BaseTrajectory): 
+    """
+    batches trajectories so that all 9 annotator commands with shared 
+    positions and rotations are batched together. 
+    """
     def __init__(self,
                  line_id: int,
                  commands: List[List[str]], 
@@ -171,9 +208,7 @@ class BatchedTrajectory(BaseTrajectory):
         return commands 
 
     def pad_commands(self, commands): 
-        """
-        pad commands in a batch to have the same length
-        """
+        # pad commands in a batch to have the same length
         max_len = 0
         lengths = [[None for j in range(len(commands))] for i in range(len(commands[0]))]
         new_commands = [[None for j in range(len(commands))] for i in range(len(commands[0]))]
@@ -215,11 +250,9 @@ class DatasetReader:
                      "dev": [],
                      "test": []} 
 
-    def read_data(self, split):
+    def read_data(self, split) -> set:
         """
         extract trajectories for training and evaluation 
-
-
         """
         if split not in self.paths:
             raise AssertionError(f"split {split} not valid. Options are {self.path.keys()}") 

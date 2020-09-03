@@ -149,14 +149,14 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # data 
-    parser.add_argument("--train-path", type=str)
-    parser.add_argument("--val-path", type=str)
+    parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
+    parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
     parser.add_argument("--num-blocks", type=int, default=20) 
     # language embedder 
-    parser.add_argument("--embedder", type=str, default="random")
+    parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # language encoder
-    parser.add_argument("--encoder", type=str, default="lstm")
+    parser.add_argument("--encoder", type=str, default="lstm", choices = ["lstm", "transformer"])
     parser.add_argument("--encoder-hidden-dim", type=int, default=128) 
     parser.add_argument("--encoder-num-layers", type=int, default=2) 
     parser.add_argument("--bidirectional", action="store_true") 
