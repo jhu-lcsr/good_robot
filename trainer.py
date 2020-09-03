@@ -487,8 +487,6 @@ class Trainer(object):
                     if self.place:
                         place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
 
-        print(push_predictions.shape)
-
         if not self.place:
             place_predictions = None
         if self.common_sense:
@@ -503,7 +501,6 @@ class Trainer(object):
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions)
 
-        print(push_predictions.shape)
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
     def end_trial(self):
