@@ -189,7 +189,7 @@ class PixelNet(nn.Module):
         if self.use_cuda:
             self.cuda()
 
-    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None):
+    def forward(self, input_color_data, input_depth_data, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False):
 
         if goal_condition is not None:
             # TODO(ahundt) is there a better place for this? Is doing this before is_volatile sloppy?
@@ -224,6 +224,7 @@ class PixelNet(nn.Module):
                         flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size(), align_corners=self.align_corners)
                     # print('goal_condition: ' + str(goal_condition))
                     # Forward pass through branches, undo rotation on output predictions, upsample results
+
                     # placenet tests block stacking
                     if self.place:
                         output_prob.append([nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear',
@@ -244,6 +245,13 @@ class PixelNet(nn.Module):
                             flow_grid_after, mode='nearest', align_corners=self.align_corners))])
 
                 else:
+                    # if we want to keep action features, strip last layer of push/grasp/placenet
+                    if keep_action_feat:
+                        self.pushnet = self.pushnet[:-1]
+                        self.graspnet = self.graspnet[:-1]
+                        if self.place:
+                            self.placenet = self.placenet[:-1]
+
                     # Apply rotations to images
                     for rotate_idx in range(self.num_rotations):
                         rotate_theta = np.radians(rotate_idx*(360/self.num_rotations))
@@ -263,6 +271,9 @@ class PixelNet(nn.Module):
                         else:
                             flow_grid_after = F.affine_grid(Variable(affine_mat_after, requires_grad=False), interm_push_feat.data.size(), align_corners=self.align_corners)
 
+                        # TODO(adit98) remove this and resolve commented portion below
+                        grasp_feat = self.graspnet(interm_grasp_feat)
+
                         # Forward pass through branches, undo rotation on output predictions, upsample results
                         # placenet tests block stacking
                         if self.place:
@@ -270,7 +281,7 @@ class PixelNet(nn.Module):
                                 align_corners=self.align_corners).forward(F.grid_sample(self.pushnet(interm_push_feat),
                                 flow_grid_after, mode='nearest', align_corners=self.align_corners)),
                                 nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear',
-                                align_corners=self.align_corners).forward(F.grid_sample(self.graspnet(interm_grasp_feat),
+                                align_corners=self.align_corners).forward(F.grid_sample(grasp_feat, #self.graspnet(interm_grasp_feat),
                                 flow_grid_after, mode='nearest', align_corners=self.align_corners)),
                                 nn.Upsample(scale_factor=self.upsample_scale, mode='bilinear',
                                 align_corners=self.align_corners).forward(F.grid_sample(self.placenet(interm_place_feat),
