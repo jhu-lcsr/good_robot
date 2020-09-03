@@ -109,11 +109,15 @@ class BaseTrajectory:
                                 except IndexError:
                                     # at the edges 
                                     pass 
+            image  = torch.tensor(image).float() 
+            image = image.unsqueeze(0)
+            # empty, batch, n_labels, depth, width, height 
+            image = image.permute(0,  4, 1, 2, 3) 
         else:
             # TODO (elias): impelement 2.5d here 
-            height, width, depth = 64, 64, 4
+            height, width = 64, 64 
             n_blocks = 20
-            image = np.zeros((depth, width, height, n_blocks)) 
+            image = np.zeros(( width, height, 1 + 1)) 
             for i, position_list in enumerate(positions): 
                 for block_idx, (x, y, z) in enumerate(position_list): 
                     new_x, new_y = (absolute_to_relative(x, width),
@@ -125,16 +129,14 @@ class BaseTrajectory:
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for y_val in range(new_y - offset, new_y + offset):
-                            image[z_val, x_val, y_val] = z
+                            image[x_val, y_val, 0] = block_idx
+                            image[x_val, y_val, 1] = z
 
-                                
+            image  = torch.tensor(image).float() 
+            image = image.unsqueeze(0)
+            # empty, batch, n_labels, depth, width, height 
+            image = image.permute(3, 1, 2, 0) 
 
-
-        image  = torch.tensor(image).float() 
-        image = image.unsqueeze(0)
-        # empty, batch, n_labels, depth, width, height 
-        image = image.permute(0,  4, 1, 2, 3) 
-        sys.exit() 
         return [image]
 
 class SimpleTrajectory(BaseTrajectory):

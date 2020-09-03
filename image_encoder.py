@@ -13,7 +13,8 @@ class ImageEncoder(torch.nn.Module):
 
         self.input_dim = input_dim
         self.factor = factor
-        output_dim = int(input_dim / factor) 
+        #output_dim = int(input_dim / factor) 
+        output_dim = 1
 
         self.n_layers = n_layers
         self.activation = torch.nn.ReLU() if activation == "relu" else torch.nn.Tanh()
@@ -22,19 +23,20 @@ class ImageEncoder(torch.nn.Module):
         layers = []
         factor = 2
         kernel_size = 3
-        maxpool_kernel_size = 5
+        maxpool_kernel_size = 3
         stride = 1
         output_wh = 64
 
         for i in range(self.n_layers):
-            layers.append(torch.nn.Conv3d(input_dim, output_dim, kernel_size, stride=stride, padding = 0))
+            print(input_dim, output_dim) 
+            layers.append(torch.nn.Conv2d(input_dim, output_dim, kernel_size, stride=stride, padding = 0))
             output_wh = (output_wh - (kernel_size-1)) 
             layers.append(self.activation)
-            layers.append(torch.nn.MaxPool3d(maxpool_kernel_size))
+            layers.append(torch.nn.MaxPool2d(maxpool_kernel_size))
             output_wh = int((output_wh - (maxpool_kernel_size-1) - 1)/ maxpool_kernel_size) + 1
 
-            layers.append(torch.nn.Dropout3d(p = self.dropout))
-            input_dim = output_dim
+            layers.append(torch.nn.Dropout2d(p = self.dropout))
+            #input_dim = output_dim
             output_dim = max(16, int(input_dim / factor)) 
        
         # infer output size 
@@ -42,7 +44,8 @@ class ImageEncoder(torch.nn.Module):
         self.layers = torch.nn.ModuleList(layers) 
 
     def forward(self, inputs):
-        bsz, n_labels, width, height, depth = inputs.shape
+        print(f"input image {inputs.shape}") 
+        bsz,  width, height, n_labels = inputs.shape
         #outputs = inputs.reshape(bsz, n_labels depth, height, width)
         outputs = inputs 
         for layer in self.layers:

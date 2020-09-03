@@ -118,10 +118,14 @@ def main(args):
     else:
         raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
     # construct image encoder 
-    image_encoder = ImageEncoder(input_dim = args.num_blocks,
+    image_encoder = ImageEncoder(input_dim = 2, 
                                  n_layers = args.conv_num_layers,
                                  factor = args.conv_factor,
                                  dropout = args.dropout)
+    #image_encoder = ImageEncoder(input_dim = args.num_blocks,
+    #                             n_layers = args.conv_num_layers,
+    #                             factor = args.conv_factor,
+    #                             dropout = args.dropout)
     # construct image and language fusion module 
     fuser = ConcatFusionModule(image_encoder.output_dim, encoder.hidden_dim) 
     # construct image decoder 
