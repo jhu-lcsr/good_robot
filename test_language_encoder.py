@@ -42,7 +42,8 @@ class LanguageTrainer:
                  val_data: List,
                  encoder: LanguageEncoder,
                  optimizer: torch.optim.Optimizer,
-                 num_epochs: int): 
+                 num_epochs: int,
+                 device: str): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
@@ -139,6 +140,13 @@ def main(args):
                               encoder = encoder, 
                               fuser = fuser, 
                               output_module = output_module) 
+
+    if args.cuda is not None:
+        device = f"cuda:{args.cuda}") 
+    else:
+        device = "cpu"
+
+    encoder = encoder.to(torch.device(device))
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters())
     # construct trainer 
@@ -146,7 +154,8 @@ def main(args):
                               val_data = dataset_reader.data["dev"], 
                               encoder = encoder,
                               optimizer = optimizer, 
-                              num_epochs = 3) 
+                              num_epochs = 3,
+                              device = device) 
     trainer.train() 
 
 if __name__ == "__main__":
@@ -172,6 +181,7 @@ if __name__ == "__main__":
     # misc
     parser.add_argument("--output-type", type=str, default="mask")
     parser.add_argument("--dropout", type=float, default=0.2) 
+    parser.add_argument("--cuda", type=int, default=None) 
 
     args = parser.parse_args()
     main(args) 

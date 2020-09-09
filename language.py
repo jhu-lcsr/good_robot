@@ -61,7 +61,8 @@ class LanguageEncoder(torch.nn.Module):
                  embedder: torch.nn.Module,
                  encoder: torch.nn.Module,
                  fuser: BaseFusionModule,
-                 output_module: torch.nn.Module):
+                 output_module: torch.nn.Module,
+                 device: torch.Device):
         """
         embedder: a choice of 
         encoder: a choice of LSTM or Transformer 
@@ -74,6 +75,7 @@ class LanguageEncoder(torch.nn.Module):
         self.encoder = encoder
         self.fuser = fuser
         self.output_module = output_module
+        self.device = device 
 
     def forward(self,
                 data_batch: dict) -> torch.Tensor: 
