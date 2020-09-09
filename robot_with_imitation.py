@@ -581,9 +581,12 @@ def main(args):
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
-                trainer.executed_action_embed_log.append([action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]]])
+                trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]])
+
+                # TODO(adit98) check if this is the best place for this
+                # TODO(adit98) consider better solution than pickle=True for 3D array saving
                 logger.write_to_log('executed-action', trainer.executed_action_log)
-                logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log)
+                logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log, pickle=True)
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
@@ -1001,12 +1004,12 @@ def main(args):
                 im_action_embedding, im_action = demo.get_action(trainer, nonlocal_variables,
                         workspace_limits)
                 # TODO(adit98) log action vector from embedding
-                trainer.im_action_log.append([im_action])
-                trainer.im_action_embed_log.append([im_action_embedding])
+                trainer.im_action_log.append(im_action)
+                trainer.im_action_embed_log.append(im_action_embedding)
 
                 # TODO(adit98) find best spot for this (write demo related stuff)
                 logger.write_to_log('im_action', trainer.im_action_log)
-                logger.write_to_log('im_action_embed', trainer.im_action_embed_log)
+                logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
 
             else:
                 # run forward pass normally

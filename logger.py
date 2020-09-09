@@ -94,11 +94,15 @@ class Logger():
             plt.imshow(saved_reloaded_depth_heightmap)
             plt.show(block=True)
 
-    def write_to_log(self, log_name, log):
-        np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
-        shortlog = np.squeeze(log)
-        if len(shortlog.shape) > 0:
-            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
+    def write_to_log(self, log_name, log, pickle=False):
+        if pickle:
+            np.save(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log)
+            print(log_name, 'length:', len(log), 'shape:', log[0].shape)
+        else:
+            np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
+            shortlog = np.squeeze(log)
+            if len(shortlog.shape) > 0:
+                np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
 
     def save_model(self, model, name):
         torch.save(model.state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))
