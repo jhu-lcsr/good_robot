@@ -60,6 +60,9 @@ def run_title(args):
     else:
         title += 'Challenging Arrangements'
 
+    if args.use_demo:
+        title += ', Imitation'
+
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
     return title, dirname
@@ -578,7 +581,9 @@ def main(args):
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
+                trainer.executed_action_embed_log.append([action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
+                logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log)
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
@@ -983,14 +988,30 @@ def main(args):
             else:
                 goal_condition = None
 
-            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
-                color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
             # TODO(adit98) here, we run forward pass on imitation video
             # TODO(adit98) extend logic to work with row making
             # TODO(adit98) add logic to advance demo if action is successful
             if args.use_demo:
-                im_action_embedding = demo.get_action(trainer, nonlocal_variables, workspace_limits)
+                # run forward pass, keep action features and get softmax predictions
+                push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
+                            valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
+                action_feat = [push_feat, grasp_feat, place_feat]
+
+                im_action_embedding, im_action = demo.get_action(trainer, nonlocal_variables,
+                        workspace_limits)
+                # TODO(adit98) log action vector from embedding
+                trainer.im_action_log.append([im_action])
+                trainer.im_action_embed_log.append([im_action_embedding])
+
+                # TODO(adit98) find best spot for this (write demo related stuff)
+                logger.write_to_log('im_action', trainer.im_action_log)
+                logger.write_to_log('im_action_embed', trainer.im_action_embed_log)
+
+            else:
+                # run forward pass normally
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(color_heightmap,
+                        valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread

@@ -34,8 +34,8 @@ class Demonstration():
     def get_action(self, trainer, nonlocal_variables, workspace_limits):
         color_heightmap, valid_depth_heightmap = self.get_heightmaps()
         # to get vector of 64 vals, run trainer.forward with get_action_feat
-        push_preds, grasp_preds, place_preds, state_feat, output_prob = trainer.forward(color_heightmap,
-                valid_depth_heightmap, is_volatile=True, keep_action_feat=True)
+        push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
+                valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
 
         # TODO(adit98) figure out how to convert rotation angle to index
         best_rot_ind = np.around(np.rad2deg(self.action_log[self.frame][-2]) * 16 / 360).astype(int)
@@ -48,12 +48,12 @@ class Demonstration():
         if self.action_log[self.frame][-1] == 0:
             # demo is grasp
             # TODO(adit98) check format of grasp_preds and action_log[self.frame][:-1]
-            print('original action log:', self.action_log[self.frame])
-            print('selected rotation:', best_rot_ind)
-            print('selected xy coord:', best_action_xy)
-            print('grasp preds shape:', grasp_preds.shape)
+            #print('original action log:', self.action_log[self.frame])
+            #print('selected rotation:', best_rot_ind)
+            #print('selected xy coord:', best_action_xy)
+            #print('grasp preds shape:', grasp_preds.shape)
             best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
-            print('best action shape:', best_action.shape)
+            #print('best action shape:', best_action.shape)
 
         # TODO(adit98) add logic for pushing here
         elif self.action_log[self.frame][-1] == 1:
@@ -64,7 +64,7 @@ class Demonstration():
             # demo is place
             best_action = place_preds[self.action_log[self.frame][:-1].astype(int)]
 
-        return best_action
+        return best_action, self.action_log[self.frame][-1]
 
     # only gets called if an action is successful at test time
     def next(self):
