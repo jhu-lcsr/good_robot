@@ -18,7 +18,7 @@ class TrajectoryIterator:
         self._index = -1
 
     def __next__(self):
-        if self._index < len(self.traj.to_iterate):
+        if self._index + 1 < len(self.traj.to_iterate):
             self._index += 1
             try:
                 command, prev_pos, next_pos, prev_rot, next_rot, image, length = self.traj.to_iterate[self._index]
@@ -56,7 +56,7 @@ class BaseTrajectory:
         self.commands = commands
         self.previous_positions = self.make_3d_positions(previous_positions)
         self.previous_rotations = previous_rotations
-        self.next_positions = self.make_3d_positions(next_positions)
+        self.next_positions = self.make_3d_positions(next_positions, make_z = True)
         self.next_rotations = next_rotations
         self.images = images
         self.lengths = lengths
@@ -86,7 +86,7 @@ class BaseTrajectory:
         if make_z: 
             height, width, depth = 64, 64, 4
             n_blocks = 20
-            image = np.zeros((depth, width, height, n_blocks)) 
+            image = np.zeros((depth, width, height, 1)) 
             # what is block width height depth 
 
             for i, position_list in enumerate(positions): 
@@ -95,26 +95,28 @@ class BaseTrajectory:
                                           absolute_to_relative(y, height),
                                           absolute_to_relative(z, depth) )
 
-                    # side length: 0.1524 => 9.7536/64
+                    # side length: 0.1524 = 9.7536/64
                     width, height = 10, 10 
                     offset = int(width/2)
-                    print(f"new_z {new_z}") 
 
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for y_val in range(new_y - offset, new_y + offset):
                             for z_val in range(new_z - offset, new_z + offset):
                                 try:
-                                    image[z_val, x_val, y_val, i] = 1
+                                    image[z_val, x_val, y_val] = block_idx 
                                 except IndexError:
                                     # at the edges 
                                     pass 
+
             image  = torch.tensor(image).float() 
             image = image.unsqueeze(0)
-            # empty, batch, n_labels, depth, width, height 
-            image = image.permute(0,  4, 1, 2, 3) 
+            # batch, n_labels,  width, height, depth 
+            image = image.permute(0, 4, 2, 3, 1) 
+            # tile for loss 
+            image = torch.cat([image.clone() for i in range(9)], dim = 0)
+
         else:
-            # TODO (elias): impelement 2.5d here 
             height, width = 64, 64 
             n_blocks = 20
             image = np.zeros(( width, height, 1 + 1)) 
@@ -135,7 +137,7 @@ class BaseTrajectory:
             image  = torch.tensor(image).float() 
             image = image.unsqueeze(0)
             # empty, batch, n_labels, depth, width, height 
-            image = image.permute(3, 1, 2, 0) 
+            image = image.permute(0, 3, 1, 2) 
 
         return [image]
 

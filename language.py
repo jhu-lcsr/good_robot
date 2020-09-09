@@ -44,11 +44,9 @@ class ConcatFusionModule(BaseFusionModule):
                  language_size):
         super(ConcatFusionModule, self).__init__(image_size, language_size)
         self.output_dim = self.image_size + self.language_size
-        print(f"fuser outptu_dim is {self.output_dim}") 
 
     def forward(self, image, language):
         output = torch.cat([image, language], dim=1)
-        print(f"fuser real output dim is {output.shape}") 
         return output 
 
 
@@ -90,14 +88,13 @@ class LanguageEncoder(torch.nn.Module):
         pos_input = data_batch["previous_position"]
         # encode image 
         pos_encoded = self.image_encoder(pos_input) 
-        print(f"image encoded: {pos_encoded.shape}") 
+
         if type(language[0]) == str:
             lang_embedded = self.embedder(language).unsqueeze(0)
         else:
             lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0)
-        print(f"embedded {lang_embedded.shape}") 
+
         lang_encoded = self.encoder(lang_embedded, lengths) 
-        print(f"encoded {lang_encoded.shape}") 
         bsz, __ = lang_encoded.shape 
         __, __, pos_hidden = pos_encoded.shape
         pos_encoded = pos_encoded.squeeze(1) 
@@ -105,7 +102,6 @@ class LanguageEncoder(torch.nn.Module):
         pos_encoded = pos_encoded.expand(bsz, pos_hidden)
 
         image_and_langauge = self.fuser(pos_encoded, lang_encoded)
-        print(f"fused shape {image_and_langauge.shape}") 
 
         output = self.output_module(image_and_langauge) 
 
