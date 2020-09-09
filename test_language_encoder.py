@@ -61,11 +61,11 @@ class LanguageTrainer:
         print(f"Training epoch {epoch}...") 
         for batch_trajectory in tqdm(self.train_data): 
             for batch_instance in batch_trajectory: 
-                print(f"doing batch_instance") 
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
-                loss.backwards() 
+                loss.backward() 
+                print(loss.item() ) 
                 self.optimizer.step() 
 
         print(f"Validating epoch {epoch}...") 
@@ -81,10 +81,11 @@ class LanguageTrainer:
         pred_image = outputs["next_position"]
         true_image = inputs["next_position"]
 
-        print(pred_image.shape)
-        print(true_image.shape) 
+        bsz, n_blocks, width, height, depth = pred_image.shape
+        true_image = true_image.reshape((bsz, width, height, depth)).long()
 
-        loss = self.loss_fxn(true_image, pred_image) 
+        loss = self.loss_fxn(pred_image, true_image) 
+
         return loss 
 
 
@@ -122,18 +123,16 @@ def main(args):
                                  n_layers = args.conv_num_layers,
                                  factor = args.conv_factor,
                                  dropout = args.dropout)
-    #image_encoder = ImageEncoder(input_dim = args.num_blocks,
-    #                             n_layers = args.conv_num_layers,
-    #                             factor = args.conv_factor,
-    #                             dropout = args.dropout)
+
     # construct image and language fusion module 
     fuser = ConcatFusionModule(image_encoder.output_dim, encoder.hidden_dim) 
     # construct image decoder 
-    output_module = DeconvolutionalNetwork(input_dim = fuser.output_dim, 
+    output_module = DeconvolutionalNetwork(input_channels  = fuser.output_dim, 
                                            num_blocks = args.num_blocks,
                                            num_layers = args.deconv_num_layers,
                                            factor = args.deconv_factor,
                                            dropout = args.dropout) 
+
     # put it all together into one module 
     encoder = LanguageEncoder(image_encoder = image_encoder, 
                               embedder = embedder, 
