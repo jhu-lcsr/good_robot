@@ -720,8 +720,9 @@ def main(args):
 
                     # TODO(adit98) figure out how to deal with changing demo frame if stack tumbles
                     if nonlocal_variables['place_success']:
-                        # advance demo since action was successful
-                        demo.next()
+                        if args.use_demo:
+                            # advance demo since action was successful
+                            demo.next()
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
