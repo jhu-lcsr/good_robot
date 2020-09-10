@@ -851,8 +851,9 @@ def main(args):
     prev_best_dict = {}
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
-    # TODO(adit98) set demo number to be cmd line arg
-    demo = Demonstration(path=args.demo_path, demo_num=0)
+    if args.use_demo:
+        # TODO(adit98) set demo number to be cmd line arg
+        demo = Demonstration(path=args.demo_path, demo_num=0)
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
