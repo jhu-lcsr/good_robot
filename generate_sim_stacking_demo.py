@@ -125,8 +125,9 @@ if __name__ == '__main__':
             primitive_position = block_positions[block_to_move]
             rotation_angle = block_orientations[block_to_move][2]
             robot.grasp(primitive_position, rotation_angle, object_color=block_to_move)
-            # write action (0 for grasp)
-            executed_action_log.append(primitive_position + [rotation_angle, 0])
+            # TODO(adit98) use ACTION_TO_ID from utils.py here
+            # write action (1 for grasp)
+            executed_action_log.append(primitive_position + [rotation_angle, 1])
 
             # save post grasp config
             get_and_save_images(stack, robot, workspace_limits, heightmap_resolution, logger, str(i) + 'grasp')
@@ -147,6 +148,7 @@ if __name__ == '__main__':
 
             place = robot.place(primitive_position, theta + np.pi / 2)
             # write action (2 for place)
+            # TODO(adit98) use ACTION_TO_ID from utils.py here
             executed_action_log.append(primitive_position + [theta + np.pi / 2, 2])
 
             # save post place config
