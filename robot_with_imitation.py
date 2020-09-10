@@ -1255,7 +1255,7 @@ def main(args):
                           'Make sure the robot did not experience either an error or security stop. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
             # TODO(adit98) change this timeout back to 60 or make it cmd line arg
-            elif is_sim and int(time_elapsed) > 500:
+            elif is_sim and int(time_elapsed) > 60:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
