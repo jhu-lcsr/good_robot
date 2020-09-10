@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+from utils import ACTION_TO_ID
 
 class Demonstration():
     def __init__(self, path, demo_num):
@@ -45,7 +46,12 @@ class Demonstration():
         best_action_xy = ((workspace_pixel_offset + 1000 * self.action_log[self.frame][:2]) / 2).astype(int)
 
         # TODO(adit98) figure out if we want more than 1 coordinate
-        if self.action_log[self.frame][-1] == 0:
+        if self.action_log[self.frame][-1] == ACTION_TO_ID['push']:
+            # demo is push
+            raise NotImplementedError
+
+        # TODO(adit98) add logic for pushing here
+        elif self.action_log[self.frame][-1] == ACTION_TO_ID['grasp']:
             # demo is grasp
             # TODO(adit98) check format of grasp_preds and action_log[self.frame][:-1]
             #print('original action log:', self.action_log[self.frame])
@@ -55,12 +61,7 @@ class Demonstration():
             best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
             #print('best action shape:', best_action.shape)
 
-        # TODO(adit98) add logic for pushing here
-        elif self.action_log[self.frame][-1] == 1:
-            # demo is push
-            raise NotImplementedError
-
-        elif self.action_log[self.frame][-1] == 2:
+        elif self.action_log[self.frame][-1] == ACTION_TO_ID['place']:
             # demo is place
             best_action = place_preds[self.action_log[self.frame][:-1].astype(int)]
 
