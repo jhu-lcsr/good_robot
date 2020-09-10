@@ -694,15 +694,16 @@ def main(args):
                         if grasp_color_task:
                             if nonlocal_variables['grasp_color_success']:
                                 successful_color_grasp_count += 1
-                                # advance demonstration (since we had a successful action)
-                                demo.next()
+                                if args.use_demo:
+                                    # advance demonstration (since we had a successful action)
+                                    demo.next()
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
-                        else:
+                        elif args.use_demo:
                             # advance demonstration (since we had a successful action)
                             demo.next()
 
