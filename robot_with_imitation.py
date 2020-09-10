@@ -581,12 +581,13 @@ def main(args):
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
-                trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]])
-
-                # TODO(adit98) check if this is the best place for this
-                # TODO(adit98) consider better solution than pickle=True for 3D array saving
                 logger.write_to_log('executed-action', trainer.executed_action_log)
-                logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log, pickle=True)
+
+                if args.use_demo:
+                    # TODO(adit98) check if this is the best place for this
+                    # TODO(adit98) consider better solution than pickle=True for 3D array saving
+                    trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]])
+                    logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log, pickle=True)
 
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
