@@ -12,67 +12,70 @@ class Demonstration():
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
         self.demo_num = demo_num
 
-        # these vars keep track of which heightmaps to load
-        self.successful_stacks = 0
+        # this str is for loading the correct images, it will be adjusted based on selected action
         self.action_str = 'orig'
 
-        # keep track of which action we are on
-        self.frame = 0
+        # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
+        self.action_dict = {}
+        for s in range(1, 4):
+            # store push, grasp, and place actions for demo at stack height s
+            # TODO(adit98) figure out how to incorporate push actions into this paradigm
+            # TODO(adit98) note this assumes perfect demo
+            # if stack height is 1, indices 0 and 1 of the action log correspond to grasp and place respectively
+            demo_first_ind = 2 * (s - 1)
+            self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
+                    ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
-    def get_heightmaps(self):
+    def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png
+        if action_str != 'orig':
+            action_str = str(int(stack_height) - 1) + action_str
+
         rgb_filename = os.path.join(self.rgb_dir, 
-                '%06d.%s.color.png' % (self.demo_num, self.action_str))
+                '%06d.%s.color.png' % (self.demo_num, action_str))
         depth_filename = os.path.join(self.depth_dir,
-                '%06d.%s.depth.png' % (self.demo_num, self.action_str))
+                '%06d.%s.depth.png' % (self.demo_num, action_str))
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
 
         return rgb_heightmap, depth_heightmap
 
-    # TODO(adit98) figure out where to get workspace limits
-    def get_action(self, trainer, nonlocal_variables, workspace_limits):
-        color_heightmap, valid_depth_heightmap = self.get_heightmaps()
+    # TODO(adit98) figure out how to get primitive action
+    # TODO(adit98) this will NOT work for novel tasks, worry about that later
+    def get_action(self, trainer, workspace_limits, primitive_action, stack_height):
+        # TODO(adit98) deal with push
+        if primitive_action == 'push':
+            return -1
+
+        # set action_str based on primitive action
+        if stack_height == 1 and primitive_action == 'grasp':
+            action_str = 'orig'
+        elif primitive_action == 'grasp':
+            action_str = 'grasp'
+        else:
+            action_str = 'place'
+
+        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+        action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
 
         # TODO(adit98) figure out how to convert rotation angle to index
-        best_rot_ind = np.around(np.rad2deg(self.action_log[self.frame][-2]) * 16 / 360).astype(int)
+        best_rot_ind = np.around(np.rad2deg(action_vec[-2]) * 16 / 360).astype(int)
 
         # TODO(adit98) convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
-        best_action_xy = ((workspace_pixel_offset + 1000 * self.action_log[self.frame][:2]) / 2).astype(int)
+        best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
 
         # TODO(adit98) figure out if we want more than 1 coordinate
-        if self.action_log[self.frame][-1] == ACTION_TO_ID['push']:
-            # demo is push
-            raise NotImplementedError
-
         # TODO(adit98) add logic for pushing here
-        elif self.action_log[self.frame][-1] == ACTION_TO_ID['grasp']:
-            # demo is grasp
-            # TODO(adit98) check format of grasp_preds and action_log[self.frame][:-1]
-            #print('original action log:', self.action_log[self.frame])
-            #print('selected rotation:', best_rot_ind)
-            #print('selected xy coord:', best_action_xy)
-            #print('grasp preds shape:', grasp_preds.shape)
+        if primitive_action == 'grasp':
             best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
-            #print('best action shape:', best_action.shape)
 
-        elif self.action_log[self.frame][-1] == ACTION_TO_ID['place']:
-            # demo is place
-            best_action = place_preds[self.action_log[self.frame][:-1].astype(int)]
+        # TODO(adit98) find out why place preds inds were different before
+        elif primitive_action == 'place':
+            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
 
-        return best_action, self.action_log[self.frame][-1]
-
-    # only gets called if an action is successful at test time
-    def next(self):
-        if 'place' in self.action_str:
-            self.successful_stacks += 1
-            self.action_str = str(self.successful_stacks) + 'grasp'
-        else:
-            self.action_str = str(self.successful_stacks) + 'place'
-
-        self.frame += 1
+        return best_action, ACTION_TO_ID[primitive_action]

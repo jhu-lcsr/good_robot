@@ -694,18 +694,12 @@ def main(args):
                         if grasp_color_task:
                             if nonlocal_variables['grasp_color_success']:
                                 successful_color_grasp_count += 1
-                                if args.use_demo:
-                                    # advance demonstration (since we had a successful action)
-                                    demo.next()
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
-                        elif args.use_demo:
-                            # advance demonstration (since we had a successful action)
-                            demo.next()
 
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
@@ -717,12 +711,6 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
-
-                    # TODO(adit98) figure out how to deal with changing demo frame if stack tumbles
-                    if nonlocal_variables['place_success']:
-                        if args.use_demo:
-                            # advance demo since action was successful
-                            demo.next()
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
@@ -957,7 +945,7 @@ def main(args):
                 if trainer.use_cuda:
                     trainer.model.load_state_dict(torch.load(snapshot_file))
                 else:
-                    trainer.model.load_state_dict(torch.load(snapshot_file, map_device=torch.device('cpu')))
+                    trainer.model.load_state_dict(torch.load(snapshot_file, map_location=torch.device('cpu')))
 
                 if test_preset_cases:
                     case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
@@ -1005,9 +993,24 @@ def main(args):
                             valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
                 action_feat = [push_feat, grasp_feat, place_feat]
 
-                im_action_embedding, im_action = demo.get_action(trainer, nonlocal_variables,
-                        workspace_limits)
+                # TODO(adit98) this ONLY works with stacks
+                # here, we decide the demo action based on action success
+                if prev_primitive_action == 'grasp': 
+                    if prev_grasp_success:
+                        next_action = 'place'
+                    else:
+                        next_action = 'grasp'
+                elif prev_primitive_action == 'place':
+                    # regardless of success, we need to grasp next
+                    next_action = 'grasp'
+                # for now, assume pushes must be followed by grasp, first action is grasp
+                else:
+                    next_action = 'grasp'
+                
+                im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
+                        next_action, nonlocal_variables['prev_stack_height'])
                 # TODO(adit98) log action vector from embedding
+                # don't really need to store im_action since they *SHOULD* line up
                 trainer.im_action_log.append(im_action)
                 trainer.im_action_embed_log.append(im_action_embedding)
 
