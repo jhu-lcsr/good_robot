@@ -1,6 +1,8 @@
 import json 
 import argparse
 from typing import List, Dict
+import glob
+import os 
 
 import torch
 from spacy.tokenizer import Tokenizer
@@ -43,24 +45,36 @@ class LanguageTrainer:
                  encoder: LanguageEncoder,
                  optimizer: torch.optim.Optimizer,
                  num_epochs: int,
-                 device: torch.device): 
+                 device: torch.device,
+                 checkpoint_dir: str,
+                 num_models_to_keep: int): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
-        # TODO: get a loss here  
-        # self.loss = torch.nn.CrossEn
         self.optimizer = optimizer 
         self.num_epochs = num_epochs
+        self.checkpoint_dir = checkpoint_dir
+        self.num_models_to_keep = num_models_to_keep
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.device = device
 
     def train(self):
+        all_accs = []
+        max_acc = 0.0 
         for epoch in range(self.num_epochs): 
-            self.train_epoch(epoch)
+            acc = self.train_and_validate_one_epoch(epoch)
+            # handle checkpointing 
+            all_accs.append(acc) 
+            is_best = False
+            if acc > max_acc:
+                is_best = True
+                max_acc = acc 
+            self.save_model(epoch, is_best) 
 
-    def train_epoch(self, epoch): 
+    def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
+        self.encoder.train() 
         for batch_trajectory in tqdm(self.train_data): 
             for batch_instance in batch_trajectory: 
                 self.optimizer.zero_grad() 
@@ -70,13 +84,38 @@ class LanguageTrainer:
                 self.optimizer.step() 
 
         print(f"Validating epoch {epoch}...") 
-        with self.encoder.eval(): 
-            for dev_batch_instance in tqdm(self.val_data): 
-                val_outputs = self.validate(dev_batch_instance) 
+        total_acc = 0.0 
+        total = 0 
 
+        self.encoder.eval() 
+        for dev_batch_trajectory in tqdm(self.val_data): 
+            for dev_batch_instance in dev_batch_trajectory: 
+                total_acc += self.validate(dev_batch_instance) 
+                total += 1
+
+        mean_acc = total_acc / total 
+        print(f"Epoch {epoch} has acc {mean_acc * 100}") 
+        return mean_acc 
 
     def validate(self, batch_instance): 
-        return None 
+        outputs = self.encoder(batch_instance) 
+        accuracy = self.compute_accuracy(batch_instance, outputs) 
+        return accuracy
+
+    def compute_accuracy(self, batch_instance, outputs): 
+        # compute overlap between predicted and true output 
+        gold_pixels = batch_instance["next_position"].to(self.device) 
+        values, pred_pixels = torch.max(outputs['next_position'], dim=1) 
+        pred_pixels = pred_pixels.reshape(*gold_pixels.shape) 
+
+        # flatten  
+        pred_pixels = pred_pixels.reshape(-1) 
+        gold_pixels = gold_pixels.reshape(-1) 
+        # compare 
+        total = gold_pixels.shape[0]
+        matching = torch.sum(pred_pixels == gold_pixels).detach().cpu().item() 
+        acc = matching/total 
+        return acc 
 
     def compute_loss(self, inputs, outputs):
         pred_image = outputs["next_position"]
@@ -89,6 +128,27 @@ class LanguageTrainer:
         loss = self.loss_fxn(pred_image, true_image) 
 
         return loss 
+
+    def save_model(self, epoch, is_best):
+        print(f"Saving checkpoint {epoch}") 
+        # get path 
+        save_path = os.path.join(self.checkpoint_dir, f"model_{epoch}.th") 
+        torch.save(self.encoder.state_dict(), save_path) 
+        print(f"Saved checkpoint to {save_path}") 
+        # if it's best performance, save extra 
+        if is_best:
+            best_path = os.path.join(self.checkpoint_dir, f"best.th") 
+            torch.save(self.encoder.state_dict(), best_path) 
+            print(f"Updated best model to {best_path} at epoch {epoch}") 
+
+        # remove old models 
+        all_paths = glob.glob(os.path.join(self.checkpoint_dir, "model_.*.th"))
+        if len(all_paths) > self.num_models_to_keep:
+            to_remove = all_paths[0:-self.num_models_to_keep]
+            for path in to_remove:
+                os.remove(path) 
+        
+        
 
 
 def main(args):
@@ -152,13 +212,22 @@ def main(args):
     #encoder = encoder.to(torch.device(device))
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters())
+
+    try:
+        os.mkdir(args.checkpoint_dir)
+    except FileExistsError:
+        # file exists
+        raise AssertionError(f"Output directory {args.checkpoint_dir} non-empty, will not overwrite!") 
+
     # construct trainer 
     trainer = LanguageTrainer(train_data = dataset_reader.data["train"], 
                               val_data = dataset_reader.data["dev"], 
                               encoder = encoder,
                               optimizer = optimizer, 
-                              num_epochs = 3,
-                              device = device) 
+                              num_epochs = args.num_epochs,
+                              device = device,
+                              checkpoint_dir = args.checkpoint_dir,
+                              num_models_to_keep = args.num_models_to_keep) 
     trainer.train() 
 
 if __name__ == "__main__":
@@ -185,6 +254,9 @@ if __name__ == "__main__":
     parser.add_argument("--output-type", type=str, default="mask")
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--cuda", type=int, default=None) 
+    parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
+    parser.add_argument("--num-models-to-keep", type=int, default = 5) 
+    parser.add_argument("--num-epochs", type=int, default=3) 
 
     args = parser.parse_args()
     main(args) 
