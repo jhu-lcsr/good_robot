@@ -85,21 +85,35 @@ class LanguageEncoder(torch.nn.Module):
     def forward(self,
                 data_batch: dict) -> torch.Tensor: 
         language = data_batch["command"]
+
         # sort lengths 
         lengths = data_batch["length"]
         lengths = [(i,x) for i, x in enumerate(lengths)]
         lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
         idxs, lengths = zip(*lengths) 
+
         # tensorize lengths 
         lengths  = torch.tensor(lengths).float() 
         pos_input = data_batch["previous_position"]
+        
+        # embed langauge 
+        try:
+            if type(language[0]) == str:
+                lang_embedded = self.embedder(language).unsqueeze(0).to(self.device) 
+            else:
+                lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0).to(self.device) 
+
+        except RuntimeError:
+            print(data_batch) 
+            print(language)
+            print(len(language) ) 
+            print([len(x) for x in language]) 
+            sys.exit() 
+            
+
         # encode image 
         pos_encoded = self.image_encoder(pos_input) 
 
-        if type(language[0]) == str:
-            lang_embedded = self.embedder(language).unsqueeze(0).to(self.device) 
-        else:
-            lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0).to(self.device) 
 
         lang_encoded = self.encoder(lang_embedded, lengths) 
         bsz, __ = lang_encoded.shape 

@@ -67,7 +67,6 @@ class LanguageTrainer:
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
                 loss.backward() 
-                print(loss.item() ) 
                 self.optimizer.step() 
 
         print(f"Validating epoch {epoch}...") 

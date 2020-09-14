@@ -25,7 +25,7 @@ class TrajectoryIterator:
             except ValueError:
                 command, prev_pos, next_pos, prev_rot, next_rot, length = self.traj.to_iterate[self._index]
                 image=None
-
+            
             return {"command": command,
                     "previous_position": prev_pos,
                     "next_position": next_pos,
@@ -54,9 +54,9 @@ class BaseTrajectory:
                  lengths: List[int]):
         self.line_id = line_id
         self.commands = commands
-        self.previous_positions = self.make_3d_positions(previous_positions)
+        self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
         self.previous_rotations = previous_rotations
-        self.next_positions = self.make_3d_positions(next_positions, make_z = True)
+        self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
         self.next_rotations = next_rotations
         self.images = images
         self.lengths = lengths
@@ -64,11 +64,14 @@ class BaseTrajectory:
 
         self.to_iterate = list(zip(self.commands, self.previous_positions, self.next_positions, 
                                    self.previous_rotations, self.next_rotations, self.images, self.lengths)) 
+        # filter out empty commands
+        self.to_iterate = [x for x in self.to_iterate if len(x[0]) > 0 ]
+
 
     def __iter__(self):
         return TrajectoryIterator(self)
 
-    def make_3d_positions(self, positions, make_z = False):
+    def make_3d_positions(self, positions, make_z = False, batch_size = 9):
         """
         take (x,y,z) positions and turn them into 1-hot 
         vector over block ids in a x,y,z coordinate grid 
@@ -114,7 +117,7 @@ class BaseTrajectory:
             # batch, n_labels,  width, height, depth 
             image = image.permute(0, 4, 2, 3, 1) 
             # tile for loss 
-            image = torch.cat([image.clone() for i in range(9)], dim = 0)
+            image = torch.cat([image.clone() for i in range(batch_size)], dim = 0)
 
         else:
             height, width = 64, 64 
@@ -214,8 +217,9 @@ class BatchedTrajectory(BaseTrajectory):
     def pad_commands(self, commands): 
         # pad commands in a batch to have the same length
         max_len = 0
-        lengths = [[None for j in range(len(commands))] for i in range(len(commands[0]))]
-        new_commands = [[None for j in range(len(commands))] for i in range(len(commands[0]))]
+        lengths = [[max_len for j in range(len(commands))] for i in range(len(commands[0]))]
+        pad_str = ["<PAD>" for __ in range(max_len)]
+        new_commands = [[pad_str for j in range(len(commands))] for i in range(len(commands[0]))]
         # get max length 
         for annotator_idx, command_list in enumerate(commands):
             for command_seq in command_list:
@@ -277,7 +281,8 @@ class DatasetReader:
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
 
-                command_trajectories = [[] for i in range(len(commands[0]['notes']))]
+                #command_trajectories = [[] for i in range(len(commands[0]['notes']))]
+                command_trajectories = [[] for i in range(9)]
                 # split commands out into separate trajectories  
                 for i, step in enumerate(commands):
                     for j, annotation in enumerate(step["notes"]): 
@@ -293,7 +298,7 @@ class DatasetReader:
                                                    next_positions,
                                                    next_rotations,
                                                    images = images,
-                                                   lengths = [None]*len(command_trajectories),
+                                                   lengths = [0]*len(command_trajectories),
                                                    tokenizer = self.tokenizer) 
                     self.data[split].append(trajectory)  
 
