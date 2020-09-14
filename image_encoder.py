@@ -13,7 +13,9 @@ class ImageEncoder(torch.nn.Module):
 
         self.input_dim = input_dim
         self.factor = factor
-        #output_dim = int(input_dim / factor) 
+        # will be set later 
+        self.device = torch.device("cpu") 
+
         output_dim = 2
 
         self.n_layers = n_layers
@@ -46,7 +48,7 @@ class ImageEncoder(torch.nn.Module):
     def forward(self, inputs):
         bsz,  width, height, n_labels = inputs.shape
         #outputs = inputs.reshape(bsz, n_labels depth, height, width)
-        outputs = inputs 
+        outputs = inputs.to(self.device)
         for layer in self.layers:
             outputs = layer(outputs) 
 
@@ -86,6 +88,8 @@ class DeconvolutionalNetwork(torch.nn.Module):
         self.input_channels = input_channels
         self.factor = factor
         self.num_layers = num_layers
+        # will be set later 
+        self.device = torch.device("cpu") 
 
         self.activation = torch.nn.ReLU() 
         self.dropout = torch.nn.Dropout3d(p=dropout) 
@@ -121,6 +125,7 @@ class DeconvolutionalNetwork(torch.nn.Module):
         self.layers = torch.nn.ModuleList(layers) 
 
     def forward(self, encoded):
+        encoded = encoded.to(self.device) 
         # encoded: [batch, seq_len, input_dim]
         bsz, input_dim = encoded.data.shape
         # reshape [bsz, 4, 4, input_dim/8]

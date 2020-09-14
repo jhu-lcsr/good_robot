@@ -13,6 +13,8 @@ class LSTMEncoder(torch.nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout 
         self.bidirectional = bidirectional
+        # will be set later 
+        self.device = torch.device("cpu") 
 
         self.lstm = torch.nn.LSTM(input_size  = input_dim,
                                   hidden_size = hidden_dim,
@@ -23,6 +25,7 @@ class LSTMEncoder(torch.nn.Module):
                                   bidirectional = bidirectional)
 
     def forward(self, embedded_tokens, lengths):
+        embedded_tokens = embedded_tokens.to(self.device) 
         embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, lengths, 
                                                           batch_first=True, 
                                                           enforce_sorted=True) 

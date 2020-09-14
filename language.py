@@ -62,7 +62,7 @@ class LanguageEncoder(torch.nn.Module):
                  encoder: torch.nn.Module,
                  fuser: BaseFusionModule,
                  output_module: torch.nn.Module,
-                 device: torch.Device):
+                 device: torch.device):
         """
         embedder: a choice of 
         encoder: a choice of LSTM or Transformer 
@@ -76,6 +76,11 @@ class LanguageEncoder(torch.nn.Module):
         self.fuser = fuser
         self.output_module = output_module
         self.device = device 
+
+        # enable cuda
+        for module in [self.image_encoder, self.encoder, self.fuser, self.output_module]:
+            module = module.to(self.device) 
+            module.device = device 
 
     def forward(self,
                 data_batch: dict) -> torch.Tensor: 
@@ -92,9 +97,9 @@ class LanguageEncoder(torch.nn.Module):
         pos_encoded = self.image_encoder(pos_input) 
 
         if type(language[0]) == str:
-            lang_embedded = self.embedder(language).unsqueeze(0)
+            lang_embedded = self.embedder(language).unsqueeze(0).to(self.device) 
         else:
-            lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0)
+            lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0).to(self.device) 
 
         lang_encoded = self.encoder(lang_embedded, lengths) 
         bsz, __ = lang_encoded.shape 

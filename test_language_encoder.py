@@ -43,7 +43,7 @@ class LanguageTrainer:
                  encoder: LanguageEncoder,
                  optimizer: torch.optim.Optimizer,
                  num_epochs: int,
-                 device: str): 
+                 device: torch.device): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
@@ -53,6 +53,7 @@ class LanguageTrainer:
         self.num_epochs = num_epochs
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
+        self.device = device
 
     def train(self):
         for epoch in range(self.num_epochs): 
@@ -84,6 +85,7 @@ class LanguageTrainer:
 
         bsz, n_blocks, width, height, depth = pred_image.shape
         true_image = true_image.reshape((bsz, width, height, depth)).long()
+        true_image = true_image.to(self.device) 
 
         loss = self.loss_fxn(pred_image, true_image) 
 
@@ -134,19 +136,21 @@ def main(args):
                                            factor = args.deconv_factor,
                                            dropout = args.dropout) 
 
+    if args.cuda is not None:
+        device = f"cuda:{args.cuda}"
+    else:
+        device = "cpu"
+    device = torch.device(device)  
+    print(f"device {device} on {torch.cuda.is_available()}") 
     # put it all together into one module 
     encoder = LanguageEncoder(image_encoder = image_encoder, 
                               embedder = embedder, 
                               encoder = encoder, 
                               fuser = fuser, 
-                              output_module = output_module) 
+                              output_module = output_module,
+                              device = device) 
 
-    if args.cuda is not None:
-        device = f"cuda:{args.cuda}") 
-    else:
-        device = "cpu"
-
-    encoder = encoder.to(torch.device(device))
+    #encoder = encoder.to(torch.device(device))
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters())
     # construct trainer 
