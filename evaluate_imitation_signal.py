@@ -18,6 +18,7 @@ args = parser.parse_args()
 # load action success logs
 grasp_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'grasp-success.log.txt'))
 place_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'place-success.log.txt'))
+action_success_inds = np.where(np.logical_or(grasp_successes, place_successes))[0]
 
 # trim array length in case of premature exit
 executed_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'executed-action.log.txt'))[:grasp_successes.shape[0]]
@@ -33,7 +34,11 @@ imitation_action_signal = []
 # find nearest neighbor for each imitation embedding
 for frame_ind, embedding in enumerate(executed_action_embeddings):
     l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
-    print(l2_dist.shape)
     match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
-    print(match_ind)
     imitation_action_signal.append(match_ind)
+
+    # evaluate nearest neighbor distance for successful actions
+    if frame_ind in action_success_inds:
+        # TODO(adit98) calculate euclidean distance between match_ind and executed_action
+        print('match_ind:', match_ind)
+        print('executed_action ind:', executed_actions[frame_ind])
