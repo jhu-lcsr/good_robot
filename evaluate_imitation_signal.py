@@ -22,10 +22,16 @@ executed_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'executed-ac
 im_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'im_action.log.txt'))[:grasp_successes.shape[0]]
 
 # load imitation embeddings and executed action embeddings
-imitation_embeddings = np.load(os.path.join(log_home, 'transitions', 'im_action_embed.log.txt.npy'), allow_pickle=True)
-executed_action_embeddings = np.load(os.path.join(log_home, 'transitions', 'executed-action-embed.log.txt.npy'), allow_pickle=True)
+imitation_embeddings = np.load(os.path.join(log_home, 'transitions', 'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0']
+executed_action_embeddings = np.load(os.path.join(log_home, 'transitions', 'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0']
 
-print(imitation_embeddings.shape, executed_action_embeddings.shape)
+# store array to hold indices in the executed action embedding map that correspond to the imitation embedding
+imitation_action_signal = []
 
 # find nearest neighbor for each imitation embedding
+for frame_ind, embedding in enumerate(executed_action_embeddings):
+    print(embedding.shape, imitation_embeddings[frame_ind].shape)
+    match_ind = np.argmin(embedding - imitation_embeddings[frame_ind])
+    print(match_ind)
+    imitation_action_signal.append(match_ind)
 
