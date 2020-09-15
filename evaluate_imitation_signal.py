@@ -32,8 +32,7 @@ imitation_action_signal = []
 
 # find nearest neighbor for each imitation embedding
 for frame_ind, embedding in enumerate(executed_action_embeddings):
-    print(embedding.shape, imitation_embeddings[frame_ind].shape)
-    match_ind = np.argmin(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3)))
+    match_ind = np.argmin(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3)), axis=1)
+    print(embedding.shape)
     print(match_ind)
     imitation_action_signal.append(match_ind)
-
