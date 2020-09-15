@@ -96,8 +96,7 @@ class Logger():
 
     def write_to_log(self, log_name, log, pickle=False):
         if pickle:
-            np.save(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log)
-            print(log_name, 'length:', len(log), 'shape:', log[0].shape)
+            np.savez(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log)
         else:
             np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
             shortlog = np.squeeze(log)
