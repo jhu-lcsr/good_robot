@@ -19,9 +19,11 @@ args = parser.parse_args()
 
 # make dir for imitation action visualizations if save_visualizations are set
 if args.save_visualizations:
-    depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home, 'data', 'depth-heightmaps')) \
+    depth_heightmap_list = sorted([os.path.join(args.log_home, 'data', 'depth-heightmaps', f) \
+            for f in os.listdir(os.path.join(args.log_home, 'data', 'depth-heightmaps')) \
             if os.path.isfile(os.path.join(args.log_home, 'data', 'depth-heightmaps', f))])
-    rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home, 'data', 'color-heightmaps')) \
+    rgb_heightmap_list = sorted([os.path.join(args.log_home, 'data', 'color-heightmaps', f) \
+            for f in os.listdir(os.path.join(args.log_home, 'data', 'color-heightmaps')) \
             if os.path.isfile(os.path.join(args.log_home, 'data', 'color-heightmaps', f))])
     depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
     rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
