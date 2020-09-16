@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import argparse
+import cv2
 
 # TODO(adit98) refactor to use ACTION_TO_IND from utils.py
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
@@ -13,7 +14,17 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-l', '--log_home', required=True, type=str, help='format is logs/EXPERIMENT_DIR')
+parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
 args = parser.parse_args()
+
+# make dir for imitation action visualizations if save_visualizations are set
+if args.save_visualizations:
+    depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home, 'data', 'depth_heightmaps')) if os.path.isfile(f)])
+    rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home, 'data', 'rgb_heightmaps')) if os.path.isfile(f)])
+    depth_home_dir = os.path.join(args.log_home, 'data', 'depth_heightmaps', 'im_depth_signal')
+    rgb_home_dir = os.path.join(args.log_home, 'data', 'rgb_heightmaps', 'im_rgb_signal')
+    os.makedirs(depth_home_dir)
+    os.makedirs(rgb_home_dir)
 
 # load action success logs
 grasp_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'grasp-success.log.txt'))
@@ -42,3 +53,20 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
         # TODO(adit98) calculate euclidean distance between match_ind and executed_action
         print('match_ind:', match_ind)
         print('executed_action ind:', executed_actions[frame_ind])
+
+    if args.save_visualizations:
+        im_mask = 255 * (l2_dist / np.max(l2_dist))
+
+        # load original depth/rgb maps
+        orig_depth = cv2.imread(depth_heightmap_list[frame_ind], -1)
+        orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(int)
+        orig_rgb = cv2.imread(rgb_heightmap_list[frame_ind])
+        orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
+
+        # blend with mask
+        depth_blended = cv2.addWeighted(orig_depth, 0.5, im_mask, 0.5, 0)
+        rgb_blended = cv2.addWeighted(orig_rgb, 0.5, im_mask, 0.5, 0)
+
+        # write blended images
+        cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_blended)
+        cv2.imwrite(os.path.join(rgb_home_dir, rgb_heightmap_list[frame_ind]), rgb_blended)
