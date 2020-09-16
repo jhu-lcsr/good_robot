@@ -25,8 +25,10 @@ if args.save_visualizations:
             if os.path.isfile(os.path.join(args.log_home, 'data', 'color-heightmaps', f))])
     depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
     rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
-    os.makedirs(depth_home_dir)
-    os.makedirs(rgb_home_dir)
+    if not os.path.exists(depth_home_dir):
+        os.makedirs(depth_home_dir)
+    if not os.path.exists(rgb_home_dir):
+        os.makedirs(rgb_home_dir)
 
 # load action success logs
 grasp_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'grasp-success.log.txt'))
