@@ -15,7 +15,6 @@ realsense/Makefile
 realsense/cmake_install.cmake
 realsense/realsense
 
-*.png
 *.zip
 *.pdf
 *.pyc
@@ -38,3 +37,5 @@ paper_figures/
 
 CoppeliaSim_Edu_V4_0_0_Mac
 CoppeliaSim_Edu_V4_0_0_Mac/*
+
+
