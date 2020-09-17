@@ -21,14 +21,15 @@ class TrajectoryIterator:
         if self._index + 1 < len(self.traj.to_iterate):
             self._index += 1
             try:
-                command, prev_pos, next_pos, prev_rot, next_rot, image, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, image, length = self.traj.to_iterate[self._index]
             except ValueError:
-                command, prev_pos, next_pos, prev_rot, next_rot, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, length = self.traj.to_iterate[self._index]
                 image=None
             
             return {"command": command,
                     "previous_position": prev_pos,
                     "next_position": next_pos,
+                    "previous_position_for_acc": prev_pos_for_acc,
                     "previous_rotation": prev_rot,
                     "next_rotation": next_rot,
                     "image": image,
@@ -55,15 +56,24 @@ class BaseTrajectory:
         self.line_id = line_id
         self.commands = commands
         self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
+        self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands))
         self.previous_rotations = previous_rotations
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
+        self.next_positions_for_acc  = self.make_3d_positions(next_positions, batch_size = len(commands))
         self.next_rotations = next_rotations
         self.images = images
         self.lengths = lengths
         self.traj_vocab = set() 
 
-        self.to_iterate = list(zip(self.commands, self.previous_positions, self.next_positions, 
-                                   self.previous_rotations, self.next_rotations, self.images, self.lengths)) 
+        self.to_iterate = list(zip(self.commands, 
+                                   self.previous_positions, 
+                                   self.previous_positions_for_acc,
+                                   self.next_positions, 
+                                   self.previous_rotations, 
+                                   self.next_rotations, 
+                                   self.images, 
+                                   self.lengths)) 
+
         # filter out empty commands
         self.to_iterate = [x for x in self.to_iterate if len(x[0]) > 0 ]
 
@@ -203,8 +213,14 @@ class BatchedTrajectory(BaseTrajectory):
         self.traj_vocab = set() 
 
         # override 
-        self.to_iterate = list(zip(self.commands, self.previous_positions, self.next_positions, 
-                                   self.previous_rotations, self.next_rotations, self.images, self.lengths)) 
+        self.to_iterate = list(zip(self.commands, 
+                                   self.previous_positions,
+                                   self.previous_positions_for_acc,
+                                   self.next_positions, 
+                                   self.previous_rotations, 
+                                   self.next_rotations, 
+                                   self.images, 
+                                   self.lengths)) 
 
     def tokenize(self, commands): 
         for annotator_idx, command_list in enumerate(commands):

@@ -99,8 +99,29 @@ class LanguageTrainer:
 
     def validate(self, batch_instance): 
         outputs = self.encoder(batch_instance) 
-        accuracy = self.compute_accuracy(batch_instance, outputs) 
+        accuracy = self.compute_localized_accuracy(batch_instance, outputs) 
         return accuracy
+
+    def compute_localized_accuracy(self, batch_instance, outputs): 
+        next_pos = batch_instance["next_position"]
+        prev_pos = batch_instance["previous_position_for_acc"]
+
+        gold_pixels_of_interest = next_pos[next_pos != prev_pos]
+
+        values, pred_pixels = torch.max(outputs['next_position'], dim=1) 
+        neg_indices = next_pos != prev_pos
+
+        pred_pixels_of_interest = pred_pixels[neg_indices.squeeze(1)]
+
+        # flatten  
+        pred_pixels = pred_pixels_of_interest.reshape(-1).detach().cpu()
+        gold_pixels = gold_pixels_of_interest.reshape(-1).detach().cpu()
+        # compare 
+        total = gold_pixels.shape[0]
+
+        matching = torch.sum(pred_pixels == gold_pixels).item() 
+        acc = matching/total 
+        return acc 
 
     def compute_accuracy(self, batch_instance, outputs): 
         # compute overlap between predicted and true output 
@@ -147,9 +168,6 @@ class LanguageTrainer:
             to_remove = all_paths[0:-self.num_models_to_keep]
             for path in to_remove:
                 os.remove(path) 
-        
-        
-
 
 def main(args):
     # load the data 
@@ -200,7 +218,7 @@ def main(args):
     else:
         device = "cpu"
     device = torch.device(device)  
-    print(f"device {device} on {torch.cuda.is_available()}") 
+    print(f"Training on device {device}") 
     # put it all together into one module 
     encoder = LanguageEncoder(image_encoder = image_encoder, 
                               embedder = embedder, 
@@ -217,7 +235,10 @@ def main(args):
         os.mkdir(args.checkpoint_dir)
     except FileExistsError:
         # file exists
-        raise AssertionError(f"Output directory {args.checkpoint_dir} non-empty, will not overwrite!") 
+        try:
+            assert(len(glob.glob(os.path.join(args.checkpoint_dir, "*.th"))) == 0)
+        except AssertionError:
+            raise AssertionError(f"Output directory {args.checkpoint_dir} non-empty, will not overwrite!") 
 
     # construct trainer 
     trainer = LanguageTrainer(train_data = dataset_reader.data["train"], 
