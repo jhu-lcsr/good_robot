@@ -120,7 +120,7 @@ class DeconvolutionalNetwork(torch.nn.Module):
 
         self.output_dim = xy_output_dim
         # per pixel per class
-        conv_last = torch.nn.ConvTranspose3d(output_channels*2, num_blocks, 1, padding=0)
+        conv_last = torch.nn.ConvTranspose3d(output_channels*2, num_blocks+1, 1, padding=0)
         layers.append(conv_last) 
         self.layers = torch.nn.ModuleList(layers) 
 
@@ -134,5 +134,5 @@ class DeconvolutionalNetwork(torch.nn.Module):
         for layer in self.layers:
             encoded = layer(encoded) 
         # output: [batch, width, height] 
-        output = encoded.reshape((bsz, 20, 64, 64, 4))
+        output = encoded.reshape((bsz, 21, 64, 64, 4))
         return output 

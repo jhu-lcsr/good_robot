@@ -9,6 +9,8 @@ from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 import logging 
 from tqdm import tqdm 
+from matplotlib import pyplot as plt
+import numpy as np
 
 from image_encoder import ImageEncoder, DeconvolutionalNetwork
 from language import LanguageEncoder, ConcatFusionModule
@@ -90,16 +92,22 @@ class LanguageTrainer:
         self.encoder.eval() 
         for dev_batch_trajectory in tqdm(self.val_data): 
             for dev_batch_instance in dev_batch_trajectory: 
-                total_acc += self.validate(dev_batch_instance) 
+                total_acc += self.validate(dev_batch_instance, epoch) 
                 total += 1
 
         mean_acc = total_acc / total 
         print(f"Epoch {epoch} has acc {mean_acc * 100}") 
         return mean_acc 
 
-    def validate(self, batch_instance): 
+    def validate(self, batch_instance, epoch_num): 
         outputs = self.encoder(batch_instance) 
         accuracy = self.compute_localized_accuracy(batch_instance, outputs) 
+            
+        if epoch_num > 80: 
+            self.generate_debugging_image(outputs, f"epoch_{epoch_num}_pred")
+            self.generate_debugging_image(batch_instance, f"epoch_{epoch_num}_gold")
+            sys.exit() 
+
         return accuracy
 
     def compute_localized_accuracy(self, batch_instance, outputs): 
@@ -120,7 +128,10 @@ class LanguageTrainer:
         total = gold_pixels.shape[0]
 
         matching = torch.sum(pred_pixels == gold_pixels).item() 
-        acc = matching/total 
+        try:
+            acc = matching/total 
+        except ZeroDivisionError:
+            acc = 0.0 
         return acc 
 
     def compute_accuracy(self, batch_instance, outputs): 
@@ -137,6 +148,49 @@ class LanguageTrainer:
         matching = torch.sum(pred_pixels == gold_pixels).detach().cpu().item() 
         acc = matching/total 
         return acc 
+
+    def generate_debugging_image(self, data, filename):
+        # 64 x 64 x 4 
+        next_pos = data["next_position"][0]
+        print(f"next pos {next_pos.shape}") 
+        if next_pos.shape[0] == 21:
+            # take argmax 
+            next_pos_id, next_pos = torch.max(next_pos, dim = 0) 
+        next_pos = next_pos.squeeze(0)
+        print(f"next pos {next_pos.shape}") 
+        # make a logging dir 
+        if not os.path.exists(os.path.join(self.checkpoint_dir, "images")):
+            os.mkdir(os.path.join(self.checkpoint_dir, "images"))
+
+        xs = np.arange(0, 64, 1)
+        ys = np.arange(0, 64, 1)
+        # separate plot per depth slice 
+        for depth in range(4):
+            fig = plt.figure(figsize=(5,5))
+            ax = fig.gca()
+            ax.set_xticks(xs)
+            ax.set_yticks(ys)
+            ax.set_ylim(0, 64)
+            ax.set_xlim(0, 64)
+            plt.grid() 
+
+            to_plot_xs, to_plot_ys, to_plot_labels = [], [], []
+            for x_pos in xs:
+                for y_pos in ys:
+                    label = next_pos[x_pos, y_pos, depth].item() 
+                    # don't plot background 
+                    if label != 0: 
+                        to_plot_xs.append(x_pos)
+                        to_plot_ys.append(y_pos)
+                        to_plot_labels.append(label) 
+            ax.plot(to_plot_xs, to_plot_ys, ".")
+            for x,y, lab in zip(to_plot_xs, to_plot_ys, to_plot_labels):
+                ax.annotate(lab, xy=(x,y))
+
+            file_path = os.path.join(self.checkpoint_dir, "images", f"{filename}-{depth}.png") 
+                
+            print(f"saving to {file_path}") 
+            plt.savefig(file_path) 
 
     def compute_loss(self, inputs, outputs):
         pred_image = outputs["next_position"]
@@ -163,9 +217,9 @@ class LanguageTrainer:
             print(f"Updated best model to {best_path} at epoch {epoch}") 
 
         # remove old models 
-        all_paths = glob.glob(os.path.join(self.checkpoint_dir, "model_.*.th"))
+        all_paths = glob.glob(os.path.join(self.checkpoint_dir, "model_*th"))
         if len(all_paths) > self.num_models_to_keep:
-            to_remove = all_paths[0:-self.num_models_to_keep]
+            to_remove = sorted(all_paths, key = lambda x: int(os.path.basename(x).split(".")[0].split('_')[1]))[0:-self.num_models_to_keep]
             for path in to_remove:
                 os.remove(path) 
 

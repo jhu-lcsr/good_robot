@@ -117,11 +117,10 @@ class BaseTrajectory:
                         for y_val in range(new_y - offset, new_y + offset):
                             for z_val in range(new_z - offset, new_z + offset):
                                 try:
-                                    image[z_val, x_val, y_val] = block_idx 
+                                    image[z_val, x_val, y_val] = block_idx + 1
                                 except IndexError:
                                     # at the edges 
                                     pass 
-
             image  = torch.tensor(image).float() 
             image = image.unsqueeze(0)
             # batch, n_labels,  width, height, depth 
