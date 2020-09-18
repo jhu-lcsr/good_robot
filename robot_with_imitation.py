@@ -1006,9 +1006,9 @@ def main(args):
                 # for now, assume pushes must be followed by grasp, first action is grasp
                 else:
                     next_action = 'grasp'
-                
+
                 im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                        next_action, nonlocal_variables['prev_stack_height'])
+                        next_action, nonlocal_variables['prev_stack_height'], nonlocal_variables['stack_success'])
                 # TODO(adit98) log action vector from embedding
                 # don't really need to store im_action since they *SHOULD* line up
                 trainer.im_action_log.append(im_action)
@@ -1260,7 +1260,7 @@ def main(args):
                           'Make sure the robot did not experience either an error or security stop. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
             # TODO(adit98) change this timeout back to 60 or make it cmd line arg
-            elif is_sim and int(time_elapsed) > 60:
+            elif is_sim and int(time_elapsed) > 120:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
