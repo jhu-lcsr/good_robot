@@ -75,9 +75,9 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
         orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
         # blend with mask
-        depth_blended = cv2.addWeighted(orig_depth, 0.5, im_mask, 0.5, 0)
+        depth_blended = cv2.addWeighted(orig_depth, 0.5, im_mask, 0.5, 0.5)
         rgb_blended = cv2.addWeighted(orig_rgb, 0.5, (np.repeat(im_mask[:, :, None], 3,
-            axis=-1)).astype(np.uint8), 0.5, 0)
+            axis=-1)).astype(np.uint8), 0.5, 0.5)
 
         # write blended images
         cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_blended)
