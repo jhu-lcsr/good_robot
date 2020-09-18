@@ -43,9 +43,10 @@ class Demonstration():
 
     # TODO(adit98) figure out how to get primitive action
     # TODO(adit98) this will NOT work for novel tasks, worry about that later
-    def get_action(self, trainer, workspace_limits, primitive_action, stack_height, stack_success):
+    def get_action(self, trainer, workspace_limits, primitive_action, stack_height):
         # if we completed a stack, prev_stack_height will be 4, but we want the imitation actions for stack height 1
-        stack_height = stack_height if not stack_success else 1
+        # TODO(adit98) switched this to get nonlocal_variables['stack_height'] now, so see how it is different
+        stack_height = stack_height if stack_height < 4 else 1
 
         # TODO(adit98) deal with push
         if primitive_action == 'push':
