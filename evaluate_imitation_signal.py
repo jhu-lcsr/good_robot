@@ -22,9 +22,9 @@ if args.save_visualizations:
     depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
         'data', 'depth-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
             'data', 'depth-heightmaps', f))])
-    rgb_heightmap_list = sorted([os.path.join(args.log_home, 'data', 'color-heightmaps', f) \
-            for f in os.listdir(os.path.join(args.log_home, 'data', 'color-heightmaps')) \
-            if os.path.isfile(os.path.join(args.log_home, 'data', 'color-heightmaps', f))])
+    rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
+        'data', 'color-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
+            'data', 'color-heightmaps', f))])
     depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
     rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
     if not os.path.exists(depth_home_dir):
@@ -74,7 +74,7 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
             depth_heightmap_list[frame_ind]), -1)
         orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(int)
         orig_rgb = cv2.imread(os.path.join(args.log_home, 'data', 'color-heightmaps',
-            rgb_heightmap_list[frame_ind]), -1)
+            rgb_heightmap_list[frame_ind]))
         orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
         # blend with mask
