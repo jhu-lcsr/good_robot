@@ -1007,8 +1007,12 @@ def main(args):
                 else:
                     next_action = 'grasp'
 
+                print('stack_height:', nonlocal_variables['stack_height'])
+                print('prev_stack_height:', nonlocal_variables['prev_stack_height'])
+
+                # TODO(adit98) figure out if we need to use prev_stack_height or stack_height
                 im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                        next_action, nonlocal_variables['prev_stack_height'], nonlocal_variables['stack_success'])
+                        next_action, nonlocal_variables['stack_height'])
                 # TODO(adit98) log action vector from embedding
                 # don't really need to store im_action since they *SHOULD* line up
                 trainer.im_action_log.append(im_action)
