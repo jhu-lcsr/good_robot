@@ -63,8 +63,11 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
     if args.save_visualizations:
         # TODO(adit98) think about this and resolve
         # for now, take max along rotation axis)
-        im_mask = np.max(l2_dist, axis=0)
-        im_mask = (255 * (im_mask / np.max(im_mask))).astype(int)
+        im_mask = np.max(l2_dist, axis=0).astype(int)
+        # apply colormap jet
+        im_mask = cv2.applyColorMap(im_mask, cv2.COLORMAP_JET)
+        print(im_mask.shape)
+        #im_mask = (255 * (im_mask / np.max(im_mask))).astype(int)
 
         # load original depth/rgb maps
         orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
