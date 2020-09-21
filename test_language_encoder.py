@@ -79,6 +79,7 @@ class LanguageTrainer:
         self.encoder.train() 
         for batch_trajectory in tqdm(self.train_data): 
             for batch_instance in batch_trajectory: 
+                self.generate_debugging_image(batch_instance, f"epoch_{epoch}_gold")
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
@@ -150,9 +151,8 @@ class LanguageTrainer:
         return acc 
 
     def generate_debugging_image(self, data, filename):
-        # 64 x 64 x 4 
+        # 21 x 4 x 64 x 64 
         next_pos = data["next_position"][0]
-        print(f"next pos {next_pos.shape}") 
         if next_pos.shape[0] == 21:
             # take argmax 
             next_pos_id, next_pos = torch.max(next_pos, dim = 0) 
@@ -163,31 +163,33 @@ class LanguageTrainer:
             os.mkdir(os.path.join(self.checkpoint_dir, "images"))
 
         xs = np.arange(0, 64, 1)
-        ys = np.arange(0, 64, 1)
+        zs = np.arange(0, 64, 1)
         # separate plot per depth slice 
-        for depth in range(4):
-            fig = plt.figure(figsize=(5,5))
+        for height in range(4):
+            fig = plt.figure(figsize=(12,12))
             ax = fig.gca()
-            ax.set_xticks(xs)
-            ax.set_yticks(ys)
+            ax.set_xticks([0, 64])
+            ax.set_yticks([0, 64]) 
             ax.set_ylim(0, 64)
             ax.set_xlim(0, 64)
             plt.grid() 
 
-            to_plot_xs, to_plot_ys, to_plot_labels = [], [], []
+            to_plot_xs, to_plot_zs, to_plot_labels = [], [], []
             for x_pos in xs:
-                for y_pos in ys:
-                    label = next_pos[x_pos, y_pos, depth].item() 
+                for z_pos in zs:
+                    #label = next_pos[depth, x_pos, y_pos].item() 
+                    label = next_pos[x_pos, z_pos, height].item() 
                     # don't plot background 
                     if label != 0: 
+                        label = int(label) 
                         to_plot_xs.append(x_pos)
-                        to_plot_ys.append(y_pos)
+                        to_plot_zs.append(z_pos)
                         to_plot_labels.append(label) 
-            ax.plot(to_plot_xs, to_plot_ys, ".")
-            for x,y, lab in zip(to_plot_xs, to_plot_ys, to_plot_labels):
-                ax.annotate(lab, xy=(x,y))
+            ax.plot(to_plot_xs, to_plot_zs, ".")
+            for x,z, lab in zip(to_plot_xs, to_plot_zs, to_plot_labels):
+                ax.annotate(lab, xy=(x,z), fontsize = 12)
 
-            file_path = os.path.join(self.checkpoint_dir, "images", f"{filename}-{depth}.png") 
+            file_path = os.path.join(self.checkpoint_dir, "images", f"{filename}-{height}.png") 
                 
             print(f"saving to {file_path}") 
             plt.savefig(file_path) 

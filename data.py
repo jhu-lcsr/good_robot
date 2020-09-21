@@ -88,43 +88,47 @@ class BaseTrajectory:
         """
         # positions: 1 for each block id 
         def absolute_to_relative(coord, dim): 
+            # shift, now out of 2 
+            coord += 1
+            # get perc 
+            coord = coord / 2
             # scale 
-            real_dim = dim/2
-            scaled = coord * real_dim
+            #real_dim = dim/2
+            scaled = coord * dim 
             # shift 
-            scaled += real_dim 
+            #scaled += real_dim 
             return int(np.around(scaled))
 
         # create a grid d x w x h
         if make_z: 
-            height, width, depth = 64, 64, 4
+            height, width, depth = 4, 64, 64
             n_blocks = 20
-            image = np.zeros((depth, width, height, 1)) 
-            # what is block width height depth 
-
+            #image = np.zeros((depth, width, height, 1)) 
+            image = np.zeros((width, depth, height, 1)) 
             for i, position_list in enumerate(positions): 
                 for block_idx, (x, y, z) in enumerate(position_list): 
-                    new_x, new_y, new_z = (absolute_to_relative(x, width),
-                                          absolute_to_relative(y, height),
+                    new_x,  new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth) )
-
                     # side length: 0.1524 = 9.7536/64
-                    width, height = 10, 10 
-                    offset = int(width/2)
-
+                    #width, height = 10, 10 
+                    #offset = int(width/2)
+                    offset = 1
+                    y_val = int(4 * 1 * y) 
+                    print(f"trying to add block_idx {block_idx} to {x, z, y}, {new_x, new_z, y_val}") 
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
-                        for y_val in range(new_y - offset, new_y + offset):
-                            for z_val in range(new_z - offset, new_z + offset):
-                                try:
-                                    image[z_val, x_val, y_val] = block_idx + 1
-                                except IndexError:
-                                    # at the edges 
-                                    pass 
+                        #for y_val in range(new_y - offset, new_y + offset):
+                        for z_val in range(new_z - offset, new_z + offset):
+                            try:
+                                image[x_val, z_val, y_val] = block_idx + 1
+                            except IndexError:
+                                # at the edges 
+                                #print(f"error add block_idx {block_idx}") 
+                                pass 
             image  = torch.tensor(image).float() 
             image = image.unsqueeze(0)
             # batch, n_labels,  width, height, depth 
-            image = image.permute(0, 4, 2, 3, 1) 
+            #image = image.permute(0, 4, 2, 3, 1) 
             # tile for loss 
             image = torch.cat([image.clone() for i in range(batch_size)], dim = 0)
 
