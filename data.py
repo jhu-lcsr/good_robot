@@ -55,7 +55,9 @@ class BaseTrajectory:
                  lengths: List[int]):
         self.line_id = line_id
         self.commands = commands
+        print(f"previous positions are {len(previous_positions)}") 
         self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
+        print(f"previous positions are {len(self.previous_positions)}") 
         self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands))
         self.previous_rotations = previous_rotations
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
@@ -99,25 +101,24 @@ class BaseTrajectory:
             #scaled += real_dim 
             return int(np.around(scaled))
 
+        image_positions = []
         # create a grid d x w x h
         if make_z: 
             height, width, depth = 4, 64, 64
             n_blocks = 20
-            #image = np.zeros((depth, width, height, 1)) 
-            image = np.zeros((width, depth, height, 1)) 
+
             for i, position_list in enumerate(positions): 
+                image = np.zeros((width, depth, height, 1)) 
+
                 for block_idx, (x, y, z) in enumerate(position_list): 
                     new_x,  new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth) )
-                    # side length: 0.1524 = 9.7536/64
-                    #width, height = 10, 10 
-                    #offset = int(width/2)
+
                     offset = 1
                     y_val = int(4 * 1 * y) 
-                    print(f"trying to add block_idx {block_idx} to {x, z, y}, {new_x, new_z, y_val}") 
+                    #print(f"trying to add block_idx {block_idx} to {x, z, y}, {new_x, new_z, y_val}") 
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
-                        #for y_val in range(new_y - offset, new_y + offset):
                         for z_val in range(new_z - offset, new_z + offset):
                             try:
                                 image[x_val, z_val, y_val] = block_idx + 1
@@ -125,37 +126,36 @@ class BaseTrajectory:
                                 # at the edges 
                                 #print(f"error add block_idx {block_idx}") 
                                 pass 
-            image  = torch.tensor(image).float() 
-            image = image.unsqueeze(0)
-            # batch, n_labels,  width, height, depth 
-            #image = image.permute(0, 4, 2, 3, 1) 
-            # tile for loss 
-            image = torch.cat([image.clone() for i in range(batch_size)], dim = 0)
+
+                image  = torch.tensor(image).float() 
+                image = image.unsqueeze(0)
+                # batch, n_labels,  width, height, depth 
+                # tile for loss 
+                image = torch.cat([image.clone() for i in range(batch_size)], dim = 0)
+                image_positions.append(image) 
 
         else:
-            height, width = 64, 64 
-            n_blocks = 20
-            image = np.zeros(( width, height, 1 + 1)) 
-            for i, position_list in enumerate(positions): 
-                for block_idx, (x, y, z) in enumerate(position_list): 
-                    new_x, new_y = (absolute_to_relative(x, width),
-                                          absolute_to_relative(y, height)) 
-                    # side length: 0.1524 => 9.7536/64
-                    width, height = 10, 10 
-                    offset = int(width/2)
+            depth, width = 64, 64 
 
+            for i, position_list in enumerate(positions): 
+                image = np.zeros(( width, depth, 1 + 1)) 
+                for block_idx, (x, y, z) in enumerate(position_list): 
+                    new_x, new_z = (absolute_to_relative(x, width),
+                                          absolute_to_relative(z, depth)) 
+                    offset = 1
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
-                        for y_val in range(new_y - offset, new_y + offset):
-                            image[x_val, y_val, 0] = block_idx
-                            image[x_val, y_val, 1] = z
+                        for z_val in range(new_z - offset, new_z + offset):
+                            image[x_val, z_val, 0] = block_idx
+                            image[x_val, z_val, 1] = y
 
-            image  = torch.tensor(image).float() 
-            image = image.unsqueeze(0)
-            # empty, batch, n_labels, depth, width, height 
-            image = image.permute(0, 3, 1, 2) 
+                image  = torch.tensor(image).float() 
+                image = image.unsqueeze(0)
+                # empty, batch, n_labels, depth, width, height 
+                image = image.permute(0, 3, 1, 2) 
+                image_positions.append(image) 
 
-        return [image]
+        return image_positions
 
 class SimpleTrajectory(BaseTrajectory):
     def __init__(self,

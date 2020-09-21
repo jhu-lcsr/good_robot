@@ -179,12 +179,15 @@ class LanguageTrainer:
                 for z_pos in zs:
                     #label = next_pos[depth, x_pos, y_pos].item() 
                     label = next_pos[x_pos, z_pos, height].item() 
+                    if height > 0 and label > 0:
+                        print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, height}")
                     # don't plot background 
                     if label != 0: 
                         label = int(label) 
                         to_plot_xs.append(x_pos)
                         to_plot_zs.append(z_pos)
                         to_plot_labels.append(label) 
+
             ax.plot(to_plot_xs, to_plot_zs, ".")
             for x,z, lab in zip(to_plot_xs, to_plot_zs, to_plot_labels):
                 ax.annotate(lab, xy=(x,z), fontsize = 12)
