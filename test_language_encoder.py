@@ -79,7 +79,7 @@ class LanguageTrainer:
         self.encoder.train() 
         for batch_trajectory in tqdm(self.train_data): 
             for batch_instance in batch_trajectory: 
-                self.generate_debugging_image(batch_instance, f"epoch_{epoch}_gold")
+                #self.generate_debugging_image(batch_instance, f"epoch_{epoch}_gold")
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 

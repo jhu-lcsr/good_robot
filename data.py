@@ -55,9 +55,7 @@ class BaseTrajectory:
                  lengths: List[int]):
         self.line_id = line_id
         self.commands = commands
-        print(f"previous positions are {len(previous_positions)}") 
         self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
-        print(f"previous positions are {len(self.previous_positions)}") 
         self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands))
         self.previous_rotations = previous_rotations
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
@@ -116,7 +114,6 @@ class BaseTrajectory:
 
                     offset = 1
                     y_val = int(4 * 1 * y) 
-                    #print(f"trying to add block_idx {block_idx} to {x, z, y}, {new_x, new_z, y_val}") 
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for z_val in range(new_z - offset, new_z + offset):
@@ -124,7 +121,6 @@ class BaseTrajectory:
                                 image[x_val, z_val, y_val] = block_idx + 1
                             except IndexError:
                                 # at the edges 
-                                #print(f"error add block_idx {block_idx}") 
                                 pass 
 
                 image  = torch.tensor(image).float() 
