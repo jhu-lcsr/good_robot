@@ -45,14 +45,10 @@ im_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'im_action.lo
 imitation_embeddings = np.load(os.path.join(args.log_home, 'transitions', 'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0']
 executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions', 'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0']
 
-# store array to hold indices in the executed action embedding map that correspond to the imitation embedding
-imitation_action_signal = []
-
 # find nearest neighbor for each imitation embedding
 for frame_ind, embedding in enumerate(executed_action_embeddings):
     l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
     match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
-    imitation_action_signal.append(match_ind)
 
     # evaluate nearest neighbor distance for successful actions
     if frame_ind in action_success_inds:
@@ -62,8 +58,10 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
 
     if args.save_visualizations:
         # TODO(adit98) think about this and resolve
-        # for now, take max along rotation axis)
-        im_mask = np.max(l2_dist, axis=0).astype(np.uint8)
+        # for now, take min along rotation axis)
+        im_mask = np.min(l2_dist, axis=0)
+        # invert values so that large values indicate correspondence
+        im_mask = 1 - (im_mask / np.max(im_mask))
         # apply colormap jet
         im_mask = cv2.applyColorMap(im_mask, cv2.COLORMAP_JET)
 
