@@ -4,13 +4,14 @@ import os
 from utils import ACTION_TO_ID
 
 class Demonstration():
-    def __init__(self, path, demo_num):
+    def __init__(self, path, demo_num, check_z_height):
         # path is expected to be <logs/exp_name>
         self.action_log = np.loadtxt(os.path.join(path, 'transitions',
             'executed-actions-0.log.txt'))
         self.rgb_dir = os.path.join(path, 'data', 'color-heightmaps')
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
         self.demo_num = demo_num
+        self.check_z_height = check_z_height
 
         # this str is for loading the correct images, it will be adjusted based on selected action
         self.action_str = 'orig'
@@ -27,10 +28,16 @@ class Demonstration():
                     ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
     def get_heightmaps(self, action_str, stack_height):
+        if not check_z_height:
+            # subtract 1 from stack height since we start with 0 blocks successfully stacked not 1
+            stack_height = int(stack_height) - 1
+        else:
+            print(stack_height)
+            stack_height = np.round(stack_height).astype(int)
+
         # e.g. initial rgb filename is 000000.orig.color.png
-        print(stack_height)
         if action_str != 'orig':
-            action_str = str(int(stack_height)) + action_str
+            action_str = str(stack_height) + action_str
 
         rgb_filename = os.path.join(self.rgb_dir, 
                 '%06d.%s.color.png' % (self.demo_num, action_str))

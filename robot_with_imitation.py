@@ -843,8 +843,8 @@ def main(args):
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
     if args.use_demo:
-        # TODO(adit98) set demo number to be cmd line arg
-        demo = Demonstration(path=args.demo_path, demo_num=0)
+        # TODO(adit98) set demo number to be cmd line arg, 0 right now
+        demo = Demonstration(path=args.demo_path, 0, check_z_height)
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -1006,9 +1006,6 @@ def main(args):
                 # for now, assume pushes must be followed by grasp, first action is grasp
                 else:
                     next_action = 'grasp'
-
-                print('stack_height:', nonlocal_variables['stack_height'])
-                print('prev_stack_height:', nonlocal_variables['prev_stack_height'])
 
                 # TODO(adit98) figure out if we need to use prev_stack_height or stack_height
                 im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
