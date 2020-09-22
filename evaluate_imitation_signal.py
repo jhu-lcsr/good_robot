@@ -50,18 +50,21 @@ for frame_ind, embedding in enumerate(executed_action_embeddings):
     l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
     match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
 
+    # TODO(adit98) need to add back action_success_inds array
     # evaluate nearest neighbor distance for successful actions
-    if frame_ind in action_success_inds:
-        # TODO(adit98) calculate euclidean distance between match_ind and executed_action
-        print('match_ind:', match_ind)
-        print('executed_action ind:', executed_actions[frame_ind])
+    #if frame_ind in action_success_inds:
+    #    # TODO(adit98) calculate euclidean distance between match_ind and executed_action
+    #    print('match_ind:', match_ind)
+    #    print('executed_action ind:', executed_actions[frame_ind])
 
     if args.save_visualizations:
         # TODO(adit98) think about this and resolve
         # for now, take min along rotation axis)
-        im_mask = np.min(l2_dist, axis=0)
+        # im_mask = np.min(l2_dist, axis=0)
+        # for now, just use unrotated image
+        im_mask = l2_dist[0]
         # invert values so that large values indicate correspondence
-        im_mask = 1 - (im_mask / np.max(im_mask))
+        im_mask = (255 * (1 - (im_mask / np.max(im_mask)))).astype(np.uint8)
         # apply colormap jet
         im_mask = cv2.applyColorMap(im_mask, cv2.COLORMAP_JET)
 
