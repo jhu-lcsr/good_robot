@@ -282,9 +282,10 @@ def main(args):
     no_change_count = [2, 2] if not is_testing else [0, 0]
     explore_prob = 0.5 if not is_testing else 0.0
 
+    # TODO(adit98) check if it is ok to initialize this to 1.0
     if check_z_height:
-        nonlocal_variables['stack_height'] = 0.0
-        nonlocal_variables['prev_stack_height'] = 0.0
+        nonlocal_variables['stack_height'] = 1.0
+        nonlocal_variables['prev_stack_height'] = 1.0
     best_stack_rate = np.inf
     prev_grasp_success = False
 
@@ -844,7 +845,7 @@ def main(args):
 
     if args.use_demo:
         # TODO(adit98) set demo number to be cmd line arg, 0 right now
-        demo = Demonstration(path=args.demo_path, 0, check_z_height)
+        demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
@@ -1276,12 +1277,13 @@ def main(args):
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
                 if check_z_height:
+                    # TODO(adit98) check if it is ok to make these 1
                     # Zero out the height because the trial is done.
                     # Note these lines must normally be after the
                     # logging of these variables is complete,
                     # but this is a special (hopefully rare) recovery scenario.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
+                    nonlocal_variables['stack_height'] = 1.0
+                    nonlocal_variables['prev_stack_height'] = 1.0
                 else:
                     nonlocal_variables['stack_height'] = 1.0
                     nonlocal_variables['prev_stack_height'] = 1.0
