@@ -28,13 +28,15 @@ class Demonstration():
 
     def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png
+        print(stack_height)
         if action_str != 'orig':
-            action_str = str(int(stack_height) - 1) + action_str
+            action_str = str(int(stack_height)) + action_str
 
         rgb_filename = os.path.join(self.rgb_dir, 
                 '%06d.%s.color.png' % (self.demo_num, action_str))
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (self.demo_num, action_str))
+        print(rgb_filename, depth_filename)
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
