@@ -18,23 +18,16 @@ class Demonstration():
 
         # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
         self.action_dict = {}
-        for s in range(1, 4):
+        for s in range(0, 3):
             # store push, grasp, and place actions for demo at stack height s
             # TODO(adit98) figure out how to incorporate push actions into this paradigm
             # TODO(adit98) note this assumes perfect demo
-            # if stack height is 1, indices 0 and 1 of the action log correspond to grasp and place respectively
-            demo_first_ind = 2 * (s - 1)
+            # if stack height is 0, indices 0 and 1 of the action log correspond to grasp and place respectively
+            demo_first_ind = 2 * s
             self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
                     ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
     def get_heightmaps(self, action_str, stack_height):
-        if not check_z_height:
-            # subtract 1 from stack height since we start with 0 blocks successfully stacked not 1
-            stack_height = int(stack_height) - 1
-        else:
-            print(stack_height)
-            stack_height = np.round(stack_height).astype(int)
-
         # e.g. initial rgb filename is 000000.orig.color.png
         if action_str != 'orig':
             action_str = str(stack_height) + action_str
@@ -43,7 +36,6 @@ class Demonstration():
                 '%06d.%s.color.png' % (self.demo_num, action_str))
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (self.demo_num, action_str))
-        print(rgb_filename, depth_filename)
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
@@ -53,16 +45,22 @@ class Demonstration():
     # TODO(adit98) figure out how to get primitive action
     # TODO(adit98) this will NOT work for novel tasks, worry about that later
     def get_action(self, trainer, workspace_limits, primitive_action, stack_height):
-        # if we completed a stack, prev_stack_height will be 4, but we want the imitation actions for stack height 1
-        # TODO(adit98) switched this to get nonlocal_variables['stack_height'] now, so see how it is different
-        stack_height = stack_height if stack_height < 4 else 1
+        if not self.check_z_height:
+            # if we completed a stack, prev_stack_height will be 4, but we want the imitation actions for stack height 1
+            # TODO(adit98) switched this to get nonlocal_variables['stack_height'] now, so see how it is different
+            stack_height = (stack_height - 1) if stack_height < 4 else 0
+        else:
+            # TODO(adit98) check but stack_height is going to be number of blocks on top of base block
+            stack_height = np.round(stack_height).astype(int)
+            # TODO(adit98) figure out how to reset stack height if check_z_height is set
+            stack_height = (stack_height - 1) if stack_height < 4 else 0
 
         # TODO(adit98) deal with push
         if primitive_action == 'push':
             return -1
 
         # set action_str based on primitive action
-        if stack_height == 1 and primitive_action == 'grasp':
+        if stack_height == 0 and primitive_action == 'grasp':
             action_str = 'orig'
         elif primitive_action == 'grasp':
             action_str = 'grasp'
