@@ -71,6 +71,8 @@ class Demonstration():
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+
+        # get demo action index vector
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
 
         # convert rotation angle to index
@@ -83,11 +85,12 @@ class Demonstration():
         # TODO(adit98) figure out if we want more than 1 coordinate
         # TODO(adit98) add logic for pushing here
         if primitive_action == 'grasp':
+            # TODO(adit98) figure out if we need to swap xy coordinates
             # we do y coordinate first, then x, because cv2 images are row, column indexed
-            best_action = grasp_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
+            best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
 
         # TODO(adit98) find out why place preds inds were different before
         elif primitive_action == 'place':
-            best_action = place_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
+            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
 
         return best_action, ACTION_TO_ID[primitive_action]
