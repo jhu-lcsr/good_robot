@@ -192,6 +192,3 @@ if __name__ == '__main__':
                 # write blended images
                 cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_canvas)
                 cv2.imwrite(os.path.join(rgb_home_dir, rgb_heightmap_list[frame_ind]), rgb_canvas)
-
-                # TODO(adit98) testing, so have break
-                break
