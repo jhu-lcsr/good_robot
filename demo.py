@@ -73,20 +73,21 @@ class Demonstration():
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
 
-        # TODO(adit98) figure out how to convert rotation angle to index
+        # convert rotation angle to index
         best_rot_ind = np.around(np.rad2deg(action_vec[-2]) * 16 / 360).astype(int)
 
-        # TODO(adit98) convert robot coordinates to pixel
+        # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
 
         # TODO(adit98) figure out if we want more than 1 coordinate
         # TODO(adit98) add logic for pushing here
         if primitive_action == 'grasp':
-            best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            # we do y coordinate first, then x, because cv2 images are row, column indexed
+            best_action = grasp_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
 
         # TODO(adit98) find out why place preds inds were different before
         elif primitive_action == 'place':
-            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            best_action = place_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
 
         return best_action, ACTION_TO_ID[primitive_action]
