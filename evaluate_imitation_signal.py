@@ -102,8 +102,8 @@ if __name__ == '__main__':
         #    print('executed_action ind:', executed_actions[frame_ind])
 
         if args.save_visualizations:
-            # invert values so that large values indicate correspondence
-            im_mask = (np.max(im_mask) - im_mask).astype(np.uint8)
+            # invert values of l2_dist so that large values indicate correspondence
+            im_mask = (np.max(l2_dist) - l2_dist).astype(np.uint8)
 
             # load original depth/rgb maps
             orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
