@@ -186,7 +186,7 @@ if __name__ == '__main__':
                 orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
                 # flip coordinates of match ind
-                match_ind[[1, 2]] = match_ind[[2, 1]]
+                match_ind = (match_ind[0], match_ind[2], match_ind[1])
 
                 # visualize with rotation, match_ind
                 depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
