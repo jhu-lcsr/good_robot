@@ -185,6 +185,9 @@ if __name__ == '__main__':
                 # TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
                 orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
+                # flip coordinates of match ind
+                match_ind[[1, 2]] = match_ind[[2, 1]]
+
                 # visualize with rotation, match_ind
                 depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
                 rgb_canvas = get_prediction_vis(im_mask, orig_rgb, match_ind)
