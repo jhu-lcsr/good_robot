@@ -8,7 +8,7 @@ import cv2
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(self, predictions, heightmap, best_pix_ind, scale_factor=8):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8):
     # predictions is a matrix of shape 16x224x224 with l2 distances squared
     print(predictions.shape)
     print(best_pix_ind)
@@ -36,10 +36,10 @@ def get_prediction_vis(self, predictions, heightmap, best_pix_ind, scale_factor=
 
             # rotate probability map and image to gripper rotation
             prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
-            background_image = ndimage.rotate(color_heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
+            background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
 
             # blend image and colorized probability heatmap
-            prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR), 0.5, prediction_vis, 0.5)
+            prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR), 0.5, prediction_vis, 0.5, 0.5)
 
             # add image to row canvas
             if tmp_row_canvas is None:
@@ -118,17 +118,16 @@ if __name__ == '__main__':
             orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(np.uint8)
             orig_rgb = cv2.imread(os.path.join(args.log_home, 'data', 'color-heightmaps',
                 rgb_heightmap_list[frame_ind]))
-
             # TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
             orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
             # visualize with rotation, match_ind
-            rgb_canvas = get_prediction_vis(self, l2_dist, orig_rgb, match_ind)
-            depth_canvas = get_prediction_vis(self, l2_dist, orig_depth, match_ind)
+            depth_canvas = get_prediction_vis(l2_dist, orig_depth, match_ind)
+            rgb_canvas = get_prediction_vis(l2_dist, orig_rgb, match_ind)
 
             # write blended images
-            cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_blended)
-            cv2.imwrite(os.path.join(rgb_home_dir, rgb_heightmap_list[frame_ind]), rgb_blended)
+            cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_canvas)
+            cv2.imwrite(os.path.join(rgb_home_dir, rgb_heightmap_list[frame_ind]), rgb_canvas)
 
             # TODO(adit98) testing, so have break
             break
