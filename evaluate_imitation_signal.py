@@ -102,15 +102,8 @@ if __name__ == '__main__':
         #    print('executed_action ind:', executed_actions[frame_ind])
 
         if args.save_visualizations:
-            # TODO(adit98) think about this and resolve
-            # for now, take min along rotation axis)
-            # im_mask = np.min(l2_dist, axis=0)
-            # for now, just use unrotated image
-            im_mask = l2_dist[0]
             # invert values so that large values indicate correspondence
-            im_mask = (255 * (1 - (im_mask / np.max(im_mask)))).astype(np.uint8)
-            # apply colormap jet
-            im_mask = cv2.applyColorMap(im_mask, cv2.COLORMAP_JET)
+            im_mask = (np.max(im_mask) - im_mask).astype(np.uint8)
 
             # load original depth/rgb maps
             orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
@@ -122,8 +115,8 @@ if __name__ == '__main__':
             orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
             # visualize with rotation, match_ind
-            depth_canvas = get_prediction_vis(l2_dist, orig_depth, match_ind)
-            rgb_canvas = get_prediction_vis(l2_dist, orig_rgb, match_ind)
+            depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
+            rgb_canvas = get_prediction_vis(im_mask, orig_rgb, match_ind)
 
             # write blended images
             cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_canvas)
