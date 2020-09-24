@@ -87,10 +87,10 @@ class Demonstration():
         if primitive_action == 'grasp':
             # TODO(adit98) figure out if we need to swap xy coordinates
             # we do y coordinate first, then x, because cv2 images are row, column indexed
-            best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            best_action = grasp_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
 
         # TODO(adit98) find out why place preds inds were different before
         elif primitive_action == 'place':
-            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            best_action = place_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
 
         return best_action, ACTION_TO_ID[primitive_action]

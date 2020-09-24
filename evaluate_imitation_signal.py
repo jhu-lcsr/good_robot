@@ -167,10 +167,10 @@ if __name__ == '__main__':
 
             # TODO(adit98) need to add back action_success_inds array
             # evaluate nearest neighbor distance for successful actions
-            #if frame_ind in action_success_inds:
-            #    # TODO(adit98) calculate euclidean distance between match_ind and executed_action
-            #    print('match_ind:', match_ind)
-            #    print('executed_action ind:', executed_actions[frame_ind])
+            if frame_ind in action_success_inds:
+                # TODO(adit98) calculate euclidean distance between match_ind and executed_action
+                print('match_ind:', match_ind)
+                print('executed_action ind:', executed_actions[frame_ind])
 
             if args.save_visualizations:
                 # invert values of l2_dist so that large values indicate correspondence
