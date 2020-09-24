@@ -158,8 +158,10 @@ if __name__ == '__main__':
         im_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'im_action.log.txt'))[:grasp_successes.shape[0]]
 
         # load imitation embeddings and executed action embeddings
-        imitation_embeddings = np.load(os.path.join(args.log_home, 'transitions', 'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0']
-        executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions', 'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0']
+        imitation_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0'][:grasp_successes.shape[0]]
+        executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0'][:grasp_successes.shape[0]]
 
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
