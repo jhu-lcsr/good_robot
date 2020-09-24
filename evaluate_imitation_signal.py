@@ -142,7 +142,6 @@ if __name__ == '__main__':
             rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'color-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
                     'data', 'color-heightmaps', f)) and f.endswith("0.color.png")])
-            print(rgb_heightmap_list)
             depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
             rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
             if not os.path.exists(depth_home_dir):
@@ -197,7 +196,7 @@ if __name__ == '__main__':
                     match_ind = executed_actions[frame_ind][1:]
 
                 # flip coordinates of match ind
-                match_ind = (match_ind[0], match_ind[1], match_ind[2])
+                match_ind = (match_ind[0], match_ind[2], match_ind[1])
 
                 # visualize with rotation, match_ind
                 depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
