@@ -138,10 +138,10 @@ if __name__ == '__main__':
             # we only want files that end in .0 (before action is carried out)
             depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'depth-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
-                    'data', 'depth-heightmaps', f)) and f.endswith(".0")])
+                    'data', 'depth-heightmaps', f)) and f.endswith("0.depth.png")])
             rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'color-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
-                    'data', 'color-heightmaps', f)) and f.endswith(".0")])
+                    'data', 'color-heightmaps', f)) and f.endswith("0.color.png")])
             print(rgb_heightmap_list)
             depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
             rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
