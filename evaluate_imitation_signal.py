@@ -60,6 +60,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log_home', type=str, help='format is logs/EXPERIMENT_DIR')
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
+    parser.add_argument('-e', '--exec_viz', default=False, action='store_true', help='visualize executed action signal instead of imitation')
     parser.add_argument('-s', '--single_image', default=None, help='visualize signal for only a single image (only works for demo images)')
     args = parser.parse_args()
 
@@ -167,10 +168,10 @@ if __name__ == '__main__':
 
             # TODO(adit98) need to add back action_success_inds array
             # evaluate nearest neighbor distance for successful actions
-            if frame_ind in action_success_inds:
-                # TODO(adit98) calculate euclidean distance between match_ind and executed_action
-                print('match_ind:', match_ind)
-                print('executed_action ind:', executed_actions[frame_ind])
+            #if frame_ind in action_success_inds:
+            #    # TODO(adit98) calculate euclidean distance between match_ind and executed_action
+            #    print('match_ind:', match_ind)
+            #    print('executed_action ind:', executed_actions[frame_ind])
 
             if args.save_visualizations:
                 # invert values of l2_dist so that large values indicate correspondence
@@ -184,6 +185,9 @@ if __name__ == '__main__':
                     rgb_heightmap_list[frame_ind]))
                 # TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
                 orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
+
+                if args.exec_viz:
+                    match_ind = executed_actions[frame_ind]
 
                 # flip coordinates of match ind
                 match_ind = (match_ind[0], match_ind[2], match_ind[1])
