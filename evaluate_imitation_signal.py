@@ -189,7 +189,7 @@ if __name__ == '__main__':
                 orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
                 if args.exec_viz:
-                    print(executed_actions[frame_ind])
+                    print("action:", executed_actions[frame_ind], "success:", frame_ind in action_success_inds)
                     match_ind = executed_actions[frame_ind][1:]
 
                 # flip coordinates of match ind
