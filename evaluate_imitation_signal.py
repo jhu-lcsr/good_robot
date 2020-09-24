@@ -189,7 +189,8 @@ if __name__ == '__main__':
                 orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
                 if args.exec_viz:
-                    print("action:", executed_actions[frame_ind], "success:", frame_ind in action_success_inds)
+                    print("action:", executed_actions[frame_ind], "success:",
+                            frame_ind in action_success_inds, "filename:", rgb_heightmap_list[frame_ind])
                     match_ind = executed_actions[frame_ind][1:]
 
                 # flip coordinates of match ind
