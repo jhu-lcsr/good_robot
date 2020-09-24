@@ -8,7 +8,7 @@ import cv2
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.3):
     canvas = None
     num_rotations = predictions.shape[0]
 
