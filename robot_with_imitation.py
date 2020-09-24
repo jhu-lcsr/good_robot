@@ -653,6 +653,7 @@ def main(args):
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
 
+                    # TODO(adit98) this shouldn't be here? resaving images if trial completes
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:

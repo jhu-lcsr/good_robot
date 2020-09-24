@@ -135,12 +135,14 @@ if __name__ == '__main__':
             if args.log_home is None:
                 raise ValueError("--log_home is required if not running a single image")
 
+            # we only want files that end in .0 (before action is carried out)
             depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'depth-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
-                    'data', 'depth-heightmaps', f))])
+                    'data', 'depth-heightmaps', f)) and f.endswith(".0")])
             rgb_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'color-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
-                    'data', 'color-heightmaps', f))])
+                    'data', 'color-heightmaps', f)) and f.endswith(".0")])
+            print(rgb_heightmap_list)
             depth_home_dir = os.path.join(args.log_home, 'data', 'depth-heightmaps', 'im_depth_signal')
             rgb_home_dir = os.path.join(args.log_home, 'data', 'color-heightmaps', 'im_rgb_signal')
             if not os.path.exists(depth_home_dir):
