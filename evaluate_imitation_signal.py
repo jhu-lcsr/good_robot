@@ -195,9 +195,6 @@ if __name__ == '__main__':
                             "filename:", rgb_heightmap_list[frame_ind])
                     match_ind = executed_actions[frame_ind][1:]
 
-                # flip coordinates of match ind
-                match_ind = (match_ind[0], match_ind[2], match_ind[1])
-
                 # visualize with rotation, match_ind
                 depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
                 rgb_canvas = get_prediction_vis(im_mask, orig_rgb, match_ind)
