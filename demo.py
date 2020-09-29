@@ -18,7 +18,7 @@ class Demonstration():
 
         # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
         self.action_dict = {}
-        for s in range(0, 3):
+        for s in range(3):
             # store push, grasp, and place actions for demo at stack height s
             # TODO(adit98) figure out how to incorporate push actions into this paradigm
             # TODO(adit98) note this assumes perfect demo
@@ -59,15 +59,21 @@ class Demonstration():
         if primitive_action == 'push':
             return -1
 
+        # TODO(adit98) clean up the way demo heightmaps are saved to reduce confusion
         # set action_str based on primitive action
+        # heightmap_height is the height we use to get the demo heightmaps
+        heightmap_height = stack_height
         if stack_height == 0 and primitive_action == 'grasp':
             action_str = 'orig'
         elif primitive_action == 'grasp':
-            action_str = 'grasp'
-        else:
+            # if primitive action is grasp, we need the previous place heightmap and grasp action
             action_str = 'place'
+            heightmap_height -= 1
+        else:
+            # if prim action is place, get the previous grasp heightmap
+            action_str = 'grasp'
 
-        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
+        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, heightmap_height)
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
@@ -76,7 +82,7 @@ class Demonstration():
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
 
         # convert rotation angle to index
-        best_rot_ind = np.around(np.rad2deg(action_vec[-2]) * 16 / 360).astype(int)
+        best_rot_ind = np.around((np.rad2deg(action_vec[-2]) % 360) * 16 / 360).astype(int)
 
         # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000

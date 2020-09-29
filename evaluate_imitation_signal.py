@@ -62,56 +62,77 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
     parser.add_argument('-e', '--exec_viz', default=False, action='store_true', help='visualize executed action signal instead of imitation')
     parser.add_argument('-s', '--single_image', default=None, help='visualize signal for only a single image (only works for demo images)')
+    parser.add_argument('-d', '--demo_dir', default=None, help='visualize signal in demo directory')
     args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
     # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]])
 
-    # we only want to process a single image
-    if args.single_image is not None:
-        if 'depth' in args.single_image:
-            depth_heightmap = cv2.imread(args.single_image, -1)
-            rgb_heightmap = cv2.cvtColor(cv2.imread(args.single_image.replace('depth',
+    if args.demo_dir is not None:
+        images = sorted(os.listdir(os.path.join(args.demo_dir, 'data', 'color-heightmaps')))
+        demo_home = args.demo_dir
+    elif args.single_image is not None:
+        images = [args.single_image]
+        demo_home = "/".join(args.single_image.split('/')[:2])
+    else:
+        images = []
+
+    for i in images:
+        if '/' not in i:
+            img_name = os.path.join(demo_home, 'data', 'color-heightmaps', i)
+        else:
+            img_name = i
+
+        # skip directories
+        if not os.path.isfile(img_name):
+            continue
+
+        if 'depth' in img_name:
+            depth_heightmap = cv2.imread(img_name, -1)
+            rgb_heightmap = cv2.cvtColor(cv2.imread(img_name.replace('depth',
                 'color')), cv2.COLOR_BGR2RGB)
-        elif 'color' in args.single_image:
-            depth_heightmap = cv2.imread(args.single_image.replace('color',
+        elif 'color' in img_name:
+            depth_heightmap = cv2.imread(img_name.replace('color',
                 'depth'), -1)
-            rgb_heightmap = cv2.cvtColor(cv2.imread(args.single_image),
+            rgb_heightmap = cv2.cvtColor(cv2.imread(img_name),
                     cv2.COLOR_BGR2RGB)
         else:
             raise ValueError("input needs to be either color or depth heightmap")
 
         # first get the demo num
-        demo_num = int(args.single_image.split('/')[-1].split('.')[0])
+        demo_num = int(i.split('/')[-1].split('.')[0])
 
         # now get the action string e.g. 0grasp, orig, 2place, etc.
-        action_str = args.single_image.split('/')[-1].split('.')[1]
+        action_str = i.split('/')[-1].split('.')[1]
 
         # now get the stack height
         stack_height = action_str[0]
         if stack_height == 'o':
-            # string is orig
-            stack_height = 0
+            # if it is 'orig', visualize the first grasp (action 0)
+            action_ind = 0
         else:
             stack_height = int(stack_height)
 
-        # finally get the action ind
-        if action_str[1:] == 'grasp':
-            action_ind = 2 * stack_height
-        elif action_str[1:] == 'place':
-            action_ind = 2 * stack_height + 1
-        else:
-            # if it is 'orig'
-            action_ind = 2 * stack_height
+            # finally get the action ind
+            if action_str[1:] == 'grasp':
+                # visualize the place action
+                action_ind = 2 * stack_height + 1
+            elif action_str[1:] == 'place':
+                # visualize the next grasp
+                action_ind = 2 * (stack_height + 1)
 
         # load best action from logs
-        demo_home = "/".join(args.single_image.split('/')[:2])
         action_log = os.path.join(demo_home, 'transitions', "executed-actions-%d.log.txt" % demo_num)
-        action_vec = np.loadtxt(action_log)[action_ind][:-1]
+        try:
+            action_vec = np.loadtxt(action_log)[action_ind][:-1]
+        except IndexError:
+            # we reach an index error if the action ind is greater than the log of actions,
+            # which means it is the state after the last place (no next action)
+            continue
 
         # convert best action from mm to pixels
-        best_rot_ind = np.around(np.rad2deg(action_vec[-1]) * 16 / 360).astype(int)
+        best_rot_ind = np.around((np.rad2deg(action_vec[-1]) % 360) * 16 / 360).astype(int)
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
         best_action_xyt = np.array([best_rot_ind, best_action_xy[1], best_action_xy[0]])
@@ -125,16 +146,22 @@ if __name__ == '__main__':
 
         # get demo home dir
         if args.save_visualizations:
-            # write blended images
-            cv2.imwrite(os.path.join(demo_home, 'depth-heightmap.png'), depth_canvas)
-            cv2.imwrite(os.path.join(demo_home, 'color-heightmap.png'), rgb_canvas)
+            # make dirs for visualizations
+            if not os.path.exists(os.path.join(demo_home, 'data', 'color-heightmaps', 'signal_viz')):
+                os.makedirs(os.path.join(demo_home, 'data', 'color-heightmaps', 'signal_viz'))
 
-    else:
+            if not os.path.exists(os.path.join(demo_home, 'data', 'depth-heightmaps', 'signal_viz')):
+                os.makedirs(os.path.join(demo_home, 'data', 'depth-heightmaps', 'signal_viz'))
+
+            # write blended images
+            cv2.imwrite(os.path.join(demo_home, 'data', 'depth-heightmaps',
+                'signal_viz', i.replace('color', 'depth')), depth_canvas)
+            cv2.imwrite(os.path.join(demo_home, 'data', 'color-heightmaps',
+                'signal_viz', i.replace('depth', 'color')), rgb_canvas)
+
+    if args.log_home is not None:
         # make dir for imitation action visualizations if save_visualizations are set
         if args.save_visualizations:
-            if args.log_home is None:
-                raise ValueError("--log_home is required if not running a single image")
-
             # we only want files that end in .0 (before action is carried out)
             depth_heightmap_list = sorted([f for f in os.listdir(os.path.join(args.log_home,
                 'data', 'depth-heightmaps')) if os.path.isfile(os.path.join(args.log_home,
