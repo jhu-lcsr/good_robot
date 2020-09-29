@@ -28,7 +28,8 @@ if __name__ == '__main__':
     ####### Testing Block Stacking #######
     is_sim = True# Run in simulation?
     obj_mesh_dir = os.path.abspath('objects/blocks') if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = 4 if is_sim else None # Number of objects to add to simulation
+    num_obj = 8 if is_sim else None # Number of objects to add to simulation
+    final_stack_height = 4 # final desired stack height
     tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
     tcp_port = args.tcp_port if not is_sim else None
     rtc_host_ip = args.rtc_host_ip if not is_sim else None # IP and port to robot arm as real-time client (UR5)
@@ -72,11 +73,11 @@ if __name__ == '__main__':
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file,
                   place=place_task, grasp_color_task=grasp_color_task)
-    stacksequence = StackSequence(num_obj, is_goal_conditioned_task=grasp_color_task or place_task)
+    stacksequence = StackSequence(final_stack_height, is_goal_conditioned_task=grasp_color_task or place_task)
 
     print('full stack sequence: ' + str(stacksequence.object_color_sequence))
     best_rotation_angle = 3.14
-    blocks_to_move = num_obj - 1
+    blocks_to_move = final_stack_height - 1
     num_stacks = 3
     original_position = np.array([-0.6, 0.25, 0])
 
@@ -169,13 +170,6 @@ if __name__ == '__main__':
         # write actions for finished stack
         print('executed-actions-' + str(stack))
         logger.write_to_log('executed-actions-' + str(stack), executed_action_log)
-
-        # TODO insert a check here to see if there are actually 4 blocks in the scene
-        # TODO if this doesn't work, just reinitalize the robot
-        valid_scene = False
-        while not valid_scene:
-          # reset scene
-          valid_scene = robot.reposition_objects()
 
         # determine first block to grasp
         stacksequence.next()
