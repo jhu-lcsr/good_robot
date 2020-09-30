@@ -193,8 +193,13 @@ if __name__ == '__main__':
 
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
-            l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
-            match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
+            if args.exec_viz:
+                match_ind = executed_actions[frame_ind][1:].astype(int)
+                l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
+                    :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+            else:
+                l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
+                match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
 
             # TODO(adit98) need to add back action_success_inds array
             # evaluate nearest neighbor distance for successful actions
@@ -204,8 +209,12 @@ if __name__ == '__main__':
             #    print('executed_action ind:', executed_actions[frame_ind])
 
             if args.save_visualizations:
-                # invert values of l2_dist so that large values indicate correspondence
-                im_mask = (np.max(l2_dist) - l2_dist).astype(np.uint8)
+                # make l2_dist range from 0 to 1                                   
+                l2_dist = l2_dist - np.min(l2_dist)
+                l2_dist /= np.max(l2_dist)
+
+                # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
+                im_mask = (1 - l2_dist) ** 4
 
                 # load original depth/rgb maps
                 orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
@@ -220,7 +229,6 @@ if __name__ == '__main__':
                     print("action:", executed_actions[frame_ind], "grasp success:",
                             grasp_successes[frame_ind], "place success:", place_successes[frame_ind],
                             "filename:", rgb_heightmap_list[frame_ind])
-                    match_ind = executed_actions[frame_ind][1:]
 
                 # visualize with rotation, match_ind
                 depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)

@@ -87,16 +87,18 @@ class Demonstration():
         # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
+        # need to swap x and y coordinates for best_action_xy
+        best_action_xy = [best_action_xy[1], best_action_xy[0]]
 
         # TODO(adit98) figure out if we want more than 1 coordinate
         # TODO(adit98) add logic for pushing here
         if primitive_action == 'grasp':
             # TODO(adit98) figure out if we need to swap xy coordinates
             # we do y coordinate first, then x, because cv2 images are row, column indexed
-            best_action = grasp_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
+            best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
 
         # TODO(adit98) find out why place preds inds were different before
         elif primitive_action == 'place':
-            best_action = place_preds[best_rot_ind, :, best_action_xy[1], best_action_xy[0]]
+            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
 
         return best_action, ACTION_TO_ID[primitive_action]
