@@ -19,6 +19,9 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
             rotate_idx = canvas_row*4+canvas_col
             prediction_vis = predictions[rotate_idx,:,:].copy()
 
+            print(np.min(prediction_vis))
+            print(np.max(prediction_vis))
+            print(np.mean(prediction_vis))
             # clip values <0 or >1
             prediction_vis = np.clip(prediction_vis, 0, 1)
 
