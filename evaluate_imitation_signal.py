@@ -19,10 +19,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
             rotate_idx = canvas_row*4+canvas_col
             prediction_vis = predictions[rotate_idx,:,:].copy()
 
-            # Reduce the dynamic range so the visualization looks better
-            prediction_vis = prediction_vis/np.max(prediction_vis)
-
-            # shouldn't be necessary since l2 distances squared are all positive, but just in case
+            # clip values <0 or >1
             prediction_vis = np.clip(prediction_vis, 0, 1)
 
             # reshape to 224x224 (or whatever image size is), and color
@@ -40,7 +37,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
 
             # blend image and colorized probability heatmap
             prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
-                    blend_ratio, prediction_vis, 1-blend_ratio)
+                    blend_ratio, prediction_vis, 1-blend_ratio, 0)
 
             # add image to row canvas
             if tmp_row_canvas is None:
@@ -191,6 +188,7 @@ if __name__ == '__main__':
         executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions',
             'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0'][:grasp_successes.shape[0]]
 
+        # TODO(adit98) wrap in a function and use multiprocessing
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
             # store indices of masked spaces
@@ -223,7 +221,7 @@ if __name__ == '__main__':
                 l2_dist /= np.max(l2_dist)
 
                 # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
-                im_mask = (1 - l2_dist) ** 2
+                im_mask = 1 - l2_dist
 
                 # load original depth/rgb maps
                 orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
