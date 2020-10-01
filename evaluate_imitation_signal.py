@@ -193,8 +193,9 @@ if __name__ == '__main__':
 
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
-            # see how many spaces were masked
-            print(np.min((embedding[0] == np.zeros([64, 1, 1])).astype(int), axis=0).mean())
+            # store indices of masked spaces
+            mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=0) == 1).astype(int)
+
             if args.exec_viz:
                 match_ind = executed_actions[frame_ind][1:].astype(int)
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
@@ -202,6 +203,12 @@ if __name__ == '__main__':
             else:
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
+
+            # set masked spaces to have max of l2_dist*1.1 distance
+            print(mask.shape)
+            print(mask[0, 0])
+            print(l2_dist.shape)
+            l2_dist[mask] = np.max(l2_dist) * 1.1
 
 
             # TODO(adit98) need to add back action_success_inds array
