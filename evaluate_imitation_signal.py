@@ -19,9 +19,6 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
             rotate_idx = canvas_row*4+canvas_col
             prediction_vis = predictions[rotate_idx,:,:].copy()
 
-            print(np.min(prediction_vis))
-            print(np.max(prediction_vis))
-            print(np.mean(prediction_vis))
             # clip values <0 or >1
             prediction_vis = np.clip(prediction_vis, 0, 1)
 
@@ -202,12 +199,12 @@ if __name__ == '__main__':
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
                     :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
                 # set masked spaces to have max of l2_dist*1.1 distance
-                l2_dist[mask] = np.max(l2_dist) * 1.1
+                l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
 
             else:
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
                 # set masked spaces to have max of l2_dist*1.1 distance
-                l2_dist[mask] = np.max(l2_dist) * 1.1
+                l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
 
 
