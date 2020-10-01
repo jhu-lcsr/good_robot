@@ -8,7 +8,7 @@ import cv2
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.3):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5):
     canvas = None
     num_rotations = predictions.shape[0]
 
@@ -40,7 +40,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
 
             # blend image and colorized probability heatmap
             prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
-                    blend_ratio, prediction_vis, 1-blend_ratio, 0.5)
+                    blend_ratio, prediction_vis, 1-blend_ratio)
 
             # add image to row canvas
             if tmp_row_canvas is None:
@@ -194,22 +194,20 @@ if __name__ == '__main__':
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
             # store indices of masked spaces
-            print(embedding.shape)
-            mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=0) == 1).astype(int)
+            mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
             if args.exec_viz:
                 match_ind = executed_actions[frame_ind][1:].astype(int)
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
                     :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+                # set masked spaces to have max of l2_dist*1.1 distance
+                l2_dist[mask] = np.max(l2_dist) * 1.1
+
             else:
                 l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
+                # set masked spaces to have max of l2_dist*1.1 distance
+                l2_dist[mask] = np.max(l2_dist) * 1.1
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
-
-            # set masked spaces to have max of l2_dist*1.1 distance
-            print(mask.shape)
-            print(mask[0, 0])
-            print(l2_dist.shape)
-            l2_dist[mask] = np.max(l2_dist) * 1.1
 
 
             # TODO(adit98) need to add back action_success_inds array
@@ -220,12 +218,12 @@ if __name__ == '__main__':
             #    print('executed_action ind:', executed_actions[frame_ind])
 
             if args.save_visualizations:
-                # make l2_dist range from 0 to 1                                   
+                # make l2_dist range from 0 to 1
                 l2_dist = l2_dist - np.min(l2_dist)
                 l2_dist /= np.max(l2_dist)
 
                 # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
-                im_mask = (1 - l2_dist) ** 4
+                im_mask = (1 - l2_dist) ** 2
 
                 # load original depth/rgb maps
                 orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
