@@ -49,7 +49,8 @@ class LanguageTrainer:
                  num_epochs: int,
                  device: torch.device,
                  checkpoint_dir: str,
-                 num_models_to_keep: int): 
+                 num_models_to_keep: int,
+                 generate_after_n: int): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
@@ -57,8 +58,11 @@ class LanguageTrainer:
         self.num_epochs = num_epochs
         self.checkpoint_dir = checkpoint_dir
         self.num_models_to_keep = num_models_to_keep
+        self.generate_after_n = generate_after_n
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
+        self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
+        #self._loss_fxn = torch.nn.CrossEntropyLoss()
         self.device = device
 
     def train(self):
@@ -77,36 +81,39 @@ class LanguageTrainer:
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
-        for batch_trajectory in tqdm(self.train_data): 
-            for batch_instance in batch_trajectory: 
-                #self.generate_debugging_image(batch_instance, f"epoch_{epoch}_gold")
+        for b, batch_trajectory in tqdm(enumerate(self.train_data)): 
+            #print(f"batch {b} has trajectory of length {len(batch_trajectory.to_iterate)}") 
+            for i, batch_instance in enumerate(batch_trajectory): 
+                #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
                 loss.backward() 
                 self.optimizer.step() 
+                # TODO (elias) remove this when done debugging 
+                #break 
 
         print(f"Validating epoch {epoch}...") 
         total_acc = 0.0 
         total = 0 
 
         self.encoder.eval() 
-        for dev_batch_trajectory in tqdm(self.val_data): 
-            for dev_batch_instance in dev_batch_trajectory: 
-                total_acc += self.validate(dev_batch_instance, epoch) 
+        for b, dev_batch_trajectory in tqdm(enumerate(self.val_data)): 
+            for i, dev_batch_instance in enumerate(dev_batch_trajectory): 
+                total_acc += self.validate(dev_batch_instance, epoch, b, i) 
                 total += 1
 
         mean_acc = total_acc / total 
         print(f"Epoch {epoch} has acc {mean_acc * 100}") 
         return mean_acc 
 
-    def validate(self, batch_instance, epoch_num): 
+    def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         outputs = self.encoder(batch_instance) 
         accuracy = self.compute_localized_accuracy(batch_instance, outputs) 
             
-        if epoch_num > 80: 
-            self.generate_debugging_image(outputs, f"epoch_{epoch_num}_pred")
-            self.generate_debugging_image(batch_instance, f"epoch_{epoch_num}_gold")
+        if epoch_num > self.generate_after_n: 
+            self.generate_debugging_image(outputs, f"epoch_{epoch_num}_{batch_num}_{instance_num}_pred")
+            self.generate_debugging_image(batch_instance, f"epoch_{epoch_num}_{batch_num}_{instance_num}_gold")
             sys.exit() 
 
         return accuracy
@@ -119,12 +126,12 @@ class LanguageTrainer:
 
         values, pred_pixels = torch.max(outputs['next_position'], dim=1) 
         neg_indices = next_pos != prev_pos
-
-        pred_pixels_of_interest = pred_pixels[neg_indices.squeeze(1)]
+        pred_pixels_of_interest = pred_pixels[neg_indices.squeeze(-1)]
 
         # flatten  
         pred_pixels = pred_pixels_of_interest.reshape(-1).detach().cpu()
         gold_pixels = gold_pixels_of_interest.reshape(-1).detach().cpu()
+
         # compare 
         total = gold_pixels.shape[0]
 
@@ -150,14 +157,19 @@ class LanguageTrainer:
         acc = matching/total 
         return acc 
 
-    def generate_debugging_image(self, data, filename):
-        # 21 x 4 x 64 x 64 
-        next_pos = data["next_position"][0]
-        if next_pos.shape[0] == 21:
-            # take argmax 
+    def generate_debugging_image(self, data, filename, is_input=False):
+        # 9 x 21 x 4 x 64 x 64 
+        # just get first image in batch, should be all identical
+        if not is_input:
+            next_pos = data["next_position"][0]
+        else:
+            next_pos = data["previous_position_for_acc"][0]
+        # TODO (elias): debugging treat as 2-way 
+        if next_pos.shape[0] == 2: 
+        #if next_pos.shape[0] == 21:
+            # take argmax if distribution 
             next_pos_id, next_pos = torch.max(next_pos, dim = 0) 
         next_pos = next_pos.squeeze(0)
-        print(f"next pos {next_pos.shape}") 
         # make a logging dir 
         if not os.path.exists(os.path.join(self.checkpoint_dir, "images")):
             os.mkdir(os.path.join(self.checkpoint_dir, "images"))
@@ -165,11 +177,13 @@ class LanguageTrainer:
         xs = np.arange(0, 64, 1)
         zs = np.arange(0, 64, 1)
         # separate plot per depth slice 
-        for height in range(4):
+        # TODO (elias) add other heights back in 
+        for height in range(1): 
+        #for height in range(4):
             fig = plt.figure(figsize=(12,12))
             ax = fig.gca()
-            ax.set_xticks([0, 64])
-            ax.set_yticks([0, 64]) 
+            ax.set_xticks([0, 16, 32, 48, 64])
+            ax.set_yticks([0, 16, 32, 48, 64]) 
             ax.set_ylim(0, 64)
             ax.set_xlim(0, 64)
             plt.grid() 
@@ -177,10 +191,10 @@ class LanguageTrainer:
             to_plot_xs, to_plot_zs, to_plot_labels = [], [], []
             for x_pos in xs:
                 for z_pos in zs:
-                    #label = next_pos[depth, x_pos, y_pos].item() 
                     label = next_pos[x_pos, z_pos, height].item() 
                     if height > 0 and label > 0:
-                        print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, height}")
+                        pass 
+                        #print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, height}")
                     # don't plot background 
                     if label != 0: 
                         label = int(label) 
@@ -196,16 +210,64 @@ class LanguageTrainer:
                 
             print(f"saving to {file_path}") 
             plt.savefig(file_path) 
+            plt.close() 
 
     def compute_loss(self, inputs, outputs):
         pred_image = outputs["next_position"]
         true_image = inputs["next_position"]
+        next_pos = batch_instance["next_position"]
+        prev_pos = batch_instance["previous_position_for_acc"]
+
+        gold_pixels_of_interest = next_pos[next_pos != prev_pos]
 
         bsz, n_blocks, width, height, depth = pred_image.shape
         true_image = true_image.reshape((bsz, width, height, depth)).long()
         true_image = true_image.to(self.device) 
 
-        loss = self.loss_fxn(pred_image, true_image) 
+        # weigh by class imbalance 
+        zero_idxs = true_image == 0
+        ones_idxs = true_image != 0
+        num_background = torch.sum(torch.ones_like(true_image)[zero_idxs]).item()
+        num_foreground = torch.sum(torch.ones_like(true_image)).item() - num_background 
+        total = num_background + num_foreground 
+
+        #print(f"num_background {type(num_background)} num_foreground {num_foreground} total {total}") 
+
+        perc_background = num_background/total
+        perc_foreground = num_foreground/total
+
+        pred_zero_idxs = zero_idxs.unsqueeze(1).repeat(1,2,1,1,1)
+        pred_ones_idxs = ones_idxs.unsqueeze(1).repeat(1,2,1,1,1)
+
+
+        #print(f"perc_background {perc_background} perc_foreground {perc_foreground}") 
+
+        #background_loss = self.loss_fxn(pred_image[pred_zero_idxs].reshape(-1, 2),
+        #                                true_image[zero_idxs])
+        #foreground_loss = self.loss_fxn(pred_image[pred_ones_idxs].reshape(-1, 2),
+        #                                true_image[ones_idxs])
+        #print(f"background_loss {background_loss} {(1/perc_background) *background_loss}")
+        #print(f"foreround_loss {foreground_loss} {(1/perc_foreground) *foreground_loss}")
+        #loss = (1/perc_background) * background_loss + (1/perc_foreground) * foreground_loss
+        #loss = background_loss + 10 * foreground_loss
+
+        total_loss = self.loss_fxn(pred_image, true_image) 
+        fore_loss = self.fore_loss_fxn(pred_image, true_image) 
+        loss = total_loss + fore_loss
+        #print(f"total {total_loss} + foreground only {fore_loss} = loss: {loss.item()}")  
+
+        pred_image = torch.argmax(pred_image, dim = 1).squeeze(1)
+        print(f"true_image: {true_image[0, 34:44, 6:16, 0]}")
+        print(f"pred_image: {pred_image[0, 34:44, 6:16, 0]}")
+        
+        #if loss.item() < 0.01:
+        #    print(f"loss is {loss.item()}") 
+        #    pred_image = torch.argmax(pred_image, dim = 1).squeeze(1)
+        #    print(pred_image.shape) 
+        #    print(f"loss converged") 
+        #    print(f"true_image: {true_image[0, 0:10, 0:10, 0]}") 
+        #    print(f"pred_image: {pred_image[0, 0:10, 0:10, 0]}") 
+        #    sys.exit() 
 
         return loss 
 
@@ -288,7 +350,7 @@ def main(args):
 
     #encoder = encoder.to(torch.device(device))
     # construct optimizer 
-    optimizer = torch.optim.Adam(encoder.parameters())
+    optimizer = torch.optim.Adam(encoder.parameters(), lr = 0.01)
 
     try:
         os.mkdir(args.checkpoint_dir)
@@ -307,7 +369,8 @@ def main(args):
                               num_epochs = args.num_epochs,
                               device = device,
                               checkpoint_dir = args.checkpoint_dir,
-                              num_models_to_keep = args.num_models_to_keep) 
+                              num_models_to_keep = args.num_models_to_keep,
+                              generate_after_n = args.generate_after_n) 
     trainer.train() 
 
 if __name__ == "__main__":
@@ -337,6 +400,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
     parser.add_argument("--num-epochs", type=int, default=3) 
+    parser.add_argument("--generate-after-n", type=int, default=10) 
 
     args = parser.parse_args()
     main(args) 

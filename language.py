@@ -92,6 +92,7 @@ class LanguageEncoder(torch.nn.Module):
         idxs, lengths = zip(*lengths) 
         # tensorize lengths 
         lengths  = torch.tensor(lengths).float() 
+        # at train-time, uses the gold previous input 
         pos_input = data_batch["previous_position"]
         # embed langauge 
         if type(language[0]) == str:

@@ -25,7 +25,7 @@ class TrajectoryIterator:
             except ValueError:
                 command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, length = self.traj.to_iterate[self._index]
                 image=None
-            
+           
             return {"command": command,
                     "previous_position": prev_pos,
                     "next_position": next_pos,
@@ -103,8 +103,6 @@ class BaseTrajectory:
         # create a grid d x w x h
         if make_z: 
             height, width, depth = 4, 64, 64
-            n_blocks = 20
-
             for i, position_list in enumerate(positions): 
                 image = np.zeros((width, depth, height, 1)) 
 
@@ -112,13 +110,15 @@ class BaseTrajectory:
                     new_x,  new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth) )
 
-                    offset = 1
+                    offset = 2
                     y_val = int(4 * 1 * y) 
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for z_val in range(new_z - offset, new_z + offset):
                             try:
-                                image[x_val, z_val, y_val] = block_idx + 1
+                                #image[x_val, z_val, y_val] = block_idx + 1
+                                # TODO (elias) for debugging, make all blocks same idx
+                                image[x_val, z_val, y_val] = 1
                             except IndexError:
                                 # at the edges 
                                 pass 
@@ -138,12 +138,16 @@ class BaseTrajectory:
                 for block_idx, (x, y, z) in enumerate(position_list): 
                     new_x, new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth)) 
-                    offset = 1
+                    offset = 2
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for z_val in range(new_z - offset, new_z + offset):
-                            image[x_val, z_val, 0] = block_idx
-                            image[x_val, z_val, 1] = y
+                            # TODO (elias): for debugging, make all blocks same
+                            #image[x_val, z_val, 0] = block_idx + 1
+                            image[x_val, z_val, 0] = 1
+
+                            # can only have 4 vertical positions so mod it 
+                            image[x_val, z_val, 1] = y % 4
 
                 image  = torch.tensor(image).float() 
                 image = image.unsqueeze(0)
@@ -291,8 +295,8 @@ class DatasetReader:
                 positions = line_data["states"]
                 rotations = line_data["rotations"]
                 commands = line_data["notes"]
-                # TODO: add images  
                 # split off previous and subsequent positions and rotations 
+                # TODO (elias) switch back to this: 
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
 
@@ -334,6 +338,7 @@ class DatasetReader:
 
                         self.data[split].append(trajectory) 
                         vocab |= trajectory.traj_vocab
+
         return vocab
 
     def shuffle_trajectories(self, split=None): 

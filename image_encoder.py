@@ -77,6 +77,28 @@ def get_deconv_out_dim(input_dim,
                       dilation = 1):
     return (input_dim - 1) * stride - 2 * input_padding + dilation * (kernel - 1) + output_padding + 1
 
+class FinalClassificationLayer(torch.nn.Module):
+    def __init__(self,
+                 input_channels: int,
+                 hidden_dim: int,
+                 n_classes: int):
+        super(FinalClassificationLayer, self).__init__() 
+        self.input_channels = input_channels
+        self.n_classes = n_classes
+        
+        self.linear_1 = torch.nn.Linear(input_channels, hidden_dim)
+        self.act = torch.nn.ReLU()
+        self.linear_2 = torch.nn.Linear(hidden_dim, n_classes)
+
+    def forward(self, encoded_image):
+        bsz, n_channels, width, height, depth = encoded_image.shape 
+        encoded_image = encoded_image.reshape(bsz, width, height, depth, n_channels)
+        encoded_image = self.linear_1(encoded_image)
+        encoded_image = self.act(encoded_image)
+        encoded_image = self.linear_2(encoded_image) 
+        encoded_image = encoded_image.reshape(bsz, self.n_classes, width, height, depth) 
+        return encoded_image
+
 class DeconvolutionalNetwork(torch.nn.Module):
     def __init__(self,
                  input_channels: int,
@@ -120,7 +142,8 @@ class DeconvolutionalNetwork(torch.nn.Module):
 
         self.output_dim = xy_output_dim
         # per pixel per class
-        conv_last = torch.nn.ConvTranspose3d(output_channels*2, num_blocks+1, 1, padding=0)
+        #conv_last = torch.nn.ConvTranspose3d(output_channels*2, num_blocks+1, 1, padding=0)
+        conv_last = FinalClassificationLayer(output_channels*2, output_channels * 4, num_blocks + 1) 
         layers.append(conv_last) 
         self.layers = torch.nn.ModuleList(layers) 
 
@@ -134,5 +157,7 @@ class DeconvolutionalNetwork(torch.nn.Module):
         for layer in self.layers:
             encoded = layer(encoded) 
         # output: [batch, width, height] 
-        output = encoded.reshape((bsz, 21, 64, 64, 4))
+        # TODO (elias): for debugging, set to binary class
+        #output = encoded.reshape((bsz, 21, 64, 64, 4))
+        output = encoded.reshape((bsz, 2, 64, 64, 4))
         return output 
