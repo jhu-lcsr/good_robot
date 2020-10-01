@@ -993,8 +993,6 @@ def main(args):
                 # run forward pass, keep action features and get softmax predictions
                 push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
                             valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
-                print(type(grasp_feat))
-                print(grasp_feat.shape)
                 action_feat = [push_feat, grasp_feat, place_feat]
 
                 # TODO(adit98) this ONLY works with stacks
