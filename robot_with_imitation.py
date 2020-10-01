@@ -587,7 +587,7 @@ def main(args):
                 if args.use_demo:
                     # TODO(adit98) check if this is the best place for this
                     # TODO(adit98) consider better solution than pickle=True for 3D array saving
-                    trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]])
+                    trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]].filled(fill_value=0))
                     logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log, pickle=True)
 
                 # Visualize executed primitive, and affordances
