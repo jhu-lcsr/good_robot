@@ -194,6 +194,7 @@ if __name__ == '__main__':
         # find nearest neighbor for each imitation embedding
         for frame_ind, embedding in enumerate(executed_action_embeddings):
             # store indices of masked spaces
+            print(embedding.shape)
             mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=0) == 1).astype(int)
 
             if args.exec_viz:
