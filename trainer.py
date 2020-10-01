@@ -398,7 +398,7 @@ class Trainer(object):
         return sample_stack_height, sample_primitive_action_id, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
 
     # Compute forward pass through model to compute affordances/Q
-    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False):
+    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False, demo_mask=False):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
@@ -529,6 +529,7 @@ class Trainer(object):
 
         if not self.place:
             place_predictions = None
+
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
@@ -537,6 +538,14 @@ class Trainer(object):
                 push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap, push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
 
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+            if demo_mask:
+                push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+            else:
+                # Mask pixels we know cannot lead to progress
+                push_predictions = np.ma.masked_array(push_predictions)
+                grasp_predictions = np.ma.masked_array(grasp_predictions)
+                place_predictions = np.ma.masked_array(place_predictions)
+
         else:
             # Mask pixels we know cannot lead to progress, in this case we don't apply common sense masking
             push_predictions = np.ma.masked_array(push_predictions)
