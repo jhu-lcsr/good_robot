@@ -534,13 +534,14 @@ class Trainer(object):
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
             if keep_action_feat and not use_demo:
                 push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap, push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
-            if demo_mask:
+            elif use_demo and demo_mask:
                 push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
             else:
                 # Mask pixels we know cannot lead to progress
                 push_predictions = np.ma.masked_array(push_predictions)
                 grasp_predictions = np.ma.masked_array(grasp_predictions)
-                place_predictions = np.ma.masked_array(place_predictions)
+                if self.place:
+                    place_predictions = np.ma.masked_array(place_predictions)
 
         else:
             # Mask pixels we know cannot lead to progress
