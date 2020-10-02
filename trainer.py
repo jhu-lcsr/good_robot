@@ -543,7 +543,7 @@ class Trainer(object):
                     else:
                         push_feat = np.ma.masked_array(push_predictions)
                         grasp_feat = np.ma.masked_array(grasp_predictions)
-                        if place:
+                        if self.place:
                             place_feat = np.ma.masked_array(place_predictions)
 
                 # using demo and demo mask is set, so common sense mask predictions
