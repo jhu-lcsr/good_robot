@@ -538,10 +538,10 @@ class Trainer(object):
                     push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
                             push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
                 else:
-                    push_feat = np.ma.masked_array(push_predictions)
-                    grasp_feat = np.ma.masked_array(grasp_predictions)
+                    push_feat = np.ma.masked_array(push_feat)
+                    grasp_feat = np.ma.masked_array(grasp_feat)
                     if self.place:
-                        place_feat = np.ma.masked_array(place_predictions)
+                        place_feat = np.ma.masked_array(place_feat)
 
             # mask predictions if not demo
             if not use_demo:
