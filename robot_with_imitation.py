@@ -1026,9 +1026,6 @@ def main(args):
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(color_heightmap,
                         valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
-            # TODO(adit98) remove
-            print(type(grasp_predictions))
-
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
                 # START THE REAL ROBOT EXECUTING THE NEXT ACTION IN THE OTHER THREAD,
