@@ -532,6 +532,7 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
+            print('keep_action_feat:', keep_action_feat, 'use_demo:', use_demo, 'demo_mask:', demo_mask)
             if keep_action_feat and not use_demo:
                 push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap, push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
             elif use_demo and demo_mask:
