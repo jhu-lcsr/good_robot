@@ -553,6 +553,9 @@ class Trainer(object):
                     grasp_predictions = np.ma.masked_array(grasp_predictions)
                     if self.place:
                         place_predictions = np.ma.masked_array(place_predictions)
+            else:
+                push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                        push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
 
         else:
             # Mask pixels we know cannot lead to progress, in this case we don't apply common sense masking
