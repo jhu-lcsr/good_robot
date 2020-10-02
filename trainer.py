@@ -807,7 +807,6 @@ class Trainer(object):
                 # This new common sense reward will have the same weight as the actual historically executed action.
                 new_best_pix_ind, each_action_max_coordinate, predicted_value = action_space_argmax(primitive_action, push_predictions, grasp_predictions, place_predictions)
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
-                print(type(grasp_predictions))
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
                     # The tmp_label value will already be 0, so just set the weight.
                     tmp_label_weights[each_action_max_coordinate[primitive_action]] = 1
