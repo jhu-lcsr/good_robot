@@ -532,34 +532,33 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            if keep_action_feat:
+            if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
-                if not use_demo:
-                    if demo_mask:
-                        push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
-                                push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
-                    else:
-                        push_feat = np.ma.masked_array(push_predictions)
-                        grasp_feat = np.ma.masked_array(grasp_predictions)
-                        if self.place:
-                            place_feat = np.ma.masked_array(place_predictions)
+                if demo_mask:
+                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
+                else:
+                    push_feat = np.ma.masked_array(push_predictions)
+                    grasp_feat = np.ma.masked_array(grasp_predictions)
+                    if self.place:
+                        place_feat = np.ma.masked_array(place_predictions)
 
-                # using demo and demo mask is set, so common sense mask predictions
-                elif demo_mask:
+            # mask predictions if not demo
+            if not use_demo:
+                # mask action if self.common_sense is set
+                if self.place:
                     push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
-                
-                # cast predictions to masked array whether they are robot obs preds or demo preds
                 else:
-                    # Mask pixels we know cannot lead to progress
-                    push_predictions = np.ma.masked_array(push_predictions)
-                    grasp_predictions = np.ma.masked_array(grasp_predictions)
-                    if self.place:
-                        place_predictions = np.ma.masked_array(place_predictions)
+                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
 
             else:
-                push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
-                        push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                # Mask pixels we know cannot lead to progress
+                push_predictions = np.ma.masked_array(push_predictions)
+                grasp_predictions = np.ma.masked_array(grasp_predictions)
+                if self.place:
+                    place_predictions = np.ma.masked_array(place_predictions)
 
         else:
             # Mask pixels we know cannot lead to progress
