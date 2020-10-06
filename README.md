@@ -8,6 +8,9 @@ Click the image to watch the video:
 
 ## Paper, Abstract, and Citations
 
+[Good Robot! Paper on IEEE Xplore](http://doi.org/10.1109/LRA.2020.3015448)
+[Good Robot! Paper on ArXiV](https://arxiv.org/abs/1909.11730)
+
 ```
 @article{hundt2020good,
 	title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
@@ -16,7 +19,8 @@ Click the image to watch the video:
 	volume="5",
 	number="4",
 	pages="6724--6731",
-	year="2020"
+	year="2020",
+	url={https://arxiv.org/abs/1909.11730}
 }
 ```
 
