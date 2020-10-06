@@ -16,6 +16,7 @@ from image_encoder import ImageEncoder, DeconvolutionalNetwork
 from language import LanguageEncoder, ConcatFusionModule
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
+from mlp import MLP 
 
 from data import DatasetReader
 
@@ -88,10 +89,9 @@ class LanguageTrainer:
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
+                print(f"loss {loss.item()}") 
                 loss.backward() 
                 self.optimizer.step() 
-                # TODO (elias) remove this when done debugging 
-                #break 
 
         print(f"Validating epoch {epoch}...") 
         total_acc = 0.0 
@@ -165,8 +165,8 @@ class LanguageTrainer:
         else:
             next_pos = data["previous_position_for_acc"][0]
         # TODO (elias): debugging treat as 2-way 
-        if next_pos.shape[0] == 2: 
-        #if next_pos.shape[0] == 21:
+        #if next_pos.shape[0] == 2: 
+        if next_pos.shape[0] == 21:
             # take argmax if distribution 
             next_pos_id, next_pos = torch.max(next_pos, dim = 0) 
         next_pos = next_pos.squeeze(0)
@@ -215,60 +215,38 @@ class LanguageTrainer:
     def compute_loss(self, inputs, outputs):
         pred_image = outputs["next_position"]
         true_image = inputs["next_position"]
-        next_pos = batch_instance["next_position"]
-        prev_pos = batch_instance["previous_position_for_acc"]
-
-        gold_pixels_of_interest = next_pos[next_pos != prev_pos]
+        prev_image  = inputs["previous_position_for_acc"]
 
         bsz, n_blocks, width, height, depth = pred_image.shape
         true_image = true_image.reshape((bsz, width, height, depth)).long()
         true_image = true_image.to(self.device) 
-
-        # weigh by class imbalance 
-        zero_idxs = true_image == 0
-        ones_idxs = true_image != 0
-        num_background = torch.sum(torch.ones_like(true_image)[zero_idxs]).item()
-        num_foreground = torch.sum(torch.ones_like(true_image)).item() - num_background 
-        total = num_background + num_foreground 
-
-        #print(f"num_background {type(num_background)} num_foreground {num_foreground} total {total}") 
-
-        perc_background = num_background/total
-        perc_foreground = num_foreground/total
-
-        pred_zero_idxs = zero_idxs.unsqueeze(1).repeat(1,2,1,1,1)
-        pred_ones_idxs = ones_idxs.unsqueeze(1).repeat(1,2,1,1,1)
-
-
-        #print(f"perc_background {perc_background} perc_foreground {perc_foreground}") 
-
-        #background_loss = self.loss_fxn(pred_image[pred_zero_idxs].reshape(-1, 2),
-        #                                true_image[zero_idxs])
-        #foreground_loss = self.loss_fxn(pred_image[pred_ones_idxs].reshape(-1, 2),
-        #                                true_image[ones_idxs])
-        #print(f"background_loss {background_loss} {(1/perc_background) *background_loss}")
-        #print(f"foreround_loss {foreground_loss} {(1/perc_foreground) *foreground_loss}")
-        #loss = (1/perc_background) * background_loss + (1/perc_foreground) * foreground_loss
-        #loss = background_loss + 10 * foreground_loss
-
+        prev_image = prev_image.reshape((bsz, width, height, depth)).long()
+        prev_image = prev_image.to(self.device) 
+        
+        # one total per-pixel loss 
         total_loss = self.loss_fxn(pred_image, true_image) 
+        # one loss on only foreground pixels, excludes index 0 
         fore_loss = self.fore_loss_fxn(pred_image, true_image) 
-        loss = total_loss + fore_loss
-        #print(f"total {total_loss} + foreground only {fore_loss} = loss: {loss.item()}")  
+
+        # find changes based on gold image 
+        pixels_of_interest = true_image != prev_image
+        # expand mask 
+        pixels_of_interest_for_pred = pixels_of_interest.unsqueeze(1).repeat(1, n_blocks, 1, 1, 1)
+        # isolate region 
+        gold_pixels_of_interest = true_image[pixels_of_interest]
+        pred_pixels_of_interest = pred_image[pixels_of_interest_for_pred].reshape((-1, n_blocks))
+
+        # two losses for just region of interest 
+        total_interest_loss = self.loss_fxn(pred_pixels_of_interest, gold_pixels_of_interest) 
+        fore_interest_loss = self.fore_loss_fxn(pred_pixels_of_interest, gold_pixels_of_interest) 
+        
+        # downweight overall loss, upweight regional loss 
+        #loss = 0.05 * (total_loss + fore_loss) +  (total_interest_loss + fore_interest_loss) 
+        #loss = total_interest_loss
+        loss = total_loss
 
         pred_image = torch.argmax(pred_image, dim = 1).squeeze(1)
-        print(f"true_image: {true_image[0, 34:44, 6:16, 0]}")
-        print(f"pred_image: {pred_image[0, 34:44, 6:16, 0]}")
         
-        #if loss.item() < 0.01:
-        #    print(f"loss is {loss.item()}") 
-        #    pred_image = torch.argmax(pred_image, dim = 1).squeeze(1)
-        #    print(pred_image.shape) 
-        #    print(f"loss converged") 
-        #    print(f"true_image: {true_image[0, 0:10, 0:10, 0]}") 
-        #    print(f"pred_image: {pred_image[0, 0:10, 0:10, 0]}") 
-        #    sys.exit() 
-
         return loss 
 
     def save_model(self, epoch, is_best):
@@ -334,6 +312,13 @@ def main(args):
                                            factor = args.deconv_factor,
                                            dropout = args.dropout) 
 
+    block_prediction_module = MLP(input_dim = fuser.output_dim,
+                                  hidden_dim = args.mlp_hidden_dim, 
+                                  output_dim = args.num_blocks, 
+                                  num_layers = args.mlp_num_layers, 
+                                  dropout = args.mlp_dropout)  
+                                                       
+
     if args.cuda is not None:
         device = f"cuda:{args.cuda}"
     else:
@@ -393,6 +378,10 @@ if __name__ == "__main__":
     # image decoder 
     parser.add_argument("--deconv-factor", type=int, default = 2) 
     parser.add_argument("--deconv-num-layers", type=int, default=2) 
+    # block mlp
+    parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 
+    parser.add_argument("--mlp-num-layers", type=int, default = 3) 
+    parser.add_argument("--mlp-dropout", type=float, default = 0.20) 
     # misc
     parser.add_argument("--output-type", type=str, default="mask")
     parser.add_argument("--dropout", type=float, default=0.2) 

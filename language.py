@@ -62,6 +62,7 @@ class LanguageEncoder(torch.nn.Module):
                  encoder: torch.nn.Module,
                  fuser: BaseFusionModule,
                  output_module: torch.nn.Module,
+                 block_prediction_module: torch.nn.Module,
                  device: torch.device):
         """
         embedder: a choice of 
@@ -76,6 +77,8 @@ class LanguageEncoder(torch.nn.Module):
         self.fuser = fuser
         self.output_module = output_module
         self.device = device 
+        self.block_prediction_module = block_prediction_module
+        self.softmax_fxn = torch.nn.LogSoftmax(dim = -1)
 
         # enable cuda
         for module in [self.image_encoder, self.encoder, self.fuser, self.output_module]:
@@ -109,11 +112,39 @@ class LanguageEncoder(torch.nn.Module):
         # expand image to batch size 
         pos_encoded = pos_encoded.expand(bsz, pos_hidden)
         # fuse image and language 
-        image_and_langauge = self.fuser(pos_encoded, lang_encoded)
-        # get output 
-        output = self.output_module(image_and_langauge) 
+        image_and_language = self.fuser(pos_encoded, lang_encoded)
+        # get block output 
+        block_output = self.block_prediction_module(image_and_language) 
+        # get image output 
+        image_output = self.output_module(image_and_language) 
+
+        output = self.filter_image_output(block_output, image_output) 
+            
         to_ret = {"next_position": output}
         return to_ret
+
+    def filter_image_output(block_output, image_output):
+        """
+        combing block distribution with per-pixel distribution 
+
+        Parameters
+        ----------
+        block output: [bsz, num_blocks]
+           logits per block
+        image_output [bsz, 64, 64, 4, num_blocks]         
+           logits per pixel 
+        """  
+        bsz, num_blocks = block_output.shape
+        block_output = block.output.reshape((bsz, 1, 1, 1, num_blocks))
+        image_output = self.softmax_fxn(image_output)
+        block_output = self.softmax_fxn(block_output) 
+        # multiply probs 
+        image_output += block_output
+
+        return image_output 
+
+        
+        
         
 
 

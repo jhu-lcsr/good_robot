@@ -21,9 +21,9 @@ class TrajectoryIterator:
         if self._index + 1 < len(self.traj.to_iterate):
             self._index += 1
             try:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, image, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, image, length = self.traj.to_iterate[self._index]
             except ValueError:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, length = self.traj.to_iterate[self._index]
                 image=None
            
             return {"command": command,
@@ -32,6 +32,7 @@ class TrajectoryIterator:
                     "previous_position_for_acc": prev_pos_for_acc,
                     "previous_rotation": prev_rot,
                     "next_rotation": next_rot,
+                    "block_to_move": block_to_move, 
                     "image": image,
                     "length": length} 
 
@@ -59,8 +60,9 @@ class BaseTrajectory:
         self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands))
         self.previous_rotations = previous_rotations
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
-        self.next_positions_for_acc  = self.make_3d_positions(next_positions, batch_size = len(commands))
         self.next_rotations = next_rotations
+        self.blocks_to_move = self.get_blocks_to_move()
+
         self.images = images
         self.lengths = lengths
         self.traj_vocab = set() 
@@ -71,6 +73,7 @@ class BaseTrajectory:
                                    self.next_positions, 
                                    self.previous_rotations, 
                                    self.next_rotations, 
+                                   self.blocks_to_move,
                                    self.images, 
                                    self.lengths)) 
 
@@ -80,6 +83,27 @@ class BaseTrajectory:
 
     def __iter__(self):
         return TrajectoryIterator(self)
+
+    def get_blocks_to_move(self):
+        batch_idx = 0
+        bsz = self.previous_positions_for_acc[0].shape[0]
+        bad = 0
+        all_blocks_to_move = []
+        for timestep in range(len(self.previous_positions_for_acc)):
+            prev_pos = self.previous_positions_for_acc[timestep][batch_idx] 
+            next_pos = self.next_positions[ timestep][batch_idx]
+            different_pixels = prev_pos[prev_pos != next_pos]
+            # exclude background 
+            different_pixel_idx = different_pixels[different_pixels != 0]
+            try:
+                blocks_to_move = torch.ones((bsz, 1), dtype=torch.long) * different_pixel_idx.item() 
+                print(f"success {different_pixel_idx.item()} {self.commands[0][timestep]}") 
+            except ValueError:
+                blocks_to_move = torch.ones((bsz, 1), dtype=torch.long) * different_pixel_idx[0].item() 
+                bad += 1
+            all_blocks_to_move.append(blocks_to_move) 
+        print(f"there are {bad} blocks with >1 move") 
+        return all_blocks_to_move
 
     def make_3d_positions(self, positions, make_z = False, batch_size = 9):
         """
@@ -109,19 +133,19 @@ class BaseTrajectory:
                 for block_idx, (x, y, z) in enumerate(position_list): 
                     new_x,  new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth) )
-
-                    offset = 2
+                    
                     y_val = int(4 * 1 * y) 
+                    # TODO: (elias) try predicting only the center of each block, know size 
+                    image[new_x, new_z, y_val] = block_idx + 1 
+                    #offset = 2
                     # infilling 
-                    for x_val in range(new_x - offset, new_x + offset):
-                        for z_val in range(new_z - offset, new_z + offset):
-                            try:
-                                #image[x_val, z_val, y_val] = block_idx + 1
-                                # TODO (elias) for debugging, make all blocks same idx
-                                image[x_val, z_val, y_val] = 1
-                            except IndexError:
-                                # at the edges 
-                                pass 
+                    #for x_val in range(new_x - offset, new_x + offset):
+                    #    for z_val in range(new_z - offset, new_z + offset):
+                    #        try:
+                    #            image[x_val, z_val, y_val] = block_idx + 1
+                    #        except IndexError:
+                    #            # at the edges 
+                    #            pass 
 
                 image  = torch.tensor(image).float() 
                 image = image.unsqueeze(0)
@@ -142,9 +166,7 @@ class BaseTrajectory:
                     # infilling 
                     for x_val in range(new_x - offset, new_x + offset):
                         for z_val in range(new_z - offset, new_z + offset):
-                            # TODO (elias): for debugging, make all blocks same
-                            #image[x_val, z_val, 0] = block_idx + 1
-                            image[x_val, z_val, 0] = 1
+                            image[x_val, z_val, 0] = block_idx + 1
 
                             # can only have 4 vertical positions so mod it 
                             image[x_val, z_val, 1] = y % 4
@@ -296,7 +318,6 @@ class DatasetReader:
                 rotations = line_data["rotations"]
                 commands = line_data["notes"]
                 # split off previous and subsequent positions and rotations 
-                # TODO (elias) switch back to this: 
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
 
