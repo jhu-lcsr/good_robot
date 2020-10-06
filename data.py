@@ -96,16 +96,15 @@ class BaseTrajectory:
             # exclude background 
             different_pixel_idx = different_pixels[different_pixels != 0]
             try:
-                blocks_to_move = torch.ones((bsz, 1), dtype=torch.long) * different_pixel_idx.item() 
-                print(f"success {different_pixel_idx.item()} {self.commands[0][timestep]}") 
+                blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
             except ValueError:
-                blocks_to_move = torch.ones((bsz, 1), dtype=torch.long) * different_pixel_idx[0].item() 
+                blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
                 bad += 1
             all_blocks_to_move.append(blocks_to_move) 
         print(f"there are {bad} blocks with >1 move") 
         return all_blocks_to_move
 
-    def make_3d_positions(self, positions, make_z = False, batch_size = 9):
+    def make_3d_positions(self, positions, make_z = False, batch_size = 9, do_infilling = True):
         """
         take (x,y,z) positions and turn them into 1-hot 
         vector over block ids in a x,y,z coordinate grid 
@@ -136,16 +135,18 @@ class BaseTrajectory:
                     
                     y_val = int(4 * 1 * y) 
                     # TODO: (elias) try predicting only the center of each block, know size 
-                    image[new_x, new_z, y_val] = block_idx + 1 
-                    #offset = 2
                     # infilling 
-                    #for x_val in range(new_x - offset, new_x + offset):
-                    #    for z_val in range(new_z - offset, new_z + offset):
-                    #        try:
-                    #            image[x_val, z_val, y_val] = block_idx + 1
-                    #        except IndexError:
-                    #            # at the edges 
-                    #            pass 
+                    if do_infilling: 
+                        offset = 2
+                        for x_val in range(new_x - offset, new_x + offset):
+                            for z_val in range(new_z - offset, new_z + offset):
+                                try:
+                                    image[x_val, z_val, y_val] = block_idx + 1
+                                except IndexError:
+                                    # at the edges 
+                                    pass 
+                    else:
+                        image[new_x, new_z, y_val] = block_idx + 1 
 
                 image  = torch.tensor(image).float() 
                 image = image.unsqueeze(0)
@@ -239,13 +240,15 @@ class BatchedTrajectory(BaseTrajectory):
 
         # override 
         self.to_iterate = list(zip(self.commands, 
-                                   self.previous_positions,
+                                   self.previous_positions, 
                                    self.previous_positions_for_acc,
                                    self.next_positions, 
                                    self.previous_rotations, 
                                    self.next_rotations, 
+                                   self.blocks_to_move,
                                    self.images, 
                                    self.lengths)) 
+
 
     def tokenize(self, commands): 
         for annotator_idx, command_list in enumerate(commands):

@@ -26,6 +26,7 @@ class LSTMEncoder(torch.nn.Module):
 
     def forward(self, embedded_tokens, lengths):
         embedded_tokens = embedded_tokens.to(self.device) 
+        #print(f"embedded tokens {embedded_tokens[0, 0:10, 0:3]}") 
         embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, lengths, 
                                                           batch_first=True, 
                                                           enforce_sorted=True) 

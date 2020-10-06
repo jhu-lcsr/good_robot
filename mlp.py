@@ -26,14 +26,17 @@ class MLP(torch.nn.Module):
 
         for i in range(self.num_layers-1):
             layer_i = torch.nn.Linear(hidden_dim, hidden_dim)
-            self.layers += [layer_i, self.append, dropout_layer]
+            self.layers += [layer_i, self.activation, dropout_layer]
 
         layer_n = torch.nn.Linear(hidden_dim, output_dim)
         self.layers.append(layer_n) 
-        self.layers = torch.nn.ModuleList(*self.layers)   
+        self.layers = torch.nn.ModuleList(self.layers)   
 
     def forward(self, inputs): 
-        outputs = self.layers(inputs) 
+        outputs = inputs
+
+        for i, layer in enumerate(self.layers): 
+            outputs = layer(outputs) 
         return outputs 
         
             

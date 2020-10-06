@@ -23,8 +23,6 @@ class SourceAttention(torch.nn.Module):
         output  = torch.bmm(weights, v) 
         return output 
 
-
-
 class BaseFusionModule(torch.nn.Module):
     def __init__(self,
                  image_size,
@@ -81,7 +79,7 @@ class LanguageEncoder(torch.nn.Module):
         self.softmax_fxn = torch.nn.LogSoftmax(dim = -1)
 
         # enable cuda
-        for module in [self.image_encoder, self.encoder, self.fuser, self.output_module]:
+        for module in [self.embedder, self.image_encoder, self.encoder, self.fuser, self.output_module, self.block_prediction_module]:
             module = module.to(self.device) 
             module.device = device 
 
@@ -120,10 +118,11 @@ class LanguageEncoder(torch.nn.Module):
 
         output = self.filter_image_output(block_output, image_output) 
             
-        to_ret = {"next_position": output}
+        to_ret = {"next_position": output,
+                  "pred_block_logits": block_output} 
         return to_ret
 
-    def filter_image_output(block_output, image_output):
+    def filter_image_output(self, block_output, image_output):
         """
         combing block distribution with per-pixel distribution 
 
@@ -135,13 +134,16 @@ class LanguageEncoder(torch.nn.Module):
            logits per pixel 
         """  
         bsz, num_blocks = block_output.shape
-        block_output = block.output.reshape((bsz, 1, 1, 1, num_blocks))
-        image_output = self.softmax_fxn(image_output)
+        bsz, num_blocks, width, depth, height = image_output.shape 
+        image_output = image_output.permute(0, 4, 2, 3, 1) 
+        block_output = block_output.reshape((bsz, 1, 1, 1, num_blocks))
+        block_output = block_output.repeat((1, height, width, depth, 1)) 
+        image_output = self.softmax_fxn(image_output) 
         block_output = self.softmax_fxn(block_output) 
         # multiply probs 
-        image_output += block_output
-
-        return image_output 
+        output = image_output + block_output
+        output = output.permute(0, 4, 2, 3, 1) 
+        return output 
 
         
         

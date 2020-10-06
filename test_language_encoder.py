@@ -62,8 +62,9 @@ class LanguageTrainer:
         self.generate_after_n = generate_after_n
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
+        self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
+        self.nll_loss_fxn = torch.nn.NLLLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
-        #self._loss_fxn = torch.nn.CrossEntropyLoss()
         self.device = device
 
     def train(self):
@@ -89,34 +90,39 @@ class LanguageTrainer:
                 self.optimizer.zero_grad() 
                 outputs = self.encoder(batch_instance) 
                 loss = self.compute_loss(batch_instance, outputs) 
-                print(f"loss {loss.item()}") 
+                #print(f"loss {loss.item()}") 
                 loss.backward() 
                 self.optimizer.step() 
 
         print(f"Validating epoch {epoch}...") 
         total_acc = 0.0 
         total = 0 
+        total_block_acc = 0.0 
 
         self.encoder.eval() 
         for b, dev_batch_trajectory in tqdm(enumerate(self.val_data)): 
             for i, dev_batch_instance in enumerate(dev_batch_trajectory): 
-                total_acc += self.validate(dev_batch_instance, epoch, b, i) 
+                pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, i) 
+                total_acc += pixel_acc
+                total_block_acc += block_acc
                 total += 1
 
         mean_acc = total_acc / total 
-        print(f"Epoch {epoch} has acc {mean_acc * 100}") 
+        mean_block_acc = total_block_acc / total
+        print(f"Epoch {epoch} has pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
         return mean_acc 
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         outputs = self.encoder(batch_instance) 
         accuracy = self.compute_localized_accuracy(batch_instance, outputs) 
+        block_accuracy = self.compute_block_accuracy(batch_instance, outputs) 
             
         if epoch_num > self.generate_after_n: 
             self.generate_debugging_image(outputs, f"epoch_{epoch_num}_{batch_num}_{instance_num}_pred")
             self.generate_debugging_image(batch_instance, f"epoch_{epoch_num}_{batch_num}_{instance_num}_gold")
             sys.exit() 
 
-        return accuracy
+        return accuracy, block_accuracy
 
     def compute_localized_accuracy(self, batch_instance, outputs): 
         next_pos = batch_instance["next_position"]
@@ -212,7 +218,39 @@ class LanguageTrainer:
             plt.savefig(file_path) 
             plt.close() 
 
+    def compute_block_accuracy(self, inputs, outputs): 
+        pred_block_logits = outputs["pred_block_logits"] 
+        true_block_idxs  = inputs["block_to_move"]
+        true_block_idxs = true_block_idxs.to(self.device).long().reshape(-1) 
+       
+        pred_block_decisions = torch.argmax(pred_block_logits)
+        num_correct = torch.sum(pred_block_decisions == true_block_idxs).detach().cpu().item() 
+        accuracy = num_correct / true_block_idxs.shape[0]
+        return accuracy
+
     def compute_loss(self, inputs, outputs):
+        pred_image = outputs["next_position"]
+        true_image = inputs["next_position"]
+        prev_image  = inputs["previous_position_for_acc"]
+
+        pred_block_logits = outputs["pred_block_logits"] 
+        true_block_idxs  = inputs["block_to_move"]
+        true_block_idxs = true_block_idxs.to(self.device).long().reshape(-1) 
+        
+        bsz, n_blocks, width, height, depth = pred_image.shape
+        true_image = true_image.reshape((bsz, width, height, depth)).long()
+        true_image = true_image.to(self.device) 
+        prev_image = prev_image.reshape((bsz, width, height, depth)).long()
+        prev_image = prev_image.to(self.device) 
+        
+        # loss per pixel 
+        pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
+        # loss per block
+        block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
+        return pixel_loss + block_loss
+        #return block_loss
+
+    def compute_loss_no_blocks(self, inputs, outputs):
         pred_image = outputs["next_position"]
         true_image = inputs["next_position"]
         prev_image  = inputs["previous_position_for_acc"]
@@ -297,6 +335,14 @@ def main(args):
                               bidirectional = args.bidirectional) 
     else:
         raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
+
+    if args.cuda is not None:
+        device = f"cuda:{args.cuda}"
+    else:
+        device = "cpu"
+    device = torch.device(device)  
+    print(f"Training on device {device}") 
+
     # construct image encoder 
     image_encoder = ImageEncoder(input_dim = 2, 
                                  n_layers = args.conv_num_layers,
@@ -314,28 +360,23 @@ def main(args):
 
     block_prediction_module = MLP(input_dim = fuser.output_dim,
                                   hidden_dim = args.mlp_hidden_dim, 
-                                  output_dim = args.num_blocks, 
+                                  output_dim = args.num_blocks+1, 
                                   num_layers = args.mlp_num_layers, 
                                   dropout = args.mlp_dropout)  
                                                        
 
-    if args.cuda is not None:
-        device = f"cuda:{args.cuda}"
-    else:
-        device = "cpu"
-    device = torch.device(device)  
-    print(f"Training on device {device}") 
     # put it all together into one module 
     encoder = LanguageEncoder(image_encoder = image_encoder, 
                               embedder = embedder, 
                               encoder = encoder, 
                               fuser = fuser, 
                               output_module = output_module,
+                              block_prediction_module = block_prediction_module,
                               device = device) 
 
     #encoder = encoder.to(torch.device(device))
     # construct optimizer 
-    optimizer = torch.optim.Adam(encoder.parameters(), lr = 0.01)
+    optimizer = torch.optim.Adam(encoder.parameters())
 
     try:
         os.mkdir(args.checkpoint_dir)
