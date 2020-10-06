@@ -8,7 +8,7 @@ Click the image to watch the video:
 
 ## Paper, Abstract, and Citations
 
-[Good Robot! Paper on IEEE Xplore](http://doi.org/10.1109/LRA.2020.3015448)
+[Good Robot! Paper on IEEE Xplore](http://doi.org/10.1109/LRA.2020.3015448), 
 [Good Robot! Paper on ArXiV](https://arxiv.org/abs/1909.11730)
 
 ```
