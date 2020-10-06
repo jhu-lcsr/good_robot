@@ -15,7 +15,6 @@ realsense/Makefile
 realsense/cmake_install.cmake
 realsense/realsense
 
-*.png
 *.zip
 *.pdf
 *.pyc
