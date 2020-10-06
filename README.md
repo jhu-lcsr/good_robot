@@ -9,14 +9,14 @@ Click the image to watch the video:
 ## Paper, Abstract, and Citations
 
 ```
-@misc{hundt2019good,
-    title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer},
-    author={Andrew Hundt and Benjamin Killeen and Nicholas Greene and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
-    year={2019},
-    eprint={1909.11730},
-    archivePrefix={arXiv},
-    primaryClass={cs.RO},
-    url={https://arxiv.org/abs/1909.11730}
+@article{hundt2020good,
+	title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
+	author="Andrew {Hundt} and Benjamin {Killeen} and Nicholas {Greene} and Hongtao {Wu} and Heeyeon {Kwon} and Chris {Paxton} and Gregory D. {Hager}",
+	journal="IEEE Robotics and Automation Letters (RA-L)",
+	volume="5",
+	number="4",
+	pages="6724--6731",
+	year="2020"
 }
 ```
 
