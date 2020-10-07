@@ -8,9 +8,15 @@ import cv2
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5, prob_exp = 1):
     canvas = None
     num_rotations = predictions.shape[0]
+
+    # clip values <0 or >1
+    predictions = np.clip(predictions, 0, 1)
+
+    # apply exponential
+    predictions = predictions ** prob_exp
 
     # populate canvas
     for canvas_row in range(int(num_rotations/4)):
@@ -18,9 +24,6 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
         for canvas_col in range(4):
             rotate_idx = canvas_row*4+canvas_col
             prediction_vis = predictions[rotate_idx,:,:].copy()
-
-            # clip values <0 or >1
-            prediction_vis = np.clip(prediction_vis, 0, 1)
 
             # reshape to 224x224 (or whatever image size is), and color
             prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
@@ -238,8 +241,8 @@ if __name__ == '__main__':
                             "filename:", rgb_heightmap_list[frame_ind])
 
                 # visualize with rotation, match_ind
-                depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind)
-                rgb_canvas = get_prediction_vis(im_mask, orig_rgb, match_ind)
+                depth_canvas = get_prediction_vis(im_mask, orig_depth, match_ind, prob_exp=3)
+                rgb_canvas = get_prediction_vis(im_mask, orig_rgb, match_ind, prob_exp=3)
 
                 # write blended images
                 cv2.imwrite(os.path.join(depth_home_dir, depth_heightmap_list[frame_ind]), depth_canvas)
