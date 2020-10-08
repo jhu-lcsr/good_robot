@@ -171,9 +171,6 @@ if __name__ == '__main__':
 
                 # set log home
                 log_home = '/'.join(args.single_image.split('/')[:2])
-                print(log_home)
-                print(depth_heightmap)
-                print(rgb_heightmap)
 
             else:
                 # we only want files that end in .0 (before action is carried out)
@@ -201,7 +198,6 @@ if __name__ == '__main__':
 
             # get frame_ind of selected frame
             frame_ind = int(depth_heightmap.split('.')[0])
-            print(frame_ind)
 
             # load executed/demo actions
             executed_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'executed-action.log.txt'))
@@ -224,7 +220,7 @@ if __name__ == '__main__':
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
 
             else:
-                l2_dist = np.sum(np.square(embedding - np.expand_dims(im_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
+                l2_dist = np.sum(np.square(embedding - np.expand_dims(im_embedding[frame_ind], axis=(0, 2, 3))), axis=1)
                 # set masked spaces to have max of l2_dist*1.1 distance
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
