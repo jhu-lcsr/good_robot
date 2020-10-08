@@ -209,9 +209,6 @@ if __name__ == '__main__':
             embedding = np.load(os.path.join(log_home, 'transitions',
                 'executed-action-embed.log.txt.npz'), allow_pickle=True, mmap_mode='c')['arr_0'][frame_ind]
 
-            print(embedding.shape)
-            print(im_embedding.shape)
-
             # store indices of masked spaces
             mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
@@ -223,7 +220,7 @@ if __name__ == '__main__':
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
 
             else:
-                l2_dist = np.sum(np.square(embedding - np.expand_dims(im_embedding[frame_ind], axis=(0, 2, 3))), axis=1)
+                l2_dist = np.sum(np.square(embedding - np.expand_dims(im_embedding, axis=(0, 2, 3))), axis=1)
                 # set masked spaces to have max of l2_dist*1.1 distance
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
