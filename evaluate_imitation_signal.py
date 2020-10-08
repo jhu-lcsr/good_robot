@@ -199,20 +199,19 @@ if __name__ == '__main__':
             if not args.save_visualizations:
                 raise ValueError("Must save visualization if running on a single image")
 
-            # trim array length in case of premature exit
+            # get frame_ind of selected frame
+            frame_ind = int(depth_heightmap.split('.')[0])
+            print(frame_ind)
+
+            # load executed/demo actions
             executed_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'executed-action.log.txt'))
             im_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'im_action.log.txt'))
 
             # load imitation embeddings and executed action embeddings
-            imitation_embeddings = np.load(os.path.join(log_home, 'transitions',
-                'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0']
-            executed_action_embeddings = np.load(os.path.join(log_home, 'transitions',
-                'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0']
-
-            # get frame_ind of selected frame
-            frame_ind = depth_heightmap.split('.')[0].astype(int)
-            print(frame_ind)
-            embedding = executed_action_embeddings[frame_ind]
+            im_embedding = np.load(os.path.join(log_home, 'transitions',
+                'im_action_embed.log.txt.npz'), allow_pickle=True, mmap_mode='c')['arr_0'][frame_ind]
+            embedding = np.load(os.path.join(log_home, 'transitions',
+                'executed-action-embed.log.txt.npz'), allow_pickle=True, mmap_mode='c')['arr_0'][frame_ind]
 
             # store indices of masked spaces
             mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
@@ -225,7 +224,7 @@ if __name__ == '__main__':
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
 
             else:
-                l2_dist = np.sum(np.square(embedding - np.expand_dims(imitation_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
+                l2_dist = np.sum(np.square(embedding - np.expand_dims(im_embeddings[frame_ind], axis=(0, 2, 3))), axis=1)
                 # set masked spaces to have max of l2_dist*1.1 distance
                 l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
                 match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
