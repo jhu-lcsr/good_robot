@@ -200,13 +200,13 @@ if __name__ == '__main__':
                 raise ValueError("Must save visualization if running on a single image")
 
             # trim array length in case of premature exit
-            executed_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'executed-action.log.txt'))
-            im_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'im_action.log.txt'))
+            executed_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'executed-action.log.txt'))
+            im_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'im_action.log.txt'))
 
             # load imitation embeddings and executed action embeddings
-            imitation_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            imitation_embeddings = np.load(os.path.join(log_home, 'transitions',
                 'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0']
-            executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            executed_action_embeddings = np.load(os.path.join(log_home, 'transitions',
                 'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0']
 
             # get frame_ind of selected frame
@@ -238,10 +238,10 @@ if __name__ == '__main__':
             im_mask = 1 - l2_dist
 
             # load original depth/rgb maps
-            orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
+            orig_depth = cv2.imread(os.path.join(log_home, 'data', 'depth-heightmaps',
                 depth_heightmap), -1)
             orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(np.uint8)
-            orig_rgb = cv2.imread(os.path.join(args.log_home, 'data', 'color-heightmaps',
+            orig_rgb = cv2.imread(os.path.join(log_home, 'data', 'color-heightmaps',
                 rgb_heightmap))
 
             # TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
@@ -257,18 +257,18 @@ if __name__ == '__main__':
 
         else:
             # load action success logs
-            grasp_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'grasp-success.log.txt'))
-            place_successes = np.loadtxt(os.path.join(args.log_home, 'transitions', 'place-success.log.txt'))
+            grasp_successes = np.loadtxt(os.path.join(log_home, 'transitions', 'grasp-success.log.txt'))
+            place_successes = np.loadtxt(os.path.join(log_home, 'transitions', 'place-success.log.txt'))
             action_success_inds = np.where(np.logical_or(grasp_successes, place_successes))[0]
 
             # trim array length in case of premature exit
-            executed_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'executed-action.log.txt'))[:grasp_successes.shape[0]]
-            im_actions = np.loadtxt(os.path.join(args.log_home, 'transitions', 'im_action.log.txt'))[:grasp_successes.shape[0]]
+            executed_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'executed-action.log.txt'))[:grasp_successes.shape[0]]
+            im_actions = np.loadtxt(os.path.join(log_home, 'transitions', 'im_action.log.txt'))[:grasp_successes.shape[0]]
 
             # load imitation embeddings and executed action embeddings
-            imitation_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            imitation_embeddings = np.load(os.path.join(log_home, 'transitions',
                 'im_action_embed.log.txt.npz'), allow_pickle=True)['arr_0'][:grasp_successes.shape[0]]
-            executed_action_embeddings = np.load(os.path.join(args.log_home, 'transitions',
+            executed_action_embeddings = np.load(os.path.join(log_home, 'transitions',
                 'executed-action-embed.log.txt.npz'), allow_pickle=True)['arr_0'][:grasp_successes.shape[0]]
 
             # TODO(adit98) wrap in a function and use multiprocessing
@@ -307,10 +307,10 @@ if __name__ == '__main__':
                     im_mask = 1 - l2_dist
 
                     # load original depth/rgb maps
-                    orig_depth = cv2.imread(os.path.join(args.log_home, 'data', 'depth-heightmaps',
+                    orig_depth = cv2.imread(os.path.join(log_home, 'data', 'depth-heightmaps',
                         depth_heightmap_list[frame_ind]), -1)
                     orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(np.uint8)
-                    orig_rgb = cv2.imread(os.path.join(args.log_home, 'data', 'color-heightmaps',
+                    orig_rgb = cv2.imread(os.path.join(log_home, 'data', 'color-heightmaps',
                         rgb_heightmap_list[frame_ind]))
                     # TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
                     orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
