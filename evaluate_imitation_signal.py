@@ -209,6 +209,9 @@ if __name__ == '__main__':
             embedding = np.load(os.path.join(log_home, 'transitions',
                 'executed-action-embed.log.txt.npz'), allow_pickle=True, mmap_mode='c')['arr_0'][frame_ind]
 
+            print(embedding.shape)
+            print(im_embedding.shape)
+
             # store indices of masked spaces
             mask = (np.min((embedding == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
