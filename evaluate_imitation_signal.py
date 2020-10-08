@@ -170,7 +170,7 @@ if __name__ == '__main__':
                     rgb_heightmap = args.single_image.split('/')[-1]
 
                 # set log home
-                log_home = args.single_image.split('/')[:2]
+                log_home = '/'.join(args.single_image.split('/')[:2])
                 print(log_home)
                 print(depth_heightmap)
                 print(rgb_heightmap)
