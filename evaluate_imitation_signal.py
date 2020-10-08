@@ -59,7 +59,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, ble
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-l', '--log_home', type=str, help='format is logs/EXPERIMENT_DIR')
-    parser.add_argument('--is_demo', default=False, help='we are visualizing demo frames and demo signals')
+    parser.add_argument('-d', '--is_demo', default=False, action='store_true', help='we are visualizing demo frames and demo signals')
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
     parser.add_argument('-e', '--exec_viz', default=False, action='store_true', help='visualize executed action signal instead of imitation')
     parser.add_argument('-s', '--single_image', default=None, help='visualize signal for only a single image (only works for demo images)')
