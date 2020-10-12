@@ -681,7 +681,7 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    def reposition_objects(self, unstack_drop_height=0.05):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, trial=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -719,6 +719,7 @@ class Robot(object):
             for pose in place_pose_history:
                 x, y, z, angle = pose
 
+                # data before grasp
                 valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
                 # get depth_heightmap pixel_coordinates of where the previous place was
@@ -735,16 +736,38 @@ class Robot(object):
                 z = primitive_position[2]
 
                 grasp_success, color_success = self.grasp([x, y, z], angle)
+                # log if we grasped successfully
                 if grasp_success:
+                    # TODO(adit98) right now this assumes that if one log is given, all are
+                    # save grasp related data
+                    if action_log is not None:
+                        print('logging unstacking action and saving images')
+                        action_log.append([x, y, z, angle, utils.ACTION_TO_ID['grasp']])
+                        logger.save_images(trial, color_img, depth_img, 'grasp')
+                        logger.save_heightmaps(trial, color_heightmap, depth_heightmap, 'grasp')
+
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
+
+                    # TODO(adit98) same assumption as above
+                    # log place action
+                    if action_log is not None:
+                        # data before place
+                        valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, \
+                                color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+                        action_log.append(rand_position + [rand_angle, utils.ACTION_TO_ID['place']])
+                        logger.save_images(trial, color_img, depth_img, 'place')
+                        logger.save_heightmaps(trial, color_heightmap, depth_heightmap, 'place')
 
                     self.place(rand_position, rand_angle, save_history=False)
 
             # clear the place hisory after unstacking
             self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
+
+            # return action log
+            return action_log
 
         else:
             if self.is_sim:
