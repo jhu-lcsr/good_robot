@@ -13,7 +13,7 @@ import utils
 from utils import StackSequence
 from logger import Logger
 
-def get_and_save_images(stack_num, robot, workspace_limits, heightmap_resolution, logger, filename_poststring='0', save_image=True):
+def get_and_save_images(stack_num, robot, logger, filename_poststring='0', save_image=True):
     # Get latest RGB-D image
     valid_depth_heightmap, color_heightmap, depth_heightmap, _, color_img, depth_img = robot.get_camera_data(return_heightmaps=True)
 
@@ -153,7 +153,7 @@ if __name__ == '__main__':
             executed_action_log.append(primitive_position + [theta + np.pi / 2, 2])
 
             # save post place config
-            get_and_save_images(stack, robot, workspace_limits, heightmap_resolution, logger, str(i) + 'place')
+            get_and_save_images(stack, robot, heightmap_resolution, logger, str(i) + 'place')
 
             print('place ' + str(i) + ' : ' + str(place))
             # check if we don't care about color

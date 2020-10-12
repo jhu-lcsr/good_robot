@@ -8,6 +8,8 @@ from robot import Robot
 import threading
 import os
 import utils
+from logger import Logger
+from generate_sim_stacking_demo import get_and_save_images
 
 class HumanControlOfRobot(object):
     """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
@@ -37,13 +39,17 @@ class HumanControlOfRobot(object):
 
         self.stop: if True shut down your program, pressing 'c' on the keyboard sets this variable to True.
     """
-    def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True):
+    def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True,
+            logger=None):
         self.stop = False
         self.print_state_count = 0
         self.tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
         self.human_control = human_control
         self.move_robot = move_robot
         self.action = action
+        self.logger = logger
+        self.executed_action_log = []
+        self.trial = 0
         self.click_count = 0
         self.click_position = None
         self.target_position = None
@@ -116,6 +122,10 @@ class HumanControlOfRobot(object):
     def execute_action(self, target_position, heightmap_rotation_angle):
         self.target_position = target_position
         self.click_count += 1
+
+        # log env state
+        get_and_save_images(self.click_count, self.robot, self.logger, self.action)
+
         print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
         def grasp(tp, ra, gh):
             # global self.grasp_success, self.grasp_color_success, self.mutex
@@ -141,12 +151,14 @@ class HumanControlOfRobot(object):
                 t = threading.Thread(target=move_to, args=(target_position, heightmap_rotation_angle))
                 t.start()
         elif self.action == 'grasp':
-            if not self.robot.place_task or (robot.place_task and not self.grasp_success):
+            if not self.robot.place_task or (self.robot.place_task and not self.grasp_success):
                 if self.move_robot:
                     t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
             else:
+                print(self.robot.place_task, self.grasp_success)
                 if self.move_robot:
+                    self.action = 'place'
                     t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
 
@@ -161,6 +173,22 @@ class HumanControlOfRobot(object):
             target_position[-1] += 0.01
             t = threading.Thread(target=lambda: self.robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
+
+        # TODO(adit98) figure out a way to skip logging unsuccessful actions/deal with prog reversal
+        # log action
+        self.executed_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
+            utils.ACTION_TO_ID[self.action]])
+
+        # TODO(adit98) figure out how to trigger this as soon as the previous action completes
+        # finish trial
+        if self.robot.check_stack(np.arange(4))[0]:
+            self.executed_action_log = self.robot.reposition_objects(action_log=self.executed_action_log,
+                    logger=self.logger, trial=self.trial)
+            self.logger.write_to_log('executed-actions-' + str(self.trial),
+                    self.executed_action_log)
+            self.trial += 1
+            self.executed_action_log = []
+
         return target_position, heightmap_rotation_angle
 
     def print_config(self):
@@ -180,6 +208,7 @@ class HumanControlOfRobot(object):
         else:
             self.camera_color_img = camera_color_img
             self.camera_depth_img = camera_depth_img
+
         if len(self.click_point_pix) != 0:
             self.camera_color_img = cv2.circle(self.camera_color_img, self.click_point_pix, 7, (0,0,255), 2)
         self.camera_color_img = cv2.cvtColor(self.camera_color_img, cv2.COLOR_RGB2BGR)
@@ -354,19 +383,23 @@ if __name__ == '__main__':
         workspace_limits = None
     else:
         raise NotImplementedError
-    is_sim = False
+    is_sim = True
     if is_sim:
         tcp_port = 19997
+        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+
+    heightmap_resolution = 0.002 # Meters per pixel of heightmap
     calibrate = False
     # Move robot to home pose
-    robot = Robot(is_sim, None, None, workspace_limits,
+    # TODO(adit98) add cmd line args to select goal, task, etc.
+    robot = Robot(is_sim, os.path.abspath('objects/blocks'), 4, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None, place=True, calibrate=calibrate)
-    # if is_sim:
-    #     robot.add_objects()
-    hcr = HumanControlOfRobot(robot, action=action)
+                False, None, None, place=True, calibrate=calibrate, unstack=True)
+
+    # initialize logger
+    logger = Logger(continue_logging=False, logging_directory='demos')
+    logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
+    logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
+
+    hcr = HumanControlOfRobot(robot, action=action, logger=logger)
     hcr.run()
-    # while not hcr.stop:
-    #     # hcr.run_one()
-    #     hcr.get_action()
-    # cv2.destroyAllWindows()
