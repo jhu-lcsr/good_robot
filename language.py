@@ -47,7 +47,6 @@ class ConcatFusionModule(BaseFusionModule):
         output = torch.cat([image, language], dim=1)
         return output 
 
-
 class LanguageEncoder(torch.nn.Module):
     """
     Handle language instructions as an API call to an encoder
@@ -99,7 +98,11 @@ class LanguageEncoder(torch.nn.Module):
         if type(language[0]) == str:
             lang_embedded = self.embedder(language).unsqueeze(0).to(self.device) 
         else:
-            lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0).to(self.device) 
+            try:
+                lang_embedded = torch.cat([self.embedder(language[i]).unsqueeze(0) for i in idxs], dim=0).to(self.device) 
+            except RuntimeError:
+                return None
+
         # encode image 
         pos_encoded = self.image_encoder(pos_input) 
         # encode language 

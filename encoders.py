@@ -35,16 +35,21 @@ class LSTMEncoder(torch.nn.Module):
         output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
 
         bsz, seq_len, hidden_dim = output.shape
+        hidden_dim = int(hidden_dim / 2)
+        output =  output.view((bsz, seq_len, 2, hidden_dim))
         # need indices of last non-pad token 
         lengths = lengths.long() 
         lengths = lengths-1
         batch_inds = torch.tensor([i for i in range(bsz)]).long() 
         # take first and last 
-        #first = output[:,0,:].unsqueeze(1) 
-        last  = output[batch_inds, lengths, :].unsqueeze(1) 
+        first = output[:,0, 0,:].unsqueeze(1) 
+        last  = output[batch_inds, lengths,1, :].unsqueeze(1) 
         # concat them together  
-        concat = last 
-        #concat = torch.cat([first, last], dim=1)
+        if self.bidirectional:
+            concat = torch.cat([first, last], dim=1)
+        else:
+            concat = output[batch_inds, lengths, :].unsqueeze(1) 
+
         # flatten 
         concat = concat.reshape((bsz, -1))
         return concat 

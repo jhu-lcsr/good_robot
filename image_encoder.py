@@ -160,7 +160,5 @@ class DeconvolutionalNetwork(torch.nn.Module):
         for layer in self.layers:
             encoded = layer(encoded) 
         # output: [batch, width, height] 
-        # TODO (elias): for debugging, set to binary class
         output = encoded.reshape((bsz, 21, 64, 64, 4))
-        #output = encoded.reshape((bsz, 2, 64, 64, 4))
         return output 
