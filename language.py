@@ -60,7 +60,8 @@ class LanguageEncoder(torch.nn.Module):
                  fuser: BaseFusionModule,
                  output_module: torch.nn.Module,
                  block_prediction_module: torch.nn.Module,
-                 device: torch.device):
+                 device: torch.device,
+                 compute_block_dist: bool):
         """
         embedder: a choice of 
         encoder: a choice of LSTM or Transformer 
@@ -76,6 +77,7 @@ class LanguageEncoder(torch.nn.Module):
         self.device = device 
         self.block_prediction_module = block_prediction_module
         self.softmax_fxn = torch.nn.LogSoftmax(dim = -1)
+        self.compute_block_dist = compute_block_dist
 
         # enable cuda
         for module in [self.embedder, self.image_encoder, self.encoder, self.fuser, self.output_module, self.block_prediction_module]:
@@ -114,12 +116,16 @@ class LanguageEncoder(torch.nn.Module):
         pos_encoded = pos_encoded.expand(bsz, pos_hidden)
         # fuse image and language 
         image_and_language = self.fuser(pos_encoded, lang_encoded)
-        # get block output 
-        block_output = self.block_prediction_module(image_and_language) 
         # get image output 
         image_output = self.output_module(image_and_language) 
 
-        output = self.filter_image_output(block_output, image_output) 
+        if self.compute_block_dist:
+            # get block output 
+            block_output = self.block_prediction_module(image_and_language) 
+            output = self.filter_image_output(block_output, image_output) 
+        else:
+            output = image_output
+            block_output = None 
             
         to_ret = {"next_position": output,
                   "pred_block_logits": block_output} 

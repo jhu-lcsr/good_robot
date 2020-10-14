@@ -67,12 +67,13 @@ class LanguageTrainer:
         self.nll_loss_fxn = torch.nn.NLLLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device
+        self.compute_block_dist = self.encoder.compute_block_dist
 
     def train(self):
         all_accs = []
         max_acc = 0.0 
         for epoch in range(self.num_epochs): 
-            acc = self.train_and_validate_one_epoch(epoch)
+            acc, __ = self.train_and_validate_one_epoch(epoch)
             # handle checkpointing 
             all_accs.append(acc) 
             is_best = False
@@ -122,7 +123,10 @@ class LanguageTrainer:
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         outputs = self.encoder(batch_instance) 
         accuracy = self.compute_localized_accuracy(batch_instance, outputs) 
-        block_accuracy = self.compute_block_accuracy(batch_instance, outputs) 
+        if self.compute_block_dist:
+            block_accuracy = self.compute_block_accuracy(batch_instance, outputs) 
+        else:
+            block_accuracy = -1.0
             
         if epoch_num > self.generate_after_n: 
             self.generate_debugging_image(outputs, f"epoch_{epoch_num}_{batch_num}_{instance_num}_pred")
@@ -248,14 +252,21 @@ class LanguageTrainer:
         prev_image = prev_image.reshape((bsz, width, height, depth)).long()
         prev_image = prev_image.to(self.device) 
         
-        # loss per pixel 
-        pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
-        # loss per block
-        block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
-        print(f"pixel_loss {pixel_loss.item()} block_loss {block_loss.item()}") 
-        return pixel_loss + block_loss
-        # TODO (elias): switch back to both losses after debugging 
-        #return block_loss
+
+        if self.compute_block_dist:
+            # loss per pixel 
+            pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
+            # loss per block
+            block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
+            total_loss = pixel_loss + block_loss
+            print(f"computing loss with blocks {total_loss.item()}") 
+        else:
+            # loss per pixel 
+            pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
+            print(f"computing loss no blocks {pixel_loss.item()}") 
+            total_loss = pixel_loss 
+
+        return pixel_loss 
 
     def compute_loss_no_blocks(self, inputs, outputs):
         pred_image = outputs["next_position"]
@@ -389,6 +400,22 @@ class FlatLanguageTrainer(LanguageTrainer):
         # TODO (elias): change back to pixel acc after debugging 
         return mean_block_acc 
 
+    def evaluate(self):
+        total_acc = 0.0 
+        total = 0 
+        total_block_acc = 0.0 
+        self.encoder.eval() 
+        for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
+            pixel_acc, block_acc = self.validate(dev_batch_instance, 1, b, 0) 
+            total_acc += pixel_acc
+            total_block_acc += block_acc
+            total += 1
+
+        mean_acc = total_acc / total 
+        mean_block_acc = total_block_acc / total
+        print(f"Test-time pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
+        return mean_acc 
+
 
 def main(args):
     # load the data 
@@ -461,11 +488,16 @@ def main(args):
                               fuser = fuser, 
                               output_module = output_module,
                               block_prediction_module = block_prediction_module,
-                              device = device) 
+                              device = device,
+                              compute_block_dist = args.compute_block_dist) 
 
-    #encoder = encoder.to(torch.device(device))
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters())
+
+    if args.traj_type == "flat":
+        trainer_cls = FlatLanguageTrainer
+    else:
+        trainer_cls = LanguageTrainer
 
     if not args.test:
         if not args.resume:
@@ -486,10 +518,6 @@ def main(args):
         with open(pathlib.Path(args.checkpoint_dir).joinpath("config.json"), "w") as f1:
             json.dump(args.__dict__, f1) 
 
-        if args.traj_type == "flat":
-            trainer_cls = FlatLanguageTrainer
-        else:
-            trainer_cls = LanguageTrainer
 
         # construct trainer 
         trainer = trainer_cls(train_data = dataset_reader.data["train"], 
@@ -546,6 +574,7 @@ if __name__ == "__main__":
     parser.add_argument("--deconv-factor", type=int, default = 2) 
     parser.add_argument("--deconv-num-layers", type=int, default=2) 
     # block mlp
+    parser.add_argument("--compute-block-dist", action="store_true") 
     parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 
     parser.add_argument("--mlp-num-layers", type=int, default = 3) 
     parser.add_argument("--mlp-dropout", type=float, default = 0.20) 
