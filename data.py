@@ -8,6 +8,8 @@ from spacy.lang.en import English
 import torch
 np.random.seed(12) 
 
+PAD = "<PAD>"
+
 class FlatIterator:
     """
     shuffle trajectories and give pairs, allowing for greater batching 
@@ -17,21 +19,8 @@ class FlatIterator:
                 batch_size = 32):
         self.all_trajectories = all_trajectories
         self._index = -1
-        self.all_timesteps = self.preprocess()
+        self.all_timesteps = None
         self.batch_size = batch_size
-
-    def preprocess(self):
-        print(f"calling preprocess") 
-        all_timesteps = [x for traj in self.all_trajectories for x in traj.to_iterate]
-        expanded_commands = []
-        # expand out each command 
-        for timestep in all_timesteps:
-            for command in timestep[0]:
-                expanded_commands.append([command, timestep[1:]])
-        np.random.shuffle(expanded_commands) 
-        
-        sys.exit()  
-        return expanded_commands
 
     def __next__(self):
         if self._index + 1 < len(self.all_timesteps):
@@ -103,15 +92,20 @@ class BaseTrajectory:
                  next_rotations: List[Tuple[float]], 
                  images: List[str],
                  lengths: List[int],
-                 traj_type: str = "flat"):
+                 traj_type: str = "flat",
+                 batch_size: int = None):
+
+        if batch_size is None:
+            batch_size = len(commands)
+        self.batch_size = batch_size 
+
         self.line_id = line_id
         self.commands = commands
 
-        print(f"commands is {commands}") 
         self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
-        self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands))
+        self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
         self.previous_rotations = previous_rotations
-        self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = len(commands))
+        self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
         self.next_rotations = next_rotations
         self.blocks_to_move = self.get_blocks_to_move()
 
@@ -138,8 +132,6 @@ class BaseTrajectory:
         if self.traj_type == "flat":     
             return FlatIterator(self)
         else:
-            print(f"traj iterator") 
-            sys.exit() 
             return TrajectoryIterator(self)
 
     def get_blocks_to_move(self):
@@ -149,7 +141,7 @@ class BaseTrajectory:
         all_blocks_to_move = []
         for timestep in range(len(self.previous_positions_for_acc)):
             prev_pos = self.previous_positions_for_acc[timestep][batch_idx] 
-            next_pos = self.next_positions[ timestep][batch_idx]
+            next_pos = self.next_positions[timestep][batch_idx]
             different_pixels = prev_pos[prev_pos != next_pos]
             # exclude background 
             different_pixel_idx = different_pixels[different_pixels != 0]
@@ -162,10 +154,10 @@ class BaseTrajectory:
                     blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
                 bad += 1
             all_blocks_to_move.append(blocks_to_move) 
-        print(f"there are {bad} blocks with >1 move") 
+        #print(f"there are {bad} blocks with >1 move") 
         return all_blocks_to_move
 
-    def make_3d_positions(self, positions, make_z = False, batch_size = 9, do_infilling = True):
+    def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
         """
         take (x,y,z) positions and turn them into 1-hot 
         vector over block ids in a x,y,z coordinate grid 
@@ -252,7 +244,8 @@ class SimpleTrajectory(BaseTrajectory):
                  images: List[str],
                  lengths: List[int],
                  tokenizer: Tokenizer,
-                 traj_type: str):
+                 traj_type: str,
+                 batch_size: int):
         super(SimpleTrajectory, self).__init__(line_id,
                                          commands, 
                                          previous_positions,
@@ -261,7 +254,8 @@ class SimpleTrajectory(BaseTrajectory):
                                          next_rotations, 
                                          images,
                                          lengths,
-                                         traj_type) 
+                                         traj_type,
+                                         batch_size) 
         self.tokenizer = tokenizer
         # commands is a list of #timestep text strings 
         self.commands = self.tokenize(commands)
@@ -299,7 +293,6 @@ class BatchedTrajectory(BaseTrajectory):
                                                 lengths,
                                                 traj_type)
 
-        print(f"inside trajectory commands is no {len(commands)}") 
         # commands is now a 9xlen matrix 
         self.tokenizer = tokenizer
         self.commands, self.lengths = self.pad_commands(self.tokenize(commands)) 
@@ -329,7 +322,7 @@ class BatchedTrajectory(BaseTrajectory):
         # pad commands in a batch to have the same length
         max_len = 0
         lengths = [[max_len for j in range(len(commands))] for i in range(len(commands[0]))]
-        pad_str = ["<PAD>" for __ in range(max_len)]
+        pad_str = [PAD for __ in range(max_len)]
         new_commands = [[pad_str for j in range(len(commands))] for i in range(len(commands[0]))]
         # get max length 
         for annotator_idx, command_list in enumerate(commands):
@@ -353,12 +346,14 @@ class DatasetReader:
                        dev_path,
                        test_path,
                        batch_by_line=False,
-                       traj_type = "flat"): 
+                       traj_type = "flat",
+                       batch_size = 32): 
         self.train_path = train_path
         self.dev_path = dev_path
         self.test_path = test_path
         self.batch_by_line = batch_by_line
         self.traj_type = traj_type
+        self.batch_size = batch_size
 
         nlp = English()
         self.tokenizer = Tokenizer(nlp.vocab)
@@ -414,30 +409,97 @@ class DatasetReader:
                     self.data[split].append(trajectory)  
                     vocab |= trajectory.traj_vocab
                 else:
-                    for command_group in commands:
+                    for i, command_group in enumerate(commands):
                         for command in command_group["notes"]:  
-                            print(f"command is {command}") 
-                            trajectory = SimpleTrajectory(line_id,
-                                                        command, 
-                                                        previous_positions,
-                                                        previous_rotations,
-                                                        next_positions,
-                                                        next_rotations,
-                                                        images=images,
-                                                        lengths = [None],
-                                                        tokenizer=self.tokenizer,
-                                                        traj_type=self.traj_type)
-                            self.data[split].append(trajectory) 
-                            vocab |= trajectory.traj_vocab
+                            for timestep in range(len(previous_positions)):
+                                # TODO: add rotations later? 
+                                trajectory = SimpleTrajectory(line_id,
+                                                            command, 
+                                                            [previous_positions[timestep]],
+                                                            [None],
+                                                            [next_positions[timestep]],
+                                                            [None],
+                                                            images=[images[timestep]],
+                                                            lengths = [None],
+                                                            tokenizer=self.tokenizer,
+                                                            traj_type=self.traj_type,
+                                                            batch_size=1)
+                                self.data[split].append(trajectory) 
+                                vocab |= trajectory.traj_vocab
+
+        if not self.batch_by_line:
+            # shuffle and batch data 
+            self.shuffle_and_batch_trajectories(split)
 
         return vocab
 
-    def shuffle_trajectories(self, split=None): 
+    def shuffle_and_batch_trajectories(self, split=None): 
         """
-        shuffle the text annotations across trajectories with the same positions 
+        shuffle the trajectories and batch them together 
         """
-        pass 
+        if split is None:
+            keys = self.data.keys()
+        else:
+            keys = [split]
+        for key in keys:
+            split_data = self.data[key]
+            # shuffle data 
+            np.random.shuffle(split_data)
+            # batchify
+            batches = []
+            curr_batch = []
+            for i in range(len(split_data)):
+                curr_batch.append(split_data[i]) 
+                if (i + 1) % self.batch_size == 0:
+                    batches.append(self.batchify(curr_batch))
+                    curr_batch = []
+            # append last one 
+            if len(curr_batch) > 0: 
+                batches.append(self.batchify(curr_batch) )
 
+            self.data[key] = batches  
+
+    def batchify(self, batch_as_list): 
+        """
+        pad and tensorize 
+        """
+
+        commands, prev_pos, next_pos, prev_pos_for_acc,  prev_rot, next_rot, block_to_move, image, length = [], [], [], [], [], [], [], [], []
+        # get max len 
+        max_length = max([traj.lengths[0] for traj in batch_as_list])
+        # pad  
+        for i, traj in enumerate(batch_as_list): 
+            length.append(len(traj.commands)) 
+            commands.append(traj.commands + [PAD for i in range(max_length - len(traj.commands))])
+            prev_pos.append(traj.previous_positions[0])
+            prev_pos_for_acc.append(traj.previous_positions_for_acc[0]) 
+            prev_rot.append(traj.previous_rotations[0])
+            next_pos.append(traj.next_positions[0])
+            next_rot.append(traj.next_rotations[0]) 
+            block_to_move.append(traj.blocks_to_move[0])
+            image.append(traj.images)  
+        
+
+        prev_pos = torch.cat(prev_pos, 0)
+        prev_pos_for_acc = torch.cat(prev_pos_for_acc, 0)
+        next_pos = torch.cat(next_pos, 0) 
+        block_to_move = torch.cat(block_to_move, 0) 
+
+        #print(f"prev_pos {prev_pos.shape}") 
+        #print(f"prev_pos_for_acc  {prev_pos_for_acc.shape}") 
+        #print(f"next_pos {next_pos.shape}") 
+        #print(f"block to move {block_to_move.shape}") 
+        #sys.exit() 
+
+        return {"command": commands,
+                "previous_position": prev_pos,
+                "next_position": next_pos,
+                "previous_position_for_acc": prev_pos_for_acc,
+                "previous_rotation": prev_rot,
+                "next_rotation": next_rot,
+                "block_to_move": block_to_move,
+                "image": image,
+                "length": length} 
 
 if __name__ == "__main__":
     reader = DatasetReader("blocks_data/devset.json", "blocks_data/devset.json", "blocks_data/devset.json")  

@@ -241,12 +241,9 @@ class LanguageTrainer:
         true_block_idxs  = inputs["block_to_move"]
         true_block_idxs = true_block_idxs.to(self.device).long().reshape(-1) 
 
-        #print(f"pred_block_logits {pred_block_logits[0]}") 
-        #print(f"true_block_idxs.shape {true_block_idxs.shape}") 
-        #sys.exit() 
-        
         bsz, n_blocks, width, height, depth = pred_image.shape
         true_image = true_image.reshape((bsz, width, height, depth)).long()
+                
         true_image = true_image.to(self.device) 
         prev_image = prev_image.reshape((bsz, width, height, depth)).long()
         prev_image = prev_image.to(self.device) 
@@ -255,11 +252,10 @@ class LanguageTrainer:
         pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
         # loss per block
         block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
-        #print(f"pixel_loss {pixel_loss.item()} block_loss {block_loss.item()}") 
-        #return pixel_loss + 2*block_loss
-        print(f"block loss {block_loss}") 
+        print(f"pixel_loss {pixel_loss.item()} block_loss {block_loss.item()}") 
+        return pixel_loss + block_loss
         # TODO (elias): switch back to both losses after debugging 
-        return block_loss
+        #return block_loss
 
     def compute_loss_no_blocks(self, inputs, outputs):
         pred_image = outputs["next_position"]
@@ -359,20 +355,21 @@ class FlatLanguageTrainer(LanguageTrainer):
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
         skipped = 0
-        for b, batch_trajectory in tqdm(enumerate(self.train_data)): 
-            #print(f"batch {b} has trajectory of length {len(batch_trajectory.to_iterate)}") 
-            for i, batch_instance in enumerate(batch_trajectory): 
-                #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
-                self.optimizer.zero_grad() 
-                outputs = self.encoder(batch_instance) 
-                # skip bad examples 
-                if outputs is None:
-                    skipped += 1
-                    continue
-                loss = self.compute_loss(batch_instance, outputs) 
-                #print(f"loss {loss.item()}") 
-                loss.backward() 
-                self.optimizer.step() 
+        print(f"training with data {len(self.train_data)}") 
+        for b, batch_instance in tqdm(enumerate(self.train_data)): 
+            #for i, batch_instance in enumerate(batch_trajectory): 
+            #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
+            self.optimizer.zero_grad() 
+            outputs = self.encoder(batch_instance) 
+            # skip bad examples 
+            if outputs is None:
+                skipped += 1
+                continue
+            loss = self.compute_loss(batch_instance, outputs) 
+            #print(f"loss {loss.item()}") 
+            loss.backward() 
+            self.optimizer.step() 
+
         print(f"skipped {skipped} examples") 
         print(f"Validating epoch {epoch}...") 
         total_acc = 0.0 
@@ -380,12 +377,11 @@ class FlatLanguageTrainer(LanguageTrainer):
         total_block_acc = 0.0 
 
         self.encoder.eval() 
-        for b, dev_batch_trajectory in tqdm(enumerate(self.val_data)): 
-            for i, dev_batch_instance in enumerate(dev_batch_trajectory): 
-                pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, i) 
-                total_acc += pixel_acc
-                total_block_acc += block_acc
-                total += 1
+        for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
+            pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            total_acc += pixel_acc
+            total_block_acc += block_acc
+            total += 1
 
         mean_acc = total_acc / total 
         mean_block_acc = total_block_acc / total
@@ -401,7 +397,8 @@ def main(args):
                                    args.val_path,
                                    None,
                                    batch_by_line = args.traj_type != "flat",
-                                   traj_type = args.traj_type)
+                                   traj_type = args.traj_type,
+                                   batch_size = args.batch_size) 
 
     train_vocab = dataset_reader.read_data("train") 
     dev_vocab = dataset_reader.read_data("dev") 
@@ -533,6 +530,7 @@ if __name__ == "__main__":
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
     parser.add_argument("--num-blocks", type=int, default=20) 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
+    parser.add_argument("--batch-size", type=int, default = 32) 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-dim", type=int, default=300) 
