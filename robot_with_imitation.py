@@ -640,15 +640,14 @@ def main(args):
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
                                     # we are in testing mode which is frequently recorded,
-                                    # so sleep for 10 seconds to show off our results!
-                                    time.sleep(10)
+                                    # so sleep for 5 seconds to show off our results!
+                                    time.sleep(5)
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                print('repositioning objects')
-                                robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo)
+                                robot.reposition_objects()
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
                                     nonlocal_variables['stack'].reset_sequence()
@@ -745,7 +744,8 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
+                            print('repositioning objects')
+                            robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo)
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
