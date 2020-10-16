@@ -645,7 +645,7 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                robot.reposition_objects()
+                                robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo)
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
                                     nonlocal_variables['stack'].reset_sequence()
@@ -848,6 +848,11 @@ def main(args):
         # TODO(adit98) set demo number to be cmd line arg, 0 right now
         demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
 
+    if args.unstack and args.use_demo:
+        unstack_demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
+        # TODO(adit98) setting demo to None if we are unstacking, hacky, need to fix
+        demo = None
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -1009,17 +1014,19 @@ def main(args):
                 else:
                     next_action = 'grasp'
 
-                # TODO(adit98) figure out if we need to use prev_stack_height or stack_height
-                im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                        next_action, nonlocal_variables['stack_height'])
-                # TODO(adit98) log action vector from embedding
-                # don't really need to store im_action since they *SHOULD* line up
-                trainer.im_action_log.append(im_action)
-                trainer.im_action_embed_log.append(im_action_embedding)
+                # TODO(adit98) remove this check once unstack_demo/demo is refactored
+                if demo is not None:
+                    # TODO(adit98) figure out if we need to use prev_stack_height or stack_height
+                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
+                            next_action, nonlocal_variables['stack_height'])
+                    # TODO(adit98) log action vector from embedding
+                    # don't really need to store im_action since they *SHOULD* line up
+                    trainer.im_action_log.append(im_action)
+                    trainer.im_action_embed_log.append(im_action_embedding)
 
-                # TODO(adit98) find best spot for this (write demo related stuff)
-                logger.write_to_log('im_action', trainer.im_action_log)
-                logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
+                    # TODO(adit98) find best spot for this (write demo related stuff)
+                    logger.write_to_log('im_action', trainer.im_action_log)
+                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
 
             else:
                 # run forward pass normally

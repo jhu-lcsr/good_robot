@@ -4,7 +4,7 @@ import os
 from utils import ACTION_TO_ID
 
 class Demonstration():
-    def __init__(self, path, demo_num, check_z_height):
+    def __init__(self, path, demo_num, check_z_height, task_type='stack'):
         # path is expected to be <logs/exp_name>
         self.action_log = np.loadtxt(os.path.join(path, 'transitions',
             'executed-actions-0.log.txt'))
@@ -12,20 +12,34 @@ class Demonstration():
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
         self.demo_num = demo_num
         self.check_z_height = check_z_height
+        self.task_type = task_type
 
-        # this str is for loading the correct images, it will be adjusted based on selected action
-        self.action_str = 'orig'
+        if self.task_type = 'stack':
+            # this str is for loading the correct images, it will be adjusted based on selected action
+            self.action_str = 'orig'
 
-        # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
-        self.action_dict = {}
-        for s in range(3):
-            # store push, grasp, and place actions for demo at stack height s
-            # TODO(adit98) figure out how to incorporate push actions into this paradigm
-            # TODO(adit98) note this assumes perfect demo
-            # if stack height is 0, indices 0 and 1 of the action log correspond to grasp and place respectively
-            demo_first_ind = 2 * s
-            self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
-                    ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
+            # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
+            self.action_dict = {}
+            for s in range(3):
+                # store push, grasp, and place actions for demo at stack height s
+                # TODO(adit98) figure out how to incorporate push actions into this paradigm
+                # TODO(adit98) note this assumes perfect demo
+                # if stack height is 0, indices 0 and 1 of the action log correspond to grasp and place respectively
+                demo_first_ind = 2 * s
+                self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
+                        ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
+
+        elif self.task_type = 'unstack':
+            # this str is for loading the correct images, it will be adjusted based on selected action
+            self.action_str = 'orig'
+
+            # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
+            self.action_dict = {}
+            for s in range(1, 5):
+                # store push, grasp, and place actions for demo at stack height s
+                demo_ind = -2 * (5 - s)
+                self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
+                        ACTION_TO_ID['place'] : self.action_log[demo_ind + 1]}
 
     def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png
@@ -62,16 +76,27 @@ class Demonstration():
         # TODO(adit98) clean up the way demo heightmaps are saved to reduce confusion
         # set action_str based on primitive action
         # heightmap_height is the height we use to get the demo heightmaps
-        heightmap_height = stack_height
-        if stack_height == 0 and primitive_action == 'grasp':
-            action_str = 'orig'
-        elif primitive_action == 'grasp':
-            # if primitive action is grasp, we need the previous place heightmap and grasp action
-            action_str = 'place'
-            heightmap_height -= 1
-        else:
-            # if prim action is place, get the previous grasp heightmap
-            action_str = 'grasp'
+        if self.task_type == 'stack':
+            heightmap_height = stack_height
+            if stack_height == 0 and primitive_action == 'grasp':
+                action_str = 'orig'
+            elif primitive_action == 'grasp':
+                # if primitive action is grasp, we need the previous place heightmap and grasp action
+                action_str = 'place'
+                heightmap_height -= 1
+            else:
+                # if prim action is place, get the previous grasp heightmap
+                action_str = 'grasp'
+
+        elif self.task_type == 'unstack':
+            heightmap_height = stack_height
+            if primitive_action == 'grasp':
+                # if primitive action is grasp, we need the previous place heightmap and grasp action
+                action_str = 'grasp_unstack'
+            else:
+                # if prim action is place, get the previous grasp heightmap
+                action_str = 'place_unstack'
+                heightmap_height += 1
 
         color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, heightmap_height)
         # to get vector of 64 vals, run trainer.forward with get_action_feat
