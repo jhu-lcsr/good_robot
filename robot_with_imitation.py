@@ -744,8 +744,8 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            print('repositioning objects')
-                            robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo)
+                            print(workspace_limits)
+                            robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo, goal_condition=goal_condition, workspace_limits=workspace_limits)
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()

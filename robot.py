@@ -681,7 +681,7 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None, goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -749,7 +749,7 @@ class Robot(object):
 
                         # get demo action
                         im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                                'grasp', nonlocal_variables['stack_height'])
+                                'grasp', stack_height)
 
                         # log action vector from embedding
                         trainer.im_action_log.append(im_action)
@@ -806,7 +806,7 @@ class Robot(object):
 
                         # get demo action
                         im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                                'place', nonlocal_variables['stack_height'])
+                                'place', stack_height)
                         # TODO(adit98) log action vector from embedding
                         # don't really need to store im_action since they *SHOULD* line up
                         trainer.im_action_log.append(im_action)
@@ -835,27 +835,27 @@ class Robot(object):
             self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
 
+        if self.is_sim:
+            # Move gripper out of the way to the home position
+            success = self.go_home()
+            if not success:
+                return success
+            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+            # time.sleep(1)
+
+            for object_handle in self.object_handles:
+                # Drop object at random x,y location and random orientation in robot workspace
+                self.reposition_object_randomly(object_handle)
+                time.sleep(0.5)
+            # an extra half second so things settle down
+            time.sleep(0.5)
+
+        if action_log is not None:
             # return action log
             return action_log
 
-        else:
-            if self.is_sim:
-                # Move gripper out of the way to the home position
-                success = self.go_home()
-                if not success:
-                    return success
-                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-                # time.sleep(1)
-
-                for object_handle in self.object_handles:
-                    
-                    # Drop object at random x,y location and random orientation in robot workspace
-                    self.reposition_object_randomly(object_handle)
-                    time.sleep(0.5)
-                # an extra half second so things settle down
-                time.sleep(0.5)
-                return True
+        return True
 
             # TODO(ahundt) add real robot support for reposition_objects
 
