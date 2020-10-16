@@ -15,9 +15,6 @@ class Demonstration():
         self.task_type = task_type
 
         if self.task_type == 'stack':
-            # this str is for loading the correct images, it will be adjusted based on selected action
-            self.action_str = 'orig'
-
             # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
             self.action_dict = {}
             for s in range(3):
@@ -30,9 +27,6 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
         elif self.task_type == 'unstack':
-            # this str is for loading the correct images, it will be adjusted based on selected action
-            self.action_str = 'orig'
-
             # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
             self.action_dict = {}
             for s in range(1, 5):
@@ -42,8 +36,8 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1]}
 
     def get_heightmaps(self, action_str, stack_height):
-        # e.g. initial rgb filename is 000000.orig.color.png
-        if action_str != 'orig':
+        # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
+        if action_str != 'orig' and self.task_type == 'stack':
             action_str = str(stack_height) + action_str
 
         rgb_filename = os.path.join(self.rgb_dir, 
@@ -85,7 +79,7 @@ class Demonstration():
                 action_str = 'place'
                 heightmap_height -= 1
             else:
-                # if prim action is place, get the previous grasp heightmap
+                # if primitive action is place, get the previous grasp heightmap
                 action_str = 'grasp'
 
         elif self.task_type == 'unstack':
