@@ -120,13 +120,11 @@ class HumanControlOfRobot(object):
         self.print_config()
 
     def execute_action(self, target_position, heightmap_rotation_angle):
-        self.target_position = target_position
-        self.click_count += 1
-
         # log env state
         get_and_save_images(self.click_count, self.robot, self.logger, self.action)
 
-        print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
+        self.target_position = target_position
+        self.click_count += 1
         def grasp(tp, ra, gh):
             # global self.grasp_success, self.grasp_color_success, self.mutex
             with self.mutex:
@@ -156,7 +154,6 @@ class HumanControlOfRobot(object):
                     t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
             else:
-                print(self.robot.place_task, self.grasp_success)
                 if self.move_robot:
                     self.action = 'place'
                     t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
@@ -174,6 +171,8 @@ class HumanControlOfRobot(object):
             t = threading.Thread(target=lambda: self.robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
 
+        print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
+
         # TODO(adit98) figure out a way to skip logging unsuccessful actions/deal with prog reversal
         # log action
         self.executed_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
@@ -183,7 +182,7 @@ class HumanControlOfRobot(object):
         # finish trial
         if self.robot.check_stack(np.arange(4))[0]:
             self.executed_action_log = self.robot.reposition_objects(action_log=self.executed_action_log,
-                    logger=self.logger, trial=self.trial)
+                    logger=self.logger, stack_height=4)
             self.logger.write_to_log('executed-actions-' + str(self.trial),
                     self.executed_action_log)
             self.trial += 1
@@ -199,6 +198,9 @@ class HumanControlOfRobot(object):
         print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
+        # default action is grasp
+        self.action = 'grasp'
+
         if camera_color_img is None:
             shape = [0, 0, 0, 0]
             # get the camera data, but make sure all the images are valid first

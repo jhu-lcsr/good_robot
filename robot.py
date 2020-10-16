@@ -681,7 +681,7 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, trial=None):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -738,13 +738,43 @@ class Robot(object):
                 grasp_success, color_success = self.grasp([x, y, z], angle)
                 # log if we grasped successfully
                 if grasp_success:
+                    # if grasp was successful, run forward pass and save embeddings
+                    # assume if demo is given, trainer, logger are also given
+                    if demo is not None:
+                        # run forward pass, keep action features and get softmax predictions
+                        push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
+                                    valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
+                        action_feat = [push_feat, grasp_feat, place_feat]
+
+                        # get demo action
+                        im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
+                                'grasp', nonlocal_variables['stack_height'])
+
+                        # log action vector from embedding
+                        trainer.im_action_log.append(im_action)
+                        trainer.im_action_embed_log.append(im_action_embedding)
+                        trainer.executed_action_log.append([x, y, z, angle,
+                            utils.ACTION_TO_ID['grasp']])
+                        trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['grasp']].filled(fill_value=0))
+
+                        # write demo related stuff
+                        logger.write_to_log('im_action', trainer.im_action_log)
+                        logger.write_to_log('im_action_embed', trainer.im_action_embed_log,
+                                pickle=True)
+                        logger.write_to_log('executed-action', trainer.executed_action_log)
+                        logger.write_to_log('executed-action-embed',
+                                trainer.executed_action_embed_log, pickle=True)
+
+                        # save images
+                        logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
+                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'place_unstack')
+
                     # TODO(adit98) right now this assumes that if one log is given, all are
-                    # save grasp related data
-                    if action_log is not None:
-                        print('logging unstacking action and saving images')
+                    # save grasp related data if generating unstacking demo
+                    elif action_log is not None:
                         action_log.append([x, y, z, angle, utils.ACTION_TO_ID['grasp']])
-                        logger.save_images(trial, color_img, depth_img, 'grasp')
-                        logger.save_heightmaps(trial, color_heightmap, depth_heightmap, 'grasp')
+                        logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
+                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'grasp_unstack')
 
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
@@ -756,11 +786,48 @@ class Robot(object):
                         # data before place
                         valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, \
                                 color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+
                         action_log.append(rand_position + [rand_angle, utils.ACTION_TO_ID['place']])
-                        logger.save_images(trial, color_img, depth_img, 'place')
-                        logger.save_heightmaps(trial, color_heightmap, depth_heightmap, 'place')
+                        logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
+                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'place_unstack')
+
+                    # run forward pass for place and save embeddings
+                    elif demo is not None:
+                        # data before place
+                        valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, \
+                                color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+
+                        # run forward pass, keep action features and get softmax predictions
+                        push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
+                                    valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
+                        action_feat = [push_feat, grasp_feat, place_feat]
+
+                        # get demo action
+                        im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
+                                'place', nonlocal_variables['stack_height'])
+                        # TODO(adit98) log action vector from embedding
+                        # don't really need to store im_action since they *SHOULD* line up
+                        trainer.im_action_log.append(im_action)
+                        trainer.im_action_embed_log.append(im_action_embedding)
+                        trainer.executed_action_log.append([x, y, z, angle,
+                            utils.ACTION_TO_ID['place']])
+                        trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['place']].filled(fill_value=0))
+
+                        # TODO(adit98) find best spot for this (write demo related stuff)
+                        logger.write_to_log('im_action', trainer.im_action_log)
+                        logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
+                        logger.write_to_log('executed-action', trainer.executed_action_log)
+                        logger.write_to_log('executed-action-embed',
+                                trainer.executed_action_embed_log, pickle=True)
+
+                        # save images
+                        logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
+                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'place_unstack')
 
                     self.place(rand_position, rand_angle, save_history=False)
+                    
+                    # stack height has decreased
+                    stack_height -= 1
 
             # clear the place hisory after unstacking
             self.place_pose_history = []
