@@ -741,6 +741,7 @@ class Robot(object):
                     # if grasp was successful, run forward pass and save embeddings
                     # assume if demo is given, trainer, logger are also given
                     if demo is not None:
+                        print('running forward pass for unstack')
                         # run forward pass, keep action features and get softmax predictions
                         push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
                                     valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
@@ -766,8 +767,8 @@ class Robot(object):
                                 trainer.executed_action_embed_log, pickle=True)
 
                         # save images
-                        logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
-                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'place_unstack')
+                        logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
+                        logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'grasp_unstack')
 
                     # TODO(adit98) right now this assumes that if one log is given, all are
                     # save grasp related data if generating unstacking demo
@@ -776,6 +777,7 @@ class Robot(object):
                         logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
                         logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'grasp_unstack')
 
+                    # generate place action randomly
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]

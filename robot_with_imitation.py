@@ -46,6 +46,8 @@ def run_title(args):
         title += 'Stack, '
     elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
+    if args.unstack:
+        title += 'Unstack, '
     if args.trial_reward:
         title += 'SPOT Trial Reward, '
     elif args.discounted_reward:
@@ -645,6 +647,7 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                print('repositioning objects')
                                 robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo)
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.

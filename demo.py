@@ -14,7 +14,7 @@ class Demonstration():
         self.check_z_height = check_z_height
         self.task_type = task_type
 
-        if self.task_type = 'stack':
+        if self.task_type == 'stack':
             # this str is for loading the correct images, it will be adjusted based on selected action
             self.action_str = 'orig'
 
@@ -29,7 +29,7 @@ class Demonstration():
                 self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
                         ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
-        elif self.task_type = 'unstack':
+        elif self.task_type == 'unstack':
             # this str is for loading the correct images, it will be adjusted based on selected action
             self.action_str = 'orig'
 
