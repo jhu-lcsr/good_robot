@@ -7,6 +7,14 @@ import cv2
 # TODO(adit98) refactor to use ACTION_TO_IND from utils.py
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
+# function to evaluate l2 distance
+def evaluate_l2_dist():
+    match_ind = executed_actions[frame_ind][1:].astype(int)
+    l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
+        :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+    # set masked spaces to have max of l2_dist*1.1 distance
+    l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
+
 # function to visualize prediction signal on heightmap (with rotations)
 def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5, prob_exp = 1):
     canvas = None
@@ -63,6 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
     parser.add_argument('-e', '--exec_viz', default=False, action='store_true', help='visualize executed action signal instead of imitation')
     parser.add_argument('-s', '--single_image', default=None, help='visualize signal for only a single image (only works for demo images)')
+    parser.add_argument('-m', '--metric', default='l2', help='metric to evaluate similarity between demo and current env embeddings')
     args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
