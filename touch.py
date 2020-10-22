@@ -168,7 +168,7 @@ class HumanControlOfRobot(object):
             t.start()
         elif self.action == 'place':
             target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: self.robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
+            t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
             t.start()
 
         print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
@@ -198,9 +198,6 @@ class HumanControlOfRobot(object):
         print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
-        # default action is grasp
-        self.action = 'grasp'
-
         if camera_color_img is None:
             shape = [0, 0, 0, 0]
             # get the camera data, but make sure all the images are valid first
