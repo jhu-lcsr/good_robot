@@ -852,7 +852,7 @@ def main(args):
         demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
 
     if args.unstack and args.use_demo:
-        unstack_demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
+        unstack_demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height, task_type='unstack')
         # TODO(adit98) setting demo to None if we are unstacking, hacky, need to fix
         demo = None
 
