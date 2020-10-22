@@ -45,6 +45,9 @@ class Demonstration():
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (self.demo_num, action_str))
 
+        print('stack height:', stack_height)
+        print(rgb_filename)
+
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
 
@@ -92,6 +95,9 @@ class Demonstration():
                 action_str = 'place_unstack'
                 # need to add one to heightmap since it 4.place_unstack refers to when the stack has 3 blocks
                 heightmap_height += 1
+
+        print('task type:', self.task_type)
+        print('heightmap height:', heightmap_height)
 
         color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, heightmap_height)
         # to get vector of 64 vals, run trainer.forward with get_action_feat
