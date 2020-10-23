@@ -682,7 +682,6 @@ class Robot(object):
                     # if grasp was successful, run forward pass and save embeddings
                     # assume if demo is given, trainer, logger are also given
                     if demo is not None:
-                        print('running forward pass for unstack')
                         # run forward pass, keep action features and get softmax predictions
                         push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
                                     valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
@@ -695,8 +694,7 @@ class Robot(object):
                         # log action vector from embedding
                         trainer.im_action_log.append(im_action)
                         trainer.im_action_embed_log.append(im_action_embedding)
-                        trainer.executed_action_log.append([x, y, z, angle,
-                            utils.ACTION_TO_ID['grasp']])
+                        trainer.executed_action_log.append([utils.ACTION_TO_ID['grasp'], x, y, z])
                         trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['grasp']].filled(fill_value=0))
 
                         # write demo related stuff
@@ -752,8 +750,7 @@ class Robot(object):
                         # don't really need to store im_action since they *SHOULD* line up
                         trainer.im_action_log.append(im_action)
                         trainer.im_action_embed_log.append(im_action_embedding)
-                        trainer.executed_action_log.append([x, y, z, angle,
-                            utils.ACTION_TO_ID['place']])
+                        trainer.executed_action_log.append([utils.ACTION_TO_ID['place'], x, y, z])
                         trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['place']].filled(fill_value=0))
 
                         # TODO(adit98) find best spot for this (write demo related stuff)

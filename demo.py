@@ -41,12 +41,9 @@ class Demonstration():
             action_str = str(stack_height) + action_str
 
         rgb_filename = os.path.join(self.rgb_dir, 
-                '%06d.%s.color.png' % (self.demo_num, action_str))
+                '%06d.%s.color.png' % (stack_height, action_str))
         depth_filename = os.path.join(self.depth_dir,
-                '%06d.%s.depth.png' % (self.demo_num, action_str))
-
-        print('stack height:', stack_height)
-        print(rgb_filename)
+                '%06d.%s.depth.png' % (stack_height, action_str))
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
@@ -74,7 +71,6 @@ class Demonstration():
             if primitive_action == 'push':
                 return -1
 
-            heightmap_height = stack_height
             if stack_height == 0 and primitive_action == 'grasp':
                 action_str = 'orig'
             elif primitive_action == 'grasp':
@@ -86,7 +82,6 @@ class Demonstration():
                 action_str = 'grasp'
 
         elif self.task_type == 'unstack':
-            heightmap_height = stack_height
             if primitive_action == 'grasp':
                 # if primitive action is grasp, we need the previous place heightmap and grasp action
                 action_str = 'grasp_unstack'
@@ -94,12 +89,9 @@ class Demonstration():
                 # if prim action is place, get the previous grasp heightmap
                 action_str = 'place_unstack'
                 # need to add one to heightmap since it 4.place_unstack refers to when the stack has 3 blocks
-                heightmap_height += 1
+                print(stack_height)
 
-        print('task type:', self.task_type)
-        print('heightmap height:', heightmap_height)
-
-        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, heightmap_height)
+        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
