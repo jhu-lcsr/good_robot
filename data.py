@@ -261,10 +261,10 @@ class SimpleTrajectory(BaseTrajectory):
         self.commands = self.tokenize(commands)
 
     def tokenize(self, command): 
-        command = list(self.tokenizer(command))
+        command = [str(x) for x in self.tokenizer(command)]
         self.lengths = [len(command)]
         # add to vocab 
-        self.traj_vocab |= set(command)
+        self.traj_vocab |= set(command) 
         return command
 
 class BatchedTrajectory(BaseTrajectory): 
@@ -347,13 +347,15 @@ class DatasetReader:
                        test_path,
                        batch_by_line=False,
                        traj_type = "flat",
-                       batch_size = 32): 
+                       batch_size = 32,
+                       max_seq_length = 65): 
         self.train_path = train_path
         self.dev_path = dev_path
         self.test_path = test_path
         self.batch_by_line = batch_by_line
         self.traj_type = traj_type
         self.batch_size = batch_size
+        self.max_seq_length = max_seq_length
 
         nlp = English()
         self.tokenizer = Tokenizer(nlp.vocab)
@@ -466,17 +468,22 @@ class DatasetReader:
 
         commands, prev_pos, next_pos, prev_pos_for_acc,  prev_rot, next_rot, block_to_move, image, length = [], [], [], [], [], [], [], [], []
         # get max len 
-        max_length = max([traj.lengths[0] for traj in batch_as_list])
+        max_length = min(self.max_seq_length, max([traj.lengths[0] for traj in batch_as_list])) 
         # pad  
         for i, traj in enumerate(batch_as_list): 
+            # trim! 
+            if len(traj.commands) > max_length:
+                traj.commands = traj.commands[0:max_length]
+            
             length.append(len(traj.commands)) 
+
             commands.append(traj.commands + [PAD for i in range(max_length - len(traj.commands))])
             prev_pos.append(traj.previous_positions[0])
             prev_pos_for_acc.append(traj.previous_positions_for_acc[0]) 
             prev_rot.append(traj.previous_rotations[0])
             next_pos.append(traj.next_positions[0])
             next_rot.append(traj.next_rotations[0]) 
-            block_to_move.append(traj.blocks_to_move[0])
+            block_to_move.append(traj.blocks_to_move[0].long())
             image.append(traj.images)  
         
 

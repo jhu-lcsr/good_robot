@@ -4,6 +4,7 @@ from typing import List, Dict
 import glob
 import os 
 import pathlib
+import pdb 
 
 import torch
 from spacy.tokenizer import Tokenizer
@@ -12,9 +13,11 @@ import logging
 from tqdm import tqdm 
 from matplotlib import pyplot as plt
 import numpy as np
+import torch.autograd.profiler as profiler
 
-from image_encoder import ImageEncoder, DeconvolutionalNetwork
-from language import LanguageEncoder, ConcatFusionModule
+
+from image_encoder import ImageEncoder, DeconvolutionalNetwork, DecoupledDeconvolutionalNetwork
+from language import LanguageEncoder, ConcatFusionModule, TiledFusionModule
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
 from mlp import MLP 
@@ -52,15 +55,17 @@ class LanguageTrainer:
                  device: torch.device,
                  checkpoint_dir: str,
                  num_models_to_keep: int,
-                 generate_after_n: int): 
+                 generate_after_n: int,
+                 best_epoch: int = -1): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
         self.optimizer = optimizer 
         self.num_epochs = num_epochs
-        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_dir = pathlib.Path(checkpoint_dir)
         self.num_models_to_keep = num_models_to_keep
         self.generate_after_n = generate_after_n
+        self.best_epoch = best_epoch
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
@@ -72,7 +77,7 @@ class LanguageTrainer:
     def train(self):
         all_accs = []
         max_acc = 0.0 
-        for epoch in range(self.num_epochs): 
+        for epoch in range(self.best_epoch + 1, self.num_epochs, 1): 
             acc, __ = self.train_and_validate_one_epoch(epoch)
             # handle checkpointing 
             all_accs.append(acc) 
@@ -91,6 +96,7 @@ class LanguageTrainer:
             for i, batch_instance in enumerate(batch_trajectory): 
                 #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
                 self.optimizer.zero_grad() 
+        
                 outputs = self.encoder(batch_instance) 
                 # skip bad examples 
                 if outputs is None:
@@ -118,7 +124,7 @@ class LanguageTrainer:
         mean_block_acc = total_block_acc / total
         print(f"Epoch {epoch} has pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
         # TODO (elias): change back to pixel acc after debugging 
-        return mean_block_acc 
+        return mean_acc, mean_block_acc 
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         outputs = self.encoder(batch_instance) 
@@ -129,8 +135,11 @@ class LanguageTrainer:
             block_accuracy = -1.0
             
         if epoch_num > self.generate_after_n: 
-            self.generate_debugging_image(outputs, f"epoch_{epoch_num}_{batch_num}_{instance_num}_pred")
-            self.generate_debugging_image(batch_instance, f"epoch_{epoch_num}_{batch_num}_{instance_num}_gold")
+            for i in range(len(batch_instance)):
+                output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
+                output_path.mkdir(parents = True, exist_ok=True)
+                self.generate_debugging_image(outputs["next_position"][i], output_path.joinpath("pred"))
+                self.generate_debugging_image(batch_instance["previous_position_for_acc"][i], output_path.joinpath("gold"))
 
         return accuracy, block_accuracy
 
@@ -173,21 +182,18 @@ class LanguageTrainer:
         acc = matching/total 
         return acc 
 
-    def generate_debugging_image(self, data, filename, is_input=False):
+    def generate_debugging_image(self, data, out_path, is_input=False):
         # 9 x 21 x 4 x 64 x 64 
         # just get first image in batch, should be all identical
-        if not is_input:
-            next_pos = data["next_position"][0]
-        else:
-            next_pos = data["previous_position_for_acc"][0]
+        #if not is_input:
+        #    next_pos = data["next_position"][0]
+        #else:
+        #    next_pos = data["previous_position_for_acc"][0]
         # TODO (elias): debugging treat as 2-way 
-        if next_pos.shape[0] == 21:
+        if data.shape[0] == 21:
             # take argmax if distribution 
-            next_pos_id, next_pos = torch.max(next_pos, dim = 0) 
-        next_pos = next_pos.squeeze(0)
-        # make a logging dir 
-        if not os.path.exists(os.path.join(self.checkpoint_dir, "images")):
-            os.mkdir(os.path.join(self.checkpoint_dir, "images"))
+            data_id, data= torch.max(data, dim = 0) 
+        data = data.squeeze(0)
 
         xs = np.arange(0, 64, 1)
         zs = np.arange(0, 64, 1)
@@ -205,7 +211,7 @@ class LanguageTrainer:
             to_plot_xs, to_plot_zs, to_plot_labels = [], [], []
             for x_pos in xs:
                 for z_pos in zs:
-                    label = next_pos[x_pos, z_pos, height].item() 
+                    label = data[x_pos, z_pos, height].item() 
                     if height > 0 and label > 0:
                         pass 
                         #print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, height}")
@@ -220,7 +226,7 @@ class LanguageTrainer:
             for x,z, lab in zip(to_plot_xs, to_plot_zs, to_plot_labels):
                 ax.annotate(lab, xy=(x,z), fontsize = 12)
 
-            file_path = os.path.join(self.checkpoint_dir, "images", f"{filename}-{height}.png") 
+            file_path =  f"{out_path}-{height}.png"
                 
             print(f"saving to {file_path}") 
             plt.savefig(file_path) 
@@ -252,21 +258,23 @@ class LanguageTrainer:
         prev_image = prev_image.reshape((bsz, width, height, depth)).long()
         prev_image = prev_image.to(self.device) 
         
-
         if self.compute_block_dist:
             # loss per pixel 
-            pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
+            #pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
+            # TODO (elias): for now just do as auxiliary task 
+            pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
             # loss per block
             block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
+            print(f"computing loss with blocks {pixel_loss.item()} + {block_loss.item()}") 
             total_loss = pixel_loss + block_loss
-            print(f"computing loss with blocks {total_loss.item()}") 
+            #total_loss = block_loss
         else:
             # loss per pixel 
             pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
             print(f"computing loss no blocks {pixel_loss.item()}") 
             total_loss = pixel_loss 
 
-        return pixel_loss 
+        return total_loss
 
     def compute_loss_no_blocks(self, inputs, outputs):
         pred_image = outputs["next_position"]
@@ -308,17 +316,22 @@ class LanguageTrainer:
     def save_model(self, epoch, is_best):
         print(f"Saving checkpoint {epoch}") 
         # get path 
-        save_path = os.path.join(self.checkpoint_dir, f"model_{epoch}.th") 
+        save_path = self.checkpoint_dir.joinpath(f"model_{epoch}.th") 
         torch.save(self.encoder.state_dict(), save_path) 
         print(f"Saved checkpoint to {save_path}") 
         # if it's best performance, save extra 
         if is_best:
-            best_path = os.path.join(self.checkpoint_dir, f"best.th") 
+            best_path = self.checkpoint_dir.joinpath(f"best.th") 
             torch.save(self.encoder.state_dict(), best_path) 
+
+            json_info = {"epoch": epoch}
+            with open(self.checkpoint_dir.joinpath("best_training_state.json"), "w") as f1:
+                json.dump(json_info, f1) 
+
             print(f"Updated best model to {best_path} at epoch {epoch}") 
 
         # remove old models 
-        all_paths = glob.glob(os.path.join(self.checkpoint_dir, "model_*th"))
+        all_paths = list(self.checkpoint_dir.glob("model_*th"))
         if len(all_paths) > self.num_models_to_keep:
             to_remove = sorted(all_paths, key = lambda x: int(os.path.basename(x).split(".")[0].split('_')[1]))[0:-self.num_models_to_keep]
             for path in to_remove:
@@ -351,7 +364,8 @@ class FlatLanguageTrainer(LanguageTrainer):
                  device: torch.device,
                  checkpoint_dir: str,
                  num_models_to_keep: int,
-                 generate_after_n: int): 
+                 generate_after_n: int,
+                 best_epoch: int = -1): 
         super(FlatLanguageTrainer, self).__init__(train_data,
                                                   val_data,
                                                   encoder,
@@ -360,7 +374,8 @@ class FlatLanguageTrainer(LanguageTrainer):
                                                   device,
                                                   checkpoint_dir,
                                                   num_models_to_keep,
-                                                  generate_after_n)
+                                                  generate_after_n,
+                                                  best_epoch)
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -371,7 +386,16 @@ class FlatLanguageTrainer(LanguageTrainer):
             #for i, batch_instance in enumerate(batch_trajectory): 
             #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
             self.optimizer.zero_grad() 
-            outputs = self.encoder(batch_instance) 
+            for inp_name, inp in batch_instance.items():
+                try:
+                    print(f"input {inp_name} {inp.shape}") 
+                except AttributeError:
+                    continue
+
+            with profiler.profile(use_cuda=True) as prof:
+                outputs = self.encoder(batch_instance) 
+            #print(prof.key_averages())
+
             # skip bad examples 
             if outputs is None:
                 skipped += 1
@@ -398,7 +422,7 @@ class FlatLanguageTrainer(LanguageTrainer):
         mean_block_acc = total_block_acc / total
         print(f"Epoch {epoch} has pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
         # TODO (elias): change back to pixel acc after debugging 
-        return mean_block_acc 
+        return mean_acc, mean_block_acc 
 
     def evaluate(self):
         total_acc = 0.0 
@@ -419,21 +443,38 @@ class FlatLanguageTrainer(LanguageTrainer):
 
 def main(args):
     # load the data 
-    logger.info(f"Reading data from {args.train_path}")
     dataset_reader = DatasetReader(args.train_path,
                                    args.val_path,
                                    None,
                                    batch_by_line = args.traj_type != "flat",
                                    traj_type = args.traj_type,
-                                   batch_size = args.batch_size) 
+                                   batch_size = args.batch_size,
+                                   max_seq_length = args.max_seq_length)  
 
-    train_vocab = dataset_reader.read_data("train") 
+    checkpoint_dir = pathlib.Path(args.checkpoint_dir)
+    if not args.test:
+        print(f"Reading data from {args.train_path}")
+        train_vocab = dataset_reader.read_data("train") 
+        try:
+            os.mkdir(checkpoint_dir)
+        except FileExistsError:
+            pass
+        with open(checkpoint_dir.joinpath("vocab.json"), "w") as f1:
+            json.dump(list(train_vocab), f1) 
+    else:
+        print(f"Reading vocab from {checkpoint_dir}") 
+        with open(checkpoint_dir.joinpath("vocab.json")) as f1:
+            train_vocab = json.load(f1) 
+        
+    print(f"Reading data from {args.val_path}")
     dev_vocab = dataset_reader.read_data("dev") 
-    
+
+
+    print(f"got data")  
     # construct the vocab and tokenizer 
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
-    
+    print(f"constructing model...")  
     # get the embedder from args 
     if args.embedder == "random":
         embedder = RandomEmbedder(tokenizer, train_vocab, args.embedding_dim, trainable=True)
@@ -463,23 +504,29 @@ def main(args):
                                  dropout = args.dropout)
 
     # construct image and language fusion module 
+    fusion_options = {"concat": ConcatFusionModule,
+                      "tiled": TiledFusionModule}
+
+    encoder_hidden_dim = encoder.hidden_dim
     if encoder.bidirectional:
-        fuser = ConcatFusionModule(image_encoder.output_dim, 2*encoder.hidden_dim) 
-    else:
-        fuser = ConcatFusionModule(image_encoder.output_dim, encoder.hidden_dim) 
+        encoder_hidden_dim *= 2 
+
+    fuser = fusion_options[args.fuser](image_encoder.output_dim, encoder_hidden_dim) 
+
     # construct image decoder 
-    output_module = DeconvolutionalNetwork(input_channels  = fuser.output_dim, 
-                                           num_blocks = args.num_blocks,
-                                           num_layers = args.deconv_num_layers,
-                                           factor = args.deconv_factor,
-                                           dropout = args.dropout) 
+    deconv_options = {"coupled": DeconvolutionalNetwork,
+                      "decoupled": DecoupledDeconvolutionalNetwork}
+
+    output_module = deconv_options[args.deconv](input_channels  = fuser.output_dim, 
+                                   num_blocks = args.num_blocks,
+                                   num_layers = args.deconv_num_layers,
+                                   dropout = args.dropout) 
 
     block_prediction_module = MLP(input_dim = fuser.output_dim,
                                   hidden_dim = args.mlp_hidden_dim, 
                                   output_dim = args.num_blocks+1, 
                                   num_layers = args.mlp_num_layers, 
                                   dropout = args.mlp_dropout)  
-                                                       
 
     # put it all together into one module 
     encoder = LanguageEncoder(image_encoder = image_encoder, 
@@ -499,6 +546,7 @@ def main(args):
     else:
         trainer_cls = LanguageTrainer
 
+    best_epoch = -1
     if not args.test:
         if not args.resume:
             try:
@@ -513,6 +561,10 @@ def main(args):
             # resume from pre-trained 
             state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
             encoder.load_state_dict(state_dict, strict=True)  
+            # get training info 
+            best_checkpoint_data = json.load(open(pathlib.Path(args.checkpoint_dir).joinpath("best_training_state.json")))
+            print(f"best_checkpoint_data {best_checkpoint_data}") 
+            best_epoch = best_checkpoint_data["epoch"]
 
         # save arg config to checkpoint_dir
         with open(pathlib.Path(args.checkpoint_dir).joinpath("config.json"), "w") as f1:
@@ -528,12 +580,14 @@ def main(args):
                               device = device,
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,
-                              generate_after_n = args.generate_after_n) 
+                              generate_after_n = args.generate_after_n, 
+                              best_epoch = best_epoch) 
         print(encoder)
         trainer.train() 
 
     else:
         # test-time, load best model  
+        print(f"loading model weights from {args.checkpoint_dir}") 
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
         encoder.load_state_dict(state_dict, strict=True)  
 
@@ -546,7 +600,7 @@ def main(args):
                                            checkpoint_dir = args.checkpoint_dir,
                                            num_models_to_keep = 0, 
                                            generate_after_n = 0) 
-
+        print(f"evaluating") 
         eval_trainer.evaluate()
 
 if __name__ == "__main__":
@@ -559,6 +613,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-blocks", type=int, default=20) 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
     parser.add_argument("--batch-size", type=int, default = 32) 
+    parser.add_argument("--max-seq-length", type=int, default = 65) 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-dim", type=int, default=300) 
@@ -571,8 +626,11 @@ if __name__ == "__main__":
     parser.add_argument("--conv-factor", type=int, default = 4) 
     parser.add_argument("--conv-num-layers", type=int, default=2) 
     # image decoder 
+    parser.add_argument("--deconv", type=str, default="coupled", choices=["coupled", "decoupled"]) 
     parser.add_argument("--deconv-factor", type=int, default = 2) 
     parser.add_argument("--deconv-num-layers", type=int, default=2) 
+    # fuser
+    parser.add_argument("--fuser", type=str, default="concat", choices=["tiled", "concat"]) 
     # block mlp
     parser.add_argument("--compute-block-dist", action="store_true") 
     parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 

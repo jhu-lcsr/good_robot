@@ -1,6 +1,7 @@
 from typing import Tuple, List, Dict
 
 import torch
+import pdb
 
 class ImageEncoder(torch.nn.Module):
     def __init__(self,
@@ -91,7 +92,9 @@ class FinalClassificationLayer(torch.nn.Module):
         self.linear_2 = torch.nn.Linear(hidden_dim, n_classes)
 
     def forward(self, encoded_image):
-        bsz, n_channels, width, height, depth = encoded_image.shape 
+        bsz, n_channels_by_depth, width, height = encoded_image.shape 
+        n_channels = int(n_channels_by_depth/4) 
+        depth = 4
         encoded_image = encoded_image.reshape(bsz, width, height, depth, n_channels)
         encoded_image = self.linear_1(encoded_image)
         encoded_image = self.act(encoded_image)
@@ -104,11 +107,9 @@ class DeconvolutionalNetwork(torch.nn.Module):
                  input_channels: int,
                  num_blocks: int,
                  num_layers: int = 3,
-                 factor: int = 2,
                  dropout: float = 0.2): 
         super(DeconvolutionalNetwork, self).__init__() 
         self.input_channels = input_channels
-        self.factor = factor
         self.num_layers = num_layers
         # will be set later 
         self.device = torch.device("cpu") 
@@ -162,3 +163,61 @@ class DeconvolutionalNetwork(torch.nn.Module):
         # output: [batch, width, height] 
         output = encoded.reshape((bsz, 21, 64, 64, 4))
         return output 
+
+
+class DecoupledDeconvolutionalNetwork(torch.nn.Module):
+    def __init__(self,
+                 input_channels: int,
+                 num_blocks: int,
+                 num_layers: int = 3,
+                 dropout: float = 0.2): 
+        super(DecoupledDeconvolutionalNetwork, self).__init__() 
+
+        self.input_channels = input_channels
+        self.num_layers = num_layers
+        # will be set later 
+        self.device = torch.device("cpu") 
+
+        self.activation = torch.nn.ReLU() 
+        self.dropout = torch.nn.Dropout2d(p=dropout) 
+        layers = []
+
+        xy_input_dim = 1
+        xy_output_dim = max(1, int(64/self.num_layers))
+        output_channels = max(1, int(input_channels/2)) 
+        
+        for i in range(num_layers):
+            xy_kernel = infer_kernel_size(xy_input_dim,xy_output_dim)  
+            kernel_size = [xy_kernel, xy_kernel]
+
+            layers.append(torch.nn.ConvTranspose2d(input_channels, output_channels, kernel_size, padding=0)) 
+            layers.append(self.activation) 
+            layers.append(self.dropout) 
+            xy_input_dim = xy_output_dim
+            xy_output_dim += xy_output_dim
+            input_channels = output_channels
+            output_channels = max(1, int(output_channels/2)) 
+
+        # take output and split into 4 channels for height 
+        final_conv_layer = torch.nn.Conv2d(output_channels*2, output_channels*4, kernel_size = 1)
+        layers.append(final_conv_layer)
+
+        self.output_dim = xy_output_dim
+        # per pixel per class
+        class_layer = FinalClassificationLayer(output_channels, output_channels*2, num_blocks + 1) 
+        layers.append(class_layer) 
+        self.layers = torch.nn.ModuleList(layers) 
+
+    def forward(self, encoded):
+        encoded = encoded.to(self.device) 
+        # encoded: [batch, seq_len, input_dim]
+        bsz, input_dim = encoded.data.shape
+        # reshape [bsz, 4, 4, input_dim/8]
+        encoded = encoded.reshape((bsz, -1, 1, 1))
+
+        for layer in self.layers:
+            encoded = layer(encoded) 
+        # output: [batch, width, height] 
+        output = encoded.reshape((bsz, 21, 64, 64, 4))
+        return output 
+

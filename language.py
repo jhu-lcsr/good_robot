@@ -41,11 +41,28 @@ class ConcatFusionModule(BaseFusionModule):
                  image_size,
                  language_size):
         super(ConcatFusionModule, self).__init__(image_size, language_size)
-        self.output_dim = self.image_size + self.language_size
 
     def forward(self, image, language):
         output = torch.cat([image, language], dim=1)
         return output 
+
+class TiledFusionModule(BaseFusionModule):
+    def __init__(self,
+                 image_size,
+                 language_size):
+        super(ConcatFusionModule, self).__init__(image_size, language_size)
+
+    def forward(self, image, language):
+        print(image.shape) 
+        bsz, n_channels, width, height = image.shape 
+        # language: bsz x 2
+        __, num_lang_channels = language.shape
+        language = language.reshape((bsz, num_lang_channels, 1, 1)) 
+        language = language.repeat((1, 1, width, height)) 
+        # cat across channel dimension 
+        output = torch.cat([image, language], dim=1) 
+        return output 
+
 
 class LanguageEncoder(torch.nn.Module):
     """
@@ -122,13 +139,15 @@ class LanguageEncoder(torch.nn.Module):
         if self.compute_block_dist:
             # get block output 
             block_output = self.block_prediction_module(image_and_language) 
-            output = self.filter_image_output(block_output, image_output) 
+            output = image_output
+            #output = self.filter_image_output(block_output, image_output) 
         else:
             output = image_output
             block_output = None 
             
         to_ret = {"next_position": output,
                   "pred_block_logits": block_output} 
+
         return to_ret
 
     def filter_image_output(self, block_output, image_output):
@@ -146,11 +165,14 @@ class LanguageEncoder(torch.nn.Module):
         bsz, num_blocks, width, depth, height = image_output.shape 
         image_output = image_output.permute(0, 4, 2, 3, 1) 
         block_output = block_output.reshape((bsz, 1, 1, 1, num_blocks))
+        # tile block softmax across shape  
         block_output = block_output.repeat((1, height, width, depth, 1)) 
+        # now in logspace with softmax across blocks dim 
         image_output = self.softmax_fxn(image_output) 
-        block_output = self.softmax_fxn(block_output) 
-        # multiply probs 
-        output = image_output + block_output
+        block_output_ln = self.softmax_fxn(block_output) 
+        # multiply probs by adding logprobs  
+        output = image_output + block_output_ln
+        # reshape output 
         output = output.permute(0, 4, 2, 3, 1) 
         return output 
 

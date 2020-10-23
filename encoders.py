@@ -31,7 +31,7 @@ class LSTMEncoder(torch.nn.Module):
                                                           batch_first=True, 
                                                           enforce_sorted=True) 
         output, __ = self.lstm(embedded)
-        
+       
         output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
 
         bsz, seq_len, hidden_dim = output.shape
