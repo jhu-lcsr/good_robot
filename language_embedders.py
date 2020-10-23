@@ -55,13 +55,27 @@ class RandomEmbedder(torch.nn.Module):
         self.unk_embedding = torch.zeros((1, embedding_dim))
         self.pad_token = torch.ones((1, embedding_dim))
         self.vocab = vocab
+        self.word_to_idx = {word:i+2 for i, word in enumerate(vocab)}
+        self.word_to_idx["<UNK>"] = 0
+        self.word_to_idx["<PAD>"] = 1
 
-        for word in vocab:
-            # TODO: give initalization 
-            embedding = torch.nn.Parameter(torch.zeros((1, embedding_dim)))
-            torch.nn.init.uniform_(embedding) 
-            self.embedding_dict[word] = embedding
+        self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
+        self.device = None
 
     def forward(self, words):
-        output = [self.embedding_dict[w] if w in self.vocab else self.unk_embedding for w in words ]
-        return torch.cat(output, dim = 0) 
+        words = [w if w in self.vocab else "<UNK>" for w in words]
+        lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long).to(self.device) 
+        
+        output = self.embeddings(lookup_tensor)
+        #return torch.cat(output, dim = 0) 
+        return output 
+
+
+
+
+
+
+
+
+
+

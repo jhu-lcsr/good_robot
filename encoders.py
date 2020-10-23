@@ -13,6 +13,8 @@ class LSTMEncoder(torch.nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout 
         self.bidirectional = bidirectional
+        # will be set later 
+        self.device = torch.device("cpu") 
 
         self.lstm = torch.nn.LSTM(input_size  = input_dim,
                                   hidden_size = hidden_dim,
@@ -23,24 +25,31 @@ class LSTMEncoder(torch.nn.Module):
                                   bidirectional = bidirectional)
 
     def forward(self, embedded_tokens, lengths):
+        embedded_tokens = embedded_tokens.to(self.device) 
+        #print(f"embedded tokens {embedded_tokens[0, 0:10, 0:3]}") 
         embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, lengths, 
                                                           batch_first=True, 
                                                           enforce_sorted=True) 
         output, __ = self.lstm(embedded)
-        
+       
         output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
 
         bsz, seq_len, hidden_dim = output.shape
+        hidden_dim = int(hidden_dim / 2)
+        output =  output.view((bsz, seq_len, 2, hidden_dim))
         # need indices of last non-pad token 
         lengths = lengths.long() 
         lengths = lengths-1
         batch_inds = torch.tensor([i for i in range(bsz)]).long() 
         # take first and last 
-        #first = output[:,0,:].unsqueeze(1) 
-        last  = output[batch_inds, lengths, :].unsqueeze(1) 
+        first = output[:,0, 0,:].unsqueeze(1) 
+        last  = output[batch_inds, lengths,1, :].unsqueeze(1) 
         # concat them together  
-        concat = last 
-        #concat = torch.cat([first, last], dim=1)
+        if self.bidirectional:
+            concat = torch.cat([first, last], dim=1)
+        else:
+            concat = output[batch_inds, lengths, :].unsqueeze(1) 
+
         # flatten 
         concat = concat.reshape((bsz, -1))
         return concat 
