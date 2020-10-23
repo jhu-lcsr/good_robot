@@ -3,20 +3,68 @@ from scipy import ndimage
 import os
 import argparse
 import cv2
+from models import PixelNet
+import torch
+from collections import OrderedDict
 
 # TODO(adit98) refactor to use ACTION_TO_IND from utils.py
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
-# function to evaluate l2 distance
-def evaluate_l2_dist():
+# function to evaluate l2 distance and generate demo-signal mask
+def evaluate_l2_mask(executed_actions, embedding, frame_ind, mask):
     match_ind = executed_actions[frame_ind][1:].astype(int)
     l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
         :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+
+    # set masked spaces to have max of l2_dist*1.1 distance
+    l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
+
+    # make l2_dist range from 0 to 1
+    l2_dist -= np.min(l2_dist)
+    l2_dist /= np.max(l2_dist)
+
+    # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
+    im_mask = 1 - l2_dist
+
+    return im_mask
+
+# function to generate demo signal mask based on q-value transformation from NN
+def evaluate_nn_mask(executed_actions, embedding, frame_ind, mask, use_cuda=False,
+        goal_condition_len=0, place=True, pretrained=True, network='densenet',
+        num_dilation=0, snapshot_file='logs/best_stacking/snapshot.reinforcement_action_efficiency_best_value.pth'):
+
+    # initialize model
+    model = PixelNet(use_cuda, goal_condition_len=goal_condition_len, place=place,
+            pretrained=pretrained, network=network, num_dilation=num_dilation)
+
+    # load snapshot and modify dict names
+    loaded_snapshot_state_dict = torch.load(snapshot_file, map_location=torch.device('cpu'))
+    loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'),
+        v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+    loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'),
+        v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+    loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'),
+        v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+    loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.2','norm2'),
+        v) if k.find('norm.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
+
+    # set model weights from state_dict
+    model.load_state_dict(loaded_snapshot_state_dict, strict=True)
+
+    # now extract grasp and place final linear layers
+    final_grasp = model.graspnet[-1].weight.data.numpy().flatten()
+    final_place = model.placenet[-1].weight.data.numpy().flatten()
+
+    # evaluate distance metric
+    match_ind = executed_actions[frame_ind][1:].astype(int)
+    l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
+        :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+
     # set masked spaces to have max of l2_dist*1.1 distance
     l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5, prob_exp = 1):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5, prob_exp=1):
     canvas = None
     num_rotations = predictions.shape[0]
 
