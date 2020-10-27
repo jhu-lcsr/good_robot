@@ -5,6 +5,8 @@ import glob
 import os 
 import pathlib
 import pdb 
+import subprocess 
+from io import StringIO
 
 import torch
 from spacy.tokenizer import Tokenizer
@@ -14,6 +16,7 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 import numpy as np
 import torch.autograd.profiler as profiler
+import pandas as pd 
 
 
 from image_encoder import ImageEncoder, DeconvolutionalNetwork, DecoupledDeconvolutionalNetwork
@@ -106,7 +109,6 @@ class LanguageTrainer:
                 #print(f"loss {loss.item()}") 
                 loss.backward() 
                 self.optimizer.step() 
-        print(f"skipped {skipped} examples") 
         print(f"Validating epoch {epoch}...") 
         total_acc = 0.0 
         total = 0 
@@ -139,7 +141,7 @@ class LanguageTrainer:
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
                 self.generate_debugging_image(outputs["next_position"][i], output_path.joinpath("pred"))
-                self.generate_debugging_image(batch_instance["previous_position_for_acc"][i], output_path.joinpath("gold"))
+                self.generate_debugging_image(batch_instance["next_position"][i], output_path.joinpath("gold"))
 
         return accuracy, block_accuracy
 
@@ -265,15 +267,15 @@ class LanguageTrainer:
             pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
             # loss per block
             block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
-            print(f"computing loss with blocks {pixel_loss.item()} + {block_loss.item()}") 
+            #print(f"computing loss with blocks {pixel_loss.item()} + {block_loss.item()}") 
             total_loss = pixel_loss + block_loss
             #total_loss = block_loss
         else:
             # loss per pixel 
             pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
-            print(f"computing loss no blocks {pixel_loss.item()}") 
+            #print(f"computing loss no blocks {pixel_loss.item()}") 
             total_loss = pixel_loss 
-
+        print(f"loss {total_loss.item()}")
         return total_loss
 
     def compute_loss_no_blocks(self, inputs, outputs):
@@ -381,27 +383,14 @@ class FlatLanguageTrainer(LanguageTrainer):
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
         skipped = 0
-        print(f"training with data {len(self.train_data)}") 
         for b, batch_instance in tqdm(enumerate(self.train_data)): 
-            #for i, batch_instance in enumerate(batch_trajectory): 
-            #self.generate_debugging_image(batch_instance, f"input_batch_{b}_image_{i}_gold", is_input = True)
             self.optimizer.zero_grad() 
-            for inp_name, inp in batch_instance.items():
-                try:
-                    print(f"input {inp_name} {inp.shape}") 
-                except AttributeError:
-                    continue
-
-            with profiler.profile(use_cuda=True) as prof:
-                outputs = self.encoder(batch_instance) 
-            #print(prof.key_averages())
-
+            outputs = self.encoder(batch_instance) 
             # skip bad examples 
             if outputs is None:
                 skipped += 1
                 continue
             loss = self.compute_loss(batch_instance, outputs) 
-            #print(f"loss {loss.item()}") 
             loss.backward() 
             self.optimizer.step() 
 
@@ -439,6 +428,25 @@ class FlatLanguageTrainer(LanguageTrainer):
         mean_block_acc = total_block_acc / total
         print(f"Test-time pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
         return mean_acc 
+
+
+def get_free_gpu():
+    gpu_stats = subprocess.check_output(["nvidia-smi", "--format=csv", "--query-gpu=memory.used,memory.free"]).decode("utf-8") 
+    gpu_df = pd.read_csv(StringIO(u"".join(gpu_stats)),
+                         names=['memory.used', 'memory.free'],
+                         skiprows=1)
+    print('GPU usage:\n{}'.format(gpu_df))
+    gpu_df['memory.free'] = gpu_df['memory.free'].map(lambda x: x.rstrip(' [MiB]'))
+    gpu_df['memory.used'] = gpu_df['memory.used'].map(lambda x: x.rstrip(' [MiB]'))
+    gpu_df['memory.free'] = gpu_df['memory.free'].astype(np.int64)
+    gpu_df['memory.used'] = gpu_df['memory.used'].astype(np.int64)
+    idx = gpu_df['memory.free'].idxmax()
+    if gpu_df["memory.used"][idx] > 0.0:
+        print(f"No free gpus!") 
+        return -1
+    print('Returning GPU{} with {} free MiB'.format(idx, gpu_df.iloc[idx]['memory.free']))
+    return idx
+
 
 
 def main(args):
@@ -490,18 +498,22 @@ def main(args):
     else:
         raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
 
+    device = "cpu"
     if args.cuda is not None:
-        device = f"cuda:{args.cuda}"
-    else:
-        device = "cpu"
+        free_gpu_id = get_free_gpu()
+        if free_gpu_id > -1:
+            device = f"cuda:{free_gpu_id}"
+
     device = torch.device(device)  
     print(f"On device {device}") 
 
     # construct image encoder 
+    flatten = args.fuser == "concat" 
     image_encoder = ImageEncoder(input_dim = 2, 
                                  n_layers = args.conv_num_layers,
                                  factor = args.conv_factor,
-                                 dropout = args.dropout)
+                                 dropout = args.dropout,
+                                 flatten = flatten)
 
     # construct image and language fusion module 
     fusion_options = {"concat": ConcatFusionModule,
@@ -520,7 +532,10 @@ def main(args):
     output_module = deconv_options[args.deconv](input_channels  = fuser.output_dim, 
                                    num_blocks = args.num_blocks,
                                    num_layers = args.deconv_num_layers,
-                                   dropout = args.dropout) 
+                                   dropout = args.dropout,
+                                   flatten = flatten,
+                                   factor = args.deconv_factor,
+                                   initial_width = 6) 
 
     block_prediction_module = MLP(input_dim = fuser.output_dim,
                                   hidden_dim = args.mlp_hidden_dim, 

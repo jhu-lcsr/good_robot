@@ -9,13 +9,15 @@ class ImageEncoder(torch.nn.Module):
                  n_layers: int,
                  activation: str = "relu", 
                  factor: int = 4, 
-                 dropout: float = 0.2):
+                 dropout: float = 0.2,
+                 flatten: bool = False):
         super(ImageEncoder, self).__init__()
 
         self.input_dim = input_dim
         self.factor = factor
         # will be set later 
         self.device = torch.device("cpu") 
+        self.flatten = flatten
 
         output_dim = 2
 
@@ -43,7 +45,11 @@ class ImageEncoder(torch.nn.Module):
        
         # infer output size 
         #self.output_dim = output_dim * output_wh**3
-        self.output_dim = output_wh * output_wh * output_dim 
+        if self.flatten:
+            self.output_dim = output_wh * output_wh * output_dim 
+        else:
+            self.output_dim = output_dim
+
         self.layers = torch.nn.ModuleList(layers) 
 
     def forward(self, inputs):
@@ -54,9 +60,9 @@ class ImageEncoder(torch.nn.Module):
             outputs = layer(outputs) 
 
         # flatten; will error out if shape inference was wrong 
-        #outputs = outputs.reshape((bsz, 1, self.output_dim))
         # flatten 
-        outputs = outputs.reshape((bsz, 1, -1))
+        if self.flatten:
+            outputs = outputs.reshape((bsz, 1, -1))
         return outputs 
 
 
@@ -65,10 +71,12 @@ def infer_kernel_size(input_dim,
                       stride = 1, 
                       input_padding = 0,
                       output_padding = 0,
-                      dilation = 1):
+                      dilation = 1,
+                      initial_size = 1):
     num = output_dim - (input_dim - 1) * stride + 2 * input_padding - output_padding - 1
     frac = num/dilation + 1
-    return int(frac)
+    frac = int(frac) - (initial_size-1)
+    return frac
 
 def get_deconv_out_dim(input_dim, 
                       kernel,
@@ -107,7 +115,8 @@ class DeconvolutionalNetwork(torch.nn.Module):
                  input_channels: int,
                  num_blocks: int,
                  num_layers: int = 3,
-                 dropout: float = 0.2): 
+                 dropout: float = 0.2,
+                 flatten: bool = False): 
         super(DeconvolutionalNetwork, self).__init__() 
         self.input_channels = input_channels
         self.num_layers = num_layers
@@ -150,13 +159,14 @@ class DeconvolutionalNetwork(torch.nn.Module):
 
         layers.append(conv_last) 
         self.layers = torch.nn.ModuleList(layers) 
+        self.flatten = flatten 
 
     def forward(self, encoded):
         encoded = encoded.to(self.device) 
-        # encoded: [batch, seq_len, input_dim]
-        bsz, input_dim = encoded.data.shape
-        # reshape [bsz, 4, 4, input_dim/8]
-        encoded = encoded.reshape((bsz, -1, 1, 1, 1))
+        if self.flatten:
+            bsz, input_dim = encoded.data.shape
+            # reshape [bsz, 4, 4, input_dim/8]
+            encoded = encoded.reshape((bsz, -1, 1, 1, 1))
 
         for layer in self.layers:
             encoded = layer(encoded) 
@@ -170,7 +180,10 @@ class DecoupledDeconvolutionalNetwork(torch.nn.Module):
                  input_channels: int,
                  num_blocks: int,
                  num_layers: int = 3,
-                 dropout: float = 0.2): 
+                 dropout: float = 0.2,
+                 flatten: bool = False,
+                 factor: int = 2,
+                 initial_width: int = 1): 
         super(DecoupledDeconvolutionalNetwork, self).__init__() 
 
         self.input_channels = input_channels
@@ -180,14 +193,18 @@ class DecoupledDeconvolutionalNetwork(torch.nn.Module):
 
         self.activation = torch.nn.ReLU() 
         self.dropout = torch.nn.Dropout2d(p=dropout) 
+        self.initial_width = initial_width
+        self.flatten = flatten
+
         layers = []
 
-        xy_input_dim = 1
+        xy_input_dim = initial_width
         xy_output_dim = max(1, int(64/self.num_layers))
-        output_channels = max(1, int(input_channels/2)) 
+        #output_channels = max(1, int(input_channels/2)) 
+        output_channels = input_channels * factor
         
         for i in range(num_layers):
-            xy_kernel = infer_kernel_size(xy_input_dim,xy_output_dim)  
+            xy_kernel = infer_kernel_size(xy_input_dim,xy_output_dim)
             kernel_size = [xy_kernel, xy_kernel]
 
             layers.append(torch.nn.ConvTranspose2d(input_channels, output_channels, kernel_size, padding=0)) 
@@ -196,10 +213,11 @@ class DecoupledDeconvolutionalNetwork(torch.nn.Module):
             xy_input_dim = xy_output_dim
             xy_output_dim += xy_output_dim
             input_channels = output_channels
-            output_channels = max(1, int(output_channels/2)) 
+            # output_channels = max(1, int(output_channels/2)) 
+            output_channels = output_channels * factor
 
         # take output and split into 4 channels for height 
-        final_conv_layer = torch.nn.Conv2d(output_channels*2, output_channels*4, kernel_size = 1)
+        final_conv_layer = torch.nn.Conv2d(int(output_channels/factor), output_channels*4, kernel_size = 1)
         layers.append(final_conv_layer)
 
         self.output_dim = xy_output_dim
@@ -211,9 +229,10 @@ class DecoupledDeconvolutionalNetwork(torch.nn.Module):
     def forward(self, encoded):
         encoded = encoded.to(self.device) 
         # encoded: [batch, seq_len, input_dim]
-        bsz, input_dim = encoded.data.shape
-        # reshape [bsz, 4, 4, input_dim/8]
-        encoded = encoded.reshape((bsz, -1, 1, 1))
+        bsz = encoded.data.shape[0]
+        if self.flatten:
+            # reshape [bsz, 4, 4, input_dim/8]
+            encoded = encoded.reshape((bsz, -1, 1, 1))
 
         for layer in self.layers:
             encoded = layer(encoded) 

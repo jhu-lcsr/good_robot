@@ -1,4 +1,5 @@
 from typing import Tuple
+import pdb 
 import torch
 
 
@@ -50,10 +51,10 @@ class TiledFusionModule(BaseFusionModule):
     def __init__(self,
                  image_size,
                  language_size):
-        super(ConcatFusionModule, self).__init__(image_size, language_size)
+        super(TiledFusionModule, self).__init__(image_size, language_size)
+        self.output_dim = self.image_size + self.language_size 
 
     def forward(self, image, language):
-        print(image.shape) 
         bsz, n_channels, width, height = image.shape 
         # language: bsz x 2
         __, num_lang_channels = language.shape
@@ -127,10 +128,6 @@ class LanguageEncoder(torch.nn.Module):
         # encode language 
         lang_encoded = self.encoder(lang_embedded, lengths) 
         bsz, __ = lang_encoded.shape 
-        __, __, pos_hidden = pos_encoded.shape
-        pos_encoded = pos_encoded.squeeze(1) 
-        # expand image to batch size 
-        pos_encoded = pos_encoded.expand(bsz, pos_hidden)
         # fuse image and language 
         image_and_language = self.fuser(pos_encoded, lang_encoded)
         # get image output 
