@@ -157,6 +157,34 @@ class BaseTrajectory:
         #print(f"there are {bad} blocks with >1 move") 
         return all_blocks_to_move
 
+    def make_grid_positions(self, positions, make_z = False, batch_size = 1, resolution = 4, num_blocks = 20): 
+        """
+        Take (x,y,z) positions and discretize them into #blocks binary random variables
+        across resolution x resolution number of bins 
+        """
+        # positions: 1 for each block id 
+        def absolute_to_relative(coord): 
+            # shift, now out of 2 
+            coord += 1
+            # get perc 
+            coord = coord / 2
+            # scale 
+            scaled = coord * resolution 
+            # shift 
+            return int(np.around(scaled))
+
+        image_positions = []
+
+        for i, position_list in enumerate(positions): 
+            if make_z:
+                bin_grid = torch.zeros((num_blocks, resolution, resolution))
+            else:
+                bin_grid = torch.zeros((num_blocks, resolution, resolution, resolution))
+        
+
+
+
+
     def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
         """
         take (x,y,z) positions and turn them into 1-hot 

@@ -14,6 +14,11 @@ class LSTMEncoder(torch.nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout 
         self.bidirectional = bidirectional
+
+        if bidirectional:
+            self.output_size = 2 * self.hidden_dim
+        else:
+            self.output_size = self.hidden_dim
         # will be set later 
         self.device = torch.device("cpu") 
 
@@ -25,12 +30,17 @@ class LSTMEncoder(torch.nn.Module):
                                   dropout     = dropout, 
                                   bidirectional = bidirectional)
 
+    def set_device(self, device):
+        self.device = device
+        self.lstm = self.lstm.cuda(device) 
+
     def forward(self, embedded_tokens, lengths):
         embedded_tokens = embedded_tokens.to(self.device) 
         #print(f"embedded tokens {embedded_tokens[0, 0:10, 0:3]}") 
         embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, lengths, 
                                                           batch_first=True, 
                                                           enforce_sorted=True) 
+        embedded = embedded.to(self.device) 
         output, __ = self.lstm(embedded)
        
         output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
@@ -53,7 +63,9 @@ class LSTMEncoder(torch.nn.Module):
 
         # flatten 
         concat = concat.reshape((bsz, -1))
-        return concat 
+        to_ret = {"sentence_encoding": concat,
+                  "output": output} 
+        return to_ret 
                                                               
 
 class TransformerEncoder(torch.nn.Module): 

@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from spacy.tokenizer import Tokenizer 
+import pdb 
 
 class GloveEmbedder(torch.nn.Module):
     def __init__(self, 
@@ -60,11 +61,16 @@ class RandomEmbedder(torch.nn.Module):
         self.word_to_idx["<PAD>"] = 1
 
         self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
-        self.device = None
+
+    def set_device(self, device):
+        self.device = device
+        self.embeddings = self.embeddings.cuda(self.device) 
+
 
     def forward(self, words):
         words = [w if w in self.vocab else "<UNK>" for w in words]
-        lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long).to(self.device) 
+        lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long)
+        lookup_tensor = lookup_tensor.to(self.device)
         
         output = self.embeddings(lookup_tensor)
         #return torch.cat(output, dim = 0) 
