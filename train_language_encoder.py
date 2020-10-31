@@ -76,6 +76,7 @@ class LanguageTrainer:
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device
         self.compute_block_dist = self.encoder.compute_block_dist
+        pdb.set_trace() 
 
     def train(self):
         all_accs = []
@@ -273,8 +274,11 @@ class LanguageTrainer:
         else:
             # loss per pixel 
             pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
+            # foreground loss 
+            foreground_loss = self.fore_loss_fxn(pred_image, true_image) 
             #print(f"computing loss no blocks {pixel_loss.item()}") 
-            total_loss = pixel_loss 
+            total_loss = pixel_loss + foreground_loss
+
         print(f"loss {total_loss.item()}")
         return total_loss
 
@@ -476,8 +480,6 @@ def main(args):
         
     print(f"Reading data from {args.val_path}")
     dev_vocab = dataset_reader.read_data("dev") 
-
-
     print(f"got data")  
     # construct the vocab and tokenizer 
     nlp = English()
@@ -629,6 +631,7 @@ if __name__ == "__main__":
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
+    parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-dim", type=int, default=300) 

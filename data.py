@@ -6,6 +6,7 @@ import numpy as np
 from spacy.tokenizer import Tokenizer 
 from spacy.lang.en import English
 import torch
+import pdb 
 np.random.seed(12) 
 
 PAD = "<PAD>"
@@ -93,11 +94,15 @@ class BaseTrajectory:
                  images: List[str],
                  lengths: List[int],
                  traj_type: str = "flat",
-                 batch_size: int = None):
+                 batch_size: int = None,
+                 do_filter: bool = False,
+                 binarize_blocks: bool = False):
 
         if batch_size is None:
             batch_size = len(commands)
         self.batch_size = batch_size 
+        self.do_filter = do_filter
+        self.binarize_blocks = binarize_blocks
 
         self.line_id = line_id
         self.commands = commands
@@ -108,6 +113,12 @@ class BaseTrajectory:
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
         self.next_rotations = next_rotations
         self.blocks_to_move = self.get_blocks_to_move()
+
+        if self.do_filter: 
+            self.previous_positions = self.filter_by_blocks_to_move(self.previous_positions)
+            self.previous_positions_for_acc = self.filter_by_blocks_to_move(self.previous_positions_for_acc)
+            self.next_positions = self.filter_by_blocks_to_move(self.next_positions)
+
 
         self.images = images
         self.lengths = lengths
@@ -133,6 +144,18 @@ class BaseTrajectory:
             return FlatIterator(self)
         else:
             return TrajectoryIterator(self)
+
+    def filter_by_blocks_to_move(self, positions):
+        # zero out positions that aren't the block of interest
+        for i in range(len(positions)):
+            pos = positions[i]
+            bidx = self.blocks_to_move[i]
+            pos[pos != bidx] = 0 
+            if self.binarize_blocks:
+                pos[pos == bidx] = 1
+            positions[i] = pos
+        return positions 
+
 
     def get_blocks_to_move(self):
         batch_idx = 0
@@ -181,10 +204,6 @@ class BaseTrajectory:
             else:
                 bin_grid = torch.zeros((num_blocks, resolution, resolution, resolution))
         
-
-
-
-
     def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
         """
         take (x,y,z) positions and turn them into 1-hot 
@@ -273,17 +292,21 @@ class SimpleTrajectory(BaseTrajectory):
                  lengths: List[int],
                  tokenizer: Tokenizer,
                  traj_type: str,
-                 batch_size: int):
-        super(SimpleTrajectory, self).__init__(line_id,
-                                         commands, 
-                                         previous_positions,
-                                         previous_rotations,
-                                         next_positions, 
-                                         next_rotations, 
-                                         images,
-                                         lengths,
-                                         traj_type,
-                                         batch_size) 
+                 batch_size: int,
+                 do_filter: bool,
+                 binarize_blocks: bool):
+        super(SimpleTrajectory, self).__init__(line_id=line_id,
+                                               commands=commands, 
+                                               previous_positions=previous_positions,
+                                               previous_rotations=previous_rotations,
+                                               next_positions=next_positions, 
+                                               next_rotations=next_rotations, 
+                                               images=images,
+                                               lengths=lengths,
+                                               traj_type=traj_type,
+                                               batch_size=batch_size,
+                                               do_filter=do_filter,
+                                               binarize_blocks=binarize_blocks) 
         self.tokenizer = tokenizer
         # commands is a list of #timestep text strings 
         self.commands = self.tokenize(commands)
@@ -310,17 +333,19 @@ class BatchedTrajectory(BaseTrajectory):
                  images: List[str],
                  lengths: List[str],
                  tokenizer: Tokenizer,
-                 traj_type: str):  
-        super(BatchedTrajectory, self).__init__(line_id,
-                                                commands,
-                                                previous_positions,
-                                                previous_rotations,
-                                                next_positions,
-                                                next_rotations,
-                                                images,
-                                                lengths,
-                                                traj_type)
-
+                 traj_type: str,
+                 do_filter: bool = False,
+                binarize_blocks: bool = False):  
+        super(BatchedTrajectory, self).__init__(line_id=line_id,
+                                               commands=commands, 
+                                               previous_positions=previous_positions,
+                                               previous_rotations=previous_rotations,
+                                               next_positions=next_positions, 
+                                               next_rotations=next_rotations, 
+                                               images=images,
+                                               lengths=lengths,
+                                               do_filter=do_filter,
+                                               binarize_blocks=binarize_blocks) 
         # commands is now a 9xlen matrix 
         self.tokenizer = tokenizer
         self.commands, self.lengths = self.pad_commands(self.tokenize(commands)) 
@@ -376,7 +401,9 @@ class DatasetReader:
                        batch_by_line=False,
                        traj_type = "flat",
                        batch_size = 32,
-                       max_seq_length = 65): 
+                       max_seq_length = 65,
+                       do_filter: bool = False,
+                       binarize_blocks: bool = False): 
         self.train_path = train_path
         self.dev_path = dev_path
         self.test_path = test_path
@@ -384,6 +411,8 @@ class DatasetReader:
         self.traj_type = traj_type
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
+        self.do_filter = do_filter
+        self.binarize_blocks = binarize_blocks
 
         nlp = English()
         self.tokenizer = Tokenizer(nlp.vocab)
@@ -435,7 +464,9 @@ class DatasetReader:
                                                    images = images,
                                                    lengths = [0]*len(command_trajectories),
                                                    tokenizer = self.tokenizer,
-                                                   traj_type = self.traj_type) 
+                                                   traj_type = self.traj_type,
+                                                   do_filter = self.do_filter,
+                                                   binarize_blocks = self.binarize_blocks) 
                     self.data[split].append(trajectory)  
                     vocab |= trajectory.traj_vocab
                 else:
@@ -453,7 +484,9 @@ class DatasetReader:
                                                             lengths = [None],
                                                             tokenizer=self.tokenizer,
                                                             traj_type=self.traj_type,
-                                                            batch_size=1)
+                                                            batch_size=1,
+                                                            do_filter=self.do_filter,
+                                                            binarize_blocks = self.binarize_blocks) 
                                 self.data[split].append(trajectory) 
                                 vocab |= trajectory.traj_vocab
 

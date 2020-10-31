@@ -23,7 +23,7 @@ from image_encoder import ImageEncoder, DeconvolutionalNetwork, DecoupledDeconvo
 from language import LanguageEncoder, ConcatFusionModule, TiledFusionModule
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
-from unet_module import BaseUNet, UNetWithLanguage
+from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from mlp import MLP 
 
 from data import DatasetReader
@@ -32,6 +32,9 @@ from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageT
 logger = logging.getLogger(__name__)
 
 def main(args):
+    if args.binarize_blocks:
+        args.num_blocks = 1
+
     # load the data 
     dataset_reader = DatasetReader(args.train_path,
                                    args.val_path,
@@ -39,7 +42,9 @@ def main(args):
                                    batch_by_line = args.traj_type != "flat",
                                    traj_type = args.traj_type,
                                    batch_size = args.batch_size,
-                                   max_seq_length = args.max_seq_length)  
+                                   max_seq_length = args.max_seq_length,
+                                   do_filter = args.do_filter,
+                                   binarize_blocks = args.binarize_blocks)  
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
     if not args.test:
@@ -58,7 +63,6 @@ def main(args):
         
     print(f"Reading data from {args.val_path}")
     dev_vocab = dataset_reader.read_data("dev") 
-
 
     print(f"got data")  
     # construct the vocab and tokenizer 
@@ -89,13 +93,18 @@ def main(args):
     device = torch.device(device)  
     print(f"On device {device}") 
 
-    encoder = UNetWithLanguage(in_channels = 2,
-                               out_channels = 8, 
-                               lang_embedder = embedder,
-                               lang_encoder = encoder, 
-                               hc_large = 8,
-                               hc_small = 4,
-                               device=device)
+    if args.compute_block_dist:
+        unet_class = UNetWithBlocks
+    else:
+        unet_class = UNetWithLanguage
+
+    encoder = unet_class(in_channels = 2,
+                         out_channels = 32, 
+                         lang_embedder = embedder,
+                         lang_encoder = encoder, 
+                         hc_large = 32,
+                         hc_small = 16,
+                         device=device)
 
     if args.cuda is not None:
         encoder = encoder.cuda(device) 
@@ -155,14 +164,14 @@ def main(args):
         encoder.load_state_dict(state_dict, strict=True)  
 
         eval_trainer = trainer_cls(train_data = dataset_reader.data["train"], 
-                                           val_data = dataset_reader.data["dev"], 
-                                           encoder = encoder,
-                                           optimizer = None, 
-                                           num_epochs = 0, 
-                                           device = device,
-                                           checkpoint_dir = args.checkpoint_dir,
-                                           num_models_to_keep = 0, 
-                                           generate_after_n = 0) 
+                                   val_data = dataset_reader.data["dev"], 
+                                   encoder = encoder,
+                                   optimizer = None, 
+                                   num_epochs = 0, 
+                                   device = device,
+                                   checkpoint_dir = args.checkpoint_dir,
+                                   num_models_to_keep = 0, 
+                                   generate_after_n = 0) 
         print(f"evaluating") 
         eval_trainer.evaluate()
 
@@ -174,9 +183,11 @@ if __name__ == "__main__":
     parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
     parser.add_argument("--num-blocks", type=int, default=20) 
+    parser.add_argument("--binarize-blocks", action="store_true", help="flag to treat block prediction as binary task instead of num-blocks-way classification") 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
+    parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-dim", type=int, default=300) 
