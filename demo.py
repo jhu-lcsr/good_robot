@@ -27,6 +27,9 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
 
         elif self.task_type == 'unstack':
+            # get number of actions in demo
+            self.num_actions = len(os.listdir(self.rgb_dir))
+
             # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
             self.action_dict = {}
             for s in range(1, 5):
@@ -40,7 +43,7 @@ class Demonstration():
         if action_str != 'orig' and self.task_type == 'stack':
             action_str = str(stack_height) + action_str
 
-        rgb_filename = os.path.join(self.rgb_dir, 
+        rgb_filename = os.path.join(self.rgb_dir,
                 '%06d.%s.color.png' % (stack_height, action_str))
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (stack_height, action_str))
@@ -81,17 +84,22 @@ class Demonstration():
                 # if primitive action is place, get the previous grasp heightmap
                 action_str = 'grasp'
 
-        elif self.task_type == 'unstack':
+        else:
+            action_str = primitive_action
             if primitive_action == 'grasp':
-                # if primitive action is grasp, we need the previous place heightmap and grasp action
-                action_str = 'grasp_unstack'
-            else:
-                # if prim action is place, get the previous grasp heightmap
-                action_str = 'place_unstack'
-                # need to add one to heightmap since it 4.place_unstack refers to when the stack has 3 blocks
-                print(stack_height)
+                # offset is 2 for stack height 4, 4 for stack height 3, ...
+                offset = 6 - stack_height
 
-        color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
+            elif primitive_action == 'place':
+                # offset is 1 for stack height 4, 3 for stack height 3, ...
+                # this is because place is always 1 action after grasp
+                offset = 5 - stack_height
+
+        if self.task_type == 'stack':
+            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
+        elif self.task_type == 'unstack':
+            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, self.num_actions - offset)
+
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
                 valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
@@ -105,6 +113,7 @@ class Demonstration():
         # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
+
         # need to swap x and y coordinates for best_action_xy
         best_action_xy = [best_action_xy[1], best_action_xy[0]]
 
