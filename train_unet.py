@@ -104,6 +104,7 @@ def main(args):
                          lang_encoder = encoder, 
                          hc_large = 32,
                          hc_small = 16,
+                         num_blocks = args.num_blocks,
                          device=device)
 
     if args.cuda is not None:
@@ -149,6 +150,7 @@ def main(args):
                               encoder = encoder,
                               optimizer = optimizer, 
                               num_epochs = args.num_epochs,
+                              num_blocks = args.num_blocks,
                               device = device,
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,

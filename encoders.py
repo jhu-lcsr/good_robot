@@ -32,7 +32,8 @@ class LSTMEncoder(torch.nn.Module):
 
     def set_device(self, device):
         self.device = device
-        self.lstm = self.lstm.cuda(device) 
+        if "cuda" in str(device):
+            self.lstm = self.lstm.cuda(device) 
 
     def forward(self, embedded_tokens, lengths):
         embedded_tokens = embedded_tokens.to(self.device) 

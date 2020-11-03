@@ -18,6 +18,7 @@ class BaseUNet(torch.nn.Module):
                 stride: int = 2,
                 num_layers: int = 5,
                 num_blocks: int = 20,
+                dropout: float = 0.20, 
                 device: torch.device = "cpu"):
         super(BaseUNet, self).__init__()
 
@@ -42,6 +43,7 @@ class BaseUNet(torch.nn.Module):
         pad = int(kernel_size / 2) 
 
         self.activation = torch.nn.ReLU()
+        self.dropout = torch.nn.Dropout2d(dropout)
 
         # exception at first layer for shape  
         first_downconv = torch.nn.Conv2d(in_channels, hc_large, kernel_size, stride=stride, padding=pad)
@@ -112,6 +114,8 @@ class BaseUNet(torch.nn.Module):
                 out = downnorm(out) 
                 downconv_results.append(out) 
 
+            out = self.dropout(out) 
+
         # go back up the U, concatenating residuals back in 
         for i in range(self.num_layers): 
             # concat the corresponding side of the U
@@ -132,6 +136,8 @@ class BaseUNet(torch.nn.Module):
                 upnorm = self.upnorms[i-1]
                 out = upnorm(out)
 
+            out = self.dropout(out) 
+
         out = self.final_layer(out) 
 
         to_ret = {"next_position": out,
@@ -150,6 +156,7 @@ class UNetWithLanguage(BaseUNet):
                 stride: int = 2,
                 num_layers: int = 5,
                 num_blocks: int = 20,
+                dropout: float = 0.20, 
                 device: torch.device = "cpu"):
         super(UNetWithLanguage, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
@@ -159,6 +166,7 @@ class UNetWithLanguage(BaseUNet):
                                                stride=stride,
                                                num_layers=num_layers,
                                                num_blocks=num_blocks,
+                                               dropout=dropout,
                                                device=device)
 
         pad = int(kernel_size / 2) 
@@ -229,6 +237,7 @@ class UNetWithLanguage(BaseUNet):
             if i < self.num_layers-1: 
                 downnorm = self.downnorms[i-1]
                 out = downnorm(out) 
+            out = self.dropout(out) 
 
             # get language projection at that layer 
             lang_proj = self.lang_projections[i]
@@ -241,7 +250,9 @@ class UNetWithLanguage(BaseUNet):
             # concat language in 
             downconv_sizes.append(out.size())
             out_with_lang = torch.cat([out, lang], 1)
+            out_with_lang = self.dropout(out_with_lang) 
             downconv_results.append(out_with_lang) 
+
             if i == self.num_layers-1:
                 # at end set out include lang
                 out = out_with_lang
@@ -269,6 +280,7 @@ class UNetWithLanguage(BaseUNet):
             if i < self.num_layers: 
                 upnorm = self.upnorms[i-1]
                 out = upnorm(out)
+            out = self.dropout(out) 
 
         out = self.final_layer(out) 
 
@@ -302,6 +314,7 @@ class UNetWithBlocks(UNetWithLanguage):
                                                stride=stride,
                                                num_layers=num_layers,
                                                num_blocks=num_blocks,
+                                               dropout=dropout,
                                                device=device)
 
         self.compute_block_dist = True 
@@ -309,7 +322,7 @@ class UNetWithBlocks(UNetWithLanguage):
         width = int(64**(1/(num_layers-1))) 
         self.block_prediction_module = MLP(input_dim  = 2*width*width*hc_large,
                                            hidden_dim = 2*hc_large,
-                                           output_dim = num_blocks + 1,
+                                           output_dim = 21, 
                                            num_layers = mlp_num_layers, 
                                            dropout = dropout) 
 
@@ -352,6 +365,7 @@ class UNetWithBlocks(UNetWithLanguage):
             if i < self.num_layers-1: 
                 downnorm = self.downnorms[i-1]
                 out = downnorm(out) 
+            out = self.dropout(out) 
 
             # get language projection at that layer 
             lang_proj = self.lang_projections[i]
@@ -364,6 +378,8 @@ class UNetWithBlocks(UNetWithLanguage):
             # concat language in 
             downconv_sizes.append(out.size())
             out_with_lang = torch.cat([out, lang], 1)
+            out_with_lang = self.dropout(out_with_lang) 
+
             downconv_results.append(out_with_lang) 
             if i == self.num_layers-1:
                 # at end set out include lang
@@ -395,6 +411,7 @@ class UNetWithBlocks(UNetWithLanguage):
             if i < self.num_layers: 
                 upnorm = self.upnorms[i-1]
                 out = upnorm(out)
+            out = self.dropout(out) 
 
         out = self.final_layer(out) 
 

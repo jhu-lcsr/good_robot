@@ -115,7 +115,7 @@ class BaseTrajectory:
         self.blocks_to_move = self.get_blocks_to_move()
 
         if self.do_filter: 
-            self.previous_positions = self.filter_by_blocks_to_move(self.previous_positions)
+            # only filter next positions, not previous ones 
             self.previous_positions_for_acc = self.filter_by_blocks_to_move(self.previous_positions_for_acc)
             self.next_positions = self.filter_by_blocks_to_move(self.next_positions)
 
@@ -155,7 +155,6 @@ class BaseTrajectory:
                 pos[pos == bidx] = 1
             positions[i] = pos
         return positions 
-
 
     def get_blocks_to_move(self):
         batch_idx = 0

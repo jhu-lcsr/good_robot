@@ -64,7 +64,8 @@ class RandomEmbedder(torch.nn.Module):
 
     def set_device(self, device):
         self.device = device
-        self.embeddings = self.embeddings.cuda(self.device) 
+        if "cuda" in str(device):
+            self.embeddings = self.embeddings.cuda(self.device) 
 
 
     def forward(self, words):

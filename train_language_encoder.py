@@ -55,6 +55,7 @@ class LanguageTrainer:
                  encoder: LanguageEncoder,
                  optimizer: torch.optim.Optimizer,
                  num_epochs: int,
+                 num_blocks: int,
                  device: torch.device,
                  checkpoint_dir: str,
                  num_models_to_keep: int,
@@ -65,6 +66,7 @@ class LanguageTrainer:
         self.encoder = encoder
         self.optimizer = optimizer 
         self.num_epochs = num_epochs
+        self.num_blocks = num_blocks
         self.checkpoint_dir = pathlib.Path(checkpoint_dir)
         self.num_models_to_keep = num_models_to_keep
         self.generate_after_n = generate_after_n
@@ -76,7 +78,6 @@ class LanguageTrainer:
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device
         self.compute_block_dist = self.encoder.compute_block_dist
-        pdb.set_trace() 
 
     def train(self):
         all_accs = []
@@ -138,7 +139,7 @@ class LanguageTrainer:
             block_accuracy = -1.0
             
         if epoch_num > self.generate_after_n: 
-            for i in range(len(batch_instance)):
+            for i in range(outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
                 self.generate_debugging_image(outputs["next_position"][i], output_path.joinpath("pred"))
@@ -162,7 +163,6 @@ class LanguageTrainer:
 
         # compare 
         total = gold_pixels.shape[0]
-
         matching = torch.sum(pred_pixels == gold_pixels).item() 
         try:
             acc = matching/total 
@@ -187,13 +187,7 @@ class LanguageTrainer:
 
     def generate_debugging_image(self, data, out_path, is_input=False):
         # 9 x 21 x 4 x 64 x 64 
-        # just get first image in batch, should be all identical
-        #if not is_input:
-        #    next_pos = data["next_position"][0]
-        #else:
-        #    next_pos = data["previous_position_for_acc"][0]
-        # TODO (elias): debugging treat as 2-way 
-        if data.shape[0] == 21:
+        if data.shape[0] == self.num_blocks + 1:
             # take argmax if distribution 
             data_id, data= torch.max(data, dim = 0) 
         data = data.squeeze(0)
@@ -251,7 +245,7 @@ class LanguageTrainer:
         prev_image  = inputs["previous_position_for_acc"]
 
         pred_block_logits = outputs["pred_block_logits"] 
-        true_block_idxs  = inputs["block_to_move"]
+        true_block_idxs = inputs["block_to_move"]
         true_block_idxs = true_block_idxs.to(self.device).long().reshape(-1) 
 
         bsz, n_blocks, width, height, depth = pred_image.shape
@@ -266,10 +260,11 @@ class LanguageTrainer:
             #pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
             # TODO (elias): for now just do as auxiliary task 
             pixel_loss = self.xent_loss_fxn(pred_image, true_image) 
+            foreground_loss = self.fore_loss_fxn(pred_image, true_image) 
             # loss per block
             block_loss = self.xent_loss_fxn(pred_block_logits, true_block_idxs) 
             #print(f"computing loss with blocks {pixel_loss.item()} + {block_loss.item()}") 
-            total_loss = pixel_loss + block_loss
+            total_loss = pixel_loss + block_loss + foreground_loss
             #total_loss = block_loss
         else:
             # loss per pixel 
@@ -367,6 +362,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                  encoder: LanguageEncoder,
                  optimizer: torch.optim.Optimizer,
                  num_epochs: int,
+                 num_blocks: int, 
                  device: torch.device,
                  checkpoint_dir: str,
                  num_models_to_keep: int,
@@ -377,6 +373,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                                                   encoder,
                                                   optimizer,
                                                   num_epochs,
+                                                  num_blocks,
                                                   device,
                                                   checkpoint_dir,
                                                   num_models_to_keep,
@@ -594,6 +591,7 @@ def main(args):
                               encoder = encoder,
                               optimizer = optimizer, 
                               num_epochs = args.num_epochs,
+                              num_blocks = args.num_blocks,
                               device = device,
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,
