@@ -180,13 +180,14 @@ class HumanControlOfRobot(object):
 
         # TODO(adit98) figure out how to trigger this as soon as the previous action completes
         # finish trial
-        if self.robot.check_stack(np.arange(4))[0]:
-            self.executed_action_log = self.robot.reposition_objects(action_log=self.executed_action_log,
-                    logger=self.logger, stack_height=4)
-            self.logger.write_to_log('executed-actions-' + str(self.trial),
-                    self.executed_action_log)
-            self.trial += 1
-            self.executed_action_log = []
+        #if self.robot.check_stack(np.arange(4))[0]:
+        #    self.executed_action_log = self.robot.reposition_objects(action_log=self.executed_action_log,
+        #            logger=self.logger, stack_height=4)
+        #    self.logger.write_to_log('executed-actions-' + str(self.trial),
+        #            self.executed_action_log)
+        #    self.trial += 1
+        #    self.executed_action_log = []
+        self.logger.write_to_log('executed-actions-' + str(self.trial), self.executed_action_log)
 
         return target_position, heightmap_rotation_angle
 
@@ -393,7 +394,7 @@ if __name__ == '__main__':
     # TODO(adit98) add cmd line args to select goal, task, etc.
     robot = Robot(is_sim, os.path.abspath('objects/blocks'), 4, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None, place=True, calibrate=calibrate, unstack=True)
+                False, None, None, place=True, calibrate=calibrate, unstack=False)
 
     # initialize logger
     logger = Logger(continue_logging=False, logging_directory='demos')
