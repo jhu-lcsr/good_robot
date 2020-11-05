@@ -3,7 +3,6 @@ from scipy import ndimage
 import os
 import argparse
 import cv2
-from models import PixelNet
 import torch
 from collections import OrderedDict
 from utils import ACTION_TO_ID
@@ -114,7 +113,7 @@ if __name__ == '__main__':
                       force_cpu=args.cpu, goal_condition_len=0, place=True,
                       pretrained=True, flops=False, network='densenet',
                       common_sense=True, show_heightmap=False, place_dilation=0,
-                      common_sense_backprop=True, trial_reward='spot'
+                      common_sense_backprop=True, trial_reward='spot',
                       num_dilation=0)
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
