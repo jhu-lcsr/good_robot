@@ -103,9 +103,9 @@ if __name__ == '__main__':
 
     # create both demo classes
     example_demo = Demonstration(path=args.example_demo, demo_num=0,
-            check_z_height=check_z_height, task_type=args.task_type)
+            check_z_height=True, task_type=args.task_type)
     imitation_demo = Demonstration(path=args.imitation_demo, demo_num=0,
-            check_z_height=check_z_height, task_type=args.task_type)
+            check_z_height=True, task_type=args.task_type)
 
     # TODO(adit98) define trainer
     # Initialize trainer
