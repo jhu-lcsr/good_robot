@@ -84,9 +84,9 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--example_demo', type=str, help='path to example demo')
     parser.add_argument('-d', '--imitation_demo', type=str, help='path to imitation demo')
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
-    parser.add_argument('-s', '--single_image', default=None, help='visualize signal for only a single image (only works for demo images)')
     parser.add_argument('-m', '--metric', default='l2', help='metric to evaluate similarity between demo and current env embeddings')
     parser.add_argument('-t', '--task_type', default='unstack', help='task type (enter custom as catch-all)')
+    parser.add_argument('-s', '--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
