@@ -715,7 +715,7 @@ class Robot(object):
             else:
                 self.open_gripper()
 
-            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+            # go to x,y position of previous places and pick up the z height from the depthmap (top of the stack)
             for ind in range(len(place_pose_history)):
                 x, y, z, angle = place_pose_history[ind]
 
@@ -723,7 +723,8 @@ class Robot(object):
                 # keep grasping until stack height decreases
                 while 1:
                     # data before grasp
-                    grasp_depth, grasp_color, _, max_z_height, _, _ = self.get_camera_data(return_heightmaps=True)
+                    grasp_depth, grasp_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
+                    _, z_height = self.check_stack(np.arange(4))
 
                     # get depth_heightmap pixel_coordinates of where the previous place was
                     x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
@@ -732,7 +733,7 @@ class Robot(object):
                     y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
                     y_pixel = min(y_pixel, 223)
 
-                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
+                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', grasp_depth)
 
                     # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
                     # plus an offset. There
@@ -742,11 +743,12 @@ class Robot(object):
                     grasp_success, color_success = self.grasp([x, y, z], angle)
 
                     # data before place
-                    place_depth, place_color, _, max_z_height, _, _ = self.get_camera_data(return_heightmaps=True)
-                    max_z_height = int(np.round(max_z_height))
+                    place_depth, place_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
+                    _, z_height = self.check_stack(np.arange(4))
 
-                    # move on if max_z_height has decreased
-                    if max_z_height < stack_height: break
+                    # move on if z_height has decreased
+                    print("Z height", z_height, "stack height", stack_height)
+                    if z_height < stack_height or z_height == 1: break
 
                 # log (run forward pass and save embeddings)
                 # assume if demo is given, trainer, logger are also given
@@ -775,8 +777,8 @@ class Robot(object):
                             trainer.executed_action_embed_log, pickle=True)
 
                     # save images
-                    logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
-                    logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'grasp_unstack')
+                    #logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
+                    logger.save_heightmaps(stack_height, grasp_color, grasp_depth, 'grasp_unstack')
 
                     # run forward pass for place and save embeddings
                     push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(place_color,
@@ -802,8 +804,8 @@ class Robot(object):
                             trainer.executed_action_embed_log, pickle=True)
 
                     # save images
-                    logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
-                    logger.save_heightmaps(stack_height, color_heightmap, depth_heightmap, 'place_unstack')
+                    #logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
+                    logger.save_heightmaps(stack_height, place_color, place_depth, 'place_unstack')
 
                 # place block if grasp was successful
                 if grasp_success:
@@ -815,7 +817,7 @@ class Robot(object):
                     self.place(rand_position, rand_angle, save_history=False)
 
                 # stack height has decreased
-                stack_height = max_z_height
+                stack_height = z_height
 
             # clear the place hisory after unstacking
             self.place_pose_history = []
