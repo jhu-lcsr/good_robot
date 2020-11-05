@@ -141,7 +141,8 @@ if __name__ == '__main__':
             else:
                 preds = place_preds
 
-            print(example_action.shape, preds.shape)
+            # reshape example_action to 1 x 64 x 1 x 1
+            example_action = np.expand_dims(example_action, (0, 2, 3))
 
             # store indices of masked spaces (take min so we enforce all 64 values are 0)
             mask = (np.min((preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
@@ -161,6 +162,9 @@ if __name__ == '__main__':
 
                 # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
                 im_mask = 1 - l2_dist
+
+                # fix dynamic range of im_depth
+                im_depth = (im_depth * 255 / np.max(im_depth)).astype(np.uint8)
 
                 ## load original depth/rgb maps
                 #orig_depth = cv2.imread(os.path.join(log_home, 'data', 'depth-heightmaps',
