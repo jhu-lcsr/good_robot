@@ -109,7 +109,7 @@ if __name__ == '__main__':
 
     # TODO(adit98) define trainer
     # Initialize trainer
-    trainer = Trainer(method, push_rewards=True, future_reward_discount=0.5,
+    trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
                       is_testing=True, snapshot_file=args.snapshot_file,
                       force_cpu=args.cpu, goal_condition_len=0, place=True,
                       pretrained=True, flops=False, network='densenet',
