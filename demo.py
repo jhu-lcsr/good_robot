@@ -37,7 +37,7 @@ class Demonstration():
                 demo_ind = -2 * (5 - s)
                 self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
-                        'demo_ind': demo_ind}
+                        'demo_ind': len(self.action_log) + demo_ind}
 
     def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
@@ -89,12 +89,11 @@ class Demonstration():
             action_str = primitive_action
             if primitive_action == 'grasp':
                 # offset is 2 for stack height 4, 4 for stack height 3, ...
-                offset = 6 - stack_height
+                offset = 10 - 2 * stack_height
 
             elif primitive_action == 'place':
-                # offset is 1 for stack height 4, 3 for stack height 3, ...
-                # this is because place is always 1 action after grasp
-                offset = 5 - stack_height
+                # offset is grasp_offset - 1 because place is always 1 action after grasp
+                offset = 9 - 2 * stack_height
 
         if self.task_type == 'stack':
             color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)

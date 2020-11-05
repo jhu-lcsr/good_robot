@@ -127,7 +127,7 @@ if __name__ == '__main__':
                     action, k)
 
             # get imitation heightmaps
-            im_depth, im_color = demo.get_heightmaps(action, example_demo.action_dict[k]['demo_ind'])
+            im_depth, im_color = imitation_demo.get_heightmaps(action, example_demo.action_dict[k]['demo_ind'])
             depth_filename = os.path.join(args.imitation_demo, 'correspondences', str(k) + '.' + action + '.depth.png')
             color_filename = os.path.join(args.imitation_demo, 'correspondences', str(k) + '.' + action + '.color.png')
 
