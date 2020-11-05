@@ -7,6 +7,7 @@ import torch
 from collections import OrderedDict
 from utils import ACTION_TO_ID
 from trainer import Trainer
+from demo import Demonstration
 
 # TODO(adit98) refactor to use ACTION_TO_IND from utils.py
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
