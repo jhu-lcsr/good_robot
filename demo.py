@@ -36,7 +36,8 @@ class Demonstration():
                 # store push, grasp, and place actions for demo at stack height s
                 demo_ind = -2 * (5 - s)
                 self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
-                        ACTION_TO_ID['place'] : self.action_log[demo_ind + 1]}
+                        ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
+                        'demo_ind': demo_ind}
 
     def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
