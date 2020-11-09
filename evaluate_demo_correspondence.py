@@ -145,10 +145,18 @@ if __name__ == '__main__':
             color_filename = os.path.join(args.imitation_demo, 'correspondences',
                     str(k) + '.' + action + '.color.png')
 
+            # set whether place common sense masks should be used
+            # TODO(adit98) make this a cmd line argument
+            if args.task_type == 'unstack':
+                place_common_sense = True
+            else:
+                place_common_sense = False
+
             # run forward pass for imitation_demo
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             push_preds, grasp_preds, place_preds = trainer.forward(im_color,
-                    im_depth, is_volatile=True, keep_action_feat=True, use_demo=True)
+                    im_depth, is_volatile=True, keep_action_feat=True, use_demo=True,
+                    demo_mask=True, place_common_sense=place_common_sense)
 
             if action == 'grasp':
                 preds = grasp_preds
