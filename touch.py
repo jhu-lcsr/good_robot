@@ -49,6 +49,7 @@ class HumanControlOfRobot(object):
         self.logger = logger
         self.all_action_log = []
         self.successful_action_log = []
+        self.heightmap_pairs = []
         self.trial = 0
         self.click_count = 0
         self.click_position = None
@@ -122,7 +123,9 @@ class HumanControlOfRobot(object):
 
     def execute_action(self, target_position, heightmap_rotation_angle):
         # log env state
-        get_and_save_images(self.click_count, self.robot, self.logger, self.action)
+        depth_heightmap, color_heightmap, _, _, _ = get_and_save_images(self.click_count,
+                self.robot, self.logger, self.action, save_image=False)
+        self.heightmap_pairs.append((depth_heightmap, color_heightmap))
 
         self.target_position = target_position
         self.click_count += 1
@@ -140,7 +143,19 @@ class HumanControlOfRobot(object):
                 if self.place_success:
                     # if we had a successful place, write the last 2 actions (grasp and place) to log
                     self.successful_action_log += self.all_action_log[-2:]
-                    self.logger.write_to_log('successful-actions-' + str(self.trial), self.successful_action_log)
+                    self.logger.write_to_log('executed-actions-' + str(self.trial),
+                            self.successful_action_log)
+
+                    # get last two pairs of heightmaps
+                    heightmap_pairs = self.heightmap_pairs[-2:]
+                    depth_grasp, color_grasp = heightmap_pairs[0]
+                    depth_place, color_place = heightmap_pairs[1]
+
+                    # save images
+                    self.logger.save_heightmaps(self.click_count, color_grasp,
+                            depth_grasp, 'grasp')
+                    self.logger.save_heightmaps(self.click_count, color_place,
+                            depth_place, 'place')
 
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
