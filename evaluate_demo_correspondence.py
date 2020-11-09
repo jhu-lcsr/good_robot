@@ -95,10 +95,6 @@ if __name__ == '__main__':
     # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]])
 
-    # TODO(adit98) add other task types
-    if args.task_type != 'unstack':
-        raise NotImplementedError
-
     # create viz directory in imitation_demo folder
     if not os.path.exists(os.path.join(args.imitation_demo, 'correspondences')):
         os.makedirs(os.path.join(args.imitation_demo, 'correspondences'))
@@ -128,15 +124,20 @@ if __name__ == '__main__':
                     action, k)
 
             # get imitation heightmaps
-            if action == 'grasp':
-                im_color, im_depth = imitation_demo.get_heightmaps(action,
-                        imitation_demo.action_dict[k]['demo_ind'])
+            if args.task_type == 'unstack':
+                if action == 'grasp':
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['demo_ind'])
+                else:
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['demo_ind'] + 1)
             else:
-                im_color, im_depth = imitation_demo.get_heightmaps(action,
-                        imitation_demo.action_dict[k]['demo_ind'] + 1)
-
-            #cv2.imwrite('before_test.png', im_color)
-            #cv2.imwrite('before_test_depth.png', (im_depth * 255 / np.max(im_depth)).astype(np.uint8))
+                if action == 'grasp':
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['grasp_image_ind'])
+                else:
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['place_image_ind'])
 
             # create filenames to be saved
             depth_filename = os.path.join(args.imitation_demo, 'correspondences',
