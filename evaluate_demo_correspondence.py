@@ -31,7 +31,7 @@ def evaluate_l2_mask(executed_actions, embedding, frame_ind, mask):
     return im_mask
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, scale_factor=8, blend_ratio=0.5, prob_exp=1):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, prob_exp=1):
     canvas = None
     num_rotations = predictions.shape[0]
 
@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task_type', default='unstack', help='task type (enter custom as catch-all)')
     parser.add_argument('-s', '--snapshot_file', dest='snapshot_file', action='store', default='', help='snapshot file to load for the model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
+    parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
     args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
@@ -119,7 +120,7 @@ if __name__ == '__main__':
                       num_dilation=0)
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
-    action_keys = example_demo.action_dict.keys()
+    action_keys = sorted(example_demo.action_dict.keys())
     for k in action_keys:
         for action in ['grasp', 'place']:
             # get action embedding
@@ -127,14 +128,26 @@ if __name__ == '__main__':
                     action, k)
 
             # get imitation heightmaps
-            im_depth, im_color = imitation_demo.get_heightmaps(action, example_demo.action_dict[k]['demo_ind'])
-            depth_filename = os.path.join(args.imitation_demo, 'correspondences', str(k) + '.' + action + '.depth.png')
-            color_filename = os.path.join(args.imitation_demo, 'correspondences', str(k) + '.' + action + '.color.png')
+            if action == 'grasp':
+                im_color, im_depth = imitation_demo.get_heightmaps(action,
+                        imitation_demo.action_dict[k]['demo_ind'])
+            else:
+                im_color, im_depth = imitation_demo.get_heightmaps(action,
+                        imitation_demo.action_dict[k]['demo_ind'] + 1)
+
+            #cv2.imwrite('before_test.png', im_color)
+            #cv2.imwrite('before_test_depth.png', (im_depth * 255 / np.max(im_depth)).astype(np.uint8))
+
+            # create filenames to be saved
+            depth_filename = os.path.join(args.imitation_demo, 'correspondences',
+                    str(k) + '.' + action + '.depth.png')
+            color_filename = os.path.join(args.imitation_demo, 'correspondences',
+                    str(k) + '.' + action + '.color.png')
 
             # run forward pass for imitation_demo
             # to get vector of 64 vals, run trainer.forward with get_action_feat
-            push_preds, grasp_preds, place_preds = trainer.forward(im_depth,
-                    im_color, is_volatile=True, keep_action_feat=True, use_demo=True)
+            push_preds, grasp_preds, place_preds = trainer.forward(im_color,
+                    im_depth, is_volatile=True, keep_action_feat=True, use_demo=True)
 
             if action == 'grasp':
                 preds = grasp_preds
@@ -176,8 +189,10 @@ if __name__ == '__main__':
                 #orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
 
                 # visualize with rotation, match_ind
-                depth_canvas = get_prediction_vis(im_mask, im_depth, match_ind, prob_exp=3)
-                rgb_canvas = get_prediction_vis(im_mask, im_rgb, match_ind, prob_exp=3)
+                #cv2.imwrite('test.png', im_color)
+                #cv2.imwrite('test_depth.png', im_depth)
+                depth_canvas = get_prediction_vis(im_mask, im_depth, match_ind, blend_ratio=args.blend_ratio)
+                rgb_canvas = get_prediction_vis(im_mask, im_color, match_ind, blend_ratio=args.blend_ratio)
 
                 # write blended images
                 cv2.imwrite(depth_filename, depth_canvas)

@@ -28,7 +28,7 @@ class Demonstration():
 
         elif self.task_type == 'unstack':
             # get number of actions in demo
-            self.num_actions = len(os.listdir(self.rgb_dir))
+            self.num_actions = len(self.action_log)
 
             # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
             self.action_dict = {}
@@ -37,7 +37,11 @@ class Demonstration():
                 demo_ind = -2 * (5 - s)
                 self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
-                        'demo_ind': len(self.action_log) + demo_ind}
+                        'demo_ind': self.num_actions + demo_ind}
+
+                #if 'unstacking2' in path:
+                #    print('stack height:', s, 'number of actions:', self.num_actions,
+                #            'demo ind', demo_ind, 'demo num', self.num_actions + demo_ind)
 
     def get_heightmaps(self, action_str, stack_height):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
@@ -48,6 +52,7 @@ class Demonstration():
                 '%06d.%s.color.png' % (stack_height, action_str))
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (stack_height, action_str))
+        print("Processing:", rgb_filename, depth_filename)
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
@@ -85,20 +90,20 @@ class Demonstration():
                 # if primitive action is place, get the previous grasp heightmap
                 action_str = 'grasp'
 
-        else:
-            action_str = primitive_action
-            if primitive_action == 'grasp':
-                # offset is 2 for stack height 4, 4 for stack height 3, ...
-                offset = 10 - 2 * stack_height
-
-            elif primitive_action == 'place':
-                # offset is grasp_offset - 1 because place is always 1 action after grasp
-                offset = 9 - 2 * stack_height
 
         if self.task_type == 'stack':
             color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
+            action_str = primitive_action
         elif self.task_type == 'unstack':
-            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, self.num_actions - offset)
+            if primitive_action == 'grasp':
+                # offset is 2 for stack height 4, 4 for stack height 3, ...
+                #offset = 10 - 2 * stack_height
+                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action, self.action_dict[stack_height]['demo_ind'])
+
+            elif primitive_action == 'place':
+                # offset is grasp_offset - 1 because place is always 1 action after grasp
+                #offset = 9 - 2 * stack_height
+                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action, self.action_dict[stack_height]['demo_ind'] + 1)
 
         # to get vector of 64 vals, run trainer.forward with get_action_feat
         push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
