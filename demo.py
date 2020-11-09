@@ -41,10 +41,6 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                         'demo_ind': self.num_actions + demo_ind}
 
-                #if 'unstacking2' in path:
-                #    print('stack height:', s, 'number of actions:', self.num_actions,
-                #            'demo ind', demo_ind, 'demo num', self.num_actions + demo_ind)
-
         else:
             # task type is some grasp-place sequence
             # get number of actions in demo
@@ -52,11 +48,12 @@ class Demonstration():
 
             # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
             # divide num actions by 2 to get number of grasp/place pairs
+            self.action_dict = {}
             for action_pair in range(self.num_actions // 2):
                 demo_ind = action_pair * 2
                 grasp_image_ind = int(self.image_names[demo_ind].split('.')[0])
                 place_image_ind = int(self.image_names[demo_ind + 1].split('.')[0])
-                self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
+                self.action_dict[action_pair] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                         'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
