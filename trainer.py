@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -42,6 +42,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
+        self.place_common_sense = self.common_sense and place_common_sense
         self.common_sense_backprop = common_sense_backprop
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
@@ -537,7 +538,7 @@ class Trainer(object):
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:
-                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_feat, grasp_feat, masked_place_feat = utils.common_sense_action_space_mask(depth_heightmap,
                             push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
                 else:
                     push_feat = np.ma.masked_array(push_feat)
@@ -549,7 +550,17 @@ class Trainer(object):
             if not use_demo:
                 # mask action if self.common_sense is set
                 if self.place:
-                    push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                else:
+                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+
+            # mask if use_demo, keep_action_feat, and demo_mask are all set
+            elif demo_mask:
+                # mask action if self.common_sense is set
+                if self.place:
+                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
                 else:
                     push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
@@ -571,9 +582,16 @@ class Trainer(object):
 
         # TODO(adit98) get both action features and actions when running with keep_action_feat in robot eval
         if use_demo:
-            return push_predictions, grasp_predictions, place_predictions
+            if self.place_common_sense:
+                return push_predictions, grasp_predictions, masked_place_predictions
+            else:
+                return push_predictions, grasp_predictions, place_predictions
+
         elif keep_action_feat:
-            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+            if self.place_common_sense:
+                return push_feat, grasp_feat, masked_place_feat, push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
+            else:
+                return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
