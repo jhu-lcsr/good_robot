@@ -90,7 +90,8 @@ class FinalClassificationLayer(torch.nn.Module):
     def __init__(self,
                  input_channels: int,
                  hidden_dim: int,
-                 n_classes: int):
+                 n_classes: int,
+                 depth: int = 4):
         super(FinalClassificationLayer, self).__init__() 
         self.input_channels = input_channels
         self.n_classes = n_classes
@@ -98,16 +99,16 @@ class FinalClassificationLayer(torch.nn.Module):
         self.linear_1 = torch.nn.Linear(input_channels, hidden_dim)
         self.act = torch.nn.ReLU()
         self.linear_2 = torch.nn.Linear(hidden_dim, n_classes)
+        self.depth = depth
 
     def forward(self, encoded_image):
         bsz, n_channels_by_depth, width, height = encoded_image.shape 
-        n_channels = int(n_channels_by_depth/4) 
-        depth = 4
-        encoded_image = encoded_image.reshape(bsz, width, height, depth, n_channels)
+        n_channels = int(n_channels_by_depth/self.depth) 
+        encoded_image = encoded_image.reshape(bsz, width, height, self.depth, n_channels)
         encoded_image = self.linear_1(encoded_image)
         encoded_image = self.act(encoded_image)
         encoded_image = self.linear_2(encoded_image) 
-        encoded_image = encoded_image.reshape(bsz, self.n_classes, width, height, depth) 
+        encoded_image = encoded_image.reshape(bsz, self.n_classes, width, height, self.depth) 
         return encoded_image
 
 class DeconvolutionalNetwork(torch.nn.Module):

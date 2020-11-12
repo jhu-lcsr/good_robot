@@ -27,15 +27,15 @@ class FlatIterator:
         if self._index + 1 < len(self.all_timesteps):
             self._index += 1
             try:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, image, length = self.all_timesteps[self._index]
+                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, image, length = self.all_timesteps[self._index]
             except ValueError:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, length = self.all_timesteps[self._index]
+                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, length = self.all_timesteps[self._index]
                 image=None
 
             return {"command": command,
                     "previous_position": prev_pos,
                     "next_position": next_pos,
-                    "previous_position_for_acc": prev_pos_for_acc,
+                    "previous_position_for_pred": prev_pos_for_pred,
                     "previous_rotation": prev_rot,
                     "next_rotation": next_rot,
                     "block_to_move": block_to_move, 
@@ -60,15 +60,15 @@ class TrajectoryIterator:
         if self._index + 1 < len(self.traj.to_iterate):
             self._index += 1
             try:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, image, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, image, length = self.traj.to_iterate[self._index]
             except ValueError:
-                command, prev_pos, prev_pos_for_acc, next_pos, prev_rot, next_rot, block_to_move, length = self.traj.to_iterate[self._index]
+                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, length = self.traj.to_iterate[self._index]
                 image=None
            
             return {"command": command,
                     "previous_position": prev_pos,
                     "next_position": next_pos,
-                    "previous_position_for_acc": prev_pos_for_acc,
+                    "previous_position_for_pred": prev_pos_for_pred,
                     "previous_rotation": prev_rot,
                     "next_rotation": next_rot,
                     "block_to_move": block_to_move, 
@@ -96,19 +96,21 @@ class BaseTrajectory:
                  traj_type: str = "flat",
                  batch_size: int = None,
                  do_filter: bool = False,
+                 top_only: bool = True, 
                  binarize_blocks: bool = False):
 
         if batch_size is None:
             batch_size = len(commands)
         self.batch_size = batch_size 
         self.do_filter = do_filter
+        self.top_only = top_only
         self.binarize_blocks = binarize_blocks
 
         self.line_id = line_id
         self.commands = commands
 
         self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
-        self.previous_positions_for_acc = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
+        self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
         self.previous_rotations = previous_rotations
         self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
         self.next_rotations = next_rotations
@@ -116,8 +118,15 @@ class BaseTrajectory:
 
         if self.do_filter: 
             # only filter next positions, not previous ones 
-            self.previous_positions_for_acc = self.filter_by_blocks_to_move(self.previous_positions_for_acc)
+            self.previous_positions_for_pred = self.filter_by_blocks_to_move(self.previous_positions_for_pred)
             self.next_positions = self.filter_by_blocks_to_move(self.next_positions)
+
+        if self.top_only:
+            (self.previous_positions, 
+            self.previous_positions_for_pred, 
+            self.next_positions) = self.filter_top_only(self.previous_positions, 
+                                                        self.previous_positions_for_pred,
+                                                        self.next_positions) 
 
 
         self.images = images
@@ -127,7 +136,7 @@ class BaseTrajectory:
 
         self.to_iterate = list(zip(self.commands, 
                                    self.previous_positions, 
-                                   self.previous_positions_for_acc,
+                                   self.previous_positions_for_pred,
                                    self.next_positions, 
                                    self.previous_rotations, 
                                    self.next_rotations, 
@@ -156,13 +165,23 @@ class BaseTrajectory:
             positions[i] = pos
         return positions 
 
+    def filter_top_only(self, prev_pos, prev_pos_for_pred, next_pos):
+        for i, (ppos, ppos_pred, npos) in enumerate(zip(prev_pos, prev_pos_for_pred, next_pos)):
+            npos_summed = torch.sum(npos, dim = (0,1,2,4))
+            non_zero_slice = torch.argmax(npos_summed)
+            npos = npos[:,:,:,non_zero_slice]
+            ppos_pred = ppos_pred[:,:,:,non_zero_slice]
+            prev_pos_for_pred[i] = ppos_pred
+            next_pos[i] = npos 
+        return prev_pos, prev_pos_for_pred, next_pos
+
     def get_blocks_to_move(self):
         batch_idx = 0
-        bsz = self.previous_positions_for_acc[0].shape[0]
+        bsz = self.previous_positions_for_pred[0].shape[0]
         bad = 0
         all_blocks_to_move = []
-        for timestep in range(len(self.previous_positions_for_acc)):
-            prev_pos = self.previous_positions_for_acc[timestep][batch_idx] 
+        for timestep in range(len(self.previous_positions_for_pred)):
+            prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
             next_pos = self.next_positions[timestep][batch_idx]
             different_pixels = prev_pos[prev_pos != next_pos]
             # exclude background 
@@ -179,29 +198,6 @@ class BaseTrajectory:
         #print(f"there are {bad} blocks with >1 move") 
         return all_blocks_to_move
 
-    def make_grid_positions(self, positions, make_z = False, batch_size = 1, resolution = 4, num_blocks = 20): 
-        """
-        Take (x,y,z) positions and discretize them into #blocks binary random variables
-        across resolution x resolution number of bins 
-        """
-        # positions: 1 for each block id 
-        def absolute_to_relative(coord): 
-            # shift, now out of 2 
-            coord += 1
-            # get perc 
-            coord = coord / 2
-            # scale 
-            scaled = coord * resolution 
-            # shift 
-            return int(np.around(scaled))
-
-        image_positions = []
-
-        for i, position_list in enumerate(positions): 
-            if make_z:
-                bin_grid = torch.zeros((num_blocks, resolution, resolution))
-            else:
-                bin_grid = torch.zeros((num_blocks, resolution, resolution, resolution))
         
     def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
         """
@@ -293,6 +289,7 @@ class SimpleTrajectory(BaseTrajectory):
                  traj_type: str,
                  batch_size: int,
                  do_filter: bool,
+                 top_only: bool,
                  binarize_blocks: bool):
         super(SimpleTrajectory, self).__init__(line_id=line_id,
                                                commands=commands, 
@@ -305,6 +302,7 @@ class SimpleTrajectory(BaseTrajectory):
                                                traj_type=traj_type,
                                                batch_size=batch_size,
                                                do_filter=do_filter,
+                                               top_only=top_only,
                                                binarize_blocks=binarize_blocks) 
         self.tokenizer = tokenizer
         # commands is a list of #timestep text strings 
@@ -334,7 +332,8 @@ class BatchedTrajectory(BaseTrajectory):
                  tokenizer: Tokenizer,
                  traj_type: str,
                  do_filter: bool = False,
-                binarize_blocks: bool = False):  
+                 top_only: bool = True,
+                 binarize_blocks: bool = False):  
         super(BatchedTrajectory, self).__init__(line_id=line_id,
                                                commands=commands, 
                                                previous_positions=previous_positions,
@@ -344,6 +343,7 @@ class BatchedTrajectory(BaseTrajectory):
                                                images=images,
                                                lengths=lengths,
                                                do_filter=do_filter,
+                                               top_only=top_only,
                                                binarize_blocks=binarize_blocks) 
         # commands is now a 9xlen matrix 
         self.tokenizer = tokenizer
@@ -353,7 +353,7 @@ class BatchedTrajectory(BaseTrajectory):
         # override 
         self.to_iterate = list(zip(self.commands, 
                                    self.previous_positions, 
-                                   self.previous_positions_for_acc,
+                                   self.previous_positions_for_pred,
                                    self.next_positions, 
                                    self.previous_rotations, 
                                    self.next_rotations, 
@@ -402,6 +402,7 @@ class DatasetReader:
                        batch_size = 32,
                        max_seq_length = 65,
                        do_filter: bool = False,
+                       top_only: bool = True, 
                        binarize_blocks: bool = False): 
         self.train_path = train_path
         self.dev_path = dev_path
@@ -411,6 +412,7 @@ class DatasetReader:
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self.do_filter = do_filter
+        self.top_only = top_only 
         self.binarize_blocks = binarize_blocks
 
         nlp = English()
@@ -465,6 +467,7 @@ class DatasetReader:
                                                    tokenizer = self.tokenizer,
                                                    traj_type = self.traj_type,
                                                    do_filter = self.do_filter,
+                                                   top_only = self.top_only, 
                                                    binarize_blocks = self.binarize_blocks) 
                     self.data[split].append(trajectory)  
                     vocab |= trajectory.traj_vocab
@@ -485,6 +488,7 @@ class DatasetReader:
                                                             traj_type=self.traj_type,
                                                             batch_size=1,
                                                             do_filter=self.do_filter,
+                                                            top_only = self.top_only,
                                                             binarize_blocks = self.binarize_blocks) 
                                 self.data[split].append(trajectory) 
                                 vocab |= trajectory.traj_vocab
@@ -526,7 +530,7 @@ class DatasetReader:
         pad and tensorize 
         """
 
-        commands, prev_pos, next_pos, prev_pos_for_acc,  prev_rot, next_rot, block_to_move, image, length = [], [], [], [], [], [], [], [], []
+        commands, prev_pos, next_pos, prev_pos_for_pred,  prev_rot, next_rot, block_to_move, image, length = [], [], [], [], [], [], [], [], []
         # get max len 
         max_length = min(self.max_seq_length, max([traj.lengths[0] for traj in batch_as_list])) 
         # pad  
@@ -539,7 +543,7 @@ class DatasetReader:
 
             commands.append(traj.commands + [PAD for i in range(max_length - len(traj.commands))])
             prev_pos.append(traj.previous_positions[0])
-            prev_pos_for_acc.append(traj.previous_positions_for_acc[0]) 
+            prev_pos_for_pred.append(traj.previous_positions_for_pred[0]) 
             prev_rot.append(traj.previous_rotations[0])
             next_pos.append(traj.next_positions[0])
             next_rot.append(traj.next_rotations[0]) 
@@ -548,7 +552,7 @@ class DatasetReader:
         
 
         prev_pos = torch.cat(prev_pos, 0)
-        prev_pos_for_acc = torch.cat(prev_pos_for_acc, 0)
+        prev_pos_for_pred = torch.cat(prev_pos_for_pred, 0)
         next_pos = torch.cat(next_pos, 0) 
         block_to_move = torch.cat(block_to_move, 0) 
 
@@ -561,7 +565,7 @@ class DatasetReader:
         return {"command": commands,
                 "previous_position": prev_pos,
                 "next_position": next_pos,
-                "previous_position_for_acc": prev_pos_for_acc,
+                "previous_position_for_pred": prev_pos_for_pred,
                 "previous_rotation": prev_rot,
                 "next_rotation": next_rot,
                 "block_to_move": block_to_move,

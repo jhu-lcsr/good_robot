@@ -6,6 +6,7 @@ import os
 import pathlib
 import pdb 
 import subprocess 
+import sys 
 from io import StringIO
 
 import torch
@@ -60,6 +61,7 @@ class LanguageTrainer:
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 depth: int = 4,
                  best_epoch: int = -1): 
         self.train_data = train_data
         self.val_data   = val_data
@@ -71,6 +73,7 @@ class LanguageTrainer:
         self.num_models_to_keep = num_models_to_keep
         self.generate_after_n = generate_after_n
         self.best_epoch = best_epoch
+        self.depth = depth 
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
@@ -149,7 +152,7 @@ class LanguageTrainer:
 
     def compute_localized_accuracy(self, batch_instance, outputs): 
         next_pos = batch_instance["next_position"]
-        prev_pos = batch_instance["previous_position_for_acc"]
+        prev_pos = batch_instance["previous_position_for_pred"]
 
         gold_pixels_of_interest = next_pos[next_pos != prev_pos]
 
@@ -189,14 +192,14 @@ class LanguageTrainer:
         # 9 x 21 x 4 x 64 x 64 
         if data.shape[0] == self.num_blocks + 1:
             # take argmax if distribution 
-            data_id, data= torch.max(data, dim = 0) 
+            data_id, data = torch.max(data, dim = 0) 
         data = data.squeeze(0)
 
         xs = np.arange(0, 64, 1)
         zs = np.arange(0, 64, 1)
         # separate plot per depth slice 
         # TODO (elias) make sure that heights are actually capped at 4
-        for height in range(4):
+        for depth in range(self.depth):
             fig = plt.figure(figsize=(12,12))
             ax = fig.gca()
             ax.set_xticks([0, 16, 32, 48, 64])
@@ -208,10 +211,10 @@ class LanguageTrainer:
             to_plot_xs, to_plot_zs, to_plot_labels = [], [], []
             for x_pos in xs:
                 for z_pos in zs:
-                    label = data[x_pos, z_pos, height].item() 
-                    if height > 0 and label > 0:
+                    label = data[x_pos, z_pos, depth].item() 
+                    if depth > 0 and label > 0:
                         pass 
-                        #print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, height}")
+                        #print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, depth}")
                     # don't plot background 
                     if label != 0: 
                         label = int(label) 
@@ -223,7 +226,7 @@ class LanguageTrainer:
             for x,z, lab in zip(to_plot_xs, to_plot_zs, to_plot_labels):
                 ax.annotate(lab, xy=(x,z), fontsize = 12)
 
-            file_path =  f"{out_path}-{height}.png"
+            file_path =  f"{out_path}-{depth}.png"
                 
             print(f"saving to {file_path}") 
             plt.savefig(file_path) 
@@ -242,7 +245,6 @@ class LanguageTrainer:
     def compute_loss(self, inputs, outputs):
         pred_image = outputs["next_position"]
         true_image = inputs["next_position"]
-        prev_image  = inputs["previous_position_for_acc"]
 
         pred_block_logits = outputs["pred_block_logits"] 
         true_block_idxs = inputs["block_to_move"]
@@ -252,8 +254,6 @@ class LanguageTrainer:
         true_image = true_image.reshape((bsz, width, height, depth)).long()
                 
         true_image = true_image.to(self.device) 
-        prev_image = prev_image.reshape((bsz, width, height, depth)).long()
-        prev_image = prev_image.to(self.device) 
         
         if self.compute_block_dist:
             # loss per pixel 
@@ -276,43 +276,6 @@ class LanguageTrainer:
 
         print(f"loss {total_loss.item()}")
         return total_loss
-
-    def compute_loss_no_blocks(self, inputs, outputs):
-        pred_image = outputs["next_position"]
-        true_image = inputs["next_position"]
-        prev_image  = inputs["previous_position_for_acc"]
-
-        bsz, n_blocks, width, height, depth = pred_image.shape
-        true_image = true_image.reshape((bsz, width, height, depth)).long()
-        true_image = true_image.to(self.device) 
-        prev_image = prev_image.reshape((bsz, width, height, depth)).long()
-        prev_image = prev_image.to(self.device) 
-        
-        # one total per-pixel loss 
-        total_loss = self.loss_fxn(pred_image, true_image) 
-        # one loss on only foreground pixels, excludes index 0 
-        fore_loss = self.fore_loss_fxn(pred_image, true_image) 
-
-        # find changes based on gold image 
-        pixels_of_interest = true_image != prev_image
-        # expand mask 
-        pixels_of_interest_for_pred = pixels_of_interest.unsqueeze(1).repeat(1, n_blocks, 1, 1, 1)
-        # isolate region 
-        gold_pixels_of_interest = true_image[pixels_of_interest]
-        pred_pixels_of_interest = pred_image[pixels_of_interest_for_pred].reshape((-1, n_blocks))
-
-        # two losses for just region of interest 
-        total_interest_loss = self.loss_fxn(pred_pixels_of_interest, gold_pixels_of_interest) 
-        fore_interest_loss = self.fore_loss_fxn(pred_pixels_of_interest, gold_pixels_of_interest) 
-        
-        # downweight overall loss, upweight regional loss 
-        #loss = 0.05 * (total_loss + fore_loss) +  (total_interest_loss + fore_interest_loss) 
-        #loss = total_interest_loss
-        loss = total_loss
-
-        pred_image = torch.argmax(pred_image, dim = 1).squeeze(1)
-        
-        return loss 
 
     def save_model(self, epoch, is_best):
         print(f"Saving checkpoint {epoch}") 
@@ -367,6 +330,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 depth: int = 4,
                  best_epoch: int = -1): 
         super(FlatLanguageTrainer, self).__init__(train_data,
                                                   val_data,
@@ -378,6 +342,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                                                   checkpoint_dir,
                                                   num_models_to_keep,
                                                   generate_after_n,
+                                                  depth, 
                                                   best_epoch)
 
     def train_and_validate_one_epoch(self, epoch): 
@@ -444,6 +409,7 @@ def get_free_gpu():
     idx = gpu_df['memory.free'].idxmax()
     if gpu_df["memory.used"][idx] > 0.0:
         print(f"No free gpus!") 
+        sys.exit() 
         return -1
     print('Returning GPU{} with {} free MiB'.format(idx, gpu_df.iloc[idx]['memory.free']))
     return idx

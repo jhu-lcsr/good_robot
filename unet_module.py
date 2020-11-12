@@ -19,16 +19,24 @@ class BaseUNet(torch.nn.Module):
                 num_layers: int = 5,
                 num_blocks: int = 20,
                 dropout: float = 0.20, 
+                depth: int = 4, 
                 device: torch.device = "cpu"):
         super(BaseUNet, self).__init__()
 
         # placeholders 
         self.compute_block_dist = False 
-
+        # device 
         self.device = device
-
-        self.num_layers = num_layers
+        # data 
         self.num_blocks = num_blocks
+        self.depth = depth 
+        # model 
+        pad = int(kernel_size / 2) 
+        self.num_layers = num_layers
+        self.hc_large = hc_large
+        self.hc_small = hc_small
+        self.activation = torch.nn.ReLU()
+        self.dropout = torch.nn.Dropout2d(dropout)
 
         self.downconv_modules = []
         self.upconv_modules = []
@@ -36,14 +44,6 @@ class BaseUNet(torch.nn.Module):
 
         self.downnorms = []
         self.upnorms = []
-            
-        self.hc_large = hc_large
-        self.hc_small = hc_small
-
-        pad = int(kernel_size / 2) 
-
-        self.activation = torch.nn.ReLU()
-        self.dropout = torch.nn.Dropout2d(dropout)
 
         # exception at first layer for shape  
         first_downconv = torch.nn.Conv2d(in_channels, hc_large, kernel_size, stride=stride, padding=pad)
@@ -88,8 +88,9 @@ class BaseUNet(torch.nn.Module):
         self.downnorms = torch.nn.ModuleList(self.downnorms) 
         self.upnorms = torch.nn.ModuleList(self.upnorms) 
 
-        self.final_layer = FinalClassificationLayer(int(out_channels/4), out_channels, self.num_blocks + 1) 
+        self.final_layer = FinalClassificationLayer(int(out_channels/self.depth), out_channels, self.num_blocks + 1, depth = self.depth) 
 
+        # make cuda compatible 
         self.downconv_modules = self.downconv_modules.to(self.device)
         self.upconv_modules = self.upconv_modules.to(self.device)
         self.downnorms = self.downnorms.to(self.device) 
@@ -157,6 +158,7 @@ class UNetWithLanguage(BaseUNet):
                 num_layers: int = 5,
                 num_blocks: int = 20,
                 dropout: float = 0.20, 
+                depth: int = 4,
                 device: torch.device = "cpu"):
         super(UNetWithLanguage, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
@@ -167,6 +169,7 @@ class UNetWithLanguage(BaseUNet):
                                                num_layers=num_layers,
                                                num_blocks=num_blocks,
                                                dropout=dropout,
+                                               depth=depth,
                                                device=device)
 
         pad = int(kernel_size / 2) 
@@ -303,6 +306,7 @@ class UNetWithBlocks(UNetWithLanguage):
                 num_blocks: int = 20,
                 mlp_num_layers: int = 3, 
                 dropout: float = 0.20,
+                depth: int = 4,
                 device: torch.device = "cpu"):
         super(UNetWithBlocks, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
@@ -315,6 +319,7 @@ class UNetWithBlocks(UNetWithLanguage):
                                                num_layers=num_layers,
                                                num_blocks=num_blocks,
                                                dropout=dropout,
+                                               depth=depth,
                                                device=device)
 
         self.compute_block_dist = True 
