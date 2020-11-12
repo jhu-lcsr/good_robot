@@ -150,10 +150,14 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             for i in range(next_outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
-                self.generate_debugging_image(next_outputs["next_position"][i], output_path.joinpath("pred_next"))
-                self.generate_debugging_image(batch_instance["next_position"][i], output_path.joinpath("gold_next"))
-                self.generate_debugging_image(prev_outputs["next_position"][i], output_path.joinpath("pred_prev"))
-                self.generate_debugging_image(batch_instance["previous_position_for_pred"][i], output_path.joinpath("gold_prev"))
+                self.generate_debugging_image(batch_instance["next_position"][i], 
+                                             next_outputs["next_position"][i], 
+                                             output_path.joinpath("next"),
+                                             caption = batch_instance["captions"][i])
+                self.generate_debugging_image(batch_instance["previous_position_for_pred"][i], 
+                                              prev_outputs["next_position"][i], 
+                                              output_path.joinpath("prev"),
+                                              caption = batch_instance["captions"][i])
 
         return next_accuracy, prev_accuracy, block_accuracy
 

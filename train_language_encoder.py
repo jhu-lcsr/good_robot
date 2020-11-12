@@ -145,8 +145,10 @@ class LanguageTrainer:
             for i in range(outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
-                self.generate_debugging_image(outputs["next_position"][i], output_path.joinpath("pred"))
-                self.generate_debugging_image(batch_instance["next_position"][i], output_path.joinpath("gold"))
+                self.generate_debugging_image(batch_instance["next_position"][i], 
+                                             outputs["next_position"][i], 
+                                             output_path.joinpath("image"),
+                                             caption=batch_instance["caption"][i])
 
         return accuracy, block_accuracy
 
@@ -188,49 +190,97 @@ class LanguageTrainer:
         acc = matching/total 
         return acc 
 
-    def generate_debugging_image(self, data, out_path, is_input=False):
-        # 9 x 21 x 4 x 64 x 64 
-        if data.shape[0] == self.num_blocks + 1:
-            # take argmax if distribution 
-            data_id, data = torch.max(data, dim = 0) 
-        data = data.squeeze(0)
+    def wrap_caption(self, caption):
+        caption_words = re.split("\s+", caption)
+        max_line_width = 21
+        curr_line_width = 0
+        curr_line = []
+        text = []
 
+        for word in caption_words:
+            if len(word) >= max_line_width:
+                # trim super long words
+                word = word[0:max_line_width-3]
+            if curr_line_width + len(word) + 1 <= max_line_width:
+                curr_line.append(word)
+                curr_line_width += len(word)+1
+            else:
+                text.append(curr_line)
+                curr_line = [word]
+                curr_line_width = len(word)+1
+        text.append(curr_line)        
+        text = [" ".join(x) for x in text]
+        text = "\n".join(text)
+        return text
+
+    def generate_debugging_image(self, true_data, pred_data, out_path, is_input=False, caption = None):
+        order = ["adidas", "bmw", "burger king", "coca cola", "esso", "heineken", "hp", 
+                 "mcdonalds", "mercedes benz", "nvidia", "pepsi", "shell", "sri", "starbucks", 
+                 "stella artois", "target", "texaco", "toyota", "twitter", "ups"]
+        legend = [f"{i}: {name}" for i, name in enumerate(order)]
+        legend_str = "\n".join(legend)
+        caption = wrap_caption(caption)
+        
+        cmap = plt.get_cmap("Reds")
+        # num_blocks x depth x 64 x 64 
+        pred_data = pred_data[1,:,:,:]
+        
         xs = np.arange(0, 64, 1)
         zs = np.arange(0, 64, 1)
-        # separate plot per depth slice 
-        # TODO (elias) make sure that heights are actually capped at 4
-        for depth in range(self.depth):
-            fig = plt.figure(figsize=(12,12))
-            ax = fig.gca()
-            ax.set_xticks([0, 16, 32, 48, 64])
-            ax.set_yticks([0, 16, 32, 48, 64]) 
-            ax.set_ylim(0, 64)
-            ax.set_xlim(0, 64)
-            plt.grid() 
 
-            to_plot_xs, to_plot_zs, to_plot_labels = [], [], []
+        depth = 0
+        fig = plt.figure(figsize=(16,12))
+        gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
+        text_ax = plt.subplot(gs[1])
+        text_ax.axis([0, 1, 0, 1])
+        text_ax.text(0.2, 0.02, legend_str, fontsize = 12)
+
+        props = dict(boxstyle='round', 
+                     facecolor='wheat', alpha=0.5)
+        text_ax.text(0.05, 0.95, caption, wrap=True, fontsize=14,
+            verticalalignment='top', bbox=props)
+        ax = plt.subplot(gs[0])
+        ax.set_xticks([0, 16, 32, 48, 64])
+        ax.set_yticks([0, 16, 32, 48, 64]) 
+        ax.set_ylim(0, 64)
+        ax.set_xlim(0, 64)
+        plt.grid() 
+        if False:
+            to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
+            to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
             for x_pos in xs:
                 for z_pos in zs:
-                    label = data[x_pos, z_pos, depth].item() 
-                    if depth > 0 and label > 0:
-                        pass 
-                        #print(f"we have a tall block with label {label} at x, z, y: {x_pos, z_pos, depth}")
+                    label = true_data[x_pos, z_pos, depth].item()
                     # don't plot background 
-                    if label != 0: 
-                        label = int(label) 
-                        to_plot_xs.append(x_pos)
-                        to_plot_zs.append(z_pos)
-                        to_plot_labels.append(label) 
+                    if label > 0:
+                        to_plot_xs_lab.append(x_pos)
+                        to_plot_zs_lab.append(z_pos)
+                        to_plot_labels.append(int(label))
 
-            ax.plot(to_plot_xs, to_plot_zs, ".")
-            for x,z, lab in zip(to_plot_xs, to_plot_zs, to_plot_labels):
+                    prob = pred_data[x_pos, z_pos, depth].item()
+                    to_plot_xs_prob.append(x_pos)
+                    to_plot_zs_prob.append(z_pos)
+                    to_plot_probs.append(prob)
+
+
+            ax.plot(to_plot_xs_lab, to_plot_zs_lab, ".")
+            for x,z, lab in zip(to_plot_xs_lab, to_plot_zs_lab, to_plot_labels):
                 ax.annotate(lab, xy=(x,z), fontsize = 12)
 
-            file_path =  f"{out_path}-{depth}.png"
+            # plot as grid squares at all positions
+            squares = []
+            for x,z, lab in zip(to_plot_xs_prob, to_plot_zs_prob, to_plot_probs):
+                rgba = list(cmap(lab))
+                # make opaque
+                rgba[-1] = 0.4
+                sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
+                ax.add_patch(sq)
+
+        file_path =  f"{out_path}-{depth}.png"
                 
-            print(f"saving to {file_path}") 
-            plt.savefig(file_path) 
-            plt.close() 
+        print(f"saving to {file_path}") 
+        plt.savefig(file_path) 
+        plt.close() 
 
     def compute_block_accuracy(self, inputs, outputs): 
         pred_block_logits = outputs["pred_block_logits"] 
