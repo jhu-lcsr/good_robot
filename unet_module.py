@@ -99,7 +99,7 @@ class BaseUNet(torch.nn.Module):
         self.activation = self.activation.to(self.device) 
         
     def forward(self, input_dict):
-        image_input = input_dict["previous_position"]
+        image_input = input_dict["prev_pos_input"]
         # store downconv results in stack 
         downconv_results = deque() 
         # start with image input 
@@ -223,7 +223,7 @@ class UNetWithLanguage(BaseUNet):
         # get language output as sentence embedding 
         sent_encoding = lang_output["sentence_encoding"] 
     
-        image_input = data_batch["previous_position"]
+        image_input = data_batch["prev_pos_input"]
         image_input = image_input.to(self.device) 
         # store downconv results in stack 
         downconv_results = deque() 
@@ -353,7 +353,7 @@ class UNetWithBlocks(UNetWithLanguage):
         # get language output as sentence embedding 
         sent_encoding = lang_output["sentence_encoding"] 
     
-        image_input = data_batch["previous_position"]
+        image_input = data_batch["prev_pos_input"]
         image_input = image_input.to(self.device) 
         # store downconv results in stack 
         downconv_results = deque() 

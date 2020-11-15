@@ -91,23 +91,20 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
         print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
-        # TODO (elias): change back to pixel acc after debugging 
         return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
 
     def compute_loss(self, inputs, next_outputs, prev_outputs):
         pred_next_image = next_outputs["next_position"]
-        true_next_image = inputs["next_position"]
+        true_next_image = inputs["next_pos_for_pred"]
 
         pred_prev_image = prev_outputs["next_position"]
-        true_prev_image = inputs["previous_position_for_pred"]
+        true_prev_image = inputs["prev_pos_for_pred"]
 
         pred_next_block_logits = next_outputs["pred_block_logits"] 
         true_next_block_idxs = inputs["block_to_move"]
         true_next_block_idxs = true_next_block_idxs.to(self.device).long().reshape(-1) 
-
         bsz, n_blocks, width, height, depth = pred_next_image.shape
         true_next_image = true_next_image.reshape((bsz, width, height, depth)).long()
-                
         true_prev_image = true_prev_image.reshape((bsz, width, height, depth)).long()
         true_next_image = true_next_image.to(self.device) 
         true_prev_image = true_prev_image.to(self.device) 
@@ -139,8 +136,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         self.encoder.eval() 
         next_outputs, prev_outputs = self.encoder(batch_instance) 
 
-        prev_accuracy = self.compute_localized_accuracy(batch_instance["previous_position_for_pred"], prev_outputs["next_position"], batch_instance["next_position"])
-        next_accuracy = self.compute_localized_accuracy(batch_instance["next_position"], next_outputs["next_position"], batch_instance["previous_position_for_pred"])
+        prev_accuracy = self.compute_localized_accuracy(batch_instance["prev_pos_for_acc"], prev_outputs["next_position"], batch_instance["next_pos_for_acc"])
+        next_accuracy = self.compute_localized_accuracy(batch_instance["next_pos_for_acc"], next_outputs["next_position"], batch_instance["prev_pos_for_acc"])
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
@@ -150,16 +147,25 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             for i in range(next_outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
-                self.generate_debugging_image(batch_instance["next_position"][i], 
+                command = batch_instance["command"][i]
+                command = [x for x in command if x != "<PAD>"]
+                command = " ".join(command) 
+                self.generate_debugging_image(batch_instance["next_pos_for_acc"][i], 
                                              next_outputs["next_position"][i], 
                                              output_path.joinpath("next"),
-                                             caption = batch_instance["captions"][i])
-                self.generate_debugging_image(batch_instance["previous_position_for_pred"][i], 
+                                             caption = command)
+
+                prev_pos = batch_instance["prev_pos_for_acc"][i]
+                #prev_pos = prev_pos.permute(1,2,0)
+                #prev_pos = prev_pos[:,:,0]
+                #prev_pos = prev_pos.unsqueeze(2).unsqueeze(3)
+                self.generate_debugging_image(prev_pos, 
                                               prev_outputs["next_position"][i], 
                                               output_path.joinpath("prev"),
-                                              caption = batch_instance["captions"][i])
+                                              caption = command) 
 
         return next_accuracy, prev_accuracy, block_accuracy
+
 
     def compute_localized_accuracy(self, true_pos, pred_pos, contrast_pos): 
         neg_indices = true_pos != contrast_pos
@@ -377,7 +383,7 @@ if __name__ == "__main__":
     parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 
     parser.add_argument("--mlp-num-layers", type=int, default = 3) 
     # unet parameters 
-    parser.add_argument("--share-unet", action="store_true", help="share the weights between predicting previous and next position") 
+    parser.add_argument("--share-level", type=str, help="share the weights between predicting previous and next position") 
     parser.add_argument("--unet-out-channels", type=int, default=128)
     parser.add_argument("--unet-hc-large", type=int, default=32)
     parser.add_argument("--unet-hc-small", type=int, default=16) 

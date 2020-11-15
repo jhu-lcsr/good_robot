@@ -1,22 +1,24 @@
 import json 
 import argparse
-from typing import List, Dict
 import glob
 import os 
 import pathlib
 import pdb 
 import subprocess 
 import sys 
+import re
+import logging 
 from io import StringIO
+from typing import List, Dict
 
-import torch
+from tqdm import tqdm 
 from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
-import logging 
-from tqdm import tqdm 
 from matplotlib import pyplot as plt
+from matplotlib import gridspec
+import matplotlib
+import torch
 import numpy as np
-import torch.autograd.profiler as profiler
 import pandas as pd 
 
 
@@ -25,7 +27,6 @@ from language import LanguageEncoder, ConcatFusionModule, TiledFusionModule
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
 from mlp import MLP 
-
 from data import DatasetReader
 
 logger = logging.getLogger(__name__)
@@ -153,8 +154,8 @@ class LanguageTrainer:
         return accuracy, block_accuracy
 
     def compute_localized_accuracy(self, batch_instance, outputs): 
-        next_pos = batch_instance["next_position"]
-        prev_pos = batch_instance["previous_position_for_pred"]
+        next_pos = batch_instance["next_pos_for_acc"]
+        prev_pos = batch_instance["prev_pos_for_acc"]
 
         gold_pixels_of_interest = next_pos[next_pos != prev_pos]
 
@@ -173,21 +174,6 @@ class LanguageTrainer:
             acc = matching/total 
         except ZeroDivisionError:
             acc = 0.0 
-        return acc 
-
-    def compute_accuracy(self, batch_instance, outputs): 
-        # compute overlap between predicted and true output 
-        gold_pixels = batch_instance["next_position"].to(self.device) 
-        values, pred_pixels = torch.max(outputs['next_position'], dim=1) 
-        pred_pixels = pred_pixels.reshape(*gold_pixels.shape) 
-
-        # flatten  
-        pred_pixels = pred_pixels.reshape(-1) 
-        gold_pixels = gold_pixels.reshape(-1) 
-        # compare 
-        total = gold_pixels.shape[0]
-        matching = torch.sum(pred_pixels == gold_pixels).detach().cpu().item() 
-        acc = matching/total 
         return acc 
 
     def wrap_caption(self, caption):
@@ -217,9 +203,9 @@ class LanguageTrainer:
         order = ["adidas", "bmw", "burger king", "coca cola", "esso", "heineken", "hp", 
                  "mcdonalds", "mercedes benz", "nvidia", "pepsi", "shell", "sri", "starbucks", 
                  "stella artois", "target", "texaco", "toyota", "twitter", "ups"]
-        legend = [f"{i}: {name}" for i, name in enumerate(order)]
+        legend = [f"{i+1}: {name}" for i, name in enumerate(order)]
         legend_str = "\n".join(legend)
-        caption = wrap_caption(caption)
+        caption = self.wrap_caption(caption)
         
         cmap = plt.get_cmap("Reds")
         # num_blocks x depth x 64 x 64 
@@ -234,6 +220,7 @@ class LanguageTrainer:
         text_ax = plt.subplot(gs[1])
         text_ax.axis([0, 1, 0, 1])
         text_ax.text(0.2, 0.02, legend_str, fontsize = 12)
+        text_ax.axis("off") 
 
         props = dict(boxstyle='round', 
                      facecolor='wheat', alpha=0.5)
@@ -245,36 +232,35 @@ class LanguageTrainer:
         ax.set_ylim(0, 64)
         ax.set_xlim(0, 64)
         plt.grid() 
-        if False:
-            to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
-            to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
-            for x_pos in xs:
-                for z_pos in zs:
-                    label = true_data[x_pos, z_pos, depth].item()
-                    # don't plot background 
-                    if label > 0:
-                        to_plot_xs_lab.append(x_pos)
-                        to_plot_zs_lab.append(z_pos)
-                        to_plot_labels.append(int(label))
+        to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
+        to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
+        for x_pos in xs:
+            for z_pos in zs:
+                label = true_data[x_pos, z_pos, depth].item()
+                # don't plot background 
+                if label > 0:
+                    to_plot_xs_lab.append(x_pos)
+                    to_plot_zs_lab.append(z_pos)
+                    to_plot_labels.append(int(label))
 
-                    prob = pred_data[x_pos, z_pos, depth].item()
-                    to_plot_xs_prob.append(x_pos)
-                    to_plot_zs_prob.append(z_pos)
-                    to_plot_probs.append(prob)
+                prob = pred_data[x_pos, z_pos, depth].item()
+                to_plot_xs_prob.append(x_pos)
+                to_plot_zs_prob.append(z_pos)
+                to_plot_probs.append(prob)
 
 
-            ax.plot(to_plot_xs_lab, to_plot_zs_lab, ".")
-            for x,z, lab in zip(to_plot_xs_lab, to_plot_zs_lab, to_plot_labels):
-                ax.annotate(lab, xy=(x,z), fontsize = 12)
+        ax.plot(to_plot_xs_lab, to_plot_zs_lab, ".")
+        for x,z, lab in zip(to_plot_xs_lab, to_plot_zs_lab, to_plot_labels):
+            ax.annotate(lab, xy=(x,z), fontsize = 12)
 
-            # plot as grid squares at all positions
-            squares = []
-            for x,z, lab in zip(to_plot_xs_prob, to_plot_zs_prob, to_plot_probs):
-                rgba = list(cmap(lab))
-                # make opaque
-                rgba[-1] = 0.4
-                sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
-                ax.add_patch(sq)
+        # plot as grid squares at all positions
+        squares = []
+        for x,z, lab in zip(to_plot_xs_prob, to_plot_zs_prob, to_plot_probs):
+            rgba = list(cmap(lab))
+            # make opaque
+            rgba[-1] = 0.4
+            sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
+            ax.add_patch(sq)
 
         file_path =  f"{out_path}-{depth}.png"
                 
@@ -324,7 +310,7 @@ class LanguageTrainer:
             #print(f"computing loss no blocks {pixel_loss.item()}") 
             total_loss = pixel_loss + foreground_loss
 
-        print(f"loss {total_loss.item()}")
+        #print(f"loss {total_loss.item()}")
         return total_loss
 
     def save_model(self, epoch, is_best):

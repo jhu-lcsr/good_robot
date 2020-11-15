@@ -31,7 +31,7 @@ class SharedUNet(torch.nn.Module):
         super(SharedUNet, self).__init__()        
         self.share_level = SHARE_LEVELS[share_level]
 
-        self.compute_block_dist = True
+        self.compute_block_dist = False
 
         if self.share_level < 2:
             # need to create copy encoder 

@@ -7,6 +7,7 @@ from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
 import torch
 import pdb 
+import copy 
 np.random.seed(12) 
 
 PAD = "<PAD>"
@@ -46,38 +47,6 @@ class FlatIterator:
             raise StopIteration 
 
 
-class TrajectoryIterator:
-    """
-    Iterator over trajectory that returns a single timestep from the Trajectory
-    meaning: 1 command, 1 previous position, 1 next position. Commands may be 
-    batched, but positions are not. 
-    """
-    def __init__(self, traj):
-        self.traj = traj
-        self._index = -1
-
-    def __next__(self):
-        if self._index + 1 < len(self.traj.to_iterate):
-            self._index += 1
-            try:
-                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, image, length = self.traj.to_iterate[self._index]
-            except ValueError:
-                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, length = self.traj.to_iterate[self._index]
-                image=None
-           
-            return {"command": command,
-                    "previous_position": prev_pos,
-                    "next_position": next_pos,
-                    "previous_position_for_pred": prev_pos_for_pred,
-                    "previous_rotation": prev_rot,
-                    "next_rotation": next_rot,
-                    "block_to_move": block_to_move, 
-                    "image": image,
-                    "length": length} 
-
-        else: 
-            raise StopIteration 
-
 class BaseTrajectory:
     """
     Trajectories are basic data-loading unit,
@@ -109,25 +78,32 @@ class BaseTrajectory:
         self.line_id = line_id
         self.commands = commands
 
-        self.previous_positions = self.make_3d_positions(previous_positions, batch_size = len(commands))
+        # input has 2.5 d 
+        self.previous_positions_input = self.make_3d_positions(previous_positions, batch_size = len(commands))
+        # output for previous positions has depth that gets filtered 
         self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
-        self.previous_rotations = previous_rotations
-        self.next_positions = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
-        self.next_rotations = next_rotations
+        self.previous_positions_for_acc = copy.deepcopy(self.previous_positions_for_pred) 
+        self.next_positions_for_pred = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
+        self.next_positions_for_acc = copy.deepcopy(self.next_positions_for_pred) 
         self.blocks_to_move = self.get_blocks_to_move()
 
-        if self.do_filter: 
-            # only filter next positions, not previous ones 
-            self.previous_positions_for_pred = self.filter_by_blocks_to_move(self.previous_positions_for_pred)
-            self.next_positions = self.filter_by_blocks_to_move(self.next_positions)
+        self.previous_rotations = previous_rotations
+        self.next_rotations = next_rotations
+
 
         if self.top_only:
-            (self.previous_positions, 
-            self.previous_positions_for_pred, 
-            self.next_positions) = self.filter_top_only(self.previous_positions, 
-                                                        self.previous_positions_for_pred,
-                                                        self.next_positions) 
+            (self.previous_positions_for_pred, 
+            self.previous_positions_for_acc,
+            self.next_positions_for_pred, 
+            self.next_positions_for_acc) = self.filter_top_only(self.previous_positions_for_pred, 
+                                                                self.previous_positions_for_acc, 
+                                                                self.next_positions_for_pred, 
+                                                                self.next_positions_for_acc)
 
+        if self.do_filter: 
+            # for loss, only look at the single block moved 
+            self.previous_positions_for_pred = self.filter_by_blocks_to_move(self.previous_positions_for_pred)
+            self.next_positions_for_pred = self.filter_by_blocks_to_move(self.next_positions_for_pred)
 
         self.images = images
         self.lengths = lengths
@@ -135,9 +111,11 @@ class BaseTrajectory:
         self.traj_type = traj_type
 
         self.to_iterate = list(zip(self.commands, 
-                                   self.previous_positions, 
+                                   self.previous_positions_input, 
                                    self.previous_positions_for_pred,
-                                   self.next_positions, 
+                                   self.previous_positions_for_acc,
+                                   self.next_positions_for_pred, 
+                                   self.next_positions_for_acc, 
                                    self.previous_rotations, 
                                    self.next_rotations, 
                                    self.blocks_to_move,
@@ -146,7 +124,6 @@ class BaseTrajectory:
 
         # filter out empty commands
         self.to_iterate = [x for x in self.to_iterate if len(x[0]) > 0 ]
-
 
     def __iter__(self):
         if self.traj_type == "flat":     
@@ -165,16 +142,24 @@ class BaseTrajectory:
             positions[i] = pos
         return positions 
 
-    def filter_top_only(self, prev_pos, prev_pos_for_pred, next_pos):
-        for i, (ppos, ppos_pred, npos) in enumerate(zip(prev_pos, prev_pos_for_pred, next_pos)):
-            npos_summed = torch.sum(npos, dim = (0,1,2,4))
-            non_zero_slice = torch.argmax(npos_summed)
-            npos = npos[:,:,:,non_zero_slice]
-            ppos_pred = ppos_pred[:,:,:,non_zero_slice]
-            prev_pos_for_pred[i] = ppos_pred
-            next_pos[i] = npos 
-        return prev_pos, prev_pos_for_pred, next_pos
-
+    def filter_top_only(self, *data_list):
+        # get top-down view from the states 
+        to_ret = []
+        # iterate over inputs 
+        data_list = list(data_list)
+        for i, data in enumerate(data_list):
+            new_data = [torch.zeros((1, 64, 64, 1, 1)) for __ in range(len(data))]
+            # iterate over steps in trajectory 
+            for j, step_data in enumerate(data):
+                for depth in range(3, -1, -1):
+                    depth_slice = step_data[:,:,:,depth,:].unsqueeze(4)
+                    # only add if new_data == 0
+                    depth_slice[new_data[j] != 0] = 0
+                    new_data[j] += depth_slice  
+            # replace 
+            data_list[i] = new_data
+        return data_list 
+        
     def get_blocks_to_move(self):
         batch_idx = 0
         bsz = self.previous_positions_for_pred[0].shape[0]
@@ -182,7 +167,7 @@ class BaseTrajectory:
         all_blocks_to_move = []
         for timestep in range(len(self.previous_positions_for_pred)):
             prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
-            next_pos = self.next_positions[timestep][batch_idx]
+            next_pos = self.next_positions_for_pred[timestep][batch_idx]
             different_pixels = prev_pos[prev_pos != next_pos]
             # exclude background 
             different_pixel_idx = different_pixels[different_pixels != 0]
@@ -315,83 +300,6 @@ class SimpleTrajectory(BaseTrajectory):
         self.traj_vocab |= set(command) 
         return command
 
-class BatchedTrajectory(BaseTrajectory): 
-    """
-    batches trajectories so that all 9 annotator commands with shared 
-    positions and rotations are batched together. 
-    """
-    def __init__(self,
-                 line_id: int,
-                 commands: List[List[str]], 
-                 previous_positions: Tuple[float],
-                 previous_rotations: Tuple[float],
-                 next_positions: List[Tuple[float]], 
-                 next_rotations: List[Tuple[float]], 
-                 images: List[str],
-                 lengths: List[str],
-                 tokenizer: Tokenizer,
-                 traj_type: str,
-                 do_filter: bool = False,
-                 top_only: bool = True,
-                 binarize_blocks: bool = False):  
-        super(BatchedTrajectory, self).__init__(line_id=line_id,
-                                               commands=commands, 
-                                               previous_positions=previous_positions,
-                                               previous_rotations=previous_rotations,
-                                               next_positions=next_positions, 
-                                               next_rotations=next_rotations, 
-                                               images=images,
-                                               lengths=lengths,
-                                               do_filter=do_filter,
-                                               top_only=top_only,
-                                               binarize_blocks=binarize_blocks) 
-        # commands is now a 9xlen matrix 
-        self.tokenizer = tokenizer
-        self.commands, self.lengths = self.pad_commands(self.tokenize(commands)) 
-        self.traj_vocab = set() 
-
-        # override 
-        self.to_iterate = list(zip(self.commands, 
-                                   self.previous_positions, 
-                                   self.previous_positions_for_pred,
-                                   self.next_positions, 
-                                   self.previous_rotations, 
-                                   self.next_rotations, 
-                                   self.blocks_to_move,
-                                   self.images, 
-                                   self.lengths)) 
-
-
-    def tokenize(self, commands): 
-        for annotator_idx, command_list in enumerate(commands):
-            for timestep, command in enumerate(command_list):
-                commands[annotator_idx][timestep] = list(self.tokenizer(command))
-                # add to vocab 
-                self.traj_vocab |= set(commands[annotator_idx][timestep])
-        return commands 
-
-    def pad_commands(self, commands): 
-        # pad commands in a batch to have the same length
-        max_len = 0
-        lengths = [[max_len for j in range(len(commands))] for i in range(len(commands[0]))]
-        pad_str = [PAD for __ in range(max_len)]
-        new_commands = [[pad_str for j in range(len(commands))] for i in range(len(commands[0]))]
-        # get max length 
-        for annotator_idx, command_list in enumerate(commands):
-            for command_seq in command_list:
-                if len(command_seq) > max_len:
-                    max_len = len(command_seq) 
-
-        # pad to max length 
-        for annotator_idx, command_list in enumerate(commands):
-            for i, command_seq in enumerate(command_list): 
-                lengths[i][annotator_idx] = len(command_seq)
-                #commands[annotator_idx][i] += ["<PAD>" for i in range(max_len - len(command_seq))]
-                # permute 0 and 1, trajectory timestep first then annotator 
-                new_commands[i][annotator_idx] = commands[annotator_idx][i] +\
-                                            ["<PAD>" for i in range(max_len - len(command_seq))]
-
-        return new_commands, lengths
 
 class DatasetReader:
     def __init__(self, train_path,
@@ -446,52 +354,26 @@ class DatasetReader:
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
 
-                #command_trajectories = [[] for i in range(len(commands[0]['notes']))]
-                if self.batch_by_line:
-                    command_trajectories = [[] for i in range(9)]
-                    # split commands out into separate trajectories  
-                    for i, step in enumerate(commands):
-                        for j, annotation in enumerate(step["notes"]): 
-                            # 9 annotations, 3 per annotator 
-                            if j > 8:
-                                break 
-                            command_trajectories[j].append(annotation) 
-                    trajectory = BatchedTrajectory(line_id, 
-                                                   command_trajectories,
-                                                   previous_positions,
-                                                   previous_rotations,
-                                                   next_positions,
-                                                   next_rotations,
-                                                   images = images,
-                                                   lengths = [0]*len(command_trajectories),
-                                                   tokenizer = self.tokenizer,
-                                                   traj_type = self.traj_type,
-                                                   do_filter = self.do_filter,
-                                                   top_only = self.top_only, 
-                                                   binarize_blocks = self.binarize_blocks) 
-                    self.data[split].append(trajectory)  
-                    vocab |= trajectory.traj_vocab
-                else:
-                    for i, command_group in enumerate(commands):
-                        for command in command_group["notes"]:  
-                            for timestep in range(len(previous_positions)):
-                                # TODO: add rotations later? 
-                                trajectory = SimpleTrajectory(line_id,
-                                                            command, 
-                                                            [previous_positions[timestep]],
-                                                            [None],
-                                                            [next_positions[timestep]],
-                                                            [None],
-                                                            images=[images[timestep]],
-                                                            lengths = [None],
-                                                            tokenizer=self.tokenizer,
-                                                            traj_type=self.traj_type,
-                                                            batch_size=1,
-                                                            do_filter=self.do_filter,
-                                                            top_only = self.top_only,
-                                                            binarize_blocks = self.binarize_blocks) 
-                                self.data[split].append(trajectory) 
-                                vocab |= trajectory.traj_vocab
+                for i, command_group in enumerate(commands):
+                    for command in command_group["notes"]:  
+                        for timestep in range(len(previous_positions)):
+                            # TODO: add rotations later? 
+                            trajectory = SimpleTrajectory(line_id,
+                                                        command, 
+                                                        [previous_positions[timestep]],
+                                                        [None],
+                                                        [next_positions[timestep]],
+                                                        [None],
+                                                        images=[images[timestep]],
+                                                        lengths = [None],
+                                                        tokenizer=self.tokenizer,
+                                                        traj_type=self.traj_type,
+                                                        batch_size=1,
+                                                        do_filter=self.do_filter,
+                                                        top_only = self.top_only,
+                                                        binarize_blocks = self.binarize_blocks) 
+                            self.data[split].append(trajectory) 
+                            vocab |= trajectory.traj_vocab
 
         if not self.batch_by_line:
             # shuffle and batch data 
@@ -530,7 +412,15 @@ class DatasetReader:
         pad and tensorize 
         """
 
-        commands, prev_pos, next_pos, prev_pos_for_pred,  prev_rot, next_rot, block_to_move, image, length = [], [], [], [], [], [], [], [], []
+        commands = []
+        prev_pos_input = []
+        prev_pos_for_pred = []
+        prev_pos_for_acc  = []
+        next_pos_for_pred = []
+        next_pos_for_acc = []
+        block_to_move = []
+        image = []
+        length = [] 
         # get max len 
         max_length = min(self.max_seq_length, max([traj.lengths[0] for traj in batch_as_list])) 
         # pad  
@@ -542,32 +432,30 @@ class DatasetReader:
             length.append(len(traj.commands)) 
 
             commands.append(traj.commands + [PAD for i in range(max_length - len(traj.commands))])
-            prev_pos.append(traj.previous_positions[0])
+            prev_pos_input.append(traj.previous_positions_input[0])
             prev_pos_for_pred.append(traj.previous_positions_for_pred[0]) 
-            prev_rot.append(traj.previous_rotations[0])
-            next_pos.append(traj.next_positions[0])
-            next_rot.append(traj.next_rotations[0]) 
+            prev_pos_for_acc.append(traj.previous_positions_for_acc[0]) 
+
+            next_pos_for_pred.append(traj.next_positions_for_pred[0])
+            next_pos_for_acc.append(traj.next_positions_for_acc[0])
+
             block_to_move.append(traj.blocks_to_move[0].long())
             image.append(traj.images)  
         
 
-        prev_pos = torch.cat(prev_pos, 0)
+        prev_pos_input = torch.cat(prev_pos_input, 0)
         prev_pos_for_pred = torch.cat(prev_pos_for_pred, 0)
-        next_pos = torch.cat(next_pos, 0) 
+        prev_pos_for_acc  = torch.cat(prev_pos_for_acc, 0)
+        next_pos_for_pred  = torch.cat(next_pos_for_pred, 0) 
+        next_pos_for_acc = torch.cat(next_pos_for_acc, 0) 
         block_to_move = torch.cat(block_to_move, 0) 
 
-        #print(f"prev_pos {prev_pos.shape}") 
-        #print(f"prev_pos_for_acc  {prev_pos_for_acc.shape}") 
-        #print(f"next_pos {next_pos.shape}") 
-        #print(f"block to move {block_to_move.shape}") 
-        #sys.exit() 
-
         return {"command": commands,
-                "previous_position": prev_pos,
-                "next_position": next_pos,
-                "previous_position_for_pred": prev_pos_for_pred,
-                "previous_rotation": prev_rot,
-                "next_rotation": next_rot,
+                "prev_pos_input": prev_pos_input,
+                "prev_pos_for_acc": prev_pos_for_acc,
+                "prev_pos_for_pred": prev_pos_for_pred,
+                "next_pos_for_acc": next_pos_for_acc,
+                "next_pos_for_pred": next_pos_for_pred,
                 "block_to_move": block_to_move,
                 "image": image,
                 "length": length} 
