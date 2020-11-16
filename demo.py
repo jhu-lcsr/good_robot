@@ -72,9 +72,12 @@ class Demonstration():
 
         return rgb_heightmap, depth_heightmap
 
-    # TODO(adit98) figure out how to get primitive action
-    # TODO(adit98) this will NOT work for novel tasks, worry about that later
-    def get_action(self, trainer, workspace_limits, primitive_action, stack_height):
+    def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
+            row_trainer=None):
+        # ensure one of stack trainer or row trainer is provided
+        if stack_trainer is None and row_trainer is None:
+            raise ValueError("Must provide one of stack_trainer or row_trainer")
+
         # TODO(adit98) clean up the way demo heightmaps are saved to reduce confusion
         # set action_str based on primitive action
         # heightmap_height is the height we use to get the demo heightmaps
@@ -122,9 +125,17 @@ class Demonstration():
                 color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
                         self.action_dict[stack_height]['place_image_ind'])
 
-        # to get vector of 64 vals, run trainer.forward with get_action_feat
-        push_preds, grasp_preds, place_preds = trainer.forward(color_heightmap,
-                valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+        # get stack features if stack_trainer is provided
+        if stack_trainer is not None:
+            # to get vector of 64 vals, run trainer.forward with get_action_feat
+            stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+
+        # get row features if row_trainer is provided
+        if row_trainer is not None:
+            # to get vector of 64 vals, run trainer.forward with get_action_feat
+            row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
 
         # get demo action index vector
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
@@ -139,15 +150,27 @@ class Demonstration():
         # need to swap x and y coordinates for best_action_xy
         best_action_xy = [best_action_xy[1], best_action_xy[0]]
 
-        # TODO(adit98) figure out if we want more than 1 coordinate
-        # TODO(adit98) add logic for pushing here
+        # initialize best actions for stacking and row making
+        best_action_stack, best_action_row = None, None
+
+        # index predictions to obtain best action
         if primitive_action == 'grasp':
-            # TODO(adit98) figure out if we need to swap xy coordinates
-            # we do y coordinate first, then x, because cv2 images are row, column indexed
-            best_action = grasp_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            if stack_trainer is not None:
+                best_action_stack = stack_grasp[best_rot_ind, :, best_action_xy[0],
+                        best_action_xy[1]]
+            
+            if row_trainer is not None:
+                best_action_row = row_grasp[best_rot_ind, :, best_action_xy[0],
+                        best_action_xy[1]]
 
-        # TODO(adit98) find out why place preds inds were different before
         elif primitive_action == 'place':
-            best_action = place_preds[best_rot_ind, :, best_action_xy[0], best_action_xy[1]]
+            if stack_trainer is not None:
+                best_action_stack = stack_place[best_rot_ind, :, best_action_xy[0],
+                        best_action_xy[1]]
+            
+            if row_trainer is not None:
+                best_action_row = row_place[best_rot_ind, :, best_action_xy[0],
+                        best_action_xy[1]]
 
-        return best_action, ACTION_TO_ID[primitive_action]
+        # return best action for row and stack (None if only using 1 or the other) and action
+        return best_action_row, best_action_stack, ACTION_TO_ID[primitive_action]
