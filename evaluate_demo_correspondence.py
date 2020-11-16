@@ -28,10 +28,10 @@ def evaluate_l2_mask(preds, example_action, demo_hist=None, execution_hist=None)
 
         # iterate through history steps and calculate difference with preds
         for action in execution_hist:
-            execution_embedding.append(preds - action.reshape([1, 64, 1, 1]))
+            execution_embedding.append(np.square(preds - action.reshape([1, 64, 1, 1])))
 
         for action in demo_hist:
-            demo_embedding.append(example_action - action.reshape([1, 64, 1, 1]))
+            demo_embedding.append(np.square(example_action - action.reshape([1, 64, 1, 1])))
 
         # turn into numpy arrays
         execution_embedding = np.concatenate(execution_embedding, axis=1)
