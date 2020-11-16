@@ -574,7 +574,7 @@ class Trainer(object):
             if self.place_common_sense:
                 return push_predictions, grasp_predictions, masked_place_predictions
             else:
-                return push_predictions, grasp_predictions, place_predictions
+                return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
 
         elif keep_action_feat:
             return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
