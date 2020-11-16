@@ -81,12 +81,9 @@ class Demonstration():
         if self.task_type == 'stack':
             if not self.check_z_height:
                 # if we completed a stack, prev_stack_height will be 4, but we want the imitation actions for stack height 1
-                # TODO(adit98) switched this to get nonlocal_variables['stack_height'] now, so see how it is different
                 stack_height = (stack_height - 1) if stack_height < 4 else 0
             else:
-                # TODO(adit98) check but stack_height is going to be number of blocks on top of base block
                 stack_height = np.round(stack_height).astype(int)
-                # TODO(adit98) figure out how to reset stack height if check_z_height is set
                 stack_height = (stack_height - 1) if stack_height < 4 else 0
 
             # TODO(adit98) deal with push
