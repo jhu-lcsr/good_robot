@@ -10,25 +10,31 @@ from trainer import Trainer
 from demo import Demonstration
 
 # function to evaluate l2 distance and generate demo-signal mask
-def evaluate_l2_mask(preds, example_action, demo_hist=None, execution_hist=None):
-    # reshape example_action to 1 x 64 x 1 x 1
-    example_action = np.expand_dims(example_action, (0, 2, 3))
+def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None):
+    # reshape each example_action to 1 x 64 x 1 x 1
+    if example_action[0] is not None:
+        example_action_row = np.expand_dims(example_action[0], (0, 2, 3))
+    if example_action[1] is not None:
+        example_action_stack = np.expand_dims(example_action[1], (0, 2, 3))
+
+    # parse preds into row/stack
+    row_preds, stack_preds = preds
 
     # store indices of masked spaces (take min so we enforce all 64 values are 0)
-    mask = (np.min((preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+    mask = (np.min((stack_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
         # initialize execution embedding, demo_embedding
-        execution_embedding = [preds]
-        demo_embedding = [example_action]
+        execution_embedding = [stack_preds]
+        demo_embedding = [example_action_stack]
 
-        # iterate through history steps and calculate element-wise product with preds
-        for action in execution_hist:
-            execution_embedding.append(np.multiply(preds, action.reshape([1, 64, 1, 1])))
+        # iterate through history steps and calculate element-wise product with stack_preds
+        for action in execution_hist[1]:
+            execution_embedding.append(np.multiply(stack_preds, action.reshape([1, 64, 1, 1])))
 
-        for action in demo_hist:
-            demo_embedding.append(np.multiply(example_action, action.reshape([1, 64, 1, 1])))
+        for action in demo_hist[1]:
+            demo_embedding.append(np.multiply(example_action_stack, action.reshape([1, 64, 1, 1])))
 
         # turn into numpy arrays
         execution_embedding = np.concatenate(execution_embedding, axis=1)
@@ -38,8 +44,8 @@ def evaluate_l2_mask(preds, example_action, demo_hist=None, execution_hist=None)
         l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
 
     else:
-        # calculate l2 distance between example action embedding and grasp_preds
-        l2_dist = np.sum(np.square(example_action - preds), axis=1)
+        # calculate l2 distance between example action embedding and grasp_stack_preds
+        l2_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
 
     # set masked spaces to have max of l2_dist*1.1 distance
     l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
@@ -109,8 +115,9 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--imitation_demo', type=str, help='path to imitation demo')
     parser.add_argument('-v', '--save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
     parser.add_argument('-m', '--metric', default='l2', help='metric to evaluate similarity between demo and current env embeddings')
-    parser.add_argument('-t', '--task_type', default='unstack', help='task type (enter custom as catch-all)')
-    parser.add_argument('-s', '--snapshot_file', dest='snapshot_file', action='store', default='', help='snapshot file to load for the model')
+    parser.add_argument('-t', '--task_type', default='custom', help='task type')
+    parser.add_argument('-s', '--stack_snapshot_file', default=None, help='snapshot file to load for the stacking model')
+    parser.add_argument('-r', '--row_snapshot_file', default=None, help='snapshot file to load for row-making model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
     parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
     parser.add_argument('-k', '--history_len', default=0, type=int, help='how many historical steps to store')
@@ -137,18 +144,29 @@ if __name__ == '__main__':
     else:
         place_common_sense = False
 
-    # Initialize trainer
-    trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
-                      is_testing=True, snapshot_file=args.snapshot_file,
-                      force_cpu=args.cpu, goal_condition_len=0, place=True,
-                      pretrained=True, flops=False, network='densenet',
-                      common_sense=True, place_common_sense=place_common_sense,
-                      show_heightmap=False, place_dilation=0,
-                      common_sense_backprop=True, trial_reward='spot',
-                      num_dilation=0)
+    # Initialize trainer(s)
+    if args.stack_snapshot_file is not None:
+        stack_trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
+                          is_testing=True, snapshot_file=args.stack_snapshot_file,
+                          force_cpu=args.cpu, goal_condition_len=0, place=True,
+                          pretrained=True, flops=False, network='densenet',
+                          common_sense=True, place_common_sense=place_common_sense,
+                          show_heightmap=False, place_dilation=0,
+                          common_sense_backprop=True, trial_reward='spot',
+                          num_dilation=0)
 
-    # iterate through action_dict and visualize example signal on imitation heightmaps
-    action_keys = sorted(example_demo.action_dict.keys())
+    if args.row_snapshot_file is not None:
+        row_trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
+                          is_testing=True, snapshot_file=args.row_snapshot_file,
+                          force_cpu=args.cpu, goal_condition_len=0, place=True,
+                          pretrained=True, flops=False, network='densenet',
+                          common_sense=True, place_common_sense=place_common_sense,
+                          show_heightmap=False, place_dilation=0,
+                          common_sense_backprop=True, trial_reward='spot',
+                          num_dilation=0)
+
+    if args.stack_snapshot_file is None and args.row_snapshot_file is None:
+        raise ValueError("Must provide one of stack trained model or row trained model")
 
     # store previous embeddings
     demo_buffer = []
@@ -159,12 +177,13 @@ if __name__ == '__main__':
         demo_buffer.append(np.zeros(64))
         execution_buffer.append(np.zeros(64))
 
-    # step through demos and evaluate correspondence
+    # iterate through action_dict and visualize example signal on imitation heightmaps
+    action_keys = sorted(example_demo.action_dict.keys())
     for k in action_keys:
         for action in ['grasp', 'place']:
-            # get action embedding
-            example_action, _ = example_demo.get_action(trainer, workspace_limits,
-                    action, k)
+            # get action embeddings from example demo
+            example_action_row, example_action_stack, _ = example_demo.get_action(workspace_limits,
+                    action, k, stack_trainer=stack_trainer, row_trainer=row_trainer)
 
             # get imitation heightmaps
             if args.task_type == 'unstack':
@@ -190,18 +209,37 @@ if __name__ == '__main__':
                     str(k) + '.' + action + '.color.png')
 
             # run forward pass for imitation_demo
-            # to get vector of 64 vals, run trainer.forward with get_action_feat
-            push_preds, grasp_preds, place_preds = trainer.forward(im_color,
-                    im_depth, is_volatile=True, keep_action_feat=True, use_demo=True,
-                    demo_mask=True)
+            stack_preds, row_preds = None, None
 
+            # get stack features if stack_trainer is provided
+            if stack_trainer is not None:
+                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
+                        valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+
+            # get row features if row_trainer is provided
+            if row_trainer is not None:
+                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
+                        valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+
+            # TODO(adit98) add logic for pushing here
             if action == 'grasp':
-                preds = grasp_preds.filled(fill_value=0)
+                if stack_trainer is not None:
+                    stack_preds = stack_grasp.filled(fill_value=0)
+                if row_trainer is not None:
+                    row_preds = row_grasp.filled(fill_value=0)
+
             else:
-                preds = place_preds.filled(fill_value=0)
+                if stack_trainer is not None:
+                    stack_preds = stack_place.filled(fill_value=0)
+                if row_trainer is not None:
+                    row_preds = row_place.filled(fill_value=0)
 
             # evaluate l2 distance based action mask
-            im_mask, match_ind = evaluate_l2_mask(preds, example_action, demo_buffer, execution_buffer)
+            im_mask, match_ind = evaluate_l2_mask(preds=[row_preds, stack_preds],
+                    example_actions=[example_action_row, example_action_stack],
+                    demo_hist=demo_buffer, execution_hist=execution_buffer)
 
             if args.save_visualizations:
                 # fix dynamic range of im_depth
@@ -216,7 +254,15 @@ if __name__ == '__main__':
                 cv2.imwrite(color_filename, rgb_canvas)
 
             # update buffers (add current action, delete first element in buffer)
-            demo_buffer.append(example_action)
+            demo_buffer.append((example_action_row, example_action_stack))
             del demo_buffer[0]
-            execution_buffer.append(preds[match_ind[0], :, match_ind[1], match_ind[2]])
+
+            if row_preds is not None and stack_preds is not None:
+                execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]],
+                    stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
+            elif row_preds is not None:
+                execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
+            else:
+                execution_buffer.append((stack_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
+
             del execution_buffer[0]
