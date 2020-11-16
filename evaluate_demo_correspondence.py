@@ -9,9 +9,6 @@ from utils import ACTION_TO_ID
 from trainer import Trainer
 from demo import Demonstration
 
-# TODO(adit98) refactor to use ACTION_TO_IND from utils.py
-# TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
-
 # function to evaluate l2 distance and generate demo-signal mask
 def evaluate_l2_mask(preds, example_action, demo_hist=None, execution_hist=None):
     # reshape example_action to 1 x 64 x 1 x 1
