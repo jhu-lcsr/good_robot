@@ -199,9 +199,9 @@ if __name__ == '__main__':
                     demo_mask=True)
 
             if action == 'grasp':
-                preds = grasp_preds
+                preds = grasp_preds.filled(fill_value=0)
             else:
-                preds = place_preds
+                preds = place_preds.filled(fill_value=0)
 
             # evaluate l2 distance based action mask
             im_mask, match_ind = evaluate_l2_mask(preds, example_action, demo_buffer, execution_buffer)
