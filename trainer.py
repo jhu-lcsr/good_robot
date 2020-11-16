@@ -535,10 +535,11 @@ class Trainer(object):
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
             # TODO(zhe) The common_sense_action_space function must also use the language mask, or we can implement a seperate function.
+            # process feature masks if we need to return feature masks and final preds
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:
-                    push_feat, grasp_feat, masked_place_feat = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
                             push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
                 else:
                     push_feat = np.ma.masked_array(push_feat)
@@ -546,19 +547,8 @@ class Trainer(object):
                     if self.place:
                         place_feat = np.ma.masked_array(place_feat)
 
-            # mask predictions if not demo
-            if not use_demo:
-                # mask action if self.common_sense is set
-                if self.place:
-                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
-                            push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
-                else:
-                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
-                            push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
-
-            # mask if use_demo, keep_action_feat, and demo_mask are all set
-            elif demo_mask:
-                # mask action if self.common_sense is set
+            # mask action, if we are not in demo or if demo_mask is set
+            if not use_demo or demo_mask:
                 if self.place:
                     push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
@@ -580,7 +570,7 @@ class Trainer(object):
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions)
 
-        # TODO(adit98) get both action features and actions when running with keep_action_feat in robot eval
+        # return components depending on flags
         if use_demo:
             if self.place_common_sense:
                 return push_predictions, grasp_predictions, masked_place_predictions
@@ -588,10 +578,7 @@ class Trainer(object):
                 return push_predictions, grasp_predictions, place_predictions
 
         elif keep_action_feat:
-            if self.place_common_sense:
-                return push_feat, grasp_feat, masked_place_feat, push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
-            else:
-                return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 

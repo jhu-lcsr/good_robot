@@ -11,7 +11,6 @@ class Demonstration():
         self.rgb_dir = os.path.join(path, 'data', 'color-heightmaps')
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
         self.image_names = sorted(os.listdir(self.rgb_dir))
-        print(self.image_names)
         self.demo_num = demo_num
         self.check_z_height = check_z_height
         self.task_type = task_type

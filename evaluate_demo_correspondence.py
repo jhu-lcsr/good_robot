@@ -13,22 +13,49 @@ from demo import Demonstration
 # TODO(adit98) rename im_action.log and im_action_embed.log to be hyphenated
 
 # function to evaluate l2 distance and generate demo-signal mask
-def evaluate_l2_mask(executed_actions, embedding, frame_ind, mask):
-    match_ind = executed_actions[frame_ind][1:].astype(int)
-    l2_dist = np.sum(np.square(embedding - np.expand_dims(embedding[match_ind[0],
-        :, match_ind[1], match_ind[2]], axis=(0, 2, 3))), axis=1)
+def evaluate_l2_mask(preds, example_action, demo_hist=None, execution_hist=None):
+    # reshape example_action to 1 x 64 x 1 x 1
+    example_action = np.expand_dims(example_action, (0, 2, 3))
+
+    # store indices of masked spaces (take min so we enforce all 64 values are 0)
+    mask = (np.min((preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+
+    # add the l2 distances for history if history is given
+    if demo_hist is not None and execution_hist is not None:
+        # initialize execution embedding, demo_embedding
+        execution_embedding = [preds]
+        demo_embedding = [example_action]
+
+        # iterate through history steps and calculate difference with preds
+        for action in execution_hist:
+            execution_embedding.append(preds - action.reshape([1, 64, 1, 1]))
+
+        for action in demo_hist:
+            demo_embedding.append(example_action - action.reshape([1, 64, 1, 1]))
+
+        # turn into numpy arrays
+        execution_embedding = np.concatenate(execution_embedding, axis=1)
+        demo_embedding = np.concatenate(demo_embedding, axis=1)
+
+        # calculate l2 distance
+        l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
+
+    else:
+        # calculate l2 distance between example action embedding and grasp_preds
+        l2_dist = np.sum(np.square(example_action - preds), axis=1)
 
     # set masked spaces to have max of l2_dist*1.1 distance
     l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
+    match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
 
     # make l2_dist range from 0 to 1
-    l2_dist -= np.min(l2_dist)
+    l2_dist = l2_dist - np.min(l2_dist)
     l2_dist /= np.max(l2_dist)
 
     # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
-    im_mask = 1 - l2_dist
+    im_mask = (1 - l2_dist)
 
-    return im_mask
+    return im_mask, match_ind
 
 # function to visualize prediction signal on heightmap (with rotations)
 def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, prob_exp=1):
@@ -89,6 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--snapshot_file', dest='snapshot_file', action='store', default='', help='snapshot file to load for the model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
     parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
+    parser.add_argument('-k', '--history_len', default=0, type=int, help='how many historical steps to store')
     args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
@@ -105,18 +133,36 @@ if __name__ == '__main__':
     imitation_demo = Demonstration(path=args.imitation_demo, demo_num=0,
             check_z_height=True, task_type=args.task_type)
 
-    # TODO(adit98) define trainer
+    # set whether place common sense masks should be used
+    # TODO(adit98) make this a cmd line argument and think about whether it should ever be set
+    if args.task_type == 'unstack':
+        place_common_sense = False
+    else:
+        place_common_sense = False
+
     # Initialize trainer
     trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
                       is_testing=True, snapshot_file=args.snapshot_file,
                       force_cpu=args.cpu, goal_condition_len=0, place=True,
                       pretrained=True, flops=False, network='densenet',
-                      common_sense=True, show_heightmap=False, place_dilation=0,
+                      common_sense=True, place_common_sense=place_common_sense,
+                      show_heightmap=False, place_dilation=0,
                       common_sense_backprop=True, trial_reward='spot',
                       num_dilation=0)
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
     action_keys = sorted(example_demo.action_dict.keys())
+
+    # store previous embeddings
+    demo_buffer = []
+    execution_buffer = []
+
+    # populate buffers (history_len is the number of steps we store)
+    for i in range(args.history_len):
+        demo_buffer.append(np.zeros(64))
+        execution_buffer.append(np.zeros(64))
+
+    # step through demos and evaluate correspondence
     for k in action_keys:
         for action in ['grasp', 'place']:
             # get action embedding
@@ -131,6 +177,7 @@ if __name__ == '__main__':
                 else:
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
                             imitation_demo.action_dict[k]['demo_ind'] + 1)
+
             else:
                 if action == 'grasp':
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
@@ -145,64 +192,34 @@ if __name__ == '__main__':
             color_filename = os.path.join(args.imitation_demo, 'correspondences',
                     str(k) + '.' + action + '.color.png')
 
-            # set whether place common sense masks should be used
-            # TODO(adit98) make this a cmd line argument
-            if args.task_type == 'unstack':
-                place_common_sense = True
-            else:
-                place_common_sense = False
-
             # run forward pass for imitation_demo
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             push_preds, grasp_preds, place_preds = trainer.forward(im_color,
                     im_depth, is_volatile=True, keep_action_feat=True, use_demo=True,
-                    demo_mask=True, place_common_sense=place_common_sense)
+                    demo_mask=True)
 
             if action == 'grasp':
                 preds = grasp_preds
             else:
                 preds = place_preds
 
-            # reshape example_action to 1 x 64 x 1 x 1
-            example_action = np.expand_dims(example_action, (0, 2, 3))
-
-            # store indices of masked spaces (take min so we enforce all 64 values are 0)
-            mask = (np.min((preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
-
-            # calculate l2 distance between example action embedding and grasp_preds
-            l2_dist = np.sum(np.square(example_action - preds), axis=1)
-
-            # set masked spaces to have max of l2_dist*1.1 distance
-            l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
-            match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
-
+            # evaluate l2 distance based action mask
+            im_mask, match_ind = evaluate_l2_mask(preds, example_action, demo_buffer, execution_buffer)
 
             if args.save_visualizations:
-                # make l2_dist range from 0 to 1
-                l2_dist = l2_dist - np.min(l2_dist)
-                l2_dist /= np.max(l2_dist)
-
-                # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
-                im_mask = 1 - l2_dist
-
                 # fix dynamic range of im_depth
                 im_depth = (im_depth * 255 / np.max(im_depth)).astype(np.uint8)
 
-                ## load original depth/rgb maps
-                #orig_depth = cv2.imread(os.path.join(log_home, 'data', 'depth-heightmaps',
-                #    depth_heightmap_list[frame_ind]), -1)
-                #orig_depth = (255 * (orig_depth / np.max(orig_depth))).astype(np.uint8)
-                #orig_rgb = cv2.imread(os.path.join(log_home, 'data', 'color-heightmaps',
-                #    rgb_heightmap_list[frame_ind]))
-                ## TODO(adit98) color conversion happens here then reversed in function above, may want to get rid
-                #orig_rgb = cv2.cvtColor(orig_rgb, cv2.COLOR_BGR2RGB)
-
                 # visualize with rotation, match_ind
-                #cv2.imwrite('test.png', im_color)
-                #cv2.imwrite('test_depth.png', im_depth)
                 depth_canvas = get_prediction_vis(im_mask, im_depth, match_ind, blend_ratio=args.blend_ratio)
                 rgb_canvas = get_prediction_vis(im_mask, im_color, match_ind, blend_ratio=args.blend_ratio)
 
                 # write blended images
                 cv2.imwrite(depth_filename, depth_canvas)
                 cv2.imwrite(color_filename, rgb_canvas)
+
+            # update buffers (add current action, delete first element in buffer)
+            demo_buffer.append(example_action)
+            del demo_buffer[0]
+            execution_buffer.append(preds[match_ind[0], :, match_ind[1], match_ind[2]])
+            del execution_buffer[0]
