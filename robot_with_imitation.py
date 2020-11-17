@@ -16,6 +16,7 @@ from collections import namedtuple
 from robot import Robot
 from trainer import Trainer
 from logger import Logger
+from demo import Demonstration
 import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
@@ -45,6 +46,8 @@ def run_title(args):
         title += 'Stack, '
     elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
+    if args.unstack:
+        title += 'Unstack, '
     if args.trial_reward:
         title += 'SPOT Trial Reward, '
     elif args.discounted_reward:
@@ -58,6 +61,9 @@ def run_title(args):
         title += 'Testing' if args.is_testing else 'Training'
     else:
         title += 'Challenging Arrangements'
+
+    if args.use_demo:
+        title += ', Imitation'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
@@ -278,9 +284,10 @@ def main(args):
     no_change_count = [2, 2] if not is_testing else [0, 0]
     explore_prob = 0.5 if not is_testing else 0.0
 
+    # TODO(adit98) check if it is ok to initialize this to 1.0
     if check_z_height:
-        nonlocal_variables['stack_height'] = 0.0
-        nonlocal_variables['prev_stack_height'] = 0.0
+        nonlocal_variables['stack_height'] = 1.0
+        nonlocal_variables['prev_stack_height'] = 1.0
     best_stack_rate = np.inf
     prev_grasp_success = False
 
@@ -579,6 +586,12 @@ def main(args):
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
+                if args.use_demo:
+                    # TODO(adit98) check if this is the best place for this
+                    # TODO(adit98) consider better solution than pickle=True for 3D array saving
+                    trainer.executed_action_embed_log.append(action_feat[ACTION_TO_ID[nonlocal_variables['primitive_action']]].filled(fill_value=0))
+                    logger.write_to_log('executed-action-embed', trainer.executed_action_embed_log, pickle=True)
+
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
                     # Q values are mostly 0 to 1 for pushing/grasping, mostly 0 to 4 for multi-step tasks with placing
@@ -627,8 +640,8 @@ def main(args):
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
                                     # we are in testing mode which is frequently recorded,
-                                    # so sleep for 10 seconds to show off our results!
-                                    time.sleep(10)
+                                    # so sleep for 5 seconds to show off our results!
+                                    time.sleep(5)
                                 nonlocal_variables['stack_success'] = True
                                 stack_count += 1
                                 # full stack complete! reset the scene
@@ -642,6 +655,7 @@ def main(args):
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
 
+                    # TODO(adit98) this shouldn't be here? resaving images if trial completes
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
@@ -666,6 +680,7 @@ def main(args):
                     else:
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
+
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
@@ -679,7 +694,6 @@ def main(args):
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
                     if nonlocal_variables['grasp_success']:
-                        # robot.restart_sim()
                         successful_grasp_count += 1
                         if grasp_color_task:
                             if nonlocal_variables['grasp_color_success']:
@@ -690,6 +704,7 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
+
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
@@ -729,7 +744,8 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
+                            print(workspace_limits)
+                            robot.reposition_objects(logger=logger, trainer=trainer, demo=unstack_demo, goal_condition=goal_condition, workspace_limits=workspace_limits)
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -831,6 +847,15 @@ def main(args):
     prev_best_dict = {}
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
+    if args.use_demo:
+        # TODO(adit98) set demo number to be cmd line arg, 0 right now
+        demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height)
+
+    if args.unstack and args.use_demo:
+        unstack_demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height, task_type='unstack')
+        # TODO(adit98) setting demo to None if we are unstacking, hacky, need to fix
+        demo = None
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
@@ -927,7 +952,11 @@ def main(args):
             if is_testing:
                 # Do special testing mode update steps
                 # If at end of test run, re-load original weights (before test run)
-                trainer.model.load_state_dict(torch.load(snapshot_file))
+                if trainer.use_cuda:
+                    trainer.model.load_state_dict(torch.load(snapshot_file))
+                else:
+                    trainer.model.load_state_dict(torch.load(snapshot_file, map_location=torch.device('cpu')))
+
                 if test_preset_cases:
                     case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                     # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
@@ -964,8 +993,48 @@ def main(args):
             else:
                 goal_condition = None
 
-            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
-                color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+
+            # TODO(adit98) here, we run forward pass on imitation video
+            # TODO(adit98) extend logic to work with row making
+            # TODO(adit98) add logic to advance demo if action is successful
+            if args.use_demo:
+                # run forward pass, keep action features and get softmax predictions
+                push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(color_heightmap,
+                            valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
+                action_feat = [push_feat, grasp_feat, place_feat]
+
+                # TODO(adit98) this ONLY works with stacks
+                # here, we decide the demo action based on action success
+                if prev_primitive_action == 'grasp': 
+                    if prev_grasp_success:
+                        next_action = 'place'
+                    else:
+                        next_action = 'grasp'
+                elif prev_primitive_action == 'place':
+                    # regardless of success, we need to grasp next
+                    next_action = 'grasp'
+                # for now, assume pushes must be followed by grasp, first action is grasp
+                else:
+                    next_action = 'grasp'
+
+                # TODO(adit98) remove this check once unstack_demo/demo is refactored
+                if demo is not None:
+                    # TODO(adit98) figure out if we need to use prev_stack_height or stack_height
+                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
+                            next_action, nonlocal_variables['stack_height'])
+                    # TODO(adit98) log action vector from embedding
+                    # don't really need to store im_action since they *SHOULD* line up
+                    trainer.im_action_log.append(im_action)
+                    trainer.im_action_embed_log.append(im_action_embedding)
+
+                    # TODO(adit98) find best spot for this (write demo related stuff)
+                    logger.write_to_log('im_action', trainer.im_action_log)
+                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
+
+            else:
+                # run forward pass normally
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(color_heightmap,
+                        valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1203,7 +1272,8 @@ def main(args):
                     print('The robot was not at home after the current action finished running. '
                           'Make sure the robot did not experience either an error or security stop. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
-            elif is_sim and int(time_elapsed) > 60:
+            # TODO(adit98) change this timeout back to 60 or make it cmd line arg
+            elif is_sim and int(time_elapsed) > 600:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
@@ -1218,12 +1288,13 @@ def main(args):
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
                 if check_z_height:
+                    # TODO(adit98) check if it is ok to make these 1
                     # Zero out the height because the trial is done.
                     # Note these lines must normally be after the
                     # logging of these variables is complete,
                     # but this is a special (hopefully rare) recovery scenario.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
+                    nonlocal_variables['stack_height'] = 1.0
+                    nonlocal_variables['prev_stack_height'] = 1.0
                 else:
                     nonlocal_variables['stack_height'] = 1.0
                     nonlocal_variables['prev_stack_height'] = 1.0
@@ -1726,6 +1797,7 @@ if __name__ == '__main__':
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
+    parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
 
 
     # -------------- Testing options --------------
@@ -1747,9 +1819,14 @@ if __name__ == '__main__':
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
     parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
+    parser.add_argument('--demo_path', dest='demo_path', type=str, default=None)
 
     # Parse args
     args = parser.parse_args()
+
+    # if use_demo is specified, we need a demo_path
+    if args.use_demo and args.demo_path is None:
+        raise ValueError('Must specify --demo_path if --use_demo is set')
 
     if not args.ablation:
         one_train_test_run(args)

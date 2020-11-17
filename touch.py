@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -8,6 +7,8 @@ from robot import Robot
 import threading
 import os
 import utils
+from logger import Logger
+from generate_sim_stacking_demo import get_and_save_images
 
 class HumanControlOfRobot(object):
     """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
@@ -37,13 +38,19 @@ class HumanControlOfRobot(object):
 
         self.stop: if True shut down your program, pressing 'c' on the keyboard sets this variable to True.
     """
-    def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True):
+    def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True,
+            logger=None):
         self.stop = False
         self.print_state_count = 0
         self.tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
         self.human_control = human_control
         self.move_robot = move_robot
         self.action = action
+        self.logger = logger
+        self.all_action_log = []
+        self.successful_action_log = []
+        self.heightmap_pairs = []
+        self.trial = 0
         self.click_count = 0
         self.click_position = None
         self.target_position = None
@@ -68,6 +75,7 @@ class HumanControlOfRobot(object):
         # robot.joint_vel = 1.05
         self.grasp_angle = 4.0
         self.grasp_success, self.grasp_color_success = False, False
+        self.place_success = False
         if mutex is None:
             self.mutex = threading.Lock()
         # Callback function for clicking on OpenCV window
@@ -114,9 +122,13 @@ class HumanControlOfRobot(object):
         self.print_config()
 
     def execute_action(self, target_position, heightmap_rotation_angle):
+        # log env state
+        depth_heightmap, color_heightmap, _, _, _ = get_and_save_images(self.click_count,
+                self.robot, self.logger, self.action, save_image=False)
+        self.heightmap_pairs.append((depth_heightmap, color_heightmap))
+
         self.target_position = target_position
         self.click_count += 1
-        print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
         def grasp(tp, ra, gh):
             # global self.grasp_success, self.grasp_color_success, self.mutex
             with self.mutex:
@@ -125,8 +137,26 @@ class HumanControlOfRobot(object):
         def place(tp, ra, gh):
             # global self.grasp_success, self.mutex
             with self.mutex:
-                self.robot.place(tp, ra, go_home=gh)
+                self.place_success = self.robot.place(tp, ra, go_home=gh)
                 self.grasp_success = False
+
+                if self.place_success:
+                    # if we had a successful place, write the last 2 actions (grasp and place) to log
+                    self.successful_action_log += self.all_action_log[-2:]
+                    self.logger.write_to_log('executed-actions-' + str(self.trial),
+                            self.successful_action_log)
+
+                    # get last two pairs of heightmaps
+                    heightmap_pairs = self.heightmap_pairs[-2:]
+                    depth_grasp, color_grasp = heightmap_pairs[0]
+                    depth_place, color_place = heightmap_pairs[1]
+
+                    # save images
+                    self.logger.save_heightmaps(self.click_count, color_grasp,
+                            depth_grasp, 'grasp')
+                    self.logger.save_heightmaps(self.click_count, color_place,
+                            depth_place, 'place')
+
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
             def move_to(tp, ra):
@@ -141,12 +171,24 @@ class HumanControlOfRobot(object):
                 t = threading.Thread(target=move_to, args=(target_position, heightmap_rotation_angle))
                 t.start()
         elif self.action == 'grasp':
-            if not self.robot.place_task or (robot.place_task and not self.grasp_success):
+            if not self.robot.place_task or (self.robot.place_task and not self.grasp_success):
+                # log action
+                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
+                    utils.ACTION_TO_ID['grasp']])
+
                 if self.move_robot:
                     t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
             else:
+                # adjust z height
+                target_position[-1] += 0.01
+
+                # log action
+                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
+                    utils.ACTION_TO_ID['place']])
+
                 if self.move_robot:
+                    self.action = 'place'
                     t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
 
@@ -158,9 +200,26 @@ class HumanControlOfRobot(object):
             t = threading.Thread(target=lambda: self.robot.push(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
         elif self.action == 'place':
-            target_position[-1] += 0.01
-            t = threading.Thread(target=lambda: self.robot.place(target_position, heightmap_rotation_angle, go_home=self.go_home))
-            t.start()
+            if not self.grasp_success:
+                # log action
+                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
+                    utils.ACTION_TO_ID['grasp']])
+
+                t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
+                t.start()
+            else:
+                # adjust z height
+                target_position[-1] += 0.01
+
+                # log action
+                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
+                    utils.ACTION_TO_ID['place']])
+
+                t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
+                t.start()
+
+        print(str(self.click_count) + ': action: ' + str(self.action) + ' pos: ' + str(target_position) + ' rot: ' + str(heightmap_rotation_angle))
+
         return target_position, heightmap_rotation_angle
 
     def print_config(self):
@@ -180,6 +239,7 @@ class HumanControlOfRobot(object):
         else:
             self.camera_color_img = camera_color_img
             self.camera_depth_img = camera_depth_img
+
         if len(self.click_point_pix) != 0:
             self.camera_color_img = cv2.circle(self.camera_color_img, self.click_point_pix, 7, (0,0,255), 2)
         self.camera_color_img = cv2.cvtColor(self.camera_color_img, cv2.COLOR_RGB2BGR)
@@ -299,39 +359,39 @@ class HumanControlOfRobot(object):
         while not hcr.stop:
             hcr.run_one()
 
-    def get_action(self, camera_color_img=None, camera_depth_img=None, prev_click_count=None, block=True):
-        """ Get a human specified action
-        # Arguments
-            camera_color_img: show the human user a specific color image
-            camera_depth_img: show the human user a specific depth image
-            prev_click_count: pass the click count you saw most recently, used to determine if the user clicked in between calls to get_action.
-            block: when True this function will loop and get keypresses via run_one() until a click is received, when false it will just immediately return the current state.
-        # Returns
-            [action_name, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img]
-        """
-        running = True
-        if prev_click_count is None:
-            with self.mutex:
-                prev_click_count = self.click_count
-        while running:
-            self.run_one(camera_color_img, camera_depth_img)
-            with self.mutex:
-                cur_click_count = self.click_count
-                action = self.action
-                target_position = self.target_position
-                grasp_angle = self.grasp_angle
-                if running:
-                    running = not self.stop
+    #def get_action(self, camera_color_img=None, camera_depth_img=None, prev_click_count=None, block=True):
+    #    """ Get a human specified action
+    #    # Arguments
+    #        camera_color_img: show the human user a specific color image
+    #        camera_depth_img: show the human user a specific depth image
+    #        prev_click_count: pass the click count you saw most recently, used to determine if the user clicked in between calls to get_action.
+    #        block: when True this function will loop and get keypresses via run_one() until a click is received, when false it will just immediately return the current state.
+    #    # Returns
+    #        [action_name, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img]
+    #    """
+    #    running = True
+    #    if prev_click_count is None:
+    #        with self.mutex:
+    #            prev_click_count = self.click_count
+    #    while running:
+    #        self.run_one(camera_color_img, camera_depth_img)
+    #        with self.mutex:
+    #            cur_click_count = self.click_count
+    #            action = self.action
+    #            target_position = self.target_position
+    #            grasp_angle = self.grasp_angle
+    #            if running:
+    #                running = not self.stop
 
-            if not block:
-                running = False
-            elif cur_click_count > prev_click_count:
-                running = False
-        if camera_color_img is None:
-            with self.mutex:
-                camera_color_img = self.camera_color_img
-                camera_depth_img = self.camera_depth_img
-        return action, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img
+    #        if not block:
+    #            running = False
+    #        elif cur_click_count > prev_click_count:
+    #            running = False
+    #    if camera_color_img is None:
+    #        with self.mutex:
+    #            camera_color_img = self.camera_color_img
+    #            camera_depth_img = self.camera_depth_img
+    #    return action, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img
 
     def __del__(self):
         cv2.destroyAllWindows()
@@ -354,19 +414,23 @@ if __name__ == '__main__':
         workspace_limits = None
     else:
         raise NotImplementedError
-    is_sim = False
+    is_sim = True
     if is_sim:
         tcp_port = 19997
+        workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.4]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+
+    heightmap_resolution = 0.002 # Meters per pixel of heightmap
     calibrate = False
     # Move robot to home pose
-    robot = Robot(is_sim, None, None, workspace_limits,
+    # TODO(adit98) add cmd line args to select goal, task, etc.
+    robot = Robot(is_sim, os.path.abspath('objects/blocks'), 4, workspace_limits,
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None, place=True, calibrate=calibrate)
-    # if is_sim:
-    #     robot.add_objects()
-    hcr = HumanControlOfRobot(robot, action=action)
+                False, None, None, place=True, calibrate=calibrate, unstack=False)
+
+    # initialize logger
+    logger = Logger(continue_logging=False, logging_directory='demos')
+    logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
+    logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
+
+    hcr = HumanControlOfRobot(robot, action=action, logger=logger)
     hcr.run()
-    # while not hcr.stop:
-    #     # hcr.run_one()
-    #     hcr.get_action()
-    # cv2.destroyAllWindows()

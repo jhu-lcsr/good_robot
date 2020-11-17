@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -42,6 +42,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
+        self.place_common_sense = self.common_sense and place_common_sense
         self.common_sense_backprop = common_sense_backprop
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
@@ -169,11 +170,19 @@ class Trainer(object):
             self.partial_stack_success_log = []
             self.place_success_log = []
 
+        # logging imitation actions, imitation action embeddings, executed action embeddings
+        self.im_action_log = []
+        self.im_action_embed_log = []
+        self.executed_action_embed_log = []
+
     def load_snapshot_file(self, snapshot_file, is_testing=None):
         if is_testing is None:
             is_testing = self.is_testing
         # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
-        loaded_snapshot_state_dict = torch.load(snapshot_file)
+        if self.use_cuda:
+            loaded_snapshot_state_dict = torch.load(snapshot_file)
+        else:
+            loaded_snapshot_state_dict = torch.load(snapshot_file, map_location=torch.device('cpu'))
         loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.1','conv1'), v) if k.find('conv.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
         loaded_snapshot_state_dict = OrderedDict([(k.replace('norm.1','norm1'), v) if k.find('norm.1') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
         loaded_snapshot_state_dict = OrderedDict([(k.replace('conv.2','conv2'), v) if k.find('conv.2') else (k, v) for k, v in loaded_snapshot_state_dict.items()])
@@ -390,7 +399,7 @@ class Trainer(object):
         return sample_stack_height, sample_primitive_action_id, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
 
     # Compute forward pass through model to compute affordances/Q
-    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None):
+    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False, demo_mask=False):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
@@ -441,49 +450,134 @@ class Trainer(object):
             flops, params = get_model_complexity_info(self.model, color_heightmap.shape, as_strings=True, print_per_layer_stat=True, input_constructor=input_constructor)
             print('flops: ' + flops + ' params: ' + params)
             exit(0)
+
         # Pass input data through model
-        output_prob, state_feat = self.model.forward(input_color_data, input_depth_data, is_volatile, specific_rotation, goal_condition=goal_condition)
+        output_prob, state_feat, output_prob_feat = self.model.forward(input_color_data, input_depth_data,
+                is_volatile, specific_rotation, goal_condition=goal_condition, keep_action_feat=keep_action_feat, use_demo=use_demo)
+
+        # TODO(adit98) remove this part if it no longer makes sense
+        # if we are keeping action feat, no softmax
+        if keep_action_feat and use_demo:
+            softmax = nn.Identity()
+            channel_ind = Ellipsis
+        else:
+            softmax = F.softmax
+            channel_ind = 0
 
         if self.method == 'reactive':
-
             # Return affordances (and remove extra padding)
             for rotate_idx in range(len(output_prob)):
                 if rotate_idx == 0:
-                    push_predictions = F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                    grasp_predictions = F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                    if self.place:
-                        place_predictions = F.softmax(output_prob[rotate_idx][2], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                else:
-                    push_predictions = np.concatenate((push_predictions, F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                    grasp_predictions = np.concatenate((grasp_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                    if self.place:
-                        place_predictions = np.concatenate((place_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-        elif self.method == 'reinforcement':
+                    if keep_action_feat and not use_demo:
+                        push_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        grasp_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        if self.place:
+                            place_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                    int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
 
+                    push_predictions = softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    grasp_predictions = softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    if self.place:
+                        place_predictions = softmax(output_prob[rotate_idx][2], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                else:
+                    if keep_action_feat and not use_demo:
+                        push_feat = np.concatenate((push_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        if self.place:
+                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                    int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+
+                    push_predictions = np.concatenate((push_predictions, softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                    grasp_predictions = np.concatenate((grasp_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                    if self.place:
+                        place_predictions = np.concatenate((place_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+
+        elif self.method == 'reinforcement':
             # Return Q values (and remove extra padding)
             for rotate_idx in range(len(output_prob)):
                 if rotate_idx == 0:
-                    push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                    grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    if keep_action_feat and not use_demo:
+                        push_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        grasp_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        if self.place:
+                            place_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                    int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        
+                    push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                    grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     if self.place:
-                        place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
+                        place_predictions = output_prob[rotate_idx][2].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                 else:
-                    push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                    grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                    if keep_action_feat and not use_demo:
+                        push_feat = np.concatenate((push_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        if self.place:
+                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                                    int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+
+                    push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                    grasp_predictions = np.concatenate((grasp_predictions, output_prob[rotate_idx][1].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     if self.place:
-                        place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,0,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        place_predictions = np.concatenate((place_predictions, output_prob[rotate_idx][2].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+
         if not self.place:
             place_predictions = None
+
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+
+            # process feature masks if we need to return feature masks and final preds
+            if keep_action_feat and not use_demo:
+                # only mask action feature maps from robot obs if demo_mask is set
+                if demo_mask:
+                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
+                else:
+                    push_feat = np.ma.masked_array(push_feat)
+                    grasp_feat = np.ma.masked_array(grasp_feat)
+                    if self.place:
+                        place_feat = np.ma.masked_array(place_feat)
+
+            # mask action, if we are not in demo or if demo_mask is set
+            if not use_demo or demo_mask:
+                if self.place:
+                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                else:
+                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                            push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+
+            else:
+                # Mask pixels we know cannot lead to progress
+                push_predictions = np.ma.masked_array(push_predictions)
+                grasp_predictions = np.ma.masked_array(grasp_predictions)
+                if self.place:
+                    place_predictions = np.ma.masked_array(place_predictions)
+
         else:
             # Mask pixels we know cannot lead to progress
             push_predictions = np.ma.masked_array(push_predictions)
             grasp_predictions = np.ma.masked_array(grasp_predictions)
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions)
+
+        # return components depending on flags
+        if use_demo:
+            if self.place_common_sense:
+                return push_predictions, grasp_predictions, masked_place_predictions
+            else:
+                return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
+
+        elif keep_action_feat:
+            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
         return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
@@ -577,6 +671,7 @@ class Trainer(object):
             return expected_reward, current_reward
 
 
+    # TODO(adit98) here is where we need to incorporate imitation loss
     def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
