@@ -28,8 +28,6 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     else:
         mask = (np.min((row_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
-    print(np.sum(mask))
-
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
         # initialize execution embedding, demo_embedding
