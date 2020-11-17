@@ -20,8 +20,8 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             ax = 1
 
         # max normalization
-        x_norm = x - np.min(x, axis=ax)
-        x_norm = x_norm / np.max(x_norm, axis=1, keepdims=True)
+        x_norm = x - np.min(x, axis=ax, keepdims=True)
+        x_norm = x_norm / np.max(x_norm, axis=ax, keepdims=True)
 
         return x_norm
 
