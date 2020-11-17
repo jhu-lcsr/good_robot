@@ -51,10 +51,10 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             demo_embedding = [np.concatenate([normalize(example_action_row), normalize(example_action_stack)], axis=1)]
         elif row_preds is not None:
             execution_embedding = [normalize(row_preds)]
-            demo_embedding = normalize([example_action_row)]
+            demo_embedding = [normalize(example_action_row)]
         else:
-            execution_embedding = normalize([stack_preds)]
-            demo_embedding = normalize([example_action_stack)]
+            execution_embedding = [normalize(stack_preds)]
+            demo_embedding = [normalize(example_action_stack)]
 
         # iterate through history steps and calculate element-wise product with stack_preds
         for row_action, stack_action in execution_hist:
@@ -91,7 +91,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
                 embed_t = np.concatenate([normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))),
-                    normalize(np.multiply(stack_preds, example_action_stack.reshape([1, 64, 1, 1])))], axis=1)
+                    normalize(np.multiply(example_action_stack, example_action_stack.reshape([1, 64, 1, 1])))], axis=1)
 
             elif example_action_row is not None:
                 row_action = normalize(row_action)
