@@ -20,21 +20,45 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     # parse preds into row/stack
     row_preds, stack_preds = preds
 
+    # TODO(adit98) see whether row mask and stack mask are different
     # store indices of masked spaces (take min so we enforce all 64 values are 0)
     mask = (np.min((stack_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
 
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
         # initialize execution embedding, demo_embedding
-        execution_embedding = [stack_preds]
-        demo_embedding = [example_action_stack]
+        execution_embedding = [np.concatenate([row_preds, stack_preds], axis=1)]
+        demo_embedding = [np.concatenate([example_action_row, example_action_stack], axis=1)]
 
         # iterate through history steps and calculate element-wise product with stack_preds
-        for action in execution_hist[1]:
-            execution_embedding.append(np.multiply(stack_preds, action.reshape([1, 64, 1, 1])))
+        for row_action, stack_action in execution_hist:
+            if row_action is not None and stack_action is not None:
+                # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
+                embed_t = np.concatenate([np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])),
+                    np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))], axis=1)
+            elif row_action is not None:
+                # just get row info
+                embed_t = np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))
+            else:
+                # just get stack info
+                embed_t = np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))
 
-        for action in demo_hist[1]:
-            demo_embedding.append(np.multiply(example_action_stack, action.reshape([1, 64, 1, 1])))
+            # append vector with dim 64 * history_len * num_policies to execution embedding
+            execution_embedding.append(embed_t)
+
+        # repeat above process with demo history
+        for row_action, stack_action in demo_hist:
+            if row_action is not None and stack_action is not None:
+                # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
+                embed_t = np.concatenate([np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1])),
+                    np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))], axis=1)
+            elif row_action is not None:
+                embed_t = np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))
+            else:
+                embed_t = np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1]))
+
+            # append vector with dim 64*history_len to demo embedding
+            demo_embedding.append(embed_t)
 
         # turn into numpy arrays
         execution_embedding = np.concatenate(execution_embedding, axis=1)
@@ -44,8 +68,9 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
 
     else:
-        # calculate l2 distance between example action embedding and grasp_stack_preds
+        # calculate l2 distance between example action embedding and preds for each policy (row and stack)
         l2_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
+        l2_dist += np.sum(np.square(example_action_row - row_preds), axis=1)
 
     # set masked spaces to have max of l2_dist*1.1 distance
     l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
