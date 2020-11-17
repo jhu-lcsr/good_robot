@@ -118,9 +118,15 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
 
     else:
+        # normalize everything
+        #example_action_stack, example_action_row = 
+
         # calculate l2 distance between example action embedding and preds for each policy (row and stack)
-        l2_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
-        l2_dist += np.sum(np.square(example_action_row - row_preds), axis=1)
+        l2_dist = np.zeros_like(mask)
+        if example_action_row is not None:
+            l2_dist += np.sum(np.square(example_action_row - row_preds), axis=1)
+        if example_action_stack is not None:
+            l2_dist += np.sum(np.square(example_action_stack - stack_preds), axis=1)
 
     # set masked spaces to have max of l2_dist*1.1 distance
     l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
@@ -247,21 +253,25 @@ if __name__ == '__main__':
     if args.stack_snapshot_file is None and args.row_snapshot_file is None:
         raise ValueError("Must provide one of stack trained model or row trained model")
 
-    # store previous embeddings
-    demo_buffer = []
-    execution_buffer = []
+    if args.history_len != 0:
+        # store previous embeddings
+        demo_buffer = []
+        execution_buffer = []
 
-    # populate buffers (history_len is the number of steps we store)
-    for i in range(args.history_len):
-        if stack_trainer is not None and row_trainer is not None:
-            demo_buffer.append((np.zeros(64), np.zeros(64)))
-            execution_buffer.append((np.zeros(64), np.zeros(64)))
-        elif row_trainer is not None:
-            demo_buffer.append((np.zeros(64), None))
-            execution_buffer.append((np.zeros(64), None))
-        else:
-            demo_buffer.append((None, np.zeros(64)))
-            execution_buffer.append((None, np.zeros(64)))
+        # populate buffers (history_len is the number of steps we store)
+        for i in range(args.history_len):
+            if stack_trainer is not None and row_trainer is not None:
+                demo_buffer.append((np.zeros(64), np.zeros(64)))
+                execution_buffer.append((np.zeros(64), np.zeros(64)))
+            elif row_trainer is not None:
+                demo_buffer.append((np.zeros(64), None))
+                execution_buffer.append((np.zeros(64), None))
+            else:
+                demo_buffer.append((None, np.zeros(64)))
+                execution_buffer.append((None, np.zeros(64)))
+
+    else:
+        demo_buffer, execution_buffer = None, None
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
     action_keys = sorted(example_demo.action_dict.keys())
@@ -339,17 +349,18 @@ if __name__ == '__main__':
                 cv2.imwrite(depth_filename, depth_canvas)
                 cv2.imwrite(color_filename, rgb_canvas)
 
-            # update buffers (add current action, delete first element in buffer)
-            demo_buffer.append((example_action_row, example_action_stack))
-            del demo_buffer[0]
+            if args.history_len != 0:
+                # update buffers (add current action, delete first element in buffer)
+                demo_buffer.append((example_action_row, example_action_stack))
+                del demo_buffer[0]
 
-            # check if row/stack preds are available first because we need to index them if they are
-            if row_preds is not None and stack_preds is not None:
-                execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]],
-                    stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
-            elif row_preds is not None:
-                execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
-            else:
-                execution_buffer.append((None, stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
+                # check if row/stack preds are available first because we need to index them if they are
+                if row_preds is not None and stack_preds is not None:
+                    execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]],
+                        stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
+                elif row_preds is not None:
+                    execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
+                else:
+                    execution_buffer.append((None, stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
 
-            del execution_buffer[0]
+                del execution_buffer[0]
