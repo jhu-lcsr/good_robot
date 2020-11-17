@@ -12,10 +12,11 @@ from demo import Demonstration
 # function to evaluate l2 distance and generate demo-signal mask
 def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None):
     # reshape each example_action to 1 x 64 x 1 x 1
-    if example_action[0] is not None:
-        example_action_row = np.expand_dims(example_action[0], (0, 2, 3))
-    if example_action[1] is not None:
-        example_action_stack = np.expand_dims(example_action[1], (0, 2, 3))
+    example_action_row, example_action_stack = example_actions
+    if example_action_row is not None:
+        example_action_row = np.expand_dims(example_action_row, (0, 2, 3))
+    if example_action_stack is not None:
+        example_action_stack = np.expand_dims(example_action_stack, (0, 2, 3))
 
     # parse preds into row/stack
     row_preds, stack_preds = preds
@@ -27,37 +28,52 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
         # initialize execution embedding, demo_embedding
-        execution_embedding = [np.concatenate([row_preds, stack_preds], axis=1)]
-        demo_embedding = [np.concatenate([example_action_row, example_action_stack], axis=1)]
+        if row_preds is not None and stack_preds is not None:
+            execution_embedding = [np.concatenate([row_preds, stack_preds], axis=1)]
+            demo_embedding = [np.concatenate([example_action_row, example_action_stack], axis=1)]
+        elif row_preds is not None:
+            execution_embedding = [row_preds]
+            demo_embedding = [example_action_row]
+        else:
+            execution_embedding = [stack_preds]
+            demo_embedding = [example_action_stack]
 
         # iterate through history steps and calculate element-wise product with stack_preds
-        for row_action, stack_action in execution_hist:
-            if row_action is not None and stack_action is not None:
+        for action_pair in execution_hist:
+            if row_preds is not None and stack_preds is not None:
+                row_action, stack_action = action_pair
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
-                embed_t = np.concatenate([np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])),
-                    np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))], axis=1)
-            elif row_action is not None:
+                embed_t = np.concatenate([np.multiply(row_preds, row_action.reshape([1, 64, 1, 1])),
+                    np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))], axis=1)
+            elif row_preds is not None:
                 # just get row info
+                row_action = action_pair
                 embed_t = np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))
             else:
                 # just get stack info
+                stack_action = action_pair
                 embed_t = np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))
 
             # append vector with dim 64 * history_len * num_policies to execution embedding
             execution_embedding.append(embed_t)
 
         # repeat above process with demo history
-        for row_action, stack_action in demo_hist:
-            if row_action is not None and stack_action is not None:
+        for action_pair in demo_hist:
+            if example_action_row is not None and example_action_stack is not None:
+                row_action, stack_action = action_pair
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
-                embed_t = np.concatenate([np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1])),
-                    np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))], axis=1)
-            elif row_action is not None:
+                embed_t = np.concatenate([np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1])),
+                    np.multiply(stack_preds, example_action_stack.reshape([1, 64, 1, 1]))], axis=1)
+            elif example_action_row is not None:
+                # just get row info
+                row_action = action_pair
                 embed_t = np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))
             else:
+                # just get stack info
+                stack_action = action_pair
                 embed_t = np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1]))
 
-            # append vector with dim 64*history_len to demo embedding
+            # append vector with dim 64 * (1 + history_len) * num_policies to demo embedding
             demo_embedding.append(embed_t)
 
         # turn into numpy arrays
@@ -170,6 +186,9 @@ if __name__ == '__main__':
         place_common_sense = False
 
     # Initialize trainer(s)
+    stack_trainer, row_trainer = None, None
+
+    # load stacking if provided
     if args.stack_snapshot_file is not None:
         stack_trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
                           is_testing=True, snapshot_file=args.stack_snapshot_file,
@@ -180,6 +199,7 @@ if __name__ == '__main__':
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 
+    # load row making if provided
     if args.row_snapshot_file is not None:
         row_trainer = Trainer(method='reinforcement', push_rewards=True, future_reward_discount=0.5,
                           is_testing=True, snapshot_file=args.row_snapshot_file,
@@ -239,14 +259,14 @@ if __name__ == '__main__':
             # get stack features if stack_trainer is provided
             if stack_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with get_action_feat
-                stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
-                        valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+                stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color, im_depth,
+                        is_volatile=True, keep_action_feat=True, use_demo=True)
 
             # get row features if row_trainer is provided
             if row_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with get_action_feat
-                row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
-                        valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+                row_push, row_grasp, row_place = row_trainer.forward(im_color, im_depth,
+                        is_volatile=True, keep_action_feat=True, use_demo=True)
 
             # TODO(adit98) add logic for pushing here
             if action == 'grasp':
