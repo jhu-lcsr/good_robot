@@ -464,6 +464,7 @@ class Trainer(object):
             softmax = F.softmax
             channel_ind = 0
 
+        # TODO(adit98) if method is reactive, this will not work, see reinforcement method for correct implementation
         if self.method == 'reactive':
             # Return affordances (and remove extra padding)
             for rotate_idx in range(len(output_prob)):
