@@ -23,7 +23,12 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
     # TODO(adit98) see whether row mask and stack mask are different
     # store indices of masked spaces (take min so we enforce all 64 values are 0)
-    mask = (np.min((stack_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+    if stack_preds is not None:
+        mask = (np.min((stack_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+    else:
+        mask = (np.min((row_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+
+    print(np.sum(mask))
 
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
@@ -39,38 +44,32 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             demo_embedding = [example_action_stack]
 
         # iterate through history steps and calculate element-wise product with stack_preds
-        for action_pair in execution_hist:
+        for row_action, stack_action in execution_hist:
             if row_preds is not None and stack_preds is not None:
-                row_action, stack_action = action_pair
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
                 embed_t = np.concatenate([np.multiply(row_preds, row_action.reshape([1, 64, 1, 1])),
                     np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))], axis=1)
             elif row_preds is not None:
                 # just get row info
-                row_action = action_pair
                 embed_t = np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))
             else:
                 # just get stack info
-                stack_action = action_pair
                 embed_t = np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))
 
             # append vector with dim 64 * history_len * num_policies to execution embedding
             execution_embedding.append(embed_t)
 
         # repeat above process with demo history
-        for action_pair in demo_hist:
+        for row_action, stack_action in demo_hist:
             if example_action_row is not None and example_action_stack is not None:
-                row_action, stack_action = action_pair
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
                 embed_t = np.concatenate([np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1])),
                     np.multiply(stack_preds, example_action_stack.reshape([1, 64, 1, 1]))], axis=1)
             elif example_action_row is not None:
                 # just get row info
-                row_action = action_pair
                 embed_t = np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))
             else:
                 # just get stack info
-                stack_action = action_pair
                 embed_t = np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1]))
 
             # append vector with dim 64 * (1 + history_len) * num_policies to demo embedding
@@ -219,8 +218,15 @@ if __name__ == '__main__':
 
     # populate buffers (history_len is the number of steps we store)
     for i in range(args.history_len):
-        demo_buffer.append(np.zeros(64))
-        execution_buffer.append(np.zeros(64))
+        if stack_trainer is not None and row_trainer is not None:
+            demo_buffer.append((np.zeros(64), np.zeros(64)))
+            execution_buffer.append((np.zeros(64), np.zeros(64)))
+        elif row_trainer is not None:
+            demo_buffer.append((np.zeros(64), None))
+            execution_buffer.append((np.zeros(64), None))
+        else:
+            demo_buffer.append((None, np.zeros(64)))
+            execution_buffer.append((None, np.zeros(64)))
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
     action_keys = sorted(example_demo.action_dict.keys())
@@ -260,13 +266,13 @@ if __name__ == '__main__':
             if stack_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with get_action_feat
                 stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color, im_depth,
-                        is_volatile=True, keep_action_feat=True, use_demo=True)
+                        is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
 
             # get row features if row_trainer is provided
             if row_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with get_action_feat
                 row_push, row_grasp, row_place = row_trainer.forward(im_color, im_depth,
-                        is_volatile=True, keep_action_feat=True, use_demo=True)
+                        is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
 
             # TODO(adit98) add logic for pushing here
             if action == 'grasp':
@@ -302,12 +308,13 @@ if __name__ == '__main__':
             demo_buffer.append((example_action_row, example_action_stack))
             del demo_buffer[0]
 
+            # check if row/stack preds are available first because we need to index them if they are
             if row_preds is not None and stack_preds is not None:
                 execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]],
                     stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
             elif row_preds is not None:
                 execution_buffer.append((row_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
             else:
-                execution_buffer.append((stack_preds[match_ind[0], :, match_ind[1], match_ind[2]], None))
+                execution_buffer.append((None, stack_preds[match_ind[0], :, match_ind[1], match_ind[2]]))
 
             del execution_buffer[0]
