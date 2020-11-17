@@ -11,6 +11,20 @@ from demo import Demonstration
 
 # function to evaluate l2 distance and generate demo-signal mask
 def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None):
+    # helper function to normalize input along axis 1 (embedding dim)
+    def normalize(x):
+        # define axis (1 if >=2 dims, 0 otherwise)
+        if len(x.shape) < 2:
+            ax = 0
+        else:
+            ax = 1
+
+        # max normalization
+        x_norm = x - np.min(x, axis=ax)
+        x_norm = x_norm / np.max(x_norm, axis=1, keepdims=True)
+
+        return x_norm
+
     # reshape each example_action to 1 x 64 x 1 x 1
     example_action_row, example_action_stack = example_actions
     if example_action_row is not None:
@@ -32,27 +46,39 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     if demo_hist is not None and execution_hist is not None:
         # initialize execution embedding, demo_embedding
         if row_preds is not None and stack_preds is not None:
-            execution_embedding = [np.concatenate([row_preds, stack_preds], axis=1)]
-            demo_embedding = [np.concatenate([example_action_row, example_action_stack], axis=1)]
+            # normalize and concatenate
+            execution_embedding = [np.concatenate([normalize(row_preds), normalize(stack_preds)], axis=1)]
+            demo_embedding = [np.concatenate([normalize(example_action_row), normalize(example_action_stack)], axis=1)]
         elif row_preds is not None:
-            execution_embedding = [row_preds]
-            demo_embedding = [example_action_row]
+            execution_embedding = [normalize(row_preds)]
+            demo_embedding = normalize([example_action_row)]
         else:
-            execution_embedding = [stack_preds]
-            demo_embedding = [example_action_stack]
+            execution_embedding = normalize([stack_preds)]
+            demo_embedding = normalize([example_action_stack)]
 
         # iterate through history steps and calculate element-wise product with stack_preds
         for row_action, stack_action in execution_hist:
             if row_preds is not None and stack_preds is not None:
+                row_action, stack_action = normalize(row_action), normalize(stack_action)
+                row_preds, stack_preds = normalize(row_preds), normalize(stack_preds)
+
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
-                embed_t = np.concatenate([np.multiply(row_preds, row_action.reshape([1, 64, 1, 1])),
-                    np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))], axis=1)
+                embed_t = np.concatenate([normalize(np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))),
+                    normalize(np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])))], axis=1)
+
             elif row_preds is not None:
                 # just get row info
-                embed_t = np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))
+                row_action = normalize(row_action)
+                row_preds = normalize(row_preds)
+
+                embed_t = normalize(np.multiply(row_preds, row_action.reshape([1, 64, 1, 1])))
+
             else:
                 # just get stack info
-                embed_t = np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1]))
+                stack_action = normalize(stack_action)
+                stack_preds = normalize(stack_preds)
+
+                embed_t = normalize(np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])))
 
             # append vector with dim 64 * history_len * num_policies to execution embedding
             execution_embedding.append(embed_t)
@@ -60,15 +86,26 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         # repeat above process with demo history
         for row_action, stack_action in demo_hist:
             if example_action_row is not None and example_action_stack is not None:
+                row_action, stack_action = normalize(row_action), normalize(stack_action)
+                example_action_row, example_action_stack = normalize(example_action_row), normalize(example_action_stack)
+
                 # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
-                embed_t = np.concatenate([np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1])),
-                    np.multiply(stack_preds, example_action_stack.reshape([1, 64, 1, 1]))], axis=1)
+                embed_t = np.concatenate([normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))),
+                    normalize(np.multiply(stack_preds, example_action_stack.reshape([1, 64, 1, 1])))], axis=1)
+
             elif example_action_row is not None:
+                row_action = normalize(row_action)
+                example_action_row = normalize(example_action_row)
+
                 # just get row info
-                embed_t = np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))
+                embed_t = normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1])))
+
             else:
+                stack_action = normalize(stack_action)
+                example_action_stack = normalize(example_action_stack)
+
                 # just get stack info
-                embed_t = np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1]))
+                embed_t = normalize(np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1])))
 
             # append vector with dim 64 * (1 + history_len) * num_policies to demo embedding
             demo_embedding.append(embed_t)
