@@ -11,17 +11,23 @@ from demo import Demonstration
 
 # function to evaluate l2 distance and generate demo-signal mask
 def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None):
+    # TODO(adit98) modify normalize to do L2 normalization (makes more sense for later steps taking inner product similarity)
     # helper function to normalize input along axis 1 (embedding dim)
-    def normalize(x):
-        # define axis (1 if >=2 dims, 0 otherwise)
-        if len(x.shape) < 2:
-            ax = 0
-        else:
-            ax = 1
+    def normalize(x, ax=None):
+        if ax is None or ax == 1:
+            # define axis (1 if >=2 dims, 0 otherwise)
+            if len(x.shape) < 2:
+                ax = 0
+            else:
+                ax = 1
 
-        # max normalization
-        x_norm = x - np.min(x, axis=ax, keepdims=True)
-        x_norm = x_norm / np.max(x_norm, axis=ax, keepdims=True)
+            # max normalization, add small constant so that maximum is non-zero
+            x_norm = x - np.min(x, axis=ax, keepdims=True) + 0.00001
+            x_norm = x_norm / np.max(x_norm, axis=ax, keepdims=True)
+
+        elif ax == 'all':
+            x_norm = x - np.min(x)
+            x_norm = x_norm / np.max(x_norm)
 
         return x_norm
 
@@ -36,11 +42,11 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     row_preds, stack_preds = preds
 
     # TODO(adit98) see whether row mask and stack mask are different
-    # store indices of masked spaces (take min so we enforce all 64 values are 0)
+    # recover masked spaces from predictions (locations where all 64 values are 0)
     if stack_preds is not None:
-        mask = (np.min((stack_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+        mask = (stack_preds == np.zeros([1, 64, 1, 1])).all(axis=1)
     else:
-        mask = (np.min((row_preds == np.zeros([1, 64, 1, 1])).astype(int), axis=1) == 1).astype(int)
+        mask = (row_preds == np.zeros([1, 64, 1, 1])).all(axis=1)
 
     # add the l2 distances for history if history is given
     if demo_hist is not None and execution_hist is not None:
@@ -89,7 +95,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
                 row_action, stack_action = normalize(row_action), normalize(stack_action)
                 example_action_row, example_action_stack = normalize(example_action_row), normalize(example_action_stack)
 
-                # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
+                # concatenate element-wise product of example_action_stack, stack_action and example_action_row, row_action
                 embed_t = np.concatenate([normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))),
                     normalize(np.multiply(example_action_stack, example_action_stack.reshape([1, 64, 1, 1])))], axis=1)
 
@@ -118,25 +124,23 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
 
     else:
-        # normalize everything
-        #example_action_stack, example_action_row = 
-
         # calculate l2 distance between example action embedding and preds for each policy (row and stack)
-        l2_dist = np.zeros_like(mask)
+        l2_dist = np.zeros_like(mask).astype(float)
         if example_action_row is not None:
-            l2_dist += np.sum(np.square(example_action_row - row_preds), axis=1)
+            # normalize sum at every pixel, ax='all' normalizes across all axes
+            l2_dist += normalize(np.sum(np.square(example_action_row - row_preds), axis=1), ax='all')
         if example_action_stack is not None:
-            l2_dist += np.sum(np.square(example_action_stack - stack_preds), axis=1)
+            l2_dist += normalize(np.sum(np.square(example_action_stack - stack_preds), axis=1), ax='all')
 
     # set masked spaces to have max of l2_dist*1.1 distance
-    l2_dist[np.multiply(l2_dist, 1 - mask) == 0] = np.max(l2_dist) * 1.1
+    l2_dist[mask] = np.max(l2_dist) * 1.1
     match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
 
     # make l2_dist range from 0 to 1
     l2_dist = l2_dist - np.min(l2_dist)
-    l2_dist /= np.max(l2_dist)
+    l2_dist = l2_dist / np.max(l2_dist)
 
-    # invert values of l2_dist so that large values indicate correspondence, exponential to increase dynamic range
+    # invert values of l2_dist so that large values indicate correspondence
     im_mask = (1 - l2_dist)
 
     return im_mask, match_ind
@@ -322,15 +326,15 @@ if __name__ == '__main__':
             # TODO(adit98) add logic for pushing here
             if action == 'grasp':
                 if stack_trainer is not None:
-                    stack_preds = stack_grasp.filled(fill_value=0)
+                    stack_preds = stack_grasp.filled(0.0)
                 if row_trainer is not None:
-                    row_preds = row_grasp.filled(fill_value=0)
+                    row_preds = row_grasp.filled(0.0)
 
             else:
                 if stack_trainer is not None:
-                    stack_preds = stack_place.filled(fill_value=0)
+                    stack_preds = stack_place.filled(0.0)
                 if row_trainer is not None:
-                    row_preds = row_place.filled(fill_value=0)
+                    row_preds = row_place.filled(0.0)
 
             # evaluate l2 distance based action mask
             im_mask, match_ind = evaluate_l2_mask(preds=[row_preds, stack_preds],
