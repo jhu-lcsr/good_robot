@@ -19,7 +19,7 @@ class BaseUNet(torch.nn.Module):
                 num_layers: int = 5,
                 num_blocks: int = 20,
                 dropout: float = 0.20, 
-                depth: int = 4, 
+                depth: int = 7, 
                 device: torch.device = "cpu"):
         super(BaseUNet, self).__init__()
 
@@ -158,7 +158,7 @@ class UNetWithLanguage(BaseUNet):
                 num_layers: int = 5,
                 num_blocks: int = 20,
                 dropout: float = 0.20, 
-                depth: int = 4,
+                depth: int = 7,
                 device: torch.device = "cpu"):
         super(UNetWithLanguage, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
@@ -306,7 +306,7 @@ class UNetWithBlocks(UNetWithLanguage):
                 num_blocks: int = 20,
                 mlp_num_layers: int = 3, 
                 dropout: float = 0.20,
-                depth: int = 4,
+                depth: int = 7,
                 device: torch.device = "cpu"):
         super(UNetWithBlocks, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
@@ -353,7 +353,11 @@ class UNetWithBlocks(UNetWithLanguage):
         # get language output as sentence embedding 
         sent_encoding = lang_output["sentence_encoding"] 
     
-        image_input = data_batch["prev_pos_input"]
+        #image_input = data_batch["prev_pos_input"]
+        # TODO (elias): Switch back after debugging 
+        image_input = data_batch["prev_pos_for_pred"]
+        image_input = image_input.reshape((-1, 1, 64, 64))
+        image_input = image_input.repeat((1,2, 1, 1))
         image_input = image_input.to(self.device) 
         # store downconv results in stack 
         downconv_results = deque() 

@@ -43,8 +43,9 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
-                 depth: int = 4,
-                 best_epoch: int = -1): 
+                 depth: int = 7,
+                 best_epoch: int = -1,
+                 zero_weight: float = 0.05):
         super(UNetLanguageTrainer, self).__init__(train_data,
                                                   val_data,
                                                   encoder,
@@ -58,18 +59,22 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                                   depth, 
                                                   best_epoch)
 
+        weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
+        self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
         skipped = 0
         for b, batch_instance in tqdm(enumerate(self.train_data)): 
+
             self.optimizer.zero_grad() 
             next_outputs, prev_outputs = self.encoder(batch_instance) 
             # skip bad examples 
-            if next_outputs is None:
+            if prev_outputs is None:
                 skipped += 1
                 continue
-            loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
+            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
 
@@ -94,24 +99,24 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
 
     def compute_loss(self, inputs, next_outputs, prev_outputs):
+        """
+        compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
+        """
         pred_next_image = next_outputs["next_position"]
         true_next_image = inputs["next_pos_for_pred"]
-
         pred_prev_image = prev_outputs["next_position"]
         true_prev_image = inputs["prev_pos_for_pred"]
 
-        pred_next_block_logits = next_outputs["pred_block_logits"] 
-        true_next_block_idxs = inputs["block_to_move"]
-        true_next_block_idxs = true_next_block_idxs.to(self.device).long().reshape(-1) 
-        bsz, n_blocks, width, height, depth = pred_next_image.shape
+        bsz, n_blocks, width, height, depth = pred_prev_image.shape
         true_next_image = true_next_image.reshape((bsz, width, height, depth)).long()
         true_prev_image = true_prev_image.reshape((bsz, width, height, depth)).long()
         true_next_image = true_next_image.to(self.device) 
         true_prev_image = true_prev_image.to(self.device) 
         
         if self.compute_block_dist:
-            # loss per pixel 
-            #pixel_loss = self.nll_loss_fxn(pred_image, true_image) 
+            pred_next_block_logits = next_outputs["pred_block_logits"] 
+            true_next_block_idxs = inputs["block_to_move"]
+            true_next_block_idxs = true_next_block_idxs.to(self.device).long().reshape(-1) 
             # TODO (elias): for now just do as auxiliary task 
             next_pixel_loss = self.xent_loss_fxn(pred_next_image, true_next_image) 
             prev_pixel_loss = self.xent_loss_fxn(pred_prev_image, true_prev_image) 
@@ -119,25 +124,53 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             prev_foreground_loss = self.fore_loss_fxn(pred_prev_image, true_prev_image) 
             # loss per block
             block_loss = self.xent_loss_fxn(pred_next_block_logits, true_next_block_idxs) 
-            #print(f"computing loss with blocks {pixel_loss.item()} + {block_loss.item()}") 
             total_loss = next_pixel_loss + prev_pixel_loss + next_foreground_loss + prev_foreground_loss + block_loss 
-            #total_loss = block_loss
         else:
-            next_pixel_loss = self.xent_loss_fxn(pred_next_image, true_next_image) 
             prev_pixel_loss = self.xent_loss_fxn(pred_prev_image, true_prev_image) 
-            next_foreground_loss = self.fore_loss_fxn(pred_next_image, true_next_image) 
+            next_pixel_loss = self.xent_loss_fxn(pred_next_image, true_next_image) 
             prev_foreground_loss = self.fore_loss_fxn(pred_prev_image, true_prev_image) 
+            next_foreground_loss = self.fore_loss_fxn(pred_next_image, true_next_image) 
+
             total_loss = next_pixel_loss + prev_pixel_loss + next_foreground_loss + prev_foreground_loss
 
+
+
         print(f"loss {total_loss.item()}")
+
         return total_loss
+
+
+    def compute_weighted_loss(self, inputs, next_outputs, prev_outputs):
+        """
+        compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
+        """
+        pred_next_image = next_outputs["next_position"]
+        true_next_image = inputs["next_pos_for_pred"]
+        pred_prev_image = prev_outputs["next_position"]
+        true_prev_image = inputs["prev_pos_for_pred"]
+
+        bsz, n_blocks, width, height, depth = pred_prev_image.shape
+        true_next_image = true_next_image.reshape((bsz, width, height, depth)).long()
+        true_prev_image = true_prev_image.reshape((bsz, width, height, depth)).long()
+        true_next_image = true_next_image.to(self.device) 
+        true_prev_image = true_prev_image.to(self.device) 
+
+        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image) 
+        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+
+        total_loss = next_pixel_loss + prev_pixel_loss 
+        print(f"loss {total_loss.item()}")
+
+        return total_loss
+        
+
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
         next_outputs, prev_outputs = self.encoder(batch_instance) 
 
-        prev_accuracy = self.compute_localized_accuracy(batch_instance["prev_pos_for_acc"], prev_outputs["next_position"], batch_instance["next_pos_for_acc"])
-        next_accuracy = self.compute_localized_accuracy(batch_instance["next_pos_for_acc"], next_outputs["next_position"], batch_instance["prev_pos_for_acc"])
+        prev_accuracy = self.compute_localized_accuracy(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"], batch_instance["next_pos_for_pred"])
+        next_accuracy = self.compute_localized_accuracy(batch_instance["next_pos_for_pred"], next_outputs["next_position"], batch_instance["prev_pos_for_pred"])
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
@@ -150,15 +183,14 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                 command = batch_instance["command"][i]
                 command = [x for x in command if x != "<PAD>"]
                 command = " ".join(command) 
-                self.generate_debugging_image(batch_instance["next_pos_for_acc"][i], 
+
+                next_pos = batch_instance["next_pos_for_acc"][i]
+                self.generate_debugging_image(next_pos,
                                              next_outputs["next_position"][i], 
                                              output_path.joinpath("next"),
                                              caption = command)
 
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
-                #prev_pos = prev_pos.permute(1,2,0)
-                #prev_pos = prev_pos[:,:,0]
-                #prev_pos = prev_pos.unsqueeze(2).unsqueeze(3)
                 self.generate_debugging_image(prev_pos, 
                                               prev_outputs["next_position"][i], 
                                               output_path.joinpath("prev"),
@@ -166,26 +198,40 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
 
         return next_accuracy, prev_accuracy, block_accuracy
 
-
-    def compute_localized_accuracy(self, true_pos, pred_pos, contrast_pos): 
-        neg_indices = true_pos != contrast_pos
-        gold_pixels_of_interest = true_pos[neg_indices]
-
+    def compute_localized_accuracy(self, true_pos, pred_pos, waste): 
         values, pred_pixels = torch.max(pred_pos, dim=1) 
-        pred_pixels_of_interest = pred_pixels[neg_indices.squeeze(-1)]
+        pred_pixels = pred_pixels.unsqueeze(-1) 
+
+        gold_pixels_ones = true_pos[true_pos == 1]
+        pred_pixels_ones = pred_pixels[true_pos == 1]
 
         # flatten  
-        pred_pixels = pred_pixels_of_interest.reshape(-1).detach().cpu()
-        gold_pixels = gold_pixels_of_interest.reshape(-1).detach().cpu()
+        pred_pixels_ones = pred_pixels_ones.reshape(-1).detach().cpu()
+        gold_pixels_ones = gold_pixels_ones.reshape(-1).detach().cpu()
 
         # compare 
-        total = gold_pixels.shape[0]
-        matching = torch.sum(pred_pixels == gold_pixels).item() 
+        total_foreground = gold_pixels_ones.shape[0]
+        matching_foreground = torch.sum(pred_pixels_ones == gold_pixels_ones).item() 
         try:
-            acc = matching/total 
+            foreground_acc = matching_foreground/total_foreground
         except ZeroDivisionError:
-            acc = 0.0 
-        return acc 
+            foreground_acc = 0.0 
+
+        gold_pixels_zeros = true_pos[true_pos == 0]
+        pred_pixels_zeros = pred_pixels[true_pos == 0]
+        # flatten  
+        pred_pixels_zeros = pred_pixels_zeros.reshape(-1).detach().cpu()
+        gold_pixels_zeros = gold_pixels_zeros.reshape(-1).detach().cpu()
+
+        total_background = gold_pixels_zeros.shape[0]
+        matching_background = torch.sum(pred_pixels_zeros == gold_pixels_zeros).item() 
+        try:
+            background_acc = matching_background/total_background
+        except ZeroDivisionError:
+            background_acc = 0.0 
+
+        #print(f"foreground {foreground_acc} background {background_acc}") 
+        return (foreground_acc + background_acc ) / 2
 
 def main(args):
     if args.binarize_blocks:
@@ -257,7 +303,7 @@ def main(args):
         depth = 1
     else:
         # TODO (elias): confirm this number 
-        depth = 4 
+        depth = 7
 
     unet_kwargs = dict(in_channels = 2,
                      out_channels = args.unet_out_channels, 
@@ -276,15 +322,6 @@ def main(args):
 
     if args.compute_block_dist:
         unet_kwargs["mlp_num_layers"] = args.mlp_num_layers
-    #    encoder_cls = UNetWithBlocks
-    #else:
-    #    encoder_cls = UNetWithLanguage
-
-    #prev_encoder = encoder_cls(**unet_kwargs) 
-    #if args.share_unet:
-    #    next_encoder = prev_encoder 
-    #else:
-    #    next_encoder = encoder_cls(**unet_kwargs) 
 
     encoder = SharedUNet(**unet_kwargs) 
 
@@ -332,8 +369,7 @@ def main(args):
                               num_models_to_keep = args.num_models_to_keep,
                               generate_after_n = args.generate_after_n, 
                               depth = depth, 
-                              best_epoch = best_epoch) 
-        print(encoder)
+                              best_epoch = best_epoch)
         trainer.train() 
 
     else:
@@ -397,6 +433,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
     parser.add_argument("--num-epochs", type=int, default=3) 
     parser.add_argument("--generate-after-n", type=int, default=10) 
+    parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
 
     args = parser.parse_args()
     main(args) 

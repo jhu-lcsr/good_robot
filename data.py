@@ -87,6 +87,7 @@ class BaseTrajectory:
         self.next_positions_for_acc = copy.deepcopy(self.next_positions_for_pred) 
         self.blocks_to_move = self.get_blocks_to_move()
 
+
         self.previous_rotations = previous_rotations
         self.next_rotations = next_rotations
 
@@ -151,7 +152,7 @@ class BaseTrajectory:
             new_data = [torch.zeros((1, 64, 64, 1, 1)) for __ in range(len(data))]
             # iterate over steps in trajectory 
             for j, step_data in enumerate(data):
-                for depth in range(3, -1, -1):
+                for depth in range(6, -1, -1):
                     depth_slice = step_data[:,:,:,depth,:].unsqueeze(4)
                     # only add if new_data == 0
                     depth_slice[new_data[j] != 0] = 0
@@ -165,22 +166,23 @@ class BaseTrajectory:
         bsz = self.previous_positions_for_pred[0].shape[0]
         bad = 0
         all_blocks_to_move = []
-        for timestep in range(len(self.previous_positions_for_pred)):
-            prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
-            next_pos = self.next_positions_for_pred[timestep][batch_idx]
-            different_pixels = prev_pos[prev_pos != next_pos]
-            # exclude background 
-            different_pixel_idx = different_pixels[different_pixels != 0]
-            try:
-                blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
-            except ValueError:
+        for batch_idx in range(bsz):
+            for timestep in range(len(self.previous_positions_for_pred)):
+                prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
+                next_pos = self.next_positions_for_pred[timestep][batch_idx]
+                different_pixels = prev_pos[prev_pos != next_pos]
+                # exclude background 
+                different_pixel_idx = different_pixels[different_pixels != 0]
                 try:
-                    blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
-                except IndexError:
-                    blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
-                bad += 1
-            all_blocks_to_move.append(blocks_to_move) 
-        #print(f"there are {bad} blocks with >1 move") 
+                    blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
+                except ValueError:
+                    try:
+                        blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
+                    except IndexError:
+                        blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
+                    bad += 1
+                all_blocks_to_move.append(blocks_to_move) 
+            #print(f"there are {bad} blocks with >1 move") 
         return all_blocks_to_move
 
         
@@ -205,7 +207,7 @@ class BaseTrajectory:
         image_positions = []
         # create a grid d x w x h
         if make_z: 
-            height, width, depth = 4, 64, 64
+            height, width, depth = 7, 64, 64
             for i, position_list in enumerate(positions): 
                 image = np.zeros((width, depth, height, 1)) 
 
@@ -213,7 +215,7 @@ class BaseTrajectory:
                     new_x,  new_z = (absolute_to_relative(x, width),
                                           absolute_to_relative(z, depth) )
                     
-                    y_val = int(4 * 1 * y) 
+                    y_val = int(7 * 1 * y) 
                     # infilling 
                     if do_infilling: 
                         offset = 2
@@ -236,8 +238,8 @@ class BaseTrajectory:
                 image_positions.append(image) 
 
         else:
+            # TODO (elias) change input so it shows the top-most element 
             depth, width = 64, 64 
-
             for i, position_list in enumerate(positions): 
                 image = np.zeros(( width, depth, 1 + 1)) 
                 for block_idx, (x, y, z) in enumerate(position_list): 
@@ -249,8 +251,8 @@ class BaseTrajectory:
                         for z_val in range(new_z - offset, new_z + offset):
                             image[x_val, z_val, 0] = block_idx + 1
 
-                            # can only have 4 vertical positions so mod it 
-                            image[x_val, z_val, 1] = y % 4
+                            # can only have 7 vertical positions so mod it 
+                            image[x_val, z_val, 1] = y % 7
 
                 image  = torch.tensor(image).float() 
                 image = image.unsqueeze(0)
@@ -354,26 +356,27 @@ class DatasetReader:
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
 
-                for i, command_group in enumerate(commands):
+                for timestep in range(len(previous_positions)):
+                    command_group = commands[timestep]
+                    #for i, command_group in enumerate(commands):
                     for command in command_group["notes"]:  
-                        for timestep in range(len(previous_positions)):
-                            # TODO: add rotations later? 
-                            trajectory = SimpleTrajectory(line_id,
-                                                        command, 
-                                                        [previous_positions[timestep]],
-                                                        [None],
-                                                        [next_positions[timestep]],
-                                                        [None],
-                                                        images=[images[timestep]],
-                                                        lengths = [None],
-                                                        tokenizer=self.tokenizer,
-                                                        traj_type=self.traj_type,
-                                                        batch_size=1,
-                                                        do_filter=self.do_filter,
-                                                        top_only = self.top_only,
-                                                        binarize_blocks = self.binarize_blocks) 
-                            self.data[split].append(trajectory) 
-                            vocab |= trajectory.traj_vocab
+                        # TODO: add rotations later? 
+                        trajectory = SimpleTrajectory(line_id,
+                                                    command, 
+                                                    [previous_positions[timestep]],
+                                                    [None],
+                                                    [next_positions[timestep]],
+                                                    [None],
+                                                    images=[images[timestep]],
+                                                    lengths = [None],
+                                                    tokenizer=self.tokenizer,
+                                                    traj_type=self.traj_type,
+                                                    batch_size=1,
+                                                    do_filter=self.do_filter,
+                                                    top_only = self.top_only,
+                                                    binarize_blocks = self.binarize_blocks) 
+                        self.data[split].append(trajectory) 
+                        vocab |= trajectory.traj_vocab
 
         if not self.batch_by_line:
             # shuffle and batch data 

@@ -78,6 +78,9 @@ class LanguageTrainer:
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
+
+        weight = torch.tensor([0.05, 0.95]).to(device) 
+        self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
         self.nll_loss_fxn = torch.nn.NLLLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device
