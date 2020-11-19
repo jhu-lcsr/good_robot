@@ -1,6 +1,6 @@
 # "Good Robot!" Now Watch This: Reinforcement Learning Before Demonstration
 
-[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Nicholas Greene, [Hongtao Wu](https://hongtaowu67.github.io), Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+Aditya Murali, [Andrew Hundt](http://ahundt.github.io/), Priyanka Hubli, and Gregory D. Hager
 
 ## Key Components
 
@@ -32,7 +32,7 @@ Modification of the old `trainer.py` that provides the option to keep the featur
 
 This is deprecated by `evaluate_demo_correspondence.py`.
 
-# To Run
+## To Run
 
 *Generating demonstrations*
 
