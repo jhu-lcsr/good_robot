@@ -2,7 +2,7 @@
 
 [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Nicholas Greene, [Hongtao Wu](https://hongtaowu67.github.io), Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
-# Key Components
+## Key Components
 
 **`demo.py`**
 
