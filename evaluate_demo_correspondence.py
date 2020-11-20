@@ -27,17 +27,15 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
         elif ax == 'all':
             x_norm = x - np.min(x)
-            x_norm = x_norm / np.max(x_norm)
+            x_norm = x_norm / (np.max(x_norm) + 0.00001)
 
         return x_norm
 
     # helper function to compute cosine similarity between pixel-wise predictions and single embedding vector
     def cos_sim(pix_preds, best_pred):
         # pix_preds is the pixel-wise embedding array, best_pred is the single template embedding vector
+        best_pred = np.expand_dims(best_pred, (0, 2, 3))
         cos_sim = np.multiply(pix_preds, best_pred)
-        cos_sim = cos_sim / (np.linalg.norm(pix_preds, axis=1,
-            keepdims=True) * np.linalg.norm(best_pred, axis=1, keepdims=True))
-
         return cos_sim
 
     # reshape each example_action to 1 x 64 x 1 x 1
@@ -80,6 +78,11 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
                 # demo similarities
                 row_sim_demo = cos_sim(example_action_row, row_demo_action)
+
+                #sim = np.sum(np.square(row_sim_exec - row_sim_demo), axis=1)
+                #print('historical l2 dist dynamic range', np.min(sim), np.max(sim), np.mean(sim))
+                #sim_norm = normalize(sim, ax='all')
+                #print('normalized historical l2 dist dynamic range', np.min(sim_norm), np.max(sim_norm), np.mean(sim_norm))
 
                 # add to l2 dist
                 l2_dist += normalize(np.sum(np.square(row_sim_exec - row_sim_demo), axis=1), ax='all')
