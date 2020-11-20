@@ -31,6 +31,15 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
         return x_norm
 
+    # helper function to compute cosine similarity between pixel-wise predictions and single embedding vector
+    def cos_sim(pix_preds, best_pred):
+        # pix_preds is the pixel-wise embedding array, best_pred is the single template embedding vector
+        cos_sim = np.multiply(pix_preds, best_pred)
+        cos_sim = cos_sim / (np.linalg.norm(pix_preds, axis=1,
+            keepdims=True) * np.linalg.norm(best_pred, axis=1, keepdims=True))
+
+        return cos_sim
+
     # reshape each example_action to 1 x 64 x 1 x 1
     example_action_row, example_action_stack = example_actions
     if example_action_row is not None:
@@ -48,80 +57,42 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     else:
         mask = (row_preds == np.zeros([1, 64, 1, 1])).all(axis=1)
 
-    # add the l2 distances for history if history is given
+    # add the l2 distances from history if history is given
     if demo_hist is not None and execution_hist is not None:
-        # initialize execution embedding, demo_embedding
-        if row_preds is not None and stack_preds is not None:
-            # normalize and concatenate
-            execution_embedding = [np.concatenate([normalize(row_preds), normalize(stack_preds)], axis=1)]
-            demo_embedding = [np.concatenate([normalize(example_action_row), normalize(example_action_stack)], axis=1)]
-        elif row_preds is not None:
-            execution_embedding = [normalize(row_preds)]
-            demo_embedding = [normalize(example_action_row)]
-        else:
-            execution_embedding = [normalize(stack_preds)]
-            demo_embedding = [normalize(example_action_stack)]
+        # initialize l2_dist
+        l2_dist = np.zeros_like(mask).astype(float)
+        if row_preds is not None:
+            # add row and stack l2 distances
+            l2_dist += normalize(np.sum(np.square(row_preds - example_action_row), axis=1), ax='all')
+        if stack_preds is not None:
+            l2_dist += normalize(np.sum(np.square(stack_preds - example_action_stack), axis=1), ax='all')
 
-        # iterate through history steps and calculate element-wise product with stack_preds
-        for row_action, stack_action in execution_hist:
-            if row_preds is not None and stack_preds is not None:
-                row_action, stack_action = normalize(row_action), normalize(stack_action)
-                row_preds, stack_preds = normalize(row_preds), normalize(stack_preds)
+        # iterate through execution_hist and demo_hist, compute cosine similarities ((e_t * e_(t-1), d_t * d_(t-1)), ...)
+        for i in range(len(execution_hist)):
+            # get previous optimal actions from execution, demo
+            row_exec_action, stack_exec_action = execution_hist[i]
+            row_demo_action, stack_demo_action = demo_hist[i]
 
-                # concatenate element-wise product of stack_preds, stack_action and row_preds, row_action
-                embed_t = np.concatenate([normalize(np.multiply(row_preds, row_action.reshape([1, 64, 1, 1]))),
-                    normalize(np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])))], axis=1)
+            # store each similarity mask (16x64x224x224)
+            if row_preds is not None:
+                # execution similarities
+                row_sim_exec = cos_sim(row_preds, row_exec_action)
 
-            elif row_preds is not None:
-                # just get row info
-                row_action = normalize(row_action)
-                row_preds = normalize(row_preds)
+                # demo similarities
+                row_sim_demo = cos_sim(example_action_row, row_demo_action)
 
-                embed_t = normalize(np.multiply(row_preds, row_action.reshape([1, 64, 1, 1])))
+                # add to l2 dist
+                l2_dist += normalize(np.sum(np.square(row_sim_exec - row_sim_demo), axis=1), ax='all')
 
-            else:
-                # just get stack info
-                stack_action = normalize(stack_action)
-                stack_preds = normalize(stack_preds)
+            if stack_preds is not None:
+                # execution similarities
+                stack_sim_exec = cos_sim(stack_preds, stack_exec_action)
 
-                embed_t = normalize(np.multiply(stack_preds, stack_action.reshape([1, 64, 1, 1])))
+                # demo similarities
+                stack_sim_demo = cos_sim(example_action_stack, stack_demo_action)
 
-            # append vector with dim 64 * history_len * num_policies to execution embedding
-            execution_embedding.append(embed_t)
-
-        # repeat above process with demo history
-        for row_action, stack_action in demo_hist:
-            if example_action_row is not None and example_action_stack is not None:
-                row_action, stack_action = normalize(row_action), normalize(stack_action)
-                example_action_row, example_action_stack = normalize(example_action_row), normalize(example_action_stack)
-
-                # concatenate element-wise product of example_action_stack, stack_action and example_action_row, row_action
-                embed_t = np.concatenate([normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1]))),
-                    normalize(np.multiply(example_action_stack, example_action_stack.reshape([1, 64, 1, 1])))], axis=1)
-
-            elif example_action_row is not None:
-                row_action = normalize(row_action)
-                example_action_row = normalize(example_action_row)
-
-                # just get row info
-                embed_t = normalize(np.multiply(example_action_row, row_action.reshape([1, 64, 1, 1])))
-
-            else:
-                stack_action = normalize(stack_action)
-                example_action_stack = normalize(example_action_stack)
-
-                # just get stack info
-                embed_t = normalize(np.multiply(example_action_stack, stack_action.reshape([1, 64, 1, 1])))
-
-            # append vector with dim 64 * (1 + history_len) * num_policies to demo embedding
-            demo_embedding.append(embed_t)
-
-        # turn into numpy arrays
-        execution_embedding = np.concatenate(execution_embedding, axis=1)
-        demo_embedding = np.concatenate(demo_embedding, axis=1)
-
-        # calculate l2 distance
-        l2_dist = np.sum(np.square(execution_embedding - demo_embedding), axis=1)
+                # add to l2 dist
+                l2_dist += normalize(np.sum(np.square(stack_sim_exec - stack_sim_demo), axis=1), ax='all')
 
     else:
         # calculate l2 distance between example action embedding and preds for each policy (row and stack)
