@@ -1,3 +1,6 @@
+#
+# partially ripped from https://github.com/lil-lab/ciff/
+
 from collections import deque
 import pdb 
 
@@ -352,12 +355,12 @@ class UNetWithBlocks(UNetWithLanguage):
         
         # get language output as sentence embedding 
         sent_encoding = lang_output["sentence_encoding"] 
-    
-        #image_input = data_batch["prev_pos_input"]
-        # TODO (elias): Switch back after debugging 
-        image_input = data_batch["prev_pos_for_pred"]
-        image_input = image_input.reshape((-1, 1, 64, 64))
-        image_input = image_input.repeat((1,2, 1, 1))
+   
+        image_input = data_batch["prev_pos_input"]
+        #image_input = image_input.reshape((-1, 1, 64, 64))
+        #image_input = image_input.repeat((1,2, 1, 1))
+
+
         image_input = image_input.to(self.device) 
         # store downconv results in stack 
         downconv_results = deque() 

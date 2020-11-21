@@ -305,7 +305,7 @@ def main(args):
         # TODO (elias): confirm this number 
         depth = 7
 
-    unet_kwargs = dict(in_channels = 2,
+    unet_kwargs = dict(in_channels = 21,
                      out_channels = args.unet_out_channels, 
                      lang_embedder = embedder,
                      lang_encoder = encoder, 

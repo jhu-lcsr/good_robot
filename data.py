@@ -6,6 +6,7 @@ import numpy as np
 from spacy.tokenizer import Tokenizer 
 from spacy.lang.en import English
 import torch
+from torch.nn import functional as F
 import pdb 
 import copy 
 np.random.seed(12) 
@@ -78,8 +79,7 @@ class BaseTrajectory:
         self.line_id = line_id
         self.commands = commands
 
-        # input has 2.5 d 
-        self.previous_positions_input = self.make_3d_positions(previous_positions, batch_size = len(commands))
+        #self.previous_positions_input = self.one_hot(self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands)))
         # output for previous positions has depth that gets filtered 
         self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
         self.previous_positions_for_acc = copy.deepcopy(self.previous_positions_for_pred) 
@@ -100,6 +100,9 @@ class BaseTrajectory:
                                                                 self.previous_positions_for_acc, 
                                                                 self.next_positions_for_pred, 
                                                                 self.next_positions_for_acc)
+
+        # set as input but one-hot 
+        self.previous_positions_input = self.one_hot(copy.deepcopy(self.previous_positions_for_acc)) 
 
         if self.do_filter: 
             # for loss, only look at the single block moved 
@@ -131,6 +134,11 @@ class BaseTrajectory:
             return FlatIterator(self)
         else:
             return TrajectoryIterator(self)
+
+    def one_hot(self, input_positions): 
+        data = [F.one_hot(x.long(), 21) for x in input_positions]
+        data = [x.reshape(-1, 21, 64, 64).float() for x in data]
+        return data 
 
     def filter_by_blocks_to_move(self, positions):
         # zero out positions that aren't the block of interest
