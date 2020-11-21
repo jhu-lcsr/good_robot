@@ -357,9 +357,9 @@ class UNetWithBlocks(UNetWithLanguage):
         sent_encoding = lang_output["sentence_encoding"] 
    
         #image_input = data_batch["prev_pos_input"]
-        image_input = data_batch["prev_pos_for_acc"]
-        image_input = image_input.reshape((-1, 1, 64, 64))
-        image_input = image_input.repeat((1,2, 1, 1))
+        image_input = data_batch["prev_pos_input"]
+        #image_input = image_input.reshape((-1, 1, 64, 64))
+        #image_input = image_input.repeat((1,2, 1, 1))
 
         image_input = image_input.to(self.device) 
         # store downconv results in stack 
