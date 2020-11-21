@@ -169,8 +169,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         self.encoder.eval() 
         next_outputs, prev_outputs = self.encoder(batch_instance) 
 
-        prev_accuracy = self.compute_localized_accuracy(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"], batch_instance["next_pos_for_pred"])
-        next_accuracy = self.compute_localized_accuracy(batch_instance["next_pos_for_pred"], next_outputs["next_position"], batch_instance["prev_pos_for_pred"])
+        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"])
+        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
@@ -196,7 +196,28 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
-        return next_accuracy, prev_accuracy, block_accuracy
+        return next_f1, prev_f1, block_accuracy
+
+    def compute_f1(self, true_pos, pred_pos):
+        values, pred_pixels = torch.max(pred_pos, dim=1) 
+        gold_pixels = true_pos 
+        pred_pixels = pred_pixels.unsqueeze(-1) 
+
+        pred_pixels = pred_pixels.detach().cpu()
+        gold_pixels = gold_pixels.detach().cpu()
+
+        total_pixels = sum(pred_pixels.shape) 
+
+        true_pos = torch.sum(pred_pixels * gold_pixels).item() 
+        true_neg = torch.sum((1-pred_pixels) * (1 - gold_pixels)).item() 
+        false_pos = torch.sum(pred_pixels * (1 - gold_pixels)).item() 
+        false_neg = torch.sum((1-pred_pixels) * gold_pixels).item() 
+        precision = true_pos / (true_pos + false_pos) 
+        recall = true_pos / (true_pos + false_neg) 
+        f1 = 2 * (precision * recall) / (precision + recall) 
+        return precision, recall, f1
+
+
 
     def compute_localized_accuracy(self, true_pos, pred_pos, waste): 
         values, pred_pixels = torch.max(pred_pos, dim=1) 
@@ -305,7 +326,7 @@ def main(args):
         # TODO (elias): confirm this number 
         depth = 7
 
-    unet_kwargs = dict(in_channels = 21,
+    unet_kwargs = dict(in_channels = 2,
                      out_channels = args.unet_out_channels, 
                      lang_embedder = embedder,
                      lang_encoder = encoder, 
