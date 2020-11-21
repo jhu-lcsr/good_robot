@@ -369,7 +369,8 @@ def main(args):
                               num_models_to_keep = args.num_models_to_keep,
                               generate_after_n = args.generate_after_n, 
                               depth = depth, 
-                              best_epoch = best_epoch)
+                              best_epoch = best_epoch,
+                              zero_weight = args.zero_weight) 
         trainer.train() 
 
     else:
