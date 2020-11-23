@@ -16,7 +16,9 @@ from tqdm import tqdm
 from matplotlib import pyplot as plt
 import numpy as np
 import torch.autograd.profiler as profiler
+from torch.nn import functional as F
 import pandas as pd 
+import kornia 
 
 
 from encoders import LSTMEncoder
@@ -29,6 +31,31 @@ from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 
 logger = logging.getLogger(__name__)
+
+class BootstrappedCE(torch.nn.Module):
+    """from https://stackoverflow.com/questions/63735255/how-do-i-compute-bootstrapped-cross-entropy-loss-in-pytorch"""
+    def __init__(self, start_warm=0, end_warm=1, top_p=0.25):
+        super().__init__()
+
+        self.start_warm = start_warm
+        self.end_warm = end_warm
+        self.top_p = top_p
+
+    def forward(self, input, target, it):
+        if it < self.start_warm:
+            #return F.cross_entropy(input, target), 1.0
+            return F.cross_entropy(input, target)
+
+        raw_loss = F.cross_entropy(input, target, reduction='none').view(-1)
+        num_pixels = raw_loss.numel()
+
+        if it > self.end_warm:
+            this_p = self.top_p
+        else:
+            this_p = self.top_p + (1-self.top_p)*((self.end_warm-it)/(self.end_warm-self.start_warm))
+        loss, _ = torch.topk(raw_loss, int(num_pixels * this_p), sorted=False)
+        #return loss.mean(), this_p
+        return loss.mean()
 
 
 class UNetLanguageTrainer(FlatLanguageTrainer): 
@@ -61,6 +88,11 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
 
         weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+        #self.weighted_xent_loss_fxn = kornia.losses.DiceLoss()
+        #self.weighted_xent_loss_fxn = BootstrappedCE()
+        self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
+        self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
+
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -74,7 +106,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             if prev_outputs is None:
                 skipped += 1
                 continue
-            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs) 
+            #loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * b) 
+            loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
 
@@ -131,16 +164,14 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             prev_foreground_loss = self.fore_loss_fxn(pred_prev_image, true_prev_image) 
             next_foreground_loss = self.fore_loss_fxn(pred_next_image, true_next_image) 
 
-            total_loss = next_pixel_loss + prev_pixel_loss + next_foreground_loss + prev_foreground_loss
-
-
+            total_loss = next_pixel_loss + prev_pixel_loss + next_foreground_loss +  prev_foreground_loss
 
         print(f"loss {total_loss.item()}")
 
         return total_loss
 
 
-    def compute_weighted_loss(self, inputs, next_outputs, prev_outputs):
+    def compute_weighted_loss(self, inputs, next_outputs, prev_outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
         """
@@ -150,10 +181,12 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         true_prev_image = inputs["prev_pos_for_pred"]
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
-        true_next_image = true_next_image.reshape((bsz, width, height, depth)).long()
-        true_prev_image = true_prev_image.reshape((bsz, width, height, depth)).long()
-        true_next_image = true_next_image.to(self.device) 
-        true_prev_image = true_prev_image.to(self.device) 
+        pred_prev_image = pred_prev_image.squeeze(-1)
+        pred_next_image = pred_next_image.squeeze(-1)
+        true_next_image = true_next_image.squeeze(-1).squeeze(-1)
+        true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
+        true_next_image = true_next_image.long().to(self.device) 
+        true_prev_image = true_prev_image.long().to(self.device) 
 
         prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image) 
         next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
@@ -162,7 +195,6 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         print(f"loss {total_loss.item()}")
 
         return total_loss
-        
 
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
@@ -185,6 +217,14 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                 command = " ".join(command) 
 
                 next_pos = batch_instance["next_pos_for_acc"][i]
+                
+                # TODO: remove fake 
+                # fake next 
+                #fake_next = batch_instance["next_pos_for_pred"][i].reshape(1, 64, 64, 1)
+                #fake_next = torch.cat([torch.zeros_like(fake_next), fake_next], dim=0)
+                #fake_pred = batch_instance["prev_pos_for_pred"][i].reshape(1, 64, 64, 1) 
+                #fake_pred = torch.cat([torch.zeros_like(fake_pred), fake_pred], dim=0)
+
                 self.generate_debugging_image(next_pos,
                                              next_outputs["next_position"][i], 
                                              output_path.joinpath("next"),
@@ -199,6 +239,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         return next_f1, prev_f1, block_accuracy
 
     def compute_f1(self, true_pos, pred_pos):
+        eps = 1e-8
         values, pred_pixels = torch.max(pred_pos, dim=1) 
         gold_pixels = true_pos 
         pred_pixels = pred_pixels.unsqueeze(-1) 
@@ -212,12 +253,10 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         true_neg = torch.sum((1-pred_pixels) * (1 - gold_pixels)).item() 
         false_pos = torch.sum(pred_pixels * (1 - gold_pixels)).item() 
         false_neg = torch.sum((1-pred_pixels) * gold_pixels).item() 
-        precision = true_pos / (true_pos + false_pos) 
-        recall = true_pos / (true_pos + false_neg) 
-        f1 = 2 * (precision * recall) / (precision + recall) 
+        precision = true_pos / (true_pos + false_pos + eps) 
+        recall = true_pos / (true_pos + false_neg + eps) 
+        f1 = 2 * (precision * recall) / (precision + recall + eps) 
         return precision, recall, f1
-
-
 
     def compute_localized_accuracy(self, true_pos, pred_pos, waste): 
         values, pred_pixels = torch.max(pred_pos, dim=1) 

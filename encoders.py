@@ -59,8 +59,10 @@ class LSTMEncoder(torch.nn.Module):
         # concat them together  
         if self.bidirectional:
             concat = torch.cat([first, last], dim=1)
+            # flatten out forward and backward 
+            output = output.reshape(bsz, seq_len, -1) 
         else:
-            concat = output[batch_inds, lengths, :].unsqueeze(1) 
+            concat = last 
 
         # flatten 
         concat = concat.reshape((bsz, -1))

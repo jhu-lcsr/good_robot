@@ -3,7 +3,7 @@
 ####################################################
 import copy 
 import torch 
-from unet_module import UNetWithBlocks
+from unet_module import UNetWithBlocks, UNetWithAttention, UNetWithLanguage
 
 
 SHARE_LEVELS = {"none": 0,
@@ -26,12 +26,13 @@ class SharedUNet(torch.nn.Module):
                 mlp_num_layers: int = 3, 
                 dropout: float = 0.20,
                 depth: int = 7,
-                share_level="encoder",
+                share_level: str = "encoder",
+                fusion: str = "concat",
                 device: torch.device = "cpu"):
         super(SharedUNet, self).__init__()        
 
         self.share_level = SHARE_LEVELS[share_level]
-        self.compute_block_dist = False
+        self.compute_block_dist = True
 
         if self.share_level < 2:
             # need to create copy encoder 
@@ -64,25 +65,25 @@ class SharedUNet(torch.nn.Module):
                                            depth=depth,
                                            device=device)
 
-        #if self.share_level < 3: 
+        if self.share_level < 3: 
             # make a new module if not shared 
-        self.prev_encoder = UNetWithBlocks(in_channels=in_channels,
-                                           out_channels=out_channels,
-                                           lang_embedder=prev_lang_embedder,
-                                           lang_encoder=prev_lang_encoder,
-                                           hc_large=hc_large,
-                                           hc_small=hc_small,
-                                           kernel_size=kernel_size,
-                                           stride=stride,
-                                           num_layers=num_layers,
-                                           num_blocks=num_blocks,
-                                           mlp_num_layers=mlp_num_layers,
-                                           dropout=dropout,
-                                           depth=depth,
-                                           device=device)
-        #else: 
-        #    # make a pointer 
-        #    self.prev_encoder = self.next_encoder
+            self.prev_encoder = UNetWithBlocks(in_channels=in_channels,
+                                               out_channels=out_channels,
+                                               lang_embedder=prev_lang_embedder,
+                                               lang_encoder=prev_lang_encoder,
+                                               hc_large=hc_large,
+                                               hc_small=hc_small,
+                                               kernel_size=kernel_size,
+                                               stride=stride,
+                                               num_layers=num_layers,
+                                               num_blocks=num_blocks,
+                                               mlp_num_layers=mlp_num_layers,
+                                               dropout=dropout,
+                                               depth=depth,
+                                               device=device)
+        else: 
+            # make a pointer 
+            self.prev_encoder = self.next_encoder
 
     def forward(self, data_batch):
         prev_output = self.prev_encoder(data_batch) 

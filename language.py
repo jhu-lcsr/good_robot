@@ -5,23 +5,31 @@ import torch
 
 class SourceAttention(torch.nn.Module):
     def __init__(self,
-                 input_dim: int,
+                 language_dim: int,
+                 image_dim: int, 
                  output_dim: int):
         super(SourceAttention, self).__init__() 
-        self.input_dim = input_dim
+        self.language_dim = language_dim
+        self.image_dim = image_dim
         self.output_dim = output_dim
 
-        self.q_proj = torch.nn.Linear(input_dim, output_dim) 
-        self.k_proj = torch.nn.Linear(input_dim, output_dim) 
-        self.v_proj = torch.nn.Linear(input_dim, output_dim) 
+        self.q_proj = torch.nn.Linear(image_dim, output_dim) 
+        self.k_proj = torch.nn.Linear(language_dim, output_dim) 
+        self.v_proj = torch.nn.Linear(language_dim, output_dim) 
 
     def forward(self, q, k, v):
-        # [batch, seq_len, output_dim]
+        # flatten q [batch, width, height, hidden] to [batch, width * height , hidden]
+        bsz, hidden_dim, width, height = q.shape 
+        q = q.reshape(bsz, width * height, hidden_dim) 
+        # project keys queries and values 
         q, k, v = self.q_proj(q), self.k_proj(k), self.v_proj(v) 
-        # [batch, seq_len, seq_len]
+        # get image to input tokens attention weights
         weights = torch.bmm(q, k.permute(0,2,1))
-        # [batch, seq_len, output_dim] 
+        # reweight values (langauge) by attention weight 
         output  = torch.bmm(weights, v) 
+        # break back out to image shape 
+        output = output.reshape(bsz, self.output_dim, width, height) 
+
         return output 
 
 class BaseFusionModule(torch.nn.Module):

@@ -20,6 +20,7 @@ import matplotlib
 import torch
 import numpy as np
 import pandas as pd 
+import kornia 
 
 
 from image_encoder import ImageEncoder, DeconvolutionalNetwork, DecoupledDeconvolutionalNetwork
@@ -79,8 +80,13 @@ class LanguageTrainer:
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
 
-        weight = torch.tensor([0.05, 0.95]).to(device) 
-        self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+        #weight = torch.tensor([zero_weight, 1-zero_weight]).to(device) 
+        #self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+        
+        # trying dice loss 
+        #self.weighted_xent_loss_fxn = kornia.losses.DiceLoss()
+
+    
         self.nll_loss_fxn = torch.nn.NLLLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device

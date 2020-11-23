@@ -13,40 +13,6 @@ np.random.seed(12)
 
 PAD = "<PAD>"
 
-class FlatIterator:
-    """
-    shuffle trajectories and give pairs, allowing for greater batching 
-    """
-    def __init__(self, 
-                all_trajectories, 
-                batch_size = 32):
-        self.all_trajectories = all_trajectories
-        self._index = -1
-        self.all_timesteps = None
-        self.batch_size = batch_size
-
-    def __next__(self):
-        if self._index + 1 < len(self.all_timesteps):
-            self._index += 1
-            try:
-                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, image, length = self.all_timesteps[self._index]
-            except ValueError:
-                command, prev_pos, prev_pos_for_pred, next_pos, prev_rot, next_rot, block_to_move, length = self.all_timesteps[self._index]
-                image=None
-
-            return {"command": command,
-                    "previous_position": prev_pos,
-                    "next_position": next_pos,
-                    "previous_position_for_pred": prev_pos_for_pred,
-                    "previous_rotation": prev_rot,
-                    "next_rotation": next_rot,
-                    "block_to_move": block_to_move, 
-                    "image": image,
-                    "length": length} 
-
-        else: 
-            raise StopIteration 
-
 
 class BaseTrajectory:
     """
@@ -79,18 +45,21 @@ class BaseTrajectory:
         self.line_id = line_id
         self.commands = commands
 
-        #self.previous_positions_input = self.one_hot(self.make_3d_positions(previous_positions, make_z = True, batch_size = len(commands)))
+        self.blocks_to_move = self.get_blocks_to_move(previous_positions, next_positions) 
+
+        print(commands) 
+        print(f"To move: {self.blocks_to_move}") 
+        #pdb.set_trace() 
+
         # output for previous positions has depth that gets filtered 
         self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
         self.previous_positions_for_acc = copy.deepcopy(self.previous_positions_for_pred) 
         self.next_positions_for_pred = self.make_3d_positions(next_positions, make_z = True, batch_size = self.batch_size)
         self.next_positions_for_acc = copy.deepcopy(self.next_positions_for_pred) 
-        self.blocks_to_move = self.get_blocks_to_move()
-
+        #self.blocks_to_move = self.get_blocks_to_move()
 
         self.previous_rotations = previous_rotations
         self.next_rotations = next_rotations
-
 
         if self.top_only:
             (self.previous_positions_for_pred, 
@@ -102,6 +71,7 @@ class BaseTrajectory:
                                                                 self.next_positions_for_acc)
 
         # set as input but one-hot 
+        #self.previous_positions_input = copy.deepcopy(self.previous_positions_for_acc)
         self.previous_positions_input = self.one_hot(copy.deepcopy(self.previous_positions_for_acc)) 
 
         if self.do_filter: 
@@ -114,30 +84,19 @@ class BaseTrajectory:
         self.traj_vocab = set() 
         self.traj_type = traj_type
 
-        self.to_iterate = list(zip(self.commands, 
-                                   self.previous_positions_input, 
-                                   self.previous_positions_for_pred,
-                                   self.previous_positions_for_acc,
-                                   self.next_positions_for_pred, 
-                                   self.next_positions_for_acc, 
-                                   self.previous_rotations, 
-                                   self.next_rotations, 
-                                   self.blocks_to_move,
-                                   self.images, 
-                                   self.lengths)) 
+    def one_hot_helper(self, input_data):
+        data = input_data.long()
+        data = F.one_hot(data, 21)
+        data = data.squeeze(3).squeeze(3)
+        data = data.permute(0, 3, 1, 2)
+        # make sure it is actuall OH 
+        assert(torch.allclose(torch.sum(data, dim =1), torch.tensor(1).to(data.device)))
+        data = data.float() 
 
-        # filter out empty commands
-        self.to_iterate = [x for x in self.to_iterate if len(x[0]) > 0 ]
-
-    def __iter__(self):
-        if self.traj_type == "flat":     
-            return FlatIterator(self)
-        else:
-            return TrajectoryIterator(self)
+        return data 
 
     def one_hot(self, input_positions): 
-        data = [F.one_hot(x.long(), 21) for x in input_positions]
-        data = [x.reshape(-1, 21, 64, 64).float() for x in data]
+        data = [self.one_hot_helper(x) for x in input_positions]
         return data 
 
     def filter_by_blocks_to_move(self, positions):
@@ -169,29 +128,41 @@ class BaseTrajectory:
             data_list[i] = new_data
         return data_list 
         
-    def get_blocks_to_move(self):
-        batch_idx = 0
-        bsz = self.previous_positions_for_pred[0].shape[0]
-        bad = 0
-        all_blocks_to_move = []
-        for batch_idx in range(bsz):
-            for timestep in range(len(self.previous_positions_for_pred)):
-                prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
-                next_pos = self.next_positions_for_pred[timestep][batch_idx]
-                different_pixels = prev_pos[prev_pos != next_pos]
-                # exclude background 
-                different_pixel_idx = different_pixels[different_pixels != 0]
-                try:
-                    blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
-                except ValueError:
-                    try:
-                        blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
-                    except IndexError:
-                        blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
-                    bad += 1
-                all_blocks_to_move.append(blocks_to_move) 
-            #print(f"there are {bad} blocks with >1 move") 
-        return all_blocks_to_move
+    def get_blocks_to_move(self, prev_state, next_state):
+
+        TOL = 0.001 
+        blocks_to_move = []
+        ppos, npos = torch.tensor(np.array(prev_state)), torch.tensor(np.array(next_state))
+
+        for i in range(ppos.shape[0]):
+            diff = torch.sum(torch.abs(ppos[i]  - npos[i]), dim = -1)
+            block_to_move = torch.argmax(diff).item() + 1
+            blocks_to_move.append(block_to_move) 
+
+        return torch.tensor(blocks_to_move, dtype=torch.long).reshape(1,1) 
+
+        #batch_idx = 0
+        #bsz = self.previous_positions_for_pred[0].shape[0]
+        #bad = 0
+        #all_blocks_to_move = []
+        #for batch_idx in range(bsz):
+        #    for timestep in range(len(self.previous_positions_for_pred)):
+        #        prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
+        #        next_pos = self.next_positions_for_pred[timestep][batch_idx]
+        #        different_pixels = prev_pos[prev_pos != next_pos]
+        #        # exclude background 
+        #        different_pixel_idx = different_pixels[different_pixels != 0]
+        #        try:
+        #            blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
+        #        except ValueError:
+        #            try:
+        #                blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
+        #            except IndexError:
+        #                blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
+        #            bad += 1
+        #        all_blocks_to_move.append(blocks_to_move) 
+        #    #print(f"there are {bad} blocks with >1 move") 
+        #return all_blocks_to_move
 
         
     def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
@@ -359,7 +330,7 @@ class DatasetReader:
                 images = line_data["images"]
                 positions = line_data["states"]
                 rotations = line_data["rotations"]
-                commands = line_data["notes"]
+                commands = sorted(line_data["notes"], key = lambda x: x["start"])
                 # split off previous and subsequent positions and rotations 
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
