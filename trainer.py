@@ -552,6 +552,7 @@ class Trainer(object):
                 if self.place:
                     push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                    place_predictions = np.ma.masked_array(place_predictions)
                 else:
                     push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
                             push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
@@ -571,16 +572,19 @@ class Trainer(object):
                 place_predictions = np.ma.masked_array(place_predictions)
 
         # return components depending on flags
-        if use_demo:
+        if keep_action_feat and not use_demo:
+            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+
+        elif use_demo:
             if self.place_common_sense:
                 return push_predictions, grasp_predictions, masked_place_predictions
             else:
                 return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
 
-        elif keep_action_feat:
-            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
-
-        return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+        if self.place_common_sense:
+            return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
+        else:
+            return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
 
     def end_trial(self):
         self.clearance_log.append([self.iteration])
