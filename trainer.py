@@ -351,13 +351,6 @@ class Trainer(object):
     def load_sample(self, sample_iteration, logger, use_hist=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
-        # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
-        trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
-        if os.path.exists(trial_success_path):
-            completed_trials = np.loadtxt(trial_success_path)
-        else:
-            completed_trials = np.zeros(sample_iteration)
-
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
         # Load sample RGB-D heightmap
@@ -368,8 +361,15 @@ class Trainer(object):
 
         # if we are using history, load the last t depth heightmaps, calculate numerical depth, and concatenate
         if use_hist:
+            # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
+            trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
+            if os.path.exists(trial_success_path):
+                completed_trials = np.loadtxt(trial_success_path)
+            else:
+                completed_trials = np.zeros(sample_iteration + 1)
+
             # append 1 channel of current timestep depth to depth_heightmap_history
-            depth_heightmap_history = [sample_depth_heightmap[:, :, 0]]
+            depth_heightmap_history = [sample_depth_heightmap]
             for i in range(1, history_len):
                 # find beginning of current trial using completed trials
                 if completed_trials[sample_iteration] == 0:
@@ -384,9 +384,12 @@ class Trainer(object):
                 h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
                     '%06d.0.depth.png' % iter_num), -1)
                 h_i = h_i.astype(np.float32)/100000
-                depth_heightmap_history.append(h_i[:, :, 0])
+                depth_heightmap_history.append(h_i)
 
             sample_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
+
+        else:
+            sample_depth_heightmap = np.stack([sample_depth_heightmap] * 3, axis=-1)
 
         # Compute forward pass with sample
         if self.goal_condition_len > 0:
@@ -434,13 +437,15 @@ class Trainer(object):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
-        depth_heightmap_2x = ndimage.zoom(depth_heightmap, zoom=[2,2], order=0)
-        assert(color_heightmap_2x.shape[0:2] == depth_heightmap_2x.shape[0:2])
+        depth_heightmap_2x = ndimage.zoom(depth_heightmap, zoom=[2,2,1], order=0)
+        assert(color_heightmap_2x.shape == depth_heightmap_2x.shape)
 
         # Add extra padding (to handle rotations inside network)
         diag_length = float(color_heightmap_2x.shape[0]) * np.sqrt(2)
         diag_length = np.ceil(diag_length/32)*32
         padding_width = int((diag_length - color_heightmap_2x.shape[0])/2)
+
+        # separate each dim of color heightmap and pad, reconcatenate after
         color_heightmap_2x_r =  np.pad(color_heightmap_2x[:,:,0], padding_width, 'constant', constant_values=0)
         color_heightmap_2x_r.shape = (color_heightmap_2x_r.shape[0], color_heightmap_2x_r.shape[1], 1)
         color_heightmap_2x_g =  np.pad(color_heightmap_2x[:,:,1], padding_width, 'constant', constant_values=0)
@@ -448,7 +453,15 @@ class Trainer(object):
         color_heightmap_2x_b =  np.pad(color_heightmap_2x[:,:,2], padding_width, 'constant', constant_values=0)
         color_heightmap_2x_b.shape = (color_heightmap_2x_b.shape[0], color_heightmap_2x_b.shape[1], 1)
         color_heightmap_2x = np.concatenate((color_heightmap_2x_r, color_heightmap_2x_g, color_heightmap_2x_b), axis=2)
-        depth_heightmap_2x =  np.pad(depth_heightmap_2x, padding_width, 'constant', constant_values=0)
+
+        # separate each dim of depth heightmap and pad, reconcatenate after
+        depth_heightmap_2x_r =  np.pad(depth_heightmap_2x[:,:,0], padding_width, 'constant', constant_values=0)
+        depth_heightmap_2x_r.shape = (depth_heightmap_2x_r.shape[0], depth_heightmap_2x_r.shape[1], 1)
+        depth_heightmap_2x_g =  np.pad(depth_heightmap_2x[:,:,1], padding_width, 'constant', constant_values=0)
+        depth_heightmap_2x_g.shape = (depth_heightmap_2x_g.shape[0], depth_heightmap_2x_g.shape[1], 1)
+        depth_heightmap_2x_b =  np.pad(depth_heightmap_2x[:,:,2], padding_width, 'constant', constant_values=0)
+        depth_heightmap_2x_b.shape = (depth_heightmap_2x_b.shape[0], depth_heightmap_2x_b.shape[1], 1)
+        depth_heightmap_2x = np.concatenate((depth_heightmap_2x_r, depth_heightmap_2x_g, depth_heightmap_2x_b), axis=2)
 
         # Pre-process color image (scale and normalize)
         image_mean = [0.485, 0.456, 0.406]
@@ -460,8 +473,7 @@ class Trainer(object):
         # Pre-process depth image (normalize)
         image_mean = [0.01, 0.01, 0.01]
         image_std = [0.03, 0.03, 0.03]
-        depth_heightmap_2x.shape = (depth_heightmap_2x.shape[0], depth_heightmap_2x.shape[1], 1)
-        input_depth_image = np.concatenate((depth_heightmap_2x, depth_heightmap_2x, depth_heightmap_2x), axis=2)
+        input_depth_image = depth_heightmap_2x.astype(float)
         for c in range(3):
             input_depth_image[:,:,c] = (input_depth_image[:,:,c] - image_mean[c])/image_std[c]
 

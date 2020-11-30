@@ -1381,10 +1381,10 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         if os.path.exists(trial_success_path):
             completed_trials = np.loadtxt(trial_success_path)
         else:
-            completed_trials = np.zeros(trainer.iteration)
+            completed_trials = np.zeros(trainer.iteration + 1)
 
         # append 1 channel of current timestep depth to depth_heightmap_history
-        depth_heightmap_history = [valid_depth_heightmap[:, :, 0]]
+        depth_heightmap_history = [valid_depth_heightmap]
         for i in range(1, history_len):
             # find beginning of current trial using completed trials
             if completed_trials[trainer.iteration] == 0:
@@ -1399,9 +1399,13 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
             h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
                 '%06d.0.depth.png' % iter_num), -1)
             h_i = h_i.astype(np.float32)/100000
-            depth_heightmap_history.append(h_i[:, :, 0])
+            depth_heightmap_history.append(h_i)
 
         valid_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
+
+    # otherwise, repeat depth values in each channel
+    else:
+        valid_depth_heightmap = np.stack([valid_depth_heightmap] * 3, axis=-1)
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
