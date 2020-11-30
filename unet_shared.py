@@ -3,8 +3,7 @@
 ####################################################
 import copy 
 import torch 
-from unet_module import UNetWithBlocks, UNetWithAttention, UNetWithLanguage
-
+from unet_module import UNetWithBlocks, UNetWithAttention, UNetWithLanguage, UNetNoNorm
 
 SHARE_LEVELS = {"none": 0,
                 "embed": 1,
@@ -32,7 +31,7 @@ class SharedUNet(torch.nn.Module):
         super(SharedUNet, self).__init__()        
 
         self.share_level = SHARE_LEVELS[share_level]
-        self.compute_block_dist = True
+        self.compute_block_dist = False
 
         if self.share_level < 2:
             # need to create copy encoder 
@@ -50,7 +49,7 @@ class SharedUNet(torch.nn.Module):
         prev_lang_encoder = copy.deepcopy(lang_encoder) 
     
         # always define this one 
-        self.next_encoder = UNetWithBlocks(in_channels=in_channels,
+        self.next_encoder = UNetWithAttention(in_channels=in_channels,
                                            out_channels=out_channels,
                                            lang_embedder=next_lang_embedder,
                                            lang_encoder=next_lang_encoder,
@@ -60,14 +59,14 @@ class SharedUNet(torch.nn.Module):
                                            stride=stride,
                                            num_layers=num_layers,
                                            num_blocks=num_blocks,
-                                           mlp_num_layers=mlp_num_layers,
+                                           #mlp_num_layers=mlp_num_layers,
                                            dropout=dropout,
                                            depth=depth,
                                            device=device)
 
         if self.share_level < 3: 
             # make a new module if not shared 
-            self.prev_encoder = UNetWithBlocks(in_channels=in_channels,
+            self.prev_encoder = UNetWithAttention(in_channels=in_channels,
                                                out_channels=out_channels,
                                                lang_embedder=prev_lang_embedder,
                                                lang_encoder=prev_lang_encoder,
@@ -77,7 +76,7 @@ class SharedUNet(torch.nn.Module):
                                                stride=stride,
                                                num_layers=num_layers,
                                                num_blocks=num_blocks,
-                                               mlp_num_layers=mlp_num_layers,
+                                               #mlp_num_layers=mlp_num_layers,
                                                dropout=dropout,
                                                depth=depth,
                                                device=device)

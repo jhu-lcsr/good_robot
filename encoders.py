@@ -1,5 +1,7 @@
 import torch 
 import pdb 
+import numpy as np
+np.set_printoptions(precision=4, suppress = True, linewidth=400) 
 
 class LSTMEncoder(torch.nn.Module):
     def __init__(self,
@@ -37,32 +39,26 @@ class LSTMEncoder(torch.nn.Module):
 
     def forward(self, embedded_tokens, lengths):
         embedded_tokens = embedded_tokens.to(self.device) 
-        #print(f"embedded tokens {embedded_tokens[0, 0:10, 0:3]}") 
-        embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, lengths, 
+        embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded_tokens, 
+                                                          lengths, 
                                                           batch_first=True, 
-                                                          enforce_sorted=True) 
-        embedded = embedded.to(self.device) 
-        output, __ = self.lstm(embedded)
-       
-        output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True)
-
+                                                          enforce_sorted=False) 
+        packed_output, (hidden, cell) = self.lstm(embedded)
+        output, lengths  = torch.nn.utils.rnn.pad_packed_sequence(packed_output, batch_first=True)
         bsz, seq_len, hidden_dim = output.shape
-        hidden_dim = int(hidden_dim / 2)
-        output =  output.view((bsz, seq_len, 2, hidden_dim))
-        # need indices of last non-pad token 
-        lengths = lengths.long() 
-        lengths = lengths-1
-        batch_inds = torch.tensor([i for i in range(bsz)]).long() 
-        # take first and last 
-        first = output[:,0, 0,:].unsqueeze(1) 
-        last  = output[batch_inds, lengths,1, :].unsqueeze(1) 
+
         # concat them together  
         if self.bidirectional:
+            hidden = hidden.view(self.num_layers, 2, bsz, -1) 
+            first = hidden[-1, 0, :, :].unsqueeze(1)
+            last = hidden[-1, 1, :, :].unsqueeze(1) 
             concat = torch.cat([first, last], dim=1)
+            
             # flatten out forward and backward 
             output = output.reshape(bsz, seq_len, -1) 
         else:
-            concat = last 
+            hidden = hidden.view(self.num_layers, 1, bsz, -1) 
+            concat = hidden 
 
         # flatten 
         concat = concat.reshape((bsz, -1))

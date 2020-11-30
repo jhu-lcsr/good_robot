@@ -23,26 +23,26 @@ echo "RUNNING ON VERSION: " > ${CHECKPOINT_DIR}/stdout.log
 git branch >> ${CHECKPOINT_DIR}/stdout.log
 git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 
-python -u train_language_encoder.py \
-        --train-path blocks_data/tinyset.json \
-        --val-path blocks_data/tinyset.json \
+python -u train_unet.py \
+        --train-path blocks_data/singleset.json \
+        --val-path blocks_data/singleset.json \
         --checkpoint-dir ${CHECKPOINT_DIR} \
-        --num-epochs 202 \
-        --num-blocks 20 \
-        --generate-after-n 200\
+        --num-epochs 110 \
+        --num-blocks 1 \
+        --binarize-blocks \
+        --generate-after-n 108 \
         --traj-type flat \
         --batch-size 256  \
         --max-seq-length 40 \
+        --do-filter \
+        --top-only \
         --embedding-dim 16 \
         --encoder-hidden-dim 16 \
         --encoder-num-layers 2 \
-        --deconv decoupled \
-        --deconv-factor 1 \
-        --fuser tiled \
+        --share-level none \
         --mlp-hidden-dim 32 \
         --mlp-num-layers 2 \
-        --mlp-dropout 0.0 \
         --dropout 0.0 \
         --bidirectional \
-        --cuda 0  | tee ${CHECKPOINT_DIR}/stdout.log
-        #--compute-block-dist \
+        --zero-weight 0.001 \
+        --cuda 0  

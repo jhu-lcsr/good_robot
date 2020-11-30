@@ -47,10 +47,6 @@ class BaseTrajectory:
 
         self.blocks_to_move = self.get_blocks_to_move(previous_positions, next_positions) 
 
-        print(commands) 
-        print(f"To move: {self.blocks_to_move}") 
-        #pdb.set_trace() 
-
         # output for previous positions has depth that gets filtered 
         self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
         self.previous_positions_for_acc = copy.deepcopy(self.previous_positions_for_pred) 
@@ -71,7 +67,6 @@ class BaseTrajectory:
                                                                 self.next_positions_for_acc)
 
         # set as input but one-hot 
-        #self.previous_positions_input = copy.deepcopy(self.previous_positions_for_acc)
         self.previous_positions_input = self.one_hot(copy.deepcopy(self.previous_positions_for_acc)) 
 
         if self.do_filter: 
@@ -84,16 +79,26 @@ class BaseTrajectory:
         self.traj_vocab = set() 
         self.traj_type = traj_type
 
-    def one_hot_helper(self, input_data):
-        data = input_data.long()
-        data = F.one_hot(data, 21)
-        data = data.squeeze(3).squeeze(3)
-        data = data.permute(0, 3, 1, 2)
-        # make sure it is actuall OH 
-        assert(torch.allclose(torch.sum(data, dim =1), torch.tensor(1).to(data.device)))
-        data = data.float() 
+    def one_hot_helper(self, input_data, C=21):
+        # states_before_onehot.shape = T,64,64
+        input_data = input_data.reshape(-1, 64, 64)
+        states_before_onehot = input_data.unsqueeze_(1).long()  # convert to Tx1xHxW
+        one_hot = torch.FloatTensor(states_before_onehot.size(0),C, states_before_onehot.size(2), states_before_onehot.size(3)).zero_()
+        one_hot.scatter_(1, states_before_onehot, 1)
+        return one_hot
 
-        return data 
+    #def one_hot_helper(self, input_data):
+    #    data = input_data.long()
+    #    data = F.one_hot(data, 21)
+    #    data = data.squeeze(3).squeeze(3)
+    #    data = data.permute(0, 3, 1, 2)
+    #    # make sure it is actuall OH 
+    #    assert(torch.allclose(torch.sum(data, dim =1), torch.tensor(1).to(data.device)))
+    #    data = data.float() 
+
+    #    # TODO (elias) REMOVE 
+    #    #data = torch.argmax(data, dim=1).unsqueeze(1).float() 
+    #    return data 
 
     def one_hot(self, input_positions): 
         data = [self.one_hot_helper(x) for x in input_positions]
@@ -141,30 +146,6 @@ class BaseTrajectory:
 
         return torch.tensor(blocks_to_move, dtype=torch.long).reshape(1,1) 
 
-        #batch_idx = 0
-        #bsz = self.previous_positions_for_pred[0].shape[0]
-        #bad = 0
-        #all_blocks_to_move = []
-        #for batch_idx in range(bsz):
-        #    for timestep in range(len(self.previous_positions_for_pred)):
-        #        prev_pos = self.previous_positions_for_pred[timestep][batch_idx] 
-        #        next_pos = self.next_positions_for_pred[timestep][batch_idx]
-        #        different_pixels = prev_pos[prev_pos != next_pos]
-        #        # exclude background 
-        #        different_pixel_idx = different_pixels[different_pixels != 0]
-        #        try:
-        #            blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx.item() 
-        #        except ValueError:
-        #            try:
-        #                blocks_to_move = torch.ones((bsz, 1), dtype=torch.int64) * different_pixel_idx[0].item() 
-        #            except IndexError:
-        #                blocks_to_move = torch.zeros((bsz, 1), dtype=torch.int64) 
-        #            bad += 1
-        #        all_blocks_to_move.append(blocks_to_move) 
-        #    #print(f"there are {bad} blocks with >1 move") 
-        #return all_blocks_to_move
-
-        
     def make_3d_positions(self, positions, make_z = False, batch_size = 1, do_infilling = True):
         """
         take (x,y,z) positions and turn them into 1-hot 
@@ -402,17 +383,27 @@ class DatasetReader:
         next_pos_for_acc = []
         block_to_move = []
         image = []
-        length = [] 
         # get max len 
         max_length = min(self.max_seq_length, max([traj.lengths[0] for traj in batch_as_list])) 
-        # pad  
-        for i, traj in enumerate(batch_as_list): 
+
+        # sort lengths
+        #lengths = [] 
+        #for i, traj in enumerate(batch_as_list):
+        #    com_len = len(traj.commands)
+        #    lengths.append((i, com_len))
+        #sorted_lengths = sorted(lengths, key = lambda x: x[1], reverse=True) 
+        #idxs, length = zip(*sorted_lengths) 
+        #length = list(length) 
+        # iterate sorted by length 
+        #for i, (idx, l) in enumerate(sorted_lengths): 
+        length = []
+        for idx in range(len(batch_as_list)):
+            traj = batch_as_list[idx]
             # trim! 
             if len(traj.commands) > max_length:
                 traj.commands = traj.commands[0:max_length]
-            
-            length.append(len(traj.commands)) 
 
+            length.append(len(traj.commands))
             commands.append(traj.commands + [PAD for i in range(max_length - len(traj.commands))])
             prev_pos_input.append(traj.previous_positions_input[0])
             prev_pos_for_pred.append(traj.previous_positions_for_pred[0]) 

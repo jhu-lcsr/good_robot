@@ -106,8 +106,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             if prev_outputs is None:
                 skipped += 1
                 continue
-            #loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * b) 
-            loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
+            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * b) 
+            #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
 

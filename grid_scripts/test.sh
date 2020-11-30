@@ -13,7 +13,7 @@ ml cudnn/7.5.0_cuda10.0
 
 source activate blocks 
 
-CHECKPOINT_DIR="/exp/estengel/blocks_project/models/lstm_vocab"
+#CHECKPOINT_DIR="/exp/estengel/blocks_project/models/lstm_vocab"
 
 # record git info 
 echo "RUNNING ON VERSION: " >> ${CHECKPOINT_DIR}/testout.log
@@ -30,8 +30,11 @@ python -u train_language_encoder.py \
         --generate-after-n 1 \
         --traj-type flat \
         --bidirectional \
-        --batch-size 256 \
-        --max-seq-length 20 \
+        --batch-size 128 \
+        --max-seq-length 40 \
+        --deconv decoupled \
+        --deconv-factor 1 \
+        --fuser tiled \
         --test \
         --cuda 0 
 

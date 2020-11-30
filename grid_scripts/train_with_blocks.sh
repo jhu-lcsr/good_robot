@@ -34,4 +34,5 @@ python -u train_language_encoder.py \
         --batch-size 256 \
         --max-seq-length 40 \
         --compute-block-dist \
-        --cuda 0 &> ${CHECKPOINT_DIR}/stdout.log 
+        --deconv decoupled \
+        --cuda 0 | tee ${CHECKPOINT_DIR}/stdout.log 

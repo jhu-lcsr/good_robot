@@ -39,7 +39,7 @@ class BaseUNet(torch.nn.Module):
         self.num_layers = num_layers
         self.hc_large = hc_large
         self.hc_small = hc_small
-        self.activation = torch.nn.ReLU()
+        self.activation = torch.nn.LeakyReLU()
         self.dropout = torch.nn.Dropout2d(dropout)
 
         self.downconv_modules = []
@@ -101,6 +101,15 @@ class BaseUNet(torch.nn.Module):
         self.upnorms = self.upnorms.to(self.device)
         self.final_layer = self.final_layer.to(self.device) 
         self.activation = self.activation.to(self.device) 
+        self._init_weights() 
+
+    def _init_weights(self): 
+        for i in range(len(self.upconv_modules)): 
+            torch.nn.init.kaiming_uniform(self.upconv_modules[i].weight)
+            self.upconv_modules[i].bias.data.fill_(0)
+            torch.nn.init.kaiming_uniform(self.downconv_modules[i].weight)
+            self.downconv_modules[i].bias.data.fill_(0)
+
         
     def forward(self, input_dict):
         image_input = input_dict["prev_pos_input"]
@@ -208,18 +217,13 @@ class UNetWithLanguage(BaseUNet):
     def forward(self, data_batch):
         lang_input = data_batch["command"]
         lang_length = data_batch["length"]
-        # sort lengths 
-        lengths = data_batch["length"]
-        lengths = [(i,x) for i, x in enumerate(lengths)]
-        lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
-        idxs, lengths = zip(*lengths) 
         # tensorize lengths 
-        lengths = torch.tensor(lengths).float() 
+        lengths = torch.tensor(lang_length).float() 
         lengths = lengths.to(self.device) 
 
         # embed langauge 
-        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in idxs], 
-                                    dim=0).to(self.device)
+        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in range(len(lang_input))], 
+                                    dim=0)
 
         # encode
         lang_output = self.lang_encoder(lang_embedded, lengths) 
@@ -338,18 +342,13 @@ class UNetWithBlocks(UNetWithLanguage):
     def forward(self, data_batch):
         lang_input = data_batch["command"]
         lang_length = data_batch["length"]
-        # sort lengths 
-        lengths = data_batch["length"]
-        lengths = [(i,x) for i, x in enumerate(lengths)]
-        lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
-        idxs, lengths = zip(*lengths) 
         # tensorize lengths 
-        lengths = torch.tensor(lengths).float() 
+        lengths = torch.tensor(lang_length).float() 
         lengths = lengths.to(self.device) 
 
-        # embed langauge 
-        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in idxs], 
-                                    dim=0).to(self.device)
+        # embed language 
+        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in range(len(lang_input))], 
+                                    dim=0)
 
         # encode
         lang_output = self.lang_encoder(lang_embedded, lengths) 
@@ -433,8 +432,6 @@ class UNetWithBlocks(UNetWithLanguage):
 
         return to_ret 
 
-
-
 class UNetWithAttention(BaseUNet):
     def __init__(self,
                 in_channels: int,
@@ -501,18 +498,13 @@ class UNetWithAttention(BaseUNet):
     def forward(self, data_batch):
         lang_input = data_batch["command"]
         lang_length = data_batch["length"]
-        # sort lengths 
-        lengths = data_batch["length"]
-        lengths = [(i,x) for i, x in enumerate(lengths)]
-        lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
-        idxs, lengths = zip(*lengths) 
         # tensorize lengths 
-        lengths = torch.tensor(lengths).float() 
+        lengths = torch.tensor(lang_length).float() 
         lengths = lengths.to(self.device) 
 
         # embed langauge 
-        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in idxs], 
-                                    dim=0).to(self.device)
+        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in range(len(lang_input))], 
+                                    dim=0)
 
         # encode
         lang_output = self.lang_encoder(lang_embedded, lengths) 
@@ -585,3 +577,43 @@ class UNetWithAttention(BaseUNet):
         to_ret = {"next_position": out,
                  "pred_block_logits": None}
         return to_ret 
+
+
+class IDLayer(torch.nn.Module):
+    def __init__(self):
+        super(IDLayer, self).__init__()
+    def forward(self, x):
+        return x
+
+class UNetNoNorm(UNetWithLanguage):
+    def __init__(self,
+                in_channels: int,
+                out_channels: int,
+                lang_embedder: torch.nn.Module,
+                lang_encoder: torch.nn.Module,
+                hc_large: int,
+                hc_small: int, 
+                kernel_size: int = 5,
+                stride: int = 2,
+                num_layers: int = 5,
+                num_blocks: int = 20,
+                dropout: float = 0.20, 
+                depth: int = 7,
+                device: torch.device = "cpu"):
+        super(UNetNoNorm, self).__init__(in_channels=in_channels,
+                                               out_channels=out_channels,
+                                               lang_embedder=lang_embedder,
+                                               lang_encoder=lang_encoder,
+                                               hc_large=hc_large,
+                                               hc_small=hc_small,
+                                               kernel_size=kernel_size,
+                                               stride=stride,
+                                               num_layers=num_layers,
+                                               num_blocks=num_blocks,
+                                               dropout=dropout,
+                                               depth=depth,
+                                               device=device)
+
+        # override with id layers 
+        self.upnorms = torch.nn.ModuleList([IDLayer() for i in range(len(self.upnorms))])
+        self.downnorms = torch.nn.ModuleList([IDLayer() for i in range(len(self.downnorms))])

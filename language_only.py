@@ -14,8 +14,7 @@ class LanguageEncoder(torch.nn.Module):
         self.lang_encoder = encoder
         self.lang_encoder.device = device
 
-        self.mlp = MLP(input_dim = len(self.lang_embedder.vocab) + 2, 
-                       #input_dim = encoder.output_size,
+        self.mlp = MLP(input_dim = encoder.output_size,
                        hidden_dim = 64, 
                        output_dim = 21, 
                        num_layers = 3,
@@ -23,28 +22,23 @@ class LanguageEncoder(torch.nn.Module):
         self.compute_block_dist = True 
         self.device = device
 
-
     def forward(self, data_batch):
+        #pdb.set_trace() 
+
         lang_input = data_batch["command"]
         lang_length = data_batch["length"]
-        # sort lengths 
-        lengths = data_batch["length"]
-        lengths = [(i,x) for i, x in enumerate(lengths)]
-        lengths = sorted(lengths, key = lambda x: x[1], reverse=True)
-        idxs, lengths = zip(*lengths) 
         # tensorize lengths 
-        lengths = torch.tensor(lengths).float() 
+        lengths = torch.tensor(lang_length).float() 
         lengths = lengths.to(self.device) 
 
-        # embed langauge 
-        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in idxs], 
-                                    dim=0).to(self.device)
-
+        # embed language 
+        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in range(len(lang_input))], 
+                                    dim=0)
         # encode
+        # USE CBOW FOR DEBUGGING 
         #mean_embedding = torch.sum(lang_embedded, dim = 1).repeat(1,2) 
-        mean_embedding = torch.sum(lang_embedded, dim = 1).float() 
-        lang_output = {"sentence_encoding": mean_embedding } 
-        #lang_output = self.lang_encoder(lang_embedded, lengths) 
+        #lang_output = {"sentence_encoding": mean_embedding } 
+        lang_output = self.lang_encoder(lang_embedded, lengths) 
         
         # get language output as sentence embedding 
         sent_encoding = lang_output["sentence_encoding"] 

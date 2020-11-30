@@ -60,7 +60,7 @@ class RandomEmbedder(torch.nn.Module):
         self.word_to_idx["<UNK>"] = 0
         self.word_to_idx["<PAD>"] = 1
 
-        #self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
+        self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
 
     def set_device(self, device):
         self.device = device
@@ -71,8 +71,8 @@ class RandomEmbedder(torch.nn.Module):
         words = [w if w in self.vocab else "<UNK>" for w in words]
         lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long)
         lookup_tensor = lookup_tensor.to(self.device)
-        output = torch.nn.functional.one_hot(lookup_tensor, len(self.vocab)+2)
-        #output = self.embeddings(lookup_tensor)
+        #output = torch.nn.functional.one_hot(lookup_tensor, len(self.vocab)+2)
+        output = self.embeddings(lookup_tensor)
         return output 
 
 

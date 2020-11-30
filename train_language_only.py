@@ -99,6 +99,7 @@ class LanguageAloneTrainer(FlatLanguageTrainer):
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
+        #pdb.set_trace() 
         lang_outputs= self.encoder(batch_instance) 
         block_accuracy = self.compute_block_accuracy(batch_instance, lang_outputs) 
         return block_accuracy
@@ -177,8 +178,8 @@ def main(args):
                          
     print(encoder) 
     # construct optimizer 
-    #optimizer = torch.optim.Adam(encoder.parameters()) 
-    optimizer = torch.optim.SGD(encoder.parameters(), lr = 0.01 ) 
+    optimizer = torch.optim.Adam(encoder.parameters()) 
+    #optimizer = torch.optim.SGD(encoder.parameters(), lr = 0.01 ) 
 
     best_epoch = -1
     if not args.test:
