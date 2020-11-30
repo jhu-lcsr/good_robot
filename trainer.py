@@ -348,10 +348,12 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
-    # TODO(adit98) add check so that we don't sample across resets due to history
     def load_sample(self, sample_iteration, logger, use_history=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
+        # load trial success log (stores number of completed trials at each iteration)
+        completed_trials = np.loadtxt(os.path.join(logger.transitions_directory, 'trial-success.log.txt'))
+
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
         # Load sample RGB-D heightmap
@@ -365,9 +367,18 @@ class Trainer(object):
             # append 1 channel of current timestep depth to depth_heightmap_history
             depth_heightmap_history = [sample_depth_heightmap[:, :, 0]]
             for i in range(1, history_len):
-                # load img at sample_iteration - i
+                # find beginning of current trial using completed trials
+                if completed_trials[sample_iteration] == 0:
+                    trial_start = 0
+                else:
+                    trial_start = np.argwhere(completed_trials[:sample_iteration] == completed_trials[sample_iteration]).squeeze()[1]
+
+                # if we try to load history before beginning of a trial, just repeat initial state
+                iter_num = max(sample_iteration - i, trial_start)
+
+                # load img at iter_num
                 h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
-                    '%06d.0.depth.png' % (sample_iteration - i)), -1)
+                    '%06d.0.depth.png' % iter_num), -1)
                 h_i = h_i.astype(np.float32)/100000
                 depth_heightmap_history.append(h_i[:, :, 0])
 
@@ -394,11 +405,13 @@ class Trainer(object):
         sample_push_predictions, sample_grasp_predictions, sample_place_predictions, sample_state_feat, output_prob = self.forward(
             sample_color_heightmap, sample_depth_heightmap, is_volatile=True, goal_condition=exp_goal_condition)
 
+        # TODO(adit98) check if changing suffix rather than changing iteration num for getting future heightmap causes issues
         # Load next sample RGB-D heightmap
-        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration+1)))
+        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.2.color.png' % (sample_iteration)))
         next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration+1)), -1)
+        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.2.depth.png' % (sample_iteration)), -1)
         next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
+
         # TODO(ahundt) tune sample_reward_value and gamma discount rate?
         sample_place_success = None
         # note that push success is always true in robot.push, and didn't affect get_label_value at the time of writing.
