@@ -643,7 +643,8 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
-                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                    valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
+                            workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
@@ -668,7 +669,9 @@ def main(args):
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot,
+                            workspace_limits, heightmap_resolution, logger, trainer, '2')
+
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -703,7 +706,8 @@ def main(args):
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot,
+                            workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
@@ -844,7 +848,7 @@ def main(args):
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer)
+            robot, workspace_limits, heightmap_resolution, logger, trainer, use_hist=args.use_hist)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
@@ -1361,7 +1365,7 @@ def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap,
             no_change_count[1] += 1
     return change_detected, no_change_count
 
-def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True):
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True, use_hist=False, history_len=3):
     # Get latest RGB-D image
     valid_depth_heightmap, color_heightmap, depth_heightmap, _, color_img, depth_img = robot.get_camera_data(return_heightmaps=True)
 
@@ -1369,6 +1373,36 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     if save_image:
         logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
         logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
+
+    # load history and modify valid_depth_heightmap
+    if use_hist:
+        # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
+        trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
+        if os.path.exists(trial_success_path):
+            completed_trials = np.loadtxt(trial_success_path)
+        else:
+            completed_trials = np.zeros(trainer.iteration)
+
+        # append 1 channel of current timestep depth to depth_heightmap_history
+        depth_heightmap_history = [valid_depth_heightmap[:, :, 0]]
+        for i in range(1, history_len):
+            # find beginning of current trial using completed trials
+            if completed_trials[trainer.iteration] == 0:
+                trial_start = 0
+            else:
+                trial_start = np.argwhere(completed_trials[:trainer.iteration] == completed_trials[trainer.iteration]).squeeze()[1]
+
+            # if we try to load history before beginning of a trial, just repeat initial state
+            iter_num = max(trainer.iteration - i, trial_start)
+
+            # load img at iter_num
+            h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
+                '%06d.0.depth.png' % iter_num), -1)
+            h_i = h_i.astype(np.float32)/100000
+            depth_heightmap_history.append(h_i[:, :, 0])
+
+        valid_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
+
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
 def experience_replay(method, prev_primitive_action, prev_reward_value, trainer, grasp_color_task, logger, nonlocal_variables, place, goal_condition, all_history_prob=0.05, trial_reward=False, train_on_successful_experience=None):
@@ -1432,7 +1466,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
          sample_change_detected, sample_push_predictions, sample_grasp_predictions,
          next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
          exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
-         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger)
+         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, use_hist=args.use_hist)
 
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
@@ -1726,6 +1760,7 @@ if __name__ == '__main__':
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
+    parser.add_argument('--use_hist', dest='use_hist', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
 
 
     # -------------- Testing options --------------

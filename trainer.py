@@ -348,11 +348,15 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
-    def load_sample(self, sample_iteration, logger, use_history=False, history_len=3):
+    def load_sample(self, sample_iteration, logger, use_hist=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
-        # load trial success log (stores number of completed trials at each iteration)
-        completed_trials = np.loadtxt(os.path.join(logger.transitions_directory, 'trial-success.log.txt'))
+        # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
+        trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
+        if os.path.exists(trial_success_path):
+            completed_trials = np.loadtxt(trial_success_path)
+        else:
+            completed_trials = np.zeros(sample_iteration)
 
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
 
@@ -363,7 +367,7 @@ class Trainer(object):
         sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
         # if we are using history, load the last t depth heightmaps, calculate numerical depth, and concatenate
-        if use_history:
+        if use_hist:
             # append 1 channel of current timestep depth to depth_heightmap_history
             depth_heightmap_history = [sample_depth_heightmap[:, :, 0]]
             for i in range(1, history_len):
