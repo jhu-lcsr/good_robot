@@ -348,7 +348,8 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
-    def load_sample(self, sample_iteration, logger):
+    # TODO(adit98) add check so that we don't sample across resets due to history
+    def load_sample(self, sample_iteration, logger, use_history=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
@@ -358,6 +359,19 @@ class Trainer(object):
         sample_color_heightmap = cv2.cvtColor(sample_color_heightmap, cv2.COLOR_BGR2RGB)
         sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration)), -1)
         sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
+
+        # if we are using history, load the last t depth heightmaps, calculate numerical depth, and concatenate
+        if use_history:
+            # append 1 channel of current timestep depth to depth_heightmap_history
+            depth_heightmap_history = [sample_depth_heightmap[:, :, 0]]
+            for i in range(1, history_len):
+                # load img at sample_iteration - i
+                h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
+                    '%06d.0.depth.png' % (sample_iteration - i)), -1)
+                h_i = h_i.astype(np.float32)/100000
+                depth_heightmap_history.append(h_i[:, :, 0])
+
+            sample_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
 
         # Compute forward pass with sample
         if self.goal_condition_len > 0:
