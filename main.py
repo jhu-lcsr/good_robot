@@ -906,6 +906,13 @@ def main(args):
                 print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
 
+            # fill trial success log with 0s if we had a no activity-caused reset, do for both real and sim
+            if not place:
+                pg_trial_success_count = np.max(trainer.trial_success_log, initial=0)
+                for i in range(len(trainer.trial_success_log), trainer.iteration + 1):
+                    # previous trials were ended early
+                    trainer.trial_success_log.append([int(pg_trial_success_count)])
+
             # If the scene started empty, we are just setting up
             # trial 0 with a reset, so no trials have been completed.
             if trainer.iteration > 0:
@@ -1380,7 +1387,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
         trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
         if os.path.exists(trial_success_path):
-            completed_trials = np.loadtxt(trial_success_path)
+            completed_trials = np.loadtxt(trial_success_path).squeeze()
         else:
             completed_trials = np.zeros(trainer.iteration + 1)
 
@@ -1388,10 +1395,10 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         depth_heightmap_history = [valid_depth_heightmap]
         for i in range(1, history_len):
             # find beginning of current trial using completed trials
-            if completed_trials[trainer.iteration] == 0:
+            if completed_trials[-1] == 0:
                 trial_start = 0
             else:
-                trial_start = np.argwhere(completed_trials[:trainer.iteration] == completed_trials[trainer.iteration]).squeeze()[1]
+                trial_start = np.argwhere(completed_trials == completed_trials[-1]).squeeze()[0] + 1
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(trainer.iteration - i, trial_start)
