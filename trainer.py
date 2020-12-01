@@ -590,7 +590,7 @@ class Trainer(object):
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:
-                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
                             push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
                 else:
                     push_feat = np.ma.masked_array(push_feat)
@@ -601,11 +601,11 @@ class Trainer(object):
             # mask action, if we are not in demo or if demo_mask is set
             if not use_demo or demo_mask:
                 if self.place:
-                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
                     place_predictions = np.ma.masked_array(place_predictions)
                 else:
-                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap,
+                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
                             push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
 
             else:
