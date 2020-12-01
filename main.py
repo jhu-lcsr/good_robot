@@ -848,7 +848,7 @@ def main(args):
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer, use_hist=args.use_hist)
+            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape)
@@ -1373,7 +1373,7 @@ def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap,
             no_change_count[1] += 1
     return change_detected, no_change_count
 
-def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True, use_hist=False, history_len=3):
+def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, filename_poststring='0', save_image=True, depth_channels_history=False, history_len=3):
     # Get latest RGB-D image
     valid_depth_heightmap, color_heightmap, depth_heightmap, _, color_img, depth_img = robot.get_camera_data(return_heightmaps=True)
 
@@ -1383,7 +1383,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
 
     # load history and modify valid_depth_heightmap
-    if use_hist:
+    if depth_channels_history:
         # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
         trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
         if os.path.exists(trial_success_path):
@@ -1478,7 +1478,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
          sample_change_detected, sample_push_predictions, sample_grasp_predictions,
          next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
          exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
-         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, use_hist=args.use_hist)
+         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, depth_channels_history=args.depth_channels_history)
 
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
@@ -1772,7 +1772,7 @@ if __name__ == '__main__':
     parser.add_argument('--disable_situation_removal', dest='disable_situation_removal', action='store_true', default=False,                        help='Disables situation removal, where rewards are set to 0 and a reset is triggered upon reversal of task progress. Automatically enabled when is_testing is enable.')
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
-    parser.add_argument('--use_hist', dest='use_hist', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
+    parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
 
 
     # -------------- Testing options --------------
