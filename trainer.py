@@ -348,7 +348,7 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
-    def load_sample(self, sample_iteration, logger, use_hist=False, history_len=3):
+    def load_sample(self, sample_iteration, logger, depth_channels_history=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
         sample_primitive_action_id = self.executed_action_log[sample_iteration][0]
@@ -360,7 +360,7 @@ class Trainer(object):
         sample_depth_heightmap = sample_depth_heightmap.astype(np.float32)/100000
 
         # if we are using history, load the last t depth heightmaps, calculate numerical depth, and concatenate
-        if use_hist:
+        if depth_channels_history:
             # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
             trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
             if os.path.exists(trial_success_path):
@@ -382,8 +382,15 @@ class Trainer(object):
                 # find beginning of current trial using completed trials
                 if completed_trials[sample_iteration] == 0:
                     trial_start = 0
+
+                # if we are sampling the end of a trial, need to find trial start differently
+                elif completed_trial[sample_iteration] != completed_trial[sample_iteration-1]:
+                    trial_start = np.argwhere(completed_trials[:sample_iteration + 1] == \
+                            completed_trials[sample_iteration - 1])[0].item() + 1
+
                 else:
-                    trial_start = np.argwhere(completed_trials[:sample_iteration] == completed_trials[sample_iteration]).squeeze()[1]
+                    trial_start = np.argwhere(completed_trials[:sample_iteration+1] == \
+                            completed_trials[sample_iteration])[0].item() + 1
 
                 # if we try to load history before beginning of a trial, just repeat initial state
                 iter_num = max(sample_iteration - i, trial_start)
