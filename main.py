@@ -1398,7 +1398,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
             if completed_trials[-1] == 0:
                 trial_start = 0
             else:
-                trial_start = np.argwhere(completed_trials == completed_trials[-1]).squeeze()[0] + 1
+                trial_start = np.argwhere(completed_trials == completed_trials[-1])[0].item() + 1
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(trainer.iteration - i, trial_start)
