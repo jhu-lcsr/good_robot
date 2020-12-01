@@ -364,7 +364,15 @@ class Trainer(object):
             # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
             trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
             if os.path.exists(trial_success_path):
+                # TODO(adit98) clean up this logic
                 completed_trials = np.loadtxt(trial_success_path)
+                # check if we are attempting to sample from the ongoing trial (hasn't been logged in trial-success log)
+                if len(completed_trials) <= sample_iteration:
+                    # extend completed trials array with current number of trials completed
+                    completed_trials_mod = np.zeros(sample_iteration + 1)
+                    completed_trials_mod[len(completed_trials):] = np.max(completed_trials)
+                    completed_trials_mod[:len(completed_trials)] = completed_trials
+                    completed_trials = completed_trials_mod
             else:
                 completed_trials = np.zeros(sample_iteration + 1)
 
