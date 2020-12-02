@@ -20,7 +20,6 @@ import matplotlib
 import torch
 import numpy as np
 import pandas as pd 
-import kornia 
 
 
 from image_encoder import ImageEncoder, DeconvolutionalNetwork, DecoupledDeconvolutionalNetwork
@@ -63,6 +62,7 @@ class LanguageTrainer:
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 resolution: int = 64, 
                  depth: int = 4,
                  best_epoch: int = -1): 
         self.train_data = train_data
@@ -76,15 +76,10 @@ class LanguageTrainer:
         self.generate_after_n = generate_after_n
         self.best_epoch = best_epoch
         self.depth = depth 
+        self.resolution = resolution
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
-
-        #weight = torch.tensor([zero_weight, 1-zero_weight]).to(device) 
-        #self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
-        
-        # trying dice loss 
-        #self.weighted_xent_loss_fxn = kornia.losses.DiceLoss()
 
     
         self.nll_loss_fxn = torch.nn.NLLLoss()
@@ -220,8 +215,8 @@ class LanguageTrainer:
         # num_blocks x depth x 64 x 64 
         pred_data = pred_data[1,:,:,:]
         
-        xs = np.arange(0, 64, 1)
-        zs = np.arange(0, 64, 1)
+        xs = np.arange(0, self.resolution, 1)
+        zs = np.arange(0, self.resolution, 1)
 
         depth = 0
         fig = plt.figure(figsize=(16,12))
@@ -236,10 +231,13 @@ class LanguageTrainer:
         text_ax.text(0.05, 0.95, caption, wrap=True, fontsize=14,
             verticalalignment='top', bbox=props)
         ax = plt.subplot(gs[0])
-        ax.set_xticks([0, 16, 32, 48, 64])
-        ax.set_yticks([0, 16, 32, 48, 64]) 
-        ax.set_ylim(0, 64)
-        ax.set_xlim(0, 64)
+        #ax.set_xticks([0, 16, 32, 48, 64])
+        #ax.set_yticks([0, 16, 32, 48, 64]) 
+        ticks = [i for i in range(0, self.resolution + 16, 16)]
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks) 
+        ax.set_ylim(0, self.resolution)
+        ax.set_xlim(0, self.resolution)
         plt.grid() 
         to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
         to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
@@ -375,6 +373,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 resolution: int = 64, 
                  depth: int = 4,
                  best_epoch: int = -1): 
         super(FlatLanguageTrainer, self).__init__(train_data,
@@ -387,6 +386,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                                                   checkpoint_dir,
                                                   num_models_to_keep,
                                                   generate_after_n,
+                                                  resolution,
                                                   depth, 
                                                   best_epoch)
 

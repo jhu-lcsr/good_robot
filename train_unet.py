@@ -18,7 +18,6 @@ import numpy as np
 import torch.autograd.profiler as profiler
 from torch.nn import functional as F
 import pandas as pd 
-import kornia 
 
 from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder
@@ -44,6 +43,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 resolution: int = 64, 
                  depth: int = 7,
                  best_epoch: int = -1,
                  zero_weight: float = 0.05):
@@ -57,6 +57,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                                   checkpoint_dir,
                                                   num_models_to_keep,
                                                   generate_after_n,
+                                                  resolution, 
                                                   depth, 
                                                   best_epoch)
 
@@ -198,13 +199,6 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                 command = " ".join(command) 
 
                 next_pos = batch_instance["next_pos_for_acc"][i]
-                
-                # TODO: remove fake 
-                # fake next 
-                #fake_next = batch_instance["next_pos_for_pred"][i].reshape(1, 64, 64, 1)
-                #fake_next = torch.cat([torch.zeros_like(fake_next), fake_next], dim=0)
-                #fake_pred = batch_instance["prev_pos_for_pred"][i].reshape(1, 64, 64, 1) 
-                #fake_pred = torch.cat([torch.zeros_like(fake_pred), fake_pred], dim=0)
 
                 self.generate_debugging_image(next_pos,
                                              next_outputs["next_position"][i], 
@@ -225,8 +219,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         gold_pixels = true_pos 
         pred_pixels = pred_pixels.unsqueeze(-1) 
 
-        pred_pixels = pred_pixels.detach().cpu()
-        gold_pixels = gold_pixels.detach().cpu()
+        pred_pixels = pred_pixels.detach().cpu().float() 
+        gold_pixels = gold_pixels.detach().cpu().float() 
 
         total_pixels = sum(pred_pixels.shape) 
 
@@ -299,6 +293,7 @@ def main(args):
                                    max_seq_length = args.max_seq_length,
                                    do_filter = args.do_filter,
                                    top_only = args.top_only,
+                                   resolution = args.resolution, 
                                    binarize_blocks = args.binarize_blocks)  
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
@@ -412,6 +407,7 @@ def main(args):
                               num_models_to_keep = args.num_models_to_keep,
                               generate_after_n = args.generate_after_n, 
                               depth = depth, 
+                              resolution = args.resolution, 
                               best_epoch = best_epoch,
                               zero_weight = args.zero_weight) 
         trainer.train() 
@@ -450,6 +446,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-seq-length", type=int, default = 65) 
     parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
     parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
+    parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
