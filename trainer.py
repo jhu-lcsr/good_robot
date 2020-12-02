@@ -384,7 +384,7 @@ class Trainer(object):
                     trial_start = 0
 
                 # if we are sampling the end of a trial, need to find trial start differently
-                elif completed_trial[sample_iteration] != completed_trial[sample_iteration-1]:
+                elif completed_trials[sample_iteration] != completed_trials[sample_iteration-1]:
                     trial_start = np.argwhere(completed_trials[:sample_iteration + 1] == \
                             completed_trials[sample_iteration - 1])[0].item() + 1
 
