@@ -79,26 +79,24 @@ class BaseTrajectory:
         self.traj_vocab = set() 
         self.traj_type = traj_type
 
-    def one_hot_helper(self, input_data, C=21):
-        # states_before_onehot.shape = T,64,64
-        input_data = input_data.reshape(-1, 64, 64)
-        states_before_onehot = input_data.unsqueeze_(1).long()  # convert to Tx1xHxW
-        one_hot = torch.FloatTensor(states_before_onehot.size(0),C, states_before_onehot.size(2), states_before_onehot.size(3)).zero_()
-        one_hot.scatter_(1, states_before_onehot, 1)
-        return one_hot
+    #def one_hot_helper(self, input_data, C=21):
+    #    # states_before_onehot.shape = T,64,64
+    #    input_data = input_data.reshape(-1, 64, 64)
+    #    states_before_onehot = input_data.unsqueeze_(1).long()  # convert to Tx1xHxW
+    #    one_hot = torch.FloatTensor(states_before_onehot.size(0),C, states_before_onehot.size(2), states_before_onehot.size(3)).zero_()
+    #    one_hot.scatter_(1, states_before_onehot, 1)
+    #    return one_hot
 
-    #def one_hot_helper(self, input_data):
-    #    data = input_data.long()
-    #    data = F.one_hot(data, 21)
-    #    data = data.squeeze(3).squeeze(3)
-    #    data = data.permute(0, 3, 1, 2)
-    #    # make sure it is actuall OH 
-    #    assert(torch.allclose(torch.sum(data, dim =1), torch.tensor(1).to(data.device)))
-    #    data = data.float() 
+    def one_hot_helper(self, input_data):
+        data = input_data.long()
+        data = F.one_hot(data, 21)
+        data = data.squeeze(3).squeeze(3)
+        data = data.permute(0, 3, 1, 2)
+        # make sure it is actuall OH 
+        assert(torch.allclose(torch.sum(data, dim =1), torch.tensor(1).to(data.device)))
+        data = data.float() 
 
-    #    # TODO (elias) REMOVE 
-    #    #data = torch.argmax(data, dim=1).unsqueeze(1).float() 
-    #    return data 
+        return data 
 
     def one_hot(self, input_positions): 
         data = [self.one_hot_helper(x) for x in input_positions]
@@ -256,7 +254,8 @@ class SimpleTrajectory(BaseTrajectory):
         self.commands = self.tokenize(commands)
 
     def tokenize(self, command): 
-        command = [str(x) for x in self.tokenizer(command)]
+        # lowercase everything 
+        command = [str(x).lower() for x in self.tokenizer(command)]
         self.lengths = [len(command)]
         # add to vocab 
         self.traj_vocab |= set(command) 

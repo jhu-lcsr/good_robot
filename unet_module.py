@@ -101,13 +101,13 @@ class BaseUNet(torch.nn.Module):
         self.upnorms = self.upnorms.to(self.device)
         self.final_layer = self.final_layer.to(self.device) 
         self.activation = self.activation.to(self.device) 
-        self._init_weights() 
+        #self._init_weights() 
 
     def _init_weights(self): 
         for i in range(len(self.upconv_modules)): 
-            torch.nn.init.kaiming_uniform(self.upconv_modules[i].weight)
+            torch.nn.init.xavier_uniform_(self.upconv_modules[i].weight)
             self.upconv_modules[i].bias.data.fill_(0)
-            torch.nn.init.kaiming_uniform(self.downconv_modules[i].weight)
+            torch.nn.init.xavier_uniform_(self.downconv_modules[i].weight)
             self.downconv_modules[i].bias.data.fill_(0)
 
         

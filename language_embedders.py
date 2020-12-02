@@ -6,39 +6,60 @@ import pdb
 class GloveEmbedder(torch.nn.Module):
     def __init__(self, 
                  tokenizer: Tokenizer,
-                 embedding_file: str,
-                 trainable: bool = False): 
+                 vocab: set,
+                 embedding_file: str, 
+                 embedding_dim: int = 300,
+                 trainable: bool = True): 
         super(GloveEmbedder, self).__init__()
 
         self.tokenizer = tokenizer
         self.trainable = trainable
         
         # read embeddings from file 
+        print(f"reading embeddings...") 
         with open(embedding_file) as f1:
             contents = f1.readlines()
 
-        embedding_dict = {}
+        # set embeddings 
+        self.unk_embedding = torch.zeros((1, embedding_dim))
+        self.pad_token = torch.ones((1, embedding_dim))
+        self.vocab = vocab
+        self.word_to_idx = {word:i+2 for i, word in enumerate(vocab)}
+        self.word_to_idx["<UNK>"] = 0
+        self.word_to_idx["<PAD>"] = 1
+
+        self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
+
+        fake_weight = torch.clone(self.embeddings.weight)
+
         for line in contents: 
             line = line.split(" ")
             key = line[0]
             embeddings = [float(x) for x in line[1:]]
-            assert(len(embeddings) == 300)
-            embedding_dict[key] = np.array(embeddings)
-        
-        # set embeddings 
-        self.embedding_dict = embedding_dict
-        self.unk_embedding = np.zeros(300)
-        self.vocab = self.embedding_dict.keys() 
+            assert(len(embeddings) == embedding_dim)
+
+            if key in self.vocab:
+                # initialize with glove embedding when you can, otherwise keep random for unks 
+                key_idx = self.word_to_idx[key]
+                fake_weight[key_idx] = torch.tensor(np.array(embeddings)) 
+
+        self.embeddings.load_state_dict({"weight": fake_weight}) 
+        if not trainable:
+            self.embeddings.weight.requires_grad = False
+        else:
+            self.embeddings.weight.requires_grad = True
+
+    def set_device(self, device):
+        self.device = device
+        if "cuda" in str(device):
+            self.embeddings = self.embeddings.cuda(self.device) 
 
     def forward(self, words):
-        words = self.tokenizer(words)
-        if not self.trainable:
-            with torch.no_grad():  
-                output = [self.embedding_dict[w] if w in self.vocab else self.unk_embedding for w in words ]
-                return torch.Tensor(output) 
-        else:
-            output = [self.embedding_dict[w] if w in self.vocab else self.unk_embedding for w in words ]
-            return torch.Parameter(torch.Tensor(output))
+        words = [w if w in self.vocab else "<UNK>" for w in words]
+        lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long)
+        lookup_tensor = lookup_tensor.to(self.device)
+        output = self.embeddings(lookup_tensor)
+        return output 
 
 class RandomEmbedder(torch.nn.Module):
     def __init__(self, 
@@ -52,7 +73,6 @@ class RandomEmbedder(torch.nn.Module):
         self.trainable = trainable
 
         # set embeddings 
-        self.embedding_dict = {}
         self.unk_embedding = torch.zeros((1, embedding_dim))
         self.pad_token = torch.ones((1, embedding_dim))
         self.vocab = vocab
@@ -71,7 +91,6 @@ class RandomEmbedder(torch.nn.Module):
         words = [w if w in self.vocab else "<UNK>" for w in words]
         lookup_tensor = torch.tensor([self.word_to_idx[w] for w in words], dtype = torch.long)
         lookup_tensor = lookup_tensor.to(self.device)
-        #output = torch.nn.functional.one_hot(lookup_tensor, len(self.vocab)+2)
         output = self.embeddings(lookup_tensor)
         return output 
 

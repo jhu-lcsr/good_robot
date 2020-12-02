@@ -20,43 +20,17 @@ from torch.nn import functional as F
 import pandas as pd 
 import kornia 
 
-
 from encoders import LSTMEncoder
-from language_embedders import RandomEmbedder
+from language_embedders import RandomEmbedder, GloveEmbedder
 from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from unet_shared import SharedUNet
 from mlp import MLP 
+from losses import ScheduledWeightedCrossEntropyLoss
 
 from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 
 logger = logging.getLogger(__name__)
-
-class BootstrappedCE(torch.nn.Module):
-    """from https://stackoverflow.com/questions/63735255/how-do-i-compute-bootstrapped-cross-entropy-loss-in-pytorch"""
-    def __init__(self, start_warm=0, end_warm=1, top_p=0.25):
-        super().__init__()
-
-        self.start_warm = start_warm
-        self.end_warm = end_warm
-        self.top_p = top_p
-
-    def forward(self, input, target, it):
-        if it < self.start_warm:
-            #return F.cross_entropy(input, target), 1.0
-            return F.cross_entropy(input, target)
-
-        raw_loss = F.cross_entropy(input, target, reduction='none').view(-1)
-        num_pixels = raw_loss.numel()
-
-        if it > self.end_warm:
-            this_p = self.top_p
-        else:
-            this_p = self.top_p + (1-self.top_p)*((self.end_warm-it)/(self.end_warm-self.start_warm))
-        loss, _ = torch.topk(raw_loss, int(num_pixels * this_p), sorted=False)
-        #return loss.mean(), this_p
-        return loss.mean()
-
 
 class UNetLanguageTrainer(FlatLanguageTrainer): 
     def __init__(self,
@@ -87,8 +61,15 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                                   best_epoch)
 
         weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
+        total_steps = num_epochs * len(train_data) 
+        print(f"total steps {total_steps}") 
+        #self.weighted_xent_loss_fxn = ScheduledWeightedCrossEntropyLoss(start_weight = 0.50, 
+        #                                                                max_weight = 0.01,
+        #                                                                num_steps = total_steps/2)
+
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
         #self.weighted_xent_loss_fxn = kornia.losses.DiceLoss()
+        #self.weighted_xent_loss_fxn = kornia.losses.FocalLoss(0.25, gamma=2.0, reduction='mean') 
         #self.weighted_xent_loss_fxn = BootstrappedCE()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
@@ -106,7 +87,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             if prev_outputs is None:
                 skipped += 1
                 continue
-            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * b) 
+            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * (b+1)) 
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
@@ -188,7 +169,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         true_next_image = true_next_image.long().to(self.device) 
         true_prev_image = true_prev_image.long().to(self.device) 
 
-        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image) 
+        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
         next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
 
         total_loss = next_pixel_loss + prev_pixel_loss 
@@ -346,6 +327,8 @@ def main(args):
     # get the embedder from args 
     if args.embedder == "random":
         embedder = RandomEmbedder(tokenizer, train_vocab, args.embedding_dim, trainable=True)
+    elif args.embedder == "glove":
+        embedder = GloveEmbedder(tokenizer, train_vocab, args.embedding_file, args.embedding_dim, trainable=True) 
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
     # get the encoder from args  
@@ -390,7 +373,7 @@ def main(args):
                          
     print(encoder) 
     # construct optimizer 
-    optimizer = torch.optim.Adam(encoder.parameters()) 
+    optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learn_rate) 
 
     best_epoch = -1
     if not args.test:
@@ -469,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
+    parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # language encoder
     parser.add_argument("--encoder", type=str, default="lstm", choices = ["lstm", "transformer"])
@@ -490,6 +474,7 @@ if __name__ == "__main__":
     # misc
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--cuda", type=int, default=None) 
+    parser.add_argument("--learn-rate", type=float, default = 0.001) 
     parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
     parser.add_argument("--num-epochs", type=int, default=3) 
