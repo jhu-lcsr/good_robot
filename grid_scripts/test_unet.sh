@@ -13,7 +13,7 @@
 
 source activate blocks 
 
-CHECKPOINT_DIR="models/unet_train_dropout_${DROPOUT}_weighted_${WEIGHT}"
+CHECKPOINT_DIR="models/unet_train_dropout_${DROPOUT}_weighted_${WEIGHT}_lr_${LR}"
 
 mkdir -p ${CHECKPOINT_DIR}/code
 # copy all code 
@@ -37,11 +37,15 @@ python -u train_unet.py \
         --max-seq-length 40 \
         --do-filter \
         --top-only \
-        --embedding-dim 128 \
+        --embedder glove \
+        --embedding-dim 100 \
+        --embedding-file /home/estengel/glove/glove.6B.100d.txt \
         --encoder-hidden-dim 64 \
         --encoder-num-layers 2 \
-        --share-level encoder \
-        --mlp-hidden-dim 128 \
+        --unet-hc-large 32 \
+        --unet-hc-small 16 \
+        --share-level none \
+        --mlp-hidden-dim 32 \
         --mlp-num-layers 2 \
         --dropout ${DROPOUT} \
         --bidirectional \

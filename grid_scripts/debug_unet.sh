@@ -36,7 +36,9 @@ python -u train_unet.py \
         --max-seq-length 40 \
         --do-filter \
         --top-only \
-        --embedding-dim 16 \
+        --embedder glove \
+        --embedding-dim 50 \
+        --embedding-file /home/estengel/glove/glove.6B.50d.txt \
         --encoder-hidden-dim 16 \
         --encoder-num-layers 2 \
         --share-level none \
