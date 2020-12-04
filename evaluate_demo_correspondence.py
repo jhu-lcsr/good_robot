@@ -259,6 +259,7 @@ if __name__ == '__main__':
             example_action_row, example_action_stack, _ = example_demo.get_action(workspace_limits,
                     action, k, stack_trainer=stack_trainer, row_trainer=row_trainer)
 
+            # TODO(adit98) add depth_channel_history options here
             # get imitation heightmaps
             if args.task_type == 'unstack':
                 if action == 'grasp':
