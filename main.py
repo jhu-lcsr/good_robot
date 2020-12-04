@@ -1606,9 +1606,10 @@ def check_training_complete(args):
         transitions_directory = os.path.join(logging_directory, 'transitions')
         kwargs = {'delimiter': ' ', 'ndmin': 2}
         iteration = int(np.loadtxt(os.path.join(transitions_directory, 'iteration.log.txt'), **kwargs)[0, 0])
-        max_iter_complete = args.max_train_actions is None and (args.max_iter < 0 or iteration < args.max_iter)
+        max_iter_complete = args.max_train_actions is None and (args.max_iter > 0 and iteration > args.max_iter)
         max_train_actions_complete = args.max_train_actions is not None and iteration > args.max_train_actions
         training_complete = max_iter_complete or max_train_actions_complete
+    
     return training_complete, logging_directory
 
 
