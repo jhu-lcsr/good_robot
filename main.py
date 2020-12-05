@@ -1384,35 +1384,23 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     # TODO(adit98) clean up this logic
     # load history and modify valid_depth_heightmap
     if depth_channels_history:
-        # check if trial succcess log exists, otherwise, no trials have been completed, so use array of 0s
-        trial_success_path = os.path.join(logger.transitions_directory, 'trial-success.log.txt')
-        if os.path.exists(trial_success_path):
-            completed_trials = np.loadtxt(trial_success_path).squeeze()
-            # check if we are attempting to sample from the ongoing trial (hasn't been logged in trial-success log)
-            if len(completed_trials) <= trainer.iteration:
-                # extend completed trials array with current number of trials completed
-                completed_trials_mod = np.zeros(trainer.iteration)
-                completed_trials_mod[len(completed_trials):] = np.max(completed_trials)
-                completed_trials_mod[:len(completed_trials)] = completed_trials
-                completed_trials = completed_trials_mod
+        # check if clearance log exists, otherwise, no trials have been completed, so use array of 0s
+        clearance_path = os.path.join(logger.transitions_directory, 'clearance.log.txt')
+        if os.path.exists(clearance_path):
+            clearance_inds = np.loadtxt(clearance_path).squeeze()
         else:
-            completed_trials = np.zeros(trainer.iteration)
+            clearance_inds = None
 
         # append 1 channel of current timestep depth to depth_heightmap_history
         depth_heightmap_history = [valid_depth_heightmap]
         for i in range(1, history_len):
-            # TODO(adit98) doesn't deal with resets
-            # find beginning of current trial using completed trials (-1 for trainer.iteration)
-            if completed_trials[-1] == 0:
+            if clearance_inds is None:
+                # if clearance_inds is None, we haven't had a reset
                 trial_start = 0
 
-            # check if we are sampling the end of a trial
-            elif completed_trials[-1] != completed_trials[-2]:
-                trial_start = np.argwhere(completed_trials == \
-                        completed_trials[-2])[0].item() + 1
-
             else:
-                trial_start = np.argwhere(completed_trials == completed_trials[-1])[0].item() + 1
+                # find beginning of current trial (iteration after last reset prior to trainer.iteration)
+                trial_start = clearance_inds[np.searchsorted(clearance_inds, trainer.iteration) - 1] + 1
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(trainer.iteration - i, trial_start)
