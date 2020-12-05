@@ -179,6 +179,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--row_snapshot_file', default=None, help='snapshot file to load for row-making model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
     parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
+    parser.add_argument('--depth_channel_history', default=False, action='store_true', help='use depth channel history when passing frames to model?')
+
+    # TODO(adit98) deprecate this
     parser.add_argument('-k', '--history_len', default=0, type=int, help='how many historical steps to store')
     args = parser.parse_args()
 
@@ -257,25 +260,25 @@ if __name__ == '__main__':
         for action in ['grasp', 'place']:
             # get action embeddings from example demo
             example_action_row, example_action_stack, _ = example_demo.get_action(workspace_limits,
-                    action, k, stack_trainer=stack_trainer, row_trainer=row_trainer)
+                    action, k, stack_trainer=stack_trainer, row_trainer=row_trainer, use_hist=args.depth_channel_history)
 
             # TODO(adit98) add depth_channel_history options here
             # get imitation heightmaps
             if args.task_type == 'unstack':
                 if action == 'grasp':
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['demo_ind'])
+                            imitation_demo.action_dict[k]['demo_ind'], use_hist=args.depth_channel_history)
                 else:
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['demo_ind'] + 1)
+                            imitation_demo.action_dict[k]['demo_ind'] + 1, use_hist=args.depth_channel_history)
 
             else:
                 if action == 'grasp':
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['grasp_image_ind'])
+                            imitation_demo.action_dict[k]['grasp_image_ind'], use_hist=args.depth_channel_history)
                 else:
                     im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['place_image_ind'])
+                            imitation_demo.action_dict[k]['place_image_ind'], use_hist=args.depth_channel_history)
 
             # create filenames to be saved
             depth_filename = os.path.join(args.imitation_demo, 'correspondences',

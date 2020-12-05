@@ -95,6 +95,7 @@ class Logger():
             plt.show(block=True)
 
     def write_to_log(self, log_name, log, pickle=False):
+        # need to pickle and use savez when saving embeddings (>1 dim)
         if pickle:
             np.savez(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log)
         else:
