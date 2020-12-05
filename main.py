@@ -1391,16 +1391,17 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
             # check if we are attempting to sample from the ongoing trial (hasn't been logged in trial-success log)
             if len(completed_trials) <= trainer.iteration:
                 # extend completed trials array with current number of trials completed
-                completed_trials_mod = np.zeros(trainer.iteration + 1)
+                completed_trials_mod = np.zeros(trainer.iteration)
                 completed_trials_mod[len(completed_trials):] = np.max(completed_trials)
                 completed_trials_mod[:len(completed_trials)] = completed_trials
                 completed_trials = completed_trials_mod
         else:
-            completed_trials = np.zeros(trainer.iteration + 1)
+            completed_trials = np.zeros(trainer.iteration)
 
         # append 1 channel of current timestep depth to depth_heightmap_history
         depth_heightmap_history = [valid_depth_heightmap]
         for i in range(1, history_len):
+            # TODO(adit98) doesn't deal with resets
             # find beginning of current trial using completed trials (-1 for trainer.iteration)
             if completed_trials[-1] == 0:
                 trial_start = 0

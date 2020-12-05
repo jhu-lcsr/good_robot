@@ -429,9 +429,9 @@ class Trainer(object):
 
         # TODO(adit98) check if changing suffix rather than changing iteration num for getting future heightmap causes issues
         # Load next sample RGB-D heightmap
-        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.2.color.png' % (sample_iteration)))
+        next_sample_color_heightmap = cv2.imread(os.path.join(logger.color_heightmaps_directory, '%06d.0.color.png' % (sample_iteration + 1)))
         next_sample_color_heightmap = cv2.cvtColor(next_sample_color_heightmap, cv2.COLOR_BGR2RGB)
-        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.2.depth.png' % (sample_iteration)), -1)
+        next_sample_depth_heightmap = cv2.imread(os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % (sample_iteration + 1)), -1)
         next_sample_depth_heightmap = next_sample_depth_heightmap.astype(np.float32)/100000
 
         # TODO(ahundt) tune sample_reward_value and gamma discount rate?

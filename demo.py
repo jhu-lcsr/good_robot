@@ -56,7 +56,7 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                         'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
-    def get_heightmaps(self, action_str, stack_height):
+    def get_heightmaps(self, action_str, stack_height, use_hist=False):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
         if action_str != 'orig' and self.task_type == 'stack':
             action_str = str(stack_height) + action_str
@@ -73,7 +73,7 @@ class Demonstration():
         return rgb_heightmap, depth_heightmap
 
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
-            row_trainer=None):
+            row_trainer=None, use_hist=False):
         # ensure one of stack trainer or row trainer is provided
         if stack_trainer is None and row_trainer is None:
             raise ValueError("Must provide one of stack_trainer or row_trainer")
@@ -103,27 +103,30 @@ class Demonstration():
                 # if primitive action is place, get the previous grasp heightmap
                 action_str = 'grasp'
 
-            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str, stack_height)
+            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str,
+                    stack_height, use_hist=use_hist)
             action_str = primitive_action
 
         elif self.task_type == 'unstack':
             if primitive_action == 'grasp':
                 # offset is 2 for stack height 4, 4 for stack height 3, ...
                 #offset = 10 - 2 * stack_height
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action, self.action_dict[stack_height]['demo_ind'])
+                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
+                        self.action_dict[stack_height]['demo_ind'], use_hist=use_hist)
 
             elif primitive_action == 'place':
                 # offset is grasp_offset - 1 because place is always 1 action after grasp
                 #offset = 9 - 2 * stack_height
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action, self.action_dict[stack_height]['demo_ind'] + 1)
+                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
+                        self.action_dict[stack_height]['demo_ind'] + 1, use_hist=use_hist)
         else:
             if primitive_action == 'grasp':
                 color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['grasp_image_ind'])
+                        self.action_dict[stack_height]['grasp_image_ind'], use_hist=use_hist)
 
             elif primitive_action == 'place':
                 color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['place_image_ind'])
+                        self.action_dict[stack_height]['place_image_ind'], use_hist=use_hist)
 
         # get stack features if stack_trainer is provided
         if stack_trainer is not None:
