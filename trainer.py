@@ -364,20 +364,31 @@ class Trainer(object):
             # check if clearance log exists, otherwise, no trials have been completed, so use array of 0s
             clearance_path = os.path.join(logger.transitions_directory, 'clearance.log.txt')
             if os.path.exists(clearance_path):
-                clearance_inds = np.loadtxt(clearance_path).squeeze()
+                clearance_inds = np.loadtxt(clearance_path)
+
+                # if it is a 0-dim array, expand dims
+                if len(clearance_inds.shape) == 0:
+                    clearance_inds = np.expand_dims(clearance_inds, axis=-1)
+
             else:
                 clearance_inds = None
 
             # append 1 channel of current timestep depth to depth_heightmap_history
-            depth_heightmap_history = [valid_depth_heightmap]
+            depth_heightmap_history = [sample_depth_heightmap]
             for i in range(1, history_len):
                 if clearance_inds is None:
                     # if clearance_inds is None, we haven't had a reset
                     trial_start = 0
 
                 else:
-                    # find beginning of current trial (iteration after last reset prior to trainer.iteration)
-                    trial_start = clearance_inds[np.searchsorted(clearance_inds, trainer.iteration) - 1] + 1
+                    # if we are sampling from before the first reset, trial start is 0 (hard-code edge condition to avoid indexing issues)
+                    if sample_iteration <= clearance_inds[0]:
+                        trial_start = 0
+
+                    else:
+                        # find beginning of current trial (iteration after last reset prior to trainer.iteration)
+                        trial_start = clearance_inds[np.searchsorted(clearance_inds, sample_iteration, side='left') - 1] + 1
+
                 # if we try to load history before beginning of a trial, just repeat initial state
                 iter_num = max(sample_iteration - i, trial_start)
 
