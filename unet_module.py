@@ -314,6 +314,7 @@ class UNetWithBlocks(UNetWithLanguage):
                 num_blocks: int = 20,
                 mlp_num_layers: int = 3, 
                 dropout: float = 0.20,
+                resolution: int = None,
                 depth: int = 7,
                 device: torch.device = "cpu"):
         super(UNetWithBlocks, self).__init__(in_channels=in_channels,
@@ -331,8 +332,9 @@ class UNetWithBlocks(UNetWithLanguage):
                                                device=device)
 
         self.compute_block_dist = True 
+        self.resolution = resolution
         # TODO (elias): automatically infer this size when the num_layers is different 
-        width = int(64**(1/(num_layers-1))) 
+        width = int(self.resolution**(1/(num_layers-1))) 
         self.block_prediction_module = MLP(input_dim  = 2*width*width*hc_large,
                                            hidden_dim = 2*hc_large,
                                            output_dim = 21, 

@@ -31,6 +31,7 @@ class BaseTrajectory:
                  lengths: List[int],
                  traj_type: str = "flat",
                  batch_size: int = None,
+                 resolution: int = 64,
                  do_filter: bool = False,
                  top_only: bool = True, 
                  binarize_blocks: bool = False):
@@ -41,11 +42,12 @@ class BaseTrajectory:
         self.do_filter = do_filter
         self.top_only = top_only
         self.binarize_blocks = binarize_blocks
+        self.resolution = resolution
 
         self.line_id = line_id
         self.commands = commands
 
-        self.blocks_to_move = self.get_blocks_to_move(previous_positions, next_positions) 
+        self.blocks_to_move = self.get_blocks_to_move(previous_positions, next_positions).float() 
 
         # output for previous positions has depth that gets filtered 
         self.previous_positions_for_pred = self.make_3d_positions(previous_positions, make_z = True, batch_size = self.batch_size)
@@ -119,7 +121,7 @@ class BaseTrajectory:
         # iterate over inputs 
         data_list = list(data_list)
         for i, data in enumerate(data_list):
-            new_data = [torch.zeros((1, 64, 64, 1, 1)) for __ in range(len(data))]
+            new_data = [torch.zeros((1, self.resolution, self.resolution, 1, 1)) for __ in range(len(data))]
             # iterate over steps in trajectory 
             for j, step_data in enumerate(data):
                 for depth in range(6, -1, -1):
@@ -165,7 +167,7 @@ class BaseTrajectory:
         image_positions = []
         # create a grid d x w x h
         if make_z: 
-            height, width, depth = 7, 64, 64
+            height, width, depth = 7, self.resolution, self.resolution
             for i, position_list in enumerate(positions): 
                 image = np.zeros((width, depth, height, 1)) 
 
@@ -197,7 +199,7 @@ class BaseTrajectory:
 
         else:
             # TODO (elias) change input so it shows the top-most element 
-            depth, width = 64, 64 
+            depth, width = self.resolution, self.resolution
             for i, position_list in enumerate(positions): 
                 image = np.zeros(( width, depth, 1 + 1)) 
                 for block_idx, (x, y, z) in enumerate(position_list): 
@@ -234,6 +236,7 @@ class SimpleTrajectory(BaseTrajectory):
                  traj_type: str,
                  batch_size: int,
                  do_filter: bool,
+                 resolution: int, 
                  top_only: bool,
                  binarize_blocks: bool):
         super(SimpleTrajectory, self).__init__(line_id=line_id,
@@ -246,6 +249,7 @@ class SimpleTrajectory(BaseTrajectory):
                                                lengths=lengths,
                                                traj_type=traj_type,
                                                batch_size=batch_size,
+                                               resolution=resolution, 
                                                do_filter=do_filter,
                                                top_only=top_only,
                                                binarize_blocks=binarize_blocks) 
@@ -271,6 +275,7 @@ class DatasetReader:
                        batch_size = 32,
                        max_seq_length = 65,
                        do_filter: bool = False,
+                       resolution: int = 64, 
                        top_only: bool = True, 
                        binarize_blocks: bool = False): 
         self.train_path = train_path
@@ -283,6 +288,7 @@ class DatasetReader:
         self.do_filter = do_filter
         self.top_only = top_only 
         self.binarize_blocks = binarize_blocks
+        self.resolution = resolution
 
         nlp = English()
         self.tokenizer = Tokenizer(nlp.vocab)
@@ -332,6 +338,7 @@ class DatasetReader:
                                                     traj_type=self.traj_type,
                                                     batch_size=1,
                                                     do_filter=self.do_filter,
+                                                    resolution=self.resolution, 
                                                     top_only = self.top_only,
                                                     binarize_blocks = self.binarize_blocks) 
                         self.data[split].append(trajectory) 
