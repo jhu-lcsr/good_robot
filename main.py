@@ -1387,7 +1387,12 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         # check if clearance log exists, otherwise, no trials have been completed, so use array of 0s
         clearance_path = os.path.join(logger.transitions_directory, 'clearance.log.txt')
         if os.path.exists(clearance_path):
-            clearance_inds = np.loadtxt(clearance_path).squeeze()
+            clearance_inds = np.loadtxt(clearance_path)
+
+            # if it is a 0-dim array, expand dims
+            if len(clearance_inds.shape) == 0:
+                clearance_inds = np.expand_dims(clearance_inds, axis=-1)
+
         else:
             clearance_inds = None
 
@@ -1400,7 +1405,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
             else:
                 # find beginning of current trial (iteration after last reset prior to trainer.iteration)
-                trial_start = clearance_inds[np.searchsorted(clearance_inds, trainer.iteration) - 1] + 1
+                trial_start = clearance_inds[-1] + 1
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(trainer.iteration - i, trial_start)
