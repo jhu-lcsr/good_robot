@@ -1381,26 +1381,15 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
         logger.save_images(trainer.iteration, color_img, depth_img, filename_poststring)
         logger.save_heightmaps(trainer.iteration, color_heightmap, valid_depth_heightmap, filename_poststring)
 
-    # TODO(adit98) clean up this logic
     # load history and modify valid_depth_heightmap
     if depth_channels_history:
-        # check if clearance log exists, otherwise, no trials have been completed, so use array of 0s
-        clearance_path = os.path.join(logger.transitions_directory, 'clearance.log.txt')
-        if os.path.exists(clearance_path):
-            clearance_inds = np.loadtxt(clearance_path)
-
-            # if it is a 0-dim array, expand dims
-            if len(clearance_inds.shape) == 0:
-                clearance_inds = np.expand_dims(clearance_inds, axis=-1)
-
-        else:
-            clearance_inds = None
+        clearance_inds = np.array(trainer.clearance_log).flatten()
 
         # append 1 channel of current timestep depth to depth_heightmap_history
         depth_heightmap_history = [valid_depth_heightmap]
         for i in range(1, history_len):
-            if clearance_inds is None:
-                # if clearance_inds is None, we haven't had a reset
+            # if clearance_inds is empty, we haven't had a reset
+            if clearance_inds.shape[0] == 0:
                 trial_start = 0
 
             else:
