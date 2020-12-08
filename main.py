@@ -1401,8 +1401,12 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
             iter_num = max(trainer.iteration - i, trial_start)
 
             # load img at iter_num
-            h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
-                '%06d.0.depth.png' % iter_num), -1)
+            h_i_path = os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % iter_num)
+            h_i = cv2.imread(h_i_path, -1)
+            if not h_i:
+                # There was an error loading the image
+                print('Warning: Could not load depth heightmap image at the following path, using zeros instead: ' + h_i_path)
+                h_i = np.zeros(valid_depth_heightmap.shape)
             h_i = h_i.astype(np.float32)/100000
             depth_heightmap_history.append(h_i)
 
