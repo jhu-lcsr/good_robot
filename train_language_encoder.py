@@ -452,7 +452,7 @@ def get_free_gpu():
     gpu_df['memory.free'] = gpu_df['memory.free'].astype(np.int64)
     gpu_df['memory.used'] = gpu_df['memory.used'].astype(np.int64)
     idx = gpu_df['memory.free'].idxmax()
-    if gpu_df["memory.used"][idx] > 0.0:
+    if gpu_df["memory.used"][idx] > 3.0:
         print(f"No free gpus!") 
         sys.exit() 
         return -1
@@ -604,6 +604,7 @@ def main(args):
                               num_epochs = args.num_epochs,
                               num_blocks = args.num_blocks,
                               device = device,
+                              resolution = args.resolution, 
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,
                               generate_after_n = args.generate_after_n, 
@@ -623,6 +624,7 @@ def main(args):
                                            optimizer = None, 
                                            num_epochs = 0, 
                                            device = device,
+                                           resolution = args.resolution, 
                                            checkpoint_dir = args.checkpoint_dir,
                                            num_models_to_keep = 0, 
                                            generate_after_n = 0) 

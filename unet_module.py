@@ -619,3 +619,123 @@ class UNetNoNorm(UNetWithLanguage):
         # override with id layers 
         self.upnorms = torch.nn.ModuleList([IDLayer() for i in range(len(self.upnorms))])
         self.downnorms = torch.nn.ModuleList([IDLayer() for i in range(len(self.downnorms))])
+
+
+class UNetForBERT(UNetWithAttention):
+    def __init__(self,
+                in_channels: int,
+                out_channels: int,
+                lang_embedder: torch.nn.Module,
+                lang_encoder: torch.nn.Module,
+                hc_large: int,
+                hc_small: int, 
+                kernel_size: int = 5,
+                stride: int = 2,
+                num_layers: int = 5,
+                num_blocks: int = 20,
+                dropout: float = 0.20, 
+                depth: int = 7,
+                device: torch.device = "cpu"):
+        super(UNetForBERT, self).__init__(in_channels=in_channels,
+                                               out_channels=out_channels,
+                                               lang_embedder=lang_embedder,
+                                               lang_encoder=lang_encoder,
+                                               hc_large=hc_large,
+                                               hc_small=hc_small,
+                                               kernel_size=kernel_size,
+                                               stride=stride,
+                                               num_layers=num_layers,
+                                               num_blocks=num_blocks,
+                                               dropout=dropout,
+                                               depth=depth,
+                                               device=device)
+        self.lang_encoder.output_size = 768 
+        # reset projections 
+        for i in range(self.num_layers):
+            lang_proj = torch.nn.Linear(self.lang_encoder.output_size, hc_large) 
+            self.lang_projections[i] = lang_proj
+        self.lang_projections = self.lang_projections.to(self.device) 
+
+    def forward(self, data_batch):
+        lang_input = data_batch["command"]
+        lang_length = data_batch["length"]
+        # tensorize lengths 
+        lengths = torch.tensor(lang_length).float() 
+        lengths = lengths.to(self.device) 
+
+        # embed langauge 
+        lang_embedded = torch.cat([self.lang_embedder(lang_input[i]).unsqueeze(0) for i in range(len(lang_input))], 
+                                    dim=0)
+
+        # already encoded with BERT! 
+        lang_output = {"output": lang_embedded} 
+        
+        # get language output as sequence of hiddent states 
+        lang_states = lang_output["output"] 
+    
+        image_input = data_batch["prev_pos_input"]
+        image_input = image_input.to(self.device) 
+        # store downconv results in stack 
+        downconv_results = deque() 
+        lang_results = deque() 
+        downconv_sizes = deque() 
+        # start with image input 
+        out = image_input     
+        
+        # get down outputs, going down U
+        for i in range(self.num_layers): 
+            downconv = self.downconv_modules[i]
+            out = self.activation(downconv(out)) 
+            # last layer has no norm 
+            if i < self.num_layers-1: 
+                downnorm = self.downnorms[i-1]
+                out = downnorm(out) 
+            out = self.dropout(out) 
+            downconv_sizes.append(out.size())
+
+            # get language projection at that layer 
+            lang_proj = self.lang_projections[i]
+            lang = lang_proj(lang_states)
+            # get attention layer 
+            lang_attn = self.lang_attentions[i] 
+            # get weighted language input 
+            lang_by_image = lang_attn(out, lang, lang) 
+            # concat weighted language in 
+            out_with_lang = torch.cat([out, lang_by_image], 1)
+            out_with_lang = self.dropout(out_with_lang) 
+            downconv_results.append(out_with_lang) 
+
+            if i == self.num_layers-1:
+                # at end set out include lang
+                out = out_with_lang
+
+        # pop off last one 
+        downconv_sizes.pop() 
+        downconv_results.pop() 
+        
+        # go back up the U, concatenating residuals and language 
+        for i in range(self.num_layers): 
+            # concat the corresponding side of the U
+            upconv = self.upconv_modules[i]
+            if i > 0:
+                resid_data = downconv_results.pop() 
+                out = torch.cat([resid_data, out], 1)
+            if i < self.num_layers-1:
+                desired_size = downconv_sizes.pop() 
+            else:
+                desired_size = image_input.size() 
+
+            out = self.activation(upconv(out, output_size = desired_size))
+                
+            # last layer has no norm 
+            if i < self.num_layers: 
+                upnorm = self.upnorms[i-1]
+                out = upnorm(out)
+            out = self.dropout(out) 
+
+        out = self.final_layer(out) 
+
+        to_ret = {"next_position": out,
+                 "pred_block_logits": None}
+        return to_ret 
+
