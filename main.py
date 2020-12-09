@@ -808,6 +808,32 @@ def main(args):
             # TODO(ahundt) this should really be using proper threading and locking algorithms
             time.sleep(0.01)
 
+    # helper function to update variables for trial ending
+    def end_trial():
+        # Check if the other thread ended the trial and reset the important values
+        no_change_count = [0, 0]
+        num_trials = trainer.end_trial()
+        if nonlocal_variables['stack'] is not None:
+            # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
+            nonlocal_variables['stack'].trial = num_trials
+        logger.write_to_log('clearance', trainer.clearance_log)
+        # we've recorded the data to mark this trial as complete
+        nonlocal_variables['trial_complete'] = False
+        # we're still not totally done, we still need to finilaize the log for the trial
+        nonlocal_variables['finalize_prev_trial_log'] = True
+        if is_testing:
+            # Do special testing mode update steps
+            # If at end of test run, re-load original weights (before test run)
+            trainer.model.load_state_dict(torch.load(snapshot_file))
+            if test_preset_cases:
+                case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
+                # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
+                # load the current preset case, incrementing as trials are cleared
+                print('loading case file: ' + str(case_file))
+                robot.load_preset_case(case_file)
+            if not place and num_trials >= max_test_trials:
+                nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -841,6 +867,10 @@ def main(args):
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     while max_iter < 0 or trainer.iteration < max_iter:
+        # end trial if signaled by process_actions thread
+        if nonlocal_variables['trial_complete']:
+            end_trial()
+
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
         # Record the current trial number
@@ -927,30 +957,9 @@ def main(args):
                 do_continue = True
                 # continue
 
+        # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
-            # Check if the other thread ended the trial and reset the important values
-            no_change_count = [0, 0]
-            num_trials = trainer.end_trial()
-            if nonlocal_variables['stack'] is not None:
-                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
-                nonlocal_variables['stack'].trial = num_trials
-            logger.write_to_log('clearance', trainer.clearance_log)
-            # we've recorded the data to mark this trial as complete
-            nonlocal_variables['trial_complete'] = False
-            # we're still not totally done, we still need to finilaize the log for the trial
-            nonlocal_variables['finalize_prev_trial_log'] = True
-            if is_testing:
-                # Do special testing mode update steps
-                # If at end of test run, re-load original weights (before test run)
-                trainer.model.load_state_dict(torch.load(snapshot_file))
-                if test_preset_cases:
-                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
-                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
-                    # load the current preset case, incrementing as trials are cleared
-                    print('loading case file: ' + str(case_file))
-                    robot.load_preset_case(case_file)
-                if not place and num_trials >= max_test_trials:
-                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
+            end_trial()
             if do_continue:
                 do_continue = False
                 continue

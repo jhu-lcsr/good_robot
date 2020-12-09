@@ -69,6 +69,8 @@ class Demonstration():
 
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
+        if use_hist:
+            raise NotImplementedError
 
         return rgb_heightmap, depth_heightmap
 
