@@ -20,7 +20,7 @@ from torch.nn import functional as F
 from torch.optim.lr_scheduler import StepLR
 import pandas as pd 
 
-from transformer import TransformerEncoder
+from transformer import TransformerEncoder, image_to_tiles
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 
 from data import DatasetReader
@@ -76,7 +76,8 @@ class TransformerTrainer(FlatLanguageTrainer):
             if outputs is None:
                 skipped += 1
                 continue
-            loss = self.compute_weighted_loss(batch_instance, outputs, (epoch + 1) * (b+1)) 
+            #loss = self.compute_weighted_loss(batch_instance, outputs, (epoch + 1) * (b+1)) 
+            loss = self.compute_patch_loss(batch_instance, outputs) 
             #loss = self.compute_weighted_loss(batch_instance, prev_outputs, (epoch + 1) * (b+1)) 
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
@@ -144,7 +145,6 @@ class TransformerTrainer(FlatLanguageTrainer):
 
         return total_loss
 
-
     def compute_weighted_loss(self, inputs, outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
@@ -153,6 +153,41 @@ class TransformerTrainer(FlatLanguageTrainer):
         true_next_image = inputs["next_pos_for_pred"]
         pred_prev_image = outputs["prev_position"]
         true_prev_image = inputs["prev_pos_for_pred"]
+
+        bsz, n_blocks, width, height, depth = pred_prev_image.shape
+        pred_prev_image = pred_prev_image.squeeze(-1)
+        pred_next_image = pred_next_image.squeeze(-1)
+        true_next_image = true_next_image.squeeze(-1).squeeze(-1)
+        true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
+        true_next_image = true_next_image.long().to(self.device) 
+        true_prev_image = true_prev_image.long().to(self.device) 
+
+        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
+        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+
+        total_loss = next_pixel_loss + prev_pixel_loss 
+        print(f"loss {total_loss.item()}")
+
+        return total_loss
+
+    def compute_patch_loss(self, inputs, outputs):
+        """
+        compute per-patch for each patch 
+        """
+        pdb.set_trace() 
+        pred_next_image = outputs["next_position"]
+        true_next_image = inputs["next_pos_for_pred"]
+        pred_prev_image = image_to_tiles(outputs["prev_position"]) 
+        true_prev_image = inputs["prev_pos_for_pred"]
+
+        # binarize patches
+        prev_sum_image = torch.sum(true_prev_image, dim = 2) 
+        prev_patches = torch.zeros_like(prev_sum_image)
+        next_sum_image = torch.sum(true_next_image, dim = 2) 
+        next_patches = torch.zeros_like(next_sum_image)
+        # any patch that has a 1 pixel in it gets 1 
+        prev_patches[prev_sum_image != 0] = 1
+        next_patches[next_sum_image != 0] = 1
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
         pred_prev_image = pred_prev_image.squeeze(-1)
