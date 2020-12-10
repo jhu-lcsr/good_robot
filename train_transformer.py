@@ -17,25 +17,22 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch.autograd.profiler as profiler
 from torch.nn import functional as F
+from torch.optim.lr_scheduler import StepLR
 import pandas as pd 
 
-from encoders import LSTMEncoder
+from transformer import TransformerEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
-from unet_shared import SharedUNet
-from mlp import MLP 
-from losses import ScheduledWeightedCrossEntropyLoss
 
 from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 
 logger = logging.getLogger(__name__)
 
-class UNetLanguageTrainer(FlatLanguageTrainer): 
+class TransformerTrainer(FlatLanguageTrainer): 
     def __init__(self,
                  train_data: List,
                  val_data: List,
-                 encoder: SharedUNet,
+                 encoder: TransformerEncoder,
                  optimizer: torch.optim.Optimizer,
                  num_epochs: int,
                  num_blocks: int, 
@@ -47,7 +44,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                  depth: int = 7,
                  best_epoch: int = -1,
                  zero_weight: float = 0.05):
-        super(UNetLanguageTrainer, self).__init__(train_data,
+        super(TransformerTrainer, self).__init__(train_data,
                                                   val_data,
                                                   encoder,
                                                   optimizer,
@@ -64,17 +61,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
         total_steps = num_epochs * len(train_data) 
         print(f"total steps {total_steps}") 
-        #self.weighted_xent_loss_fxn = ScheduledWeightedCrossEntropyLoss(start_weight = 0.50, 
-        #                                                                max_weight = 0.01,
-        #                                                                num_steps = total_steps/2)
-
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
-        #self.weighted_xent_loss_fxn = kornia.losses.DiceLoss()
-        #self.weighted_xent_loss_fxn = kornia.losses.FocalLoss(0.25, gamma=2.0, reduction='mean') 
-        #self.weighted_xent_loss_fxn = BootstrappedCE()
-        self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
-        self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
-
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -83,12 +70,14 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         for b, batch_instance in tqdm(enumerate(self.train_data)): 
 
             self.optimizer.zero_grad() 
-            next_outputs, prev_outputs = self.encoder(batch_instance) 
+            prev_outputs = self.encoder(batch_instance) 
+            #next_outputs, prev_outputs = self.encoder(batch_instance) 
             # skip bad examples 
             if prev_outputs is None:
                 skipped += 1
                 continue
-            loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * (b+1)) 
+            #loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * (b+1)) 
+            loss = self.compute_weighted_loss(batch_instance, prev_outputs, (epoch + 1) * (b+1)) 
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
@@ -101,17 +90,20 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
 
         self.encoder.eval() 
         for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
-            next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            #next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
             total_prev_acc += prev_pixel_acc
-            total_next_acc += next_pixel_acc
+            #total_next_acc += next_pixel_acc
             total_block_acc += block_acc
             total += 1
 
-        mean_next_acc = total_next_acc / total 
+        #mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
-        print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
-        return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
+        #print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
+        print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
+        #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
+        return mean_prev_acc, 0
 
     def compute_loss(self, inputs, next_outputs, prev_outputs):
         """
@@ -153,27 +145,29 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         return total_loss
 
 
-    def compute_weighted_loss(self, inputs, next_outputs, prev_outputs, it):
+    #def compute_weighted_loss(self, inputs, next_outputs, prev_outputs, it):
+    def compute_weighted_loss(self, inputs, prev_outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
         """
-        pred_next_image = next_outputs["next_position"]
-        true_next_image = inputs["next_pos_for_pred"]
+        #pred_next_image = next_outputs["next_position"]
+        #true_next_image = inputs["next_pos_for_pred"]
         pred_prev_image = prev_outputs["next_position"]
         true_prev_image = inputs["prev_pos_for_pred"]
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
         pred_prev_image = pred_prev_image.squeeze(-1)
-        pred_next_image = pred_next_image.squeeze(-1)
-        true_next_image = true_next_image.squeeze(-1).squeeze(-1)
+        #pred_next_image = pred_next_image.squeeze(-1)
+        #true_next_image = true_next_image.squeeze(-1).squeeze(-1)
         true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
-        true_next_image = true_next_image.long().to(self.device) 
+        #true_next_image = true_next_image.long().to(self.device) 
         true_prev_image = true_prev_image.long().to(self.device) 
 
         prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
-        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+        #next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
 
-        total_loss = next_pixel_loss + prev_pixel_loss 
+        #total_loss = next_pixel_loss + prev_pixel_loss 
+        total_loss = prev_pixel_loss
         print(f"loss {total_loss.item()}")
 
         return total_loss
@@ -181,29 +175,30 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
-        next_outputs, prev_outputs = self.encoder(batch_instance) 
+        #next_outputs, prev_outputs = self.encoder(batch_instance) 
+        prev_outputs = self.encoder(batch_instance) 
 
         prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"])
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
+        #next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
             block_accuracy = -1.0
             
         if epoch_num > self.generate_after_n: 
-            for i in range(next_outputs["next_position"].shape[0]):
+            for i in range(prev_outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
                 command = batch_instance["command"][i]
                 command = [x for x in command if x != "<PAD>"]
                 command = " ".join(command) 
 
-                next_pos = batch_instance["next_pos_for_acc"][i]
-
-                self.generate_debugging_image(next_pos,
-                                             next_outputs["next_position"][i], 
-                                             output_path.joinpath("next"),
-                                             caption = command)
+                #next_pos = batch_instance["next_pos_for_acc"][i]
+                # 
+                #self.generate_debugging_image(next_pos,
+                #                             next_outputs["next_position"][i], 
+                #                             output_path.joinpath("next"),
+                #                             caption = command)
 
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
                 self.generate_debugging_image(prev_pos, 
@@ -211,7 +206,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
-        return next_f1, prev_f1, block_accuracy
+        #return next_f1, prev_f1, block_accuracy
+        return prev_f1, block_accuracy
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
@@ -292,6 +288,7 @@ def main(args):
                                    batch_size = args.batch_size,
                                    max_seq_length = args.max_seq_length,
                                    do_filter = args.do_filter,
+                                   do_one_hot = args.do_one_hot, 
                                    top_only = args.top_only,
                                    resolution = args.resolution, 
                                    binarize_blocks = args.binarize_blocks)  
@@ -328,15 +325,6 @@ def main(args):
         embedder = BERTEmbedder(model_name = args.embedder,  max_seq_len = args.max_seq_length) 
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
-    # get the encoder from args  
-    if args.encoder == "lstm":
-        encoder = LSTMEncoder(input_dim = args.embedding_dim,
-                              hidden_dim = args.encoder_hidden_dim,
-                              num_layers = args.encoder_num_layers,
-                              dropout = args.dropout,
-                              bidirectional = args.bidirectional) 
-    else:
-        raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
 
     if args.top_only:
         depth = 1
@@ -344,33 +332,28 @@ def main(args):
         # TODO (elias): confirm this number 
         depth = 7
 
-    unet_kwargs = dict(in_channels = 21,
-                     out_channels = args.unet_out_channels, 
-                     lang_embedder = embedder,
-                     lang_encoder = encoder, 
-                     hc_large = args.unet_hc_large,
-                     hc_small = args.unet_hc_small,
-                     kernel_size = args.unet_kernel_size,
-                     stride = args.unet_stride,
-                     num_layers = args.unet_num_layers,
-                     num_blocks = args.num_blocks,
-                     unet_type = args.unet_type, 
-                     dropout = args.dropout,
-                     depth = depth,
-                     device=device)
+    encoder = TransformerEncoder(image_size = args.resolution,
+                                 patch_size = args.patch_size, 
+                                 language_embedder = embedder, 
+                                 n_layers = args.n_layers,
+                                 n_classes = 2,
+                                 channels = 1, 
+                                 n_heads = args.n_heads,
+                                 hidden_dim = args.hidden_dim,
+                                 ff_dim = args.ff_dim,
+                                 dropout = args.dropout,
+                                 embed_dropout = args.embed_dropout,
+                                 device = device) 
 
-
-    if args.compute_block_dist:
-        unet_kwargs["mlp_num_layers"] = args.mlp_num_layers
-
-    encoder = SharedUNet(**unet_kwargs) 
 
     if args.cuda is not None:
-        encoder= encoder.cuda(device) 
+        encoder = encoder.cuda(device) 
                          
     print(encoder) 
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learn_rate) 
+    # scheduler
+    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
 
     best_epoch = -1
     if not args.test:
@@ -398,7 +381,7 @@ def main(args):
 
 
         # construct trainer 
-        trainer = UNetLanguageTrainer(train_data = dataset_reader.data["train"], 
+        trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
                               val_data = dataset_reader.data["dev"], 
                               encoder = encoder,
                               optimizer = optimizer, 
@@ -420,7 +403,7 @@ def main(args):
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
         encoder.load_state_dict(state_dict, strict=True)  
 
-        eval_trainer = UNetLanguageTrainer(train_data = dataset_reader.data["train"], 
+        eval_trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
                                    val_data = dataset_reader.data["dev"], 
                                    encoder = encoder,
                                    optimizer = None, 
@@ -448,34 +431,26 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
     parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
+    parser.add_argument("--do-one-hot", action="store_true", help="set if you want input representation to be one-hot" )
     parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
     parser.add_argument("--embedding-dim", type=int, default=300) 
-    # language encoder
-    parser.add_argument("--encoder", type=str, default="lstm", choices = ["lstm", "transformer"])
-    parser.add_argument("--encoder-hidden-dim", type=int, default=128) 
-    parser.add_argument("--encoder-num-layers", type=int, default=2) 
-    parser.add_argument("--bidirectional", action="store_true") 
-    # block mlp
-    parser.add_argument("--compute-block-dist", action="store_true") 
-    parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 
-    parser.add_argument("--mlp-num-layers", type=int, default = 3) 
-    # unet parameters 
-    parser.add_argument("--unet-type", type=str, default="unet_with_attention", help = "type of unet to use") 
-    parser.add_argument("--share-level", type=str, help="share the weights between predicting previous and next position") 
-    parser.add_argument("--unet-out-channels", type=int, default=128)
-    parser.add_argument("--unet-hc-large", type=int, default=32)
-    parser.add_argument("--unet-hc-small", type=int, default=16) 
-    parser.add_argument("--unet-num-layers", type=int, default=5) 
-    parser.add_argument("--unet-stride", type=int, default=2) 
-    parser.add_argument("--unet-kernel-size", type=int, default=5) 
-    # misc
+    # transformer parameters 
+    parser.add_argument("--patch-size", type=int, default = 8)  
+    parser.add_argument("--n-layers", type=int, default = 6) 
+    parser.add_argument("--n-classes", type=int, default = 2) 
+    parser.add_argument("--n-heads", type= int, default = 8) 
+    parser.add_argument("--hidden-dim", type= int, default = 512)
+    parser.add_argument("--ff-dim", type = int, default = 1024) 
     parser.add_argument("--dropout", type=float, default=0.2) 
+    parser.add_argument("--embed-dropout", type=float, default=0.2) 
+    # misc
     parser.add_argument("--cuda", type=int, default=None) 
-    parser.add_argument("--learn-rate", type=float, default = 0.001) 
+    parser.add_argument("--learn-rate", type=float, default = 3e-5) 
+    parser.add_argument("--gamma", type=float, default = 0.7) 
     parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
     parser.add_argument("--num-epochs", type=int, default=3) 
@@ -484,4 +459,3 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args) 
-

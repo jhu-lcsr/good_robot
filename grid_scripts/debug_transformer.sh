@@ -23,29 +23,27 @@ echo "RUNNING ON VERSION: " > ${CHECKPOINT_DIR}/stdout.log
 git branch >> ${CHECKPOINT_DIR}/stdout.log
 git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 
-python -u train_unet.py \
+python -u train_transformer.py \
         --train-path blocks_data/singleset.json \
         --val-path blocks_data/singleset.json \
-        --resolution 32 \
         --checkpoint-dir ${CHECKPOINT_DIR} \
-        --num-epochs 110 \
+        --num-epochs 210 \
         --num-blocks 1 \
         --binarize-blocks \
-        --generate-after-n 108 \
+        --generate-after-n 208 \
         --traj-type flat \
         --batch-size 256  \
         --max-seq-length 40 \
         --do-filter \
         --top-only \
         --embedding-dim 16 \
-        --unet-type unet_with_attention \
         --embedder random \
         --embedding-dim 50 \
-        --encoder-hidden-dim 16 \
-        --encoder-num-layers 2 \
-        --share-level none \
-        --mlp-hidden-dim 32 \
-        --mlp-num-layers 2 \
+        --hidden-dim 64 \
+        --n-heads 4 \
+        --n-layers 3 \
+        --ff-dim 256 \
+        --learn-rate 0.001 \
         --dropout 0.0 \
-        --bidirectional \
+        --embed-dropout 0.0 \
         --zero-weight 0.001 
