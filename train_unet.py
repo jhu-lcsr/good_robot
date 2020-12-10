@@ -292,6 +292,7 @@ def main(args):
                                    batch_size = args.batch_size,
                                    max_seq_length = args.max_seq_length,
                                    do_filter = args.do_filter,
+                                   do_one_hot = args.do_one_hot, 
                                    top_only = args.top_only,
                                    resolution = args.resolution, 
                                    binarize_blocks = args.binarize_blocks)  
@@ -448,6 +449,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
     parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
+    parser.add_argument("--do-one-hot", action="store_true", help="set if you want input representation to be one-hot" )
     parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     # language embedder 
