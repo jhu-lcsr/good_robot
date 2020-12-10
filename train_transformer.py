@@ -18,10 +18,13 @@ import numpy as np
 import torch.autograd.profiler as profiler
 from torch.nn import functional as F
 from torch.optim.lr_scheduler import StepLR
+from allennlp.training.scheduler import Scheduler 
+from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
+
 
 from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -34,6 +37,7 @@ class TransformerTrainer(FlatLanguageTrainer):
                  val_data: List,
                  encoder: TransformerEncoder,
                  optimizer: torch.optim.Optimizer,
+                 scheduler: Scheduler, 
                  num_epochs: int,
                  num_blocks: int, 
                  device: torch.device,
@@ -62,6 +66,7 @@ class TransformerTrainer(FlatLanguageTrainer):
         total_steps = num_epochs * len(train_data) 
         print(f"total steps {total_steps}") 
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+        self.scheduler = scheduler 
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -81,6 +86,8 @@ class TransformerTrainer(FlatLanguageTrainer):
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
+            it = (epoch + 1) * (b+1) 
+            self.scheduler.step_batch(it) 
 
         print(f"skipped {skipped} examples") 
         print(f"Validating epoch {epoch}...") 
@@ -349,7 +356,8 @@ def main(args):
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learn_rate) 
     # scheduler
-    scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+    #scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
+    scheduler = NoamLR(optimizer, model_size = args.hidden_dim, warmup_steps = args.warmup, factor = args.lr_factor) 
 
     best_epoch = -1
     if not args.test:
@@ -381,6 +389,7 @@ def main(args):
                               val_data = dataset_reader.data["dev"], 
                               encoder = encoder,
                               optimizer = optimizer, 
+                              scheduler = scheduler, 
                               num_epochs = args.num_epochs,
                               num_blocks = args.num_blocks,
                               device = device,
@@ -403,6 +412,7 @@ def main(args):
                                    val_data = dataset_reader.data["dev"], 
                                    encoder = encoder,
                                    optimizer = None, 
+                                   scheduler = None, 
                                    num_epochs = 0, 
                                    num_blocks = args.num_blocks,
                                    device = device,
@@ -446,6 +456,8 @@ if __name__ == "__main__":
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
+    parser.add_argument("--warmup", type=int, default=4000, help = "warmup setps for learn-rate scheduling")
+    parser.add_argument("--lr-factor", type=float, default = 1.0, help = "factor for learn-rate scheduling") 
     parser.add_argument("--gamma", type=float, default = 0.7) 
     parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
