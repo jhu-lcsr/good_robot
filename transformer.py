@@ -178,6 +178,10 @@ class TransformerEncoder(torch.nn.Module):
         super(TransformerEncoder, self).__init__() 
 
         self.compute_block_dist = False                                                                                                                         
+        try:
+            assert(n_layers % 2 == 0)
+        except AssertionError:
+            raise AssertionError("number of layers {n_layers} must be even") 
 
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
@@ -196,10 +200,18 @@ class TransformerEncoder(torch.nn.Module):
         self.cls_token = torch.nn.Parameter(torch.randn(1, 1, hidden_dim))
         self.sep_token = torch.nn.Parameter(torch.randn(1, 1, hidden_dim))
 
-        self.transformer = Transformer(hidden_dim, n_layers, n_heads, ff_dim, dropout) 
+        # first half of stack is dedicated to joint modeling, 2nd half splits previous and next 
+        self.start_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
+        self.prev_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
+        self.next_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
+
         self.dropout = torch.nn.Dropout(embed_dropout) 
 
-        self.mlp_head = nn.Sequential(
+        self.next_mlp_head = nn.Sequential(
+            nn.LayerNorm(hidden_dim),
+            nn.Linear(hidden_dim, self.patch_size**2 * n_classes)
+        )
+        self.prev_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, self.patch_size**2 * n_classes)
         )
@@ -256,18 +268,24 @@ class TransformerEncoder(torch.nn.Module):
 
         tfmr_input, mask, n_patches = self._prepare_input(image, language, language_mask) 
 
-        tfmr_output = self.transformer(tfmr_input, mask) 
+        tfmr_output = self.start_transformer(tfmr_input, mask) 
+        prev_output = self.prev_transformer(tfmr_output, mask) 
+        next_output = self.next_transformer(tfmr_output, mask) 
 
         # trim off language 
-        just_image_output = tfmr_output[:, 0:n_patches, :]
+        prev_just_image_output = prev_output[:, 0:n_patches, :]
+        next_just_image_output = next_output[:, 0:n_patches, :]
 
         # run final MLP 
-        classes = self.mlp_head(just_image_output) 
+        prev_classes = self.prev_mlp_head(prev_just_image_output) 
+        next_classes = self.next_mlp_head(next_just_image_output) 
 
         # convert back to image 
-        image_output = tiles_to_image(classes, self.patch_size).unsqueeze(-1) 
+        prev_image_output = tiles_to_image(prev_classes, self.patch_size).unsqueeze(-1) 
+        next_image_output = tiles_to_image(next_classes, self.patch_size).unsqueeze(-1) 
 
-        return {"next_position": image_output}
+        return {"prev_position": prev_image_output,
+                "next_position": next_image_output}
 
 
 

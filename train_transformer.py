@@ -70,14 +70,14 @@ class TransformerTrainer(FlatLanguageTrainer):
         for b, batch_instance in tqdm(enumerate(self.train_data)): 
 
             self.optimizer.zero_grad() 
-            prev_outputs = self.encoder(batch_instance) 
+            outputs = self.encoder(batch_instance) 
             #next_outputs, prev_outputs = self.encoder(batch_instance) 
             # skip bad examples 
-            if prev_outputs is None:
+            if outputs is None:
                 skipped += 1
                 continue
-            #loss = self.compute_weighted_loss(batch_instance, next_outputs, prev_outputs, (epoch + 1) * (b+1)) 
-            loss = self.compute_weighted_loss(batch_instance, prev_outputs, (epoch + 1) * (b+1)) 
+            loss = self.compute_weighted_loss(batch_instance, outputs, (epoch + 1) * (b+1)) 
+            #loss = self.compute_weighted_loss(batch_instance, prev_outputs, (epoch + 1) * (b+1)) 
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
             self.optimizer.step() 
@@ -90,20 +90,20 @@ class TransformerTrainer(FlatLanguageTrainer):
 
         self.encoder.eval() 
         for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
-            prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
-            #next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            #prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
             total_prev_acc += prev_pixel_acc
-            #total_next_acc += next_pixel_acc
+            total_next_acc += next_pixel_acc
             total_block_acc += block_acc
             total += 1
 
-        #mean_next_acc = total_next_acc / total 
+        mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
-        #print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
-        print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
+        print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
+        #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
         #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
-        return mean_prev_acc, 0
+        return (mean_next_acc + mean_prev_acc)/2, mean_block_acc
 
     def compute_loss(self, inputs, next_outputs, prev_outputs):
         """
@@ -145,29 +145,27 @@ class TransformerTrainer(FlatLanguageTrainer):
         return total_loss
 
 
-    #def compute_weighted_loss(self, inputs, next_outputs, prev_outputs, it):
-    def compute_weighted_loss(self, inputs, prev_outputs, it):
+    def compute_weighted_loss(self, inputs, outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
         """
-        #pred_next_image = next_outputs["next_position"]
-        #true_next_image = inputs["next_pos_for_pred"]
-        pred_prev_image = prev_outputs["next_position"]
+        pred_next_image = outputs["next_position"]
+        true_next_image = inputs["next_pos_for_pred"]
+        pred_prev_image = outputs["prev_position"]
         true_prev_image = inputs["prev_pos_for_pred"]
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
         pred_prev_image = pred_prev_image.squeeze(-1)
-        #pred_next_image = pred_next_image.squeeze(-1)
-        #true_next_image = true_next_image.squeeze(-1).squeeze(-1)
+        pred_next_image = pred_next_image.squeeze(-1)
+        true_next_image = true_next_image.squeeze(-1).squeeze(-1)
         true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
-        #true_next_image = true_next_image.long().to(self.device) 
+        true_next_image = true_next_image.long().to(self.device) 
         true_prev_image = true_prev_image.long().to(self.device) 
 
         prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
-        #next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
 
-        #total_loss = next_pixel_loss + prev_pixel_loss 
-        total_loss = prev_pixel_loss
+        total_loss = next_pixel_loss + prev_pixel_loss 
         print(f"loss {total_loss.item()}")
 
         return total_loss
@@ -175,39 +173,37 @@ class TransformerTrainer(FlatLanguageTrainer):
 
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
-        #next_outputs, prev_outputs = self.encoder(batch_instance) 
-        prev_outputs = self.encoder(batch_instance) 
+        outputs = self.encoder(batch_instance) 
 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"])
-        #next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
+        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], outputs["prev_position"])
+        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], outputs["next_position"]) 
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
             block_accuracy = -1.0
             
         if epoch_num > self.generate_after_n: 
-            for i in range(prev_outputs["next_position"].shape[0]):
+            for i in range(outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
                 output_path.mkdir(parents = True, exist_ok=True)
                 command = batch_instance["command"][i]
                 command = [x for x in command if x != "<PAD>"]
                 command = " ".join(command) 
 
-                #next_pos = batch_instance["next_pos_for_acc"][i]
-                # 
-                #self.generate_debugging_image(next_pos,
-                #                             next_outputs["next_position"][i], 
-                #                             output_path.joinpath("next"),
-                #                             caption = command)
+                next_pos = batch_instance["next_pos_for_acc"][i]
+                 
+                self.generate_debugging_image(next_pos,
+                                             outputs["next_position"][i], 
+                                             output_path.joinpath("next"),
+                                             caption = command)
 
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
                 self.generate_debugging_image(prev_pos, 
-                                              prev_outputs["next_position"][i], 
+                                              outputs["prev_position"][i], 
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
-        #return next_f1, prev_f1, block_accuracy
-        return prev_f1, block_accuracy
+        return next_f1, prev_f1, block_accuracy
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8

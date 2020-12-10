@@ -41,7 +41,7 @@ python -u train_transformer.py \
         --embedding-dim 50 \
         --hidden-dim 64 \
         --n-heads 4 \
-        --n-layers 3 \
+        --n-layers 4 \
         --ff-dim 256 \
         --learn-rate 0.001 \
         --dropout 0.0 \
