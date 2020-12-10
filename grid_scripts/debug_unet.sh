@@ -36,6 +36,7 @@ python -u train_unet.py \
         --max-seq-length 40 \
         --do-filter \
         --top-only \
+        --resolution 32 \
         --embedding-dim 16 \
         --encoder-hidden-dim 16 \
         --encoder-num-layers 2 \
@@ -44,5 +45,4 @@ python -u train_unet.py \
         --mlp-num-layers 2 \
         --dropout 0.0 \
         --bidirectional \
-        --zero-weight 0.001 \
-        --cuda 0  
+        --zero-weight 0.001 
