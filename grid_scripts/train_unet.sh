@@ -13,7 +13,7 @@
 
 source activate blocks 
 
-CHECKPOINT_DIR="models/unet_train_dropout_${DROPOUT}_weighted_${WEIGHT}_lr_${LR}"
+CHECKPOINT_DIR="models/unet_attn_dropout_${DROPOUT}_weighted_${WEIGHT}_lr_${LR}"
 
 mkdir -p ${CHECKPOINT_DIR}/code
 # copy all code 
@@ -27,7 +27,7 @@ python -u train_unet.py \
         --train-path blocks_data/trainset_v2.json \
         --val-path blocks_data/small_devset.json \
         --checkpoint-dir ${CHECKPOINT_DIR} \
-        --num-epochs 200 \
+        --num-epochs 75 \
         --binarize-blocks \
         --compute-block-dist \
         --generate-after-n 199 \
@@ -36,6 +36,7 @@ python -u train_unet.py \
         --max-seq-length 40 \
         --do-filter \
         --top-only \
+        --unet-type unet_with_attention \
         --embedder glove \
         --embedding-dim 100 \
         --embedding-file /home/estengel/glove/glove.6B.100d.txt \
