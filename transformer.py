@@ -230,7 +230,7 @@ class TransformerEncoder(torch.nn.Module):
     def _prepare_input(self, image, language, mask = None):
         # patchify 
         p = self.patch_size 
-        image_input = image_to_tiles(image, p) 
+        image_input = image_to_tiles(image, p).to(self.device) 
         batch_size, num_patches, __ = image_input.shape
 
         # get mask
