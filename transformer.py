@@ -66,21 +66,66 @@ def image_to_tiles(image, tile_size):
 
     p = tile_size 
     # from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_pytorch.py
-    new_image = einops.rearrange(image, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = p, p2 = p)            
+    new_image = rearrange(image, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = p, p2 = p)            
     return new_image 
 
-def tiles_to_image(tile_output, tile_size):
+def upsample_tiles(tiled_output, tile_size):
+    tiled_output = tiled_output.squeeze(-1)
+    tiled_output = rearrange(tiled_output, 'b n c -> b c n')
+    b, c, n = tiled_output.shape 
+
+    image_size = n * tile_size**2
+    w = int(math.sqrt(image_size))
+   
+    output_image = [[None for j in range(w // tile_size)] for i in range(w//tile_size)]
+
+    for row_idx in range(int(w / tile_size)):
+        for col_idx in range(int(w / tile_size)):
+            abs_idx = (row_idx * (w // tile_size)) + col_idx 
+            tile_values = tiled_output[:,:,abs_idx].unsqueeze(-1)
+            # [b, c, p^2]
+            tile = tile_values.repeat((1, 1, tile_size**2))
+            # [b, c, p, p]
+            tile = tile.reshape((b, c, tile_size, tile_size))
+            output_image[row_idx][col_idx] = tile
+
+    output_rows = [torch.cat(row, dim=3) for row in output_image]
+    output = torch.cat(output_rows, dim=2) 
+    return output 
+
+def tiles_to_image(tile_output, tile_size, output_type = "per-pixel", upsample = True):
     """takes tiled output of a model and converts it back to an image-like shape
     tile_output: torch.Tensor
         [batch, num_tiles, tile_size^2 * channels] 
     tile_size: int
     """
-
     p = tile_size 
-    image = einops.rearrange(tile_output, 'b n (p1 p2 c) -> b c (n p1 p2)', p1 = p, p2 = p)
+    if output_type == "per-pixel":
+        image = tile_output 
+        image = rearrange(image, 'b n (p1 p2 c) -> b c (n p1 p2)', p1 = p, p2 = p)
+    elif output_type == "per-patch" and upsample: 
+        # each of the n patches gets turned into a pxp image region 
+        #image = repeat(tile_output, 'b n c () -> b c n psq', psq = p**2) 
+        #image = rearrange(image, 'b c n psq -> b c (n psq)') 
+        image = upsample_tiles(tile_output, tile_size) 
+        return image 
+    else:
+        return tile_output 
+
     w = int(math.sqrt(image.shape[-1]))
-    image = einops.rearrange(image, 'b c (w1 w2) -> b c w1 w2', w1 = w, w2 = w) 
+    image = rearrange(image, 'b c (w1 w2) -> b c w1 w2', w1 = w, w2 = w) 
     return image 
+
+def _get_std_from_tensor(init_scale, tensor):
+    if len(tensor.shape) > 2:
+        in_d1, in_d2, out_d = tensor.shape
+        in_d = in_d1 * in_d2
+    else:
+        in_d, out_d = tensor.shape
+
+    # use gain to scale as in SmallInit of https://arxiv.org/pdf/1910.05895.pdf
+    return (2 / (in_d + init_scale * out_d)) ** 0.5       
+
 
 # from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_pytorch.py
 class Residual(nn.Module):
@@ -99,8 +144,11 @@ class PreNorm(nn.Module):
         return self.fn(self.norm(x), **kwargs)
 
 class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
+    def __init__(self, dim, hidden_dim, dropout = 0., init_scale=4):
         super().__init__()
+
+        self.init_scale = init_scale 
+
         self.net = nn.Sequential(
             nn.Linear(dim, hidden_dim),
             nn.GELU(),
@@ -108,20 +156,35 @@ class FeedForward(nn.Module):
             nn.Linear(hidden_dim, dim),
             nn.Dropout(dropout)
         )
+        self._init_weights() 
+
+    def _init_weights(self): 
+        for m in self.net:
+            if isinstance(m, nn.Linear):
+                torch.nn.init.normal_(m.weight, mean = 0, std = _get_std_from_tensor(self.init_scale, m.weight))
+                torch.nn.init.constant_(m.bias,  0) 
+
     def forward(self, x):
         return self.net(x)
 
 class Attention(nn.Module):
-    def __init__(self, dim, heads = 8, dropout = 0.):
+    def __init__(self, dim, heads = 8, dropout = 0., init_scale=4):
         super().__init__()
         self.heads = heads
         self.scale = dim ** -0.5
+        self.init_scale = init_scale 
 
         self.to_qkv = nn.Linear(dim, dim * 3, bias = False)
         self.to_out = nn.Sequential(
             nn.Linear(dim, dim),
             nn.Dropout(dropout)
         )
+        self._init_weights() 
+
+    def _init_weights(self): 
+        torch.nn.init.normal_(self.to_qkv.weight, mean = 0, std = _get_std_from_tensor(self.init_scale, self.to_qkv.weight))
+        torch.nn.init.normal_(self.to_out[0].weight, mean = 0, std = _get_std_from_tensor(self.init_scale, self.to_out[0].weight))
+        torch.nn.init.constant_(self.to_out[0].bias, 0) 
 
     def forward(self, x, mask = None):
         b, n, _, h = *x.shape, self.heads
@@ -147,13 +210,13 @@ class Attention(nn.Module):
         return out
 
 class Transformer(nn.Module):
-    def __init__(self, dim, depth, heads, mlp_dim, dropout):
+    def __init__(self, dim, depth, heads, mlp_dim, dropout, init_scale):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(nn.ModuleList([
-                Residual(PreNorm(dim, Attention(dim, heads = heads, dropout = dropout))),
-                Residual(PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout)))
+                Residual(PreNorm(dim, Attention(dim, heads = heads, dropout = dropout, init_scale = init_scale))),
+                Residual(PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout, init_scale = init_scale)))
             ]))
     def forward(self, x, mask = None):
         for attn, ff in self.layers:
@@ -166,22 +229,23 @@ class TransformerEncoder(torch.nn.Module):
                  image_size: int, 
                  patch_size: int, 
                  language_embedder: torch.nn.Module, 
-                 n_layers: int,
+                 n_layers_shared: int,
+                 n_layers_split: int,
                  n_classes: int = 2, 
                  channels: int = 21, 
                  n_heads: int = 8,
                  hidden_dim: int = 512,
                  ff_dim: int = 1024,
+                 init_scale: int = 4,
                  dropout: float = 0.33,
                  embed_dropout: float = 0.33,
+                 output_type: str = "per-pixel",
                  device: torch.device = "cpu"):
         super(TransformerEncoder, self).__init__() 
 
-        self.compute_block_dist = False                                                                                                                         
-        try:
-            assert(n_layers % 2 == 0)
-        except AssertionError:
-            raise AssertionError("number of layers {n_layers} must be even") 
+        self.compute_block_dist = False 
+        self.output_type = output_type 
+        self.init_scale = init_scale
 
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
@@ -201,19 +265,24 @@ class TransformerEncoder(torch.nn.Module):
         self.sep_token = torch.nn.Parameter(torch.randn(1, 1, hidden_dim))
 
         # first half of stack is dedicated to joint modeling, 2nd half splits previous and next 
-        self.start_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
-        self.prev_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
-        self.next_transformer = Transformer(hidden_dim, int(n_layers/2), n_heads, ff_dim, dropout) 
+        self.start_transformer = Transformer(hidden_dim, n_layers_shared, n_heads, ff_dim, dropout, init_scale) 
+        self.prev_transformer = Transformer(hidden_dim, n_layers_split, n_heads, ff_dim, dropout, init_scale) 
+        self.next_transformer = Transformer(hidden_dim, n_layers_split, n_heads, ff_dim, dropout, init_scale) 
 
         self.dropout = torch.nn.Dropout(embed_dropout) 
+        
+        if output_type == "per-pixel":
+            output_dim = self.patch_size**2 * n_classes
+        else:
+            output_dim = n_classes 
 
         self.next_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, self.patch_size**2 * n_classes)
+            nn.Linear(hidden_dim, output_dim)
         )
         self.prev_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, self.patch_size**2 * n_classes)
+            nn.Linear(hidden_dim, output_dim) 
         )
 
     def get_lang_mask(self, lang): 
@@ -281,8 +350,8 @@ class TransformerEncoder(torch.nn.Module):
         next_classes = self.next_mlp_head(next_just_image_output) 
 
         # convert back to image 
-        prev_image_output = tiles_to_image(prev_classes, self.patch_size).unsqueeze(-1) 
-        next_image_output = tiles_to_image(next_classes, self.patch_size).unsqueeze(-1) 
+        prev_image_output = tiles_to_image(prev_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
+        next_image_output = tiles_to_image(next_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
 
         return {"prev_position": prev_image_output,
                 "next_position": next_image_output}

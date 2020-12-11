@@ -23,27 +23,4 @@ echo "RUNNING ON VERSION: " > ${CHECKPOINT_DIR}/stdout.log
 git branch >> ${CHECKPOINT_DIR}/stdout.log
 git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 
-python -u train_transformer.py \
-        --train-path blocks_data/singleset.json \
-        --val-path blocks_data/singleset.json \
-        --checkpoint-dir ${CHECKPOINT_DIR} \
-        --num-epochs 210 \
-        --num-blocks 1 \
-        --binarize-blocks \
-        --generate-after-n 208 \
-        --traj-type flat \
-        --batch-size 256  \
-        --max-seq-length 40 \
-        --do-filter \
-        --top-only \
-        --embedding-dim 16 \
-        --embedder random \
-        --embedding-dim 50 \
-        --hidden-dim 64 \
-        --n-heads 4 \
-        --n-layers 4 \
-        --ff-dim 256 \
-        --learn-rate 0.001 \
-        --dropout 0.0 \
-        --embed-dropout 0.0 \
-        --zero-weight 0.001 
+python -u train_transformer.py  --cfg configs/debug_transformer.yaml 

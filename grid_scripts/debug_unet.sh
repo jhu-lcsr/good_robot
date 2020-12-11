@@ -36,6 +36,7 @@ python -u train_unet.py \
         --batch-size 256  \
         --max-seq-length 40 \
         --do-filter \
+        --do-one-hot \
         --top-only \
         --embedding-dim 16 \
         --unet-type unet_with_attention \

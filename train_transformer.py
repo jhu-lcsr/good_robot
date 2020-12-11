@@ -1,5 +1,6 @@
 import json 
-import argparse
+from jsonargparse import ArgumentParser, ActionConfigFile 
+import yaml 
 from typing import List, Dict
 import glob
 import os 
@@ -11,6 +12,7 @@ from io import StringIO
 import torch
 from spacy.tokenizer import Tokenizer
 from spacy.lang.en import English
+from einops import rearrange 
 import logging 
 from tqdm import tqdm 
 from matplotlib import pyplot as plt
@@ -22,7 +24,7 @@ from allennlp.training.scheduler import Scheduler
 from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
-from transformer import TransformerEncoder, image_to_tiles
+from transformer import TransformerEncoder, image_to_tiles, tiles_to_image
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 
 
@@ -45,6 +47,8 @@ class TransformerTrainer(FlatLanguageTrainer):
                  num_models_to_keep: int,
                  generate_after_n: int,
                  resolution: int = 64, 
+                 patch_size: int = 8,
+                 output_type: str = "per-pixel", 
                  depth: int = 7,
                  best_epoch: int = -1,
                  zero_weight: float = 0.05):
@@ -67,6 +71,8 @@ class TransformerTrainer(FlatLanguageTrainer):
         print(f"total steps {total_steps}") 
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
         self.scheduler = scheduler 
+        self.patch_size = patch_size 
+        self.output_type = output_type
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -81,8 +87,12 @@ class TransformerTrainer(FlatLanguageTrainer):
             if outputs is None:
                 skipped += 1
                 continue
-            #loss = self.compute_weighted_loss(batch_instance, outputs, (epoch + 1) * (b+1)) 
-            loss = self.compute_patch_loss(batch_instance, outputs) 
+            if self.output_type == "per-pixel": 
+                loss = self.compute_weighted_loss(batch_instance, outputs, (epoch + 1) * (b+1)) 
+            elif self.output_type == "per-patch": 
+                loss = self.compute_patch_loss(batch_instance, outputs) 
+            else:
+                raise AssertionError("must have output in ['per-pixel', 'per-patch']") 
             #loss = self.compute_weighted_loss(batch_instance, prev_outputs, (epoch + 1) * (b+1)) 
             #loss = self.compute_loss(batch_instance, next_outputs, prev_outputs) 
             loss.backward() 
@@ -169,6 +179,7 @@ class TransformerTrainer(FlatLanguageTrainer):
         true_next_image = true_next_image.long().to(self.device) 
         true_prev_image = true_prev_image.long().to(self.device) 
 
+
         prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
         next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
 
@@ -181,44 +192,53 @@ class TransformerTrainer(FlatLanguageTrainer):
         """
         compute per-patch for each patch 
         """
-        pdb.set_trace() 
+        bsz, __, w, h = inputs['prev_pos_input'].shape 
+
         pred_next_image = outputs["next_position"]
-        true_next_image = inputs["next_pos_for_pred"]
-        pred_prev_image = image_to_tiles(outputs["prev_position"]) 
-        true_prev_image = inputs["prev_pos_for_pred"]
+        pred_prev_image = outputs["prev_position"]
+
+        true_next_image = image_to_tiles(inputs["next_pos_for_pred"].reshape(bsz, 1, w, h), self.patch_size) 
+        true_prev_image = image_to_tiles(inputs["prev_pos_for_pred"].reshape(bsz, 1, w, h), self.patch_size) 
 
         # binarize patches
-        prev_sum_image = torch.sum(true_prev_image, dim = 2) 
+        prev_sum_image = torch.sum(true_prev_image, dim = 2, keepdim=True) 
         prev_patches = torch.zeros_like(prev_sum_image)
-        next_sum_image = torch.sum(true_next_image, dim = 2) 
+        next_sum_image = torch.sum(true_next_image, dim = 2, keepdim=True) 
         next_patches = torch.zeros_like(next_sum_image)
         # any patch that has a 1 pixel in it gets 1 
         prev_patches[prev_sum_image != 0] = 1
         next_patches[next_sum_image != 0] = 1
 
-        bsz, n_blocks, width, height, depth = pred_prev_image.shape
+
         pred_prev_image = pred_prev_image.squeeze(-1)
         pred_next_image = pred_next_image.squeeze(-1)
-        true_next_image = true_next_image.squeeze(-1).squeeze(-1)
-        true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
-        true_next_image = true_next_image.long().to(self.device) 
-        true_prev_image = true_prev_image.long().to(self.device) 
+        prev_patches = prev_patches.squeeze(-1).to(self.device).long()
+        next_patches = next_patches.squeeze(-1).to(self.device).long()  
 
-        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
-        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+        pred_prev_image = rearrange(pred_prev_image, 'b n c -> b c n')
+        pred_next_image = rearrange(pred_next_image, 'b n c -> b c n')
+
+        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, prev_patches)  
+        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, next_patches) 
 
         total_loss = next_pixel_loss + prev_pixel_loss 
         print(f"loss {total_loss.item()}")
 
         return total_loss
 
-
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
         outputs = self.encoder(batch_instance) 
+        prev_position = outputs['prev_position']
+        next_position = outputs['next_position']
+        if self.output_type == 'per-patch': 
+            prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
+            next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
+            prev_position = prev_position.unsqueeze(-1)
+            next_position = next_position.unsqueeze(-1)
 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], outputs["prev_position"])
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], outputs["next_position"]) 
+        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_position) 
+        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_position) 
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
@@ -235,13 +255,13 @@ class TransformerTrainer(FlatLanguageTrainer):
                 next_pos = batch_instance["next_pos_for_acc"][i]
                  
                 self.generate_debugging_image(next_pos,
-                                             outputs["next_position"][i], 
+                                             next_position[i], 
                                              output_path.joinpath("next"),
                                              caption = command)
 
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
                 self.generate_debugging_image(prev_pos, 
-                                              outputs["prev_position"][i], 
+                                              prev_position[i], 
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
@@ -370,17 +390,20 @@ def main(args):
         # TODO (elias): confirm this number 
         depth = 7
 
+    channels = 21 if args.do_one_hot else 1
     encoder = TransformerEncoder(image_size = args.resolution,
                                  patch_size = args.patch_size, 
                                  language_embedder = embedder, 
-                                 n_layers = args.n_layers,
+                                 n_layers_shared = args.n_shared_layers,
+                                 n_layers_split  = args.n_split_layers,
                                  n_classes = 2,
-                                 channels = 1, 
+                                 channels = channels, 
                                  n_heads = args.n_heads,
                                  hidden_dim = args.hidden_dim,
                                  ff_dim = args.ff_dim,
                                  dropout = args.dropout,
                                  embed_dropout = args.embed_dropout,
+                                 output_type = args.output_type, 
                                  device = device) 
 
 
@@ -391,7 +414,6 @@ def main(args):
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learn_rate) 
     # scheduler
-    #scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     scheduler = NoamLR(optimizer, model_size = args.hidden_dim, warmup_steps = args.warmup, factor = args.lr_factor) 
 
     best_epoch = -1
@@ -415,9 +437,8 @@ def main(args):
             best_epoch = best_checkpoint_data["epoch"]
 
         # save arg config to checkpoint_dir
-        with open(pathlib.Path(args.checkpoint_dir).joinpath("config.json"), "w") as f1:
-            json.dump(args.__dict__, f1) 
-
+        with open(pathlib.Path(args.checkpoint_dir).joinpath("config.yaml"), "w") as f1:
+            yaml.dump(args, f1) 
 
         # construct trainer 
         trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
@@ -433,6 +454,8 @@ def main(args):
                               generate_after_n = args.generate_after_n, 
                               depth = depth, 
                               resolution = args.resolution, 
+                              output_type = args.output_type, 
+                              patch_size = args.patch_size,
                               best_epoch = best_epoch,
                               zero_weight = args.zero_weight) 
         trainer.train() 
@@ -452,14 +475,20 @@ def main(args):
                                    num_blocks = args.num_blocks,
                                    device = device,
                                    resolution = args.resolution, 
+                                   output_type = args.output_type, 
                                    checkpoint_dir = args.checkpoint_dir,
+                                   patch_size = args.patch_size,
                                    num_models_to_keep = 0, 
                                    generate_after_n = 0) 
         print(f"evaluating") 
         eval_trainer.evaluate()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
+    
+    # config file 
+    parser.add_argument("--cfg", action = ActionConfigFile) 
+    
     # training 
     parser.add_argument("--test", action="store_true", help="load model and test")
     parser.add_argument("--resume", action="store_true", help="resume training a model")
@@ -481,13 +510,15 @@ if __name__ == "__main__":
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # transformer parameters 
     parser.add_argument("--patch-size", type=int, default = 8)  
-    parser.add_argument("--n-layers", type=int, default = 6) 
+    parser.add_argument("--n-shared-layers", type=int, default = 6) 
+    parser.add_argument("--n-split-layers", type=int, default = 2) 
     parser.add_argument("--n-classes", type=int, default = 2) 
     parser.add_argument("--n-heads", type= int, default = 8) 
     parser.add_argument("--hidden-dim", type= int, default = 512)
     parser.add_argument("--ff-dim", type = int, default = 1024) 
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
+    parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch"], default='per-pixel')
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
@@ -500,5 +531,5 @@ if __name__ == "__main__":
     parser.add_argument("--generate-after-n", type=int, default=10) 
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
 
-    args = parser.parse_args()
+    args = parser.parse_args() 
     main(args) 
