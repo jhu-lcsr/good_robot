@@ -417,8 +417,7 @@ def main(args):
             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
             if not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
-            print(mismatch_str)
-            if not disable_situation_removal:
+                print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.reposition_objects()
@@ -428,6 +427,8 @@ def main(args):
                 # all rewards and success checks are False!
                 set_nonlocal_success_variables_false()
                 nonlocal_variables['trial_complete'] = True
+                # TODO(adit98) think of a better way to do this
+                time.sleep(2)
                 if check_row:
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
@@ -641,6 +642,9 @@ def main(args):
                                 # goal is 2 blocks in a row
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
+
+                                # TODO(adit98) think of a better way to do this
+                                time.sleep(2)
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
@@ -1225,6 +1229,9 @@ def main(args):
                     # the simulation below.
                     num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
+                # TODO(adit98) think of a better way to do this
+                time.sleep(2)
+
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
                     nonlocal_variables['stack'].next()
@@ -1398,6 +1405,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(trainer.iteration - i, trial_start)
+            print(trial_start, trainer.iteration - i, iter_num)
 
             # load img at iter_num
             h_i_path = os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % iter_num)
