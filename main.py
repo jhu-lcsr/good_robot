@@ -427,8 +427,6 @@ def main(args):
                 # all rewards and success checks are False!
                 set_nonlocal_success_variables_false()
                 nonlocal_variables['trial_complete'] = True
-                # TODO(adit98) think of a better way to do this
-                time.sleep(2)
                 if check_row:
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
@@ -643,9 +641,6 @@ def main(args):
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
 
-                                # TODO(adit98) think of a better way to do this
-                                time.sleep(2)
-
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
@@ -834,6 +829,8 @@ def main(args):
             if not place and num_trials >= max_test_trials:
                 nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
 
+        return no_change_count, num_trials
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -869,7 +866,7 @@ def main(args):
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
         if nonlocal_variables['trial_complete']:
-            end_trial()
+            no_change_count, num_trials = end_trial()
 
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
@@ -959,9 +956,10 @@ def main(args):
 
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
-            end_trial()
+            no_change_count, num_trials = end_trial()
             if do_continue:
                 do_continue = False
+                print("continuing")
                 continue
 
             # TODO(ahundt) update experience replay trial rewards
@@ -1239,8 +1237,6 @@ def main(args):
                     # the simulation below.
                     num_problems_detected += 3
                 nonlocal_variables['trial_complete'] = True
-                # TODO(adit98) think of a better way to do this
-                time.sleep(2)
 
                 if place:
                     nonlocal_variables['stack'].reset_sequence()
@@ -1400,34 +1396,8 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
     # load history and modify valid_depth_heightmap
     if depth_channels_history:
-        clearance_inds = np.array(trainer.clearance_log).flatten()
-
-        # append 1 channel of current timestep depth to depth_heightmap_history
-        depth_heightmap_history = [valid_depth_heightmap]
-        for i in range(1, history_len):
-            # if clearance_inds is empty, we haven't had a reset
-            if clearance_inds.shape[0] == 0:
-                trial_start = 0
-
-            else:
-                # find beginning of current trial (iteration after last reset prior to trainer.iteration)
-                trial_start = clearance_inds[-1] + 1
-
-            # if we try to load history before beginning of a trial, just repeat initial state
-            iter_num = max(trainer.iteration - i, trial_start)
-            print(trial_start, trainer.iteration - i, iter_num)
-
-            # load img at iter_num
-            h_i_path = os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % iter_num)
-            h_i = cv2.imread(h_i_path, -1)
-            if h_i is None:
-                # There was an error loading the image
-                print('Warning: Could not load depth heightmap image at the following path, using zeros instead: ' + h_i_path)
-                h_i = np.zeros(valid_depth_heightmap.shape)
-            h_i = h_i.astype(np.float32)/100000
-            depth_heightmap_history.append(h_i)
-
-        valid_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
+        valid_depth_heightmap = trainer.generate_hist_heightmap(valid_depth_heightmap,
+                trainer.iteration, logger)
 
     # otherwise, repeat depth values in each channel
     else:

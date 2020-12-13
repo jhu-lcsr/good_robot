@@ -348,6 +348,36 @@ class Trainer(object):
                   str(end) + ' clearance length: ' + str(clearance_length) +
                   ' reward value log length: ' + str(len(self.reward_value_log)))
 
+    def generate_hist_heightmap(self, valid_depth_heightmap, iteration, logger, history_len=3):
+        clearance_inds = np.array(self.clearance_log).flatten()
+
+        # append 1 channel of current timestep depth to depth_heightmap_history
+        depth_heightmap_history = [valid_depth_heightmap]
+        for i in range(1, history_len):
+            # if clearance_inds is empty, we haven't had a reset
+            if clearance_inds.shape[0] == 0:
+                trial_start = 0
+
+            else:
+                # find beginning of current trial (iteration after last reset prior to iteration)
+                trial_start = clearance_inds[np.searchsorted(clearance_inds, iteration, side='right') - 1]
+
+            # if we try to load history before beginning of a trial, just repeat initial state
+            iter_num = max(iteration - i, trial_start)
+            print(trial_start, iteration - i, iter_num)
+
+            # load img at iter_num
+            h_i_path = os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % iter_num)
+            h_i = cv2.imread(h_i_path, -1)
+            if h_i is None:
+                # There was an error loading the image
+                print('Warning: Could not load depth heightmap image at the following path, using zeros instead: ' + h_i_path)
+                h_i = np.zeros(valid_depth_heightmap.shape)
+            h_i = h_i.astype(np.float32)/100000
+            depth_heightmap_history.append(h_i)
+
+        return np.stack(depth_heightmap_history, axis=-1)
+
     def load_sample(self, sample_iteration, logger, depth_channels_history=False, history_len=3):
         """Load the data from disk, and run a forward pass with the current model
         """
@@ -361,35 +391,7 @@ class Trainer(object):
 
         # if we are using history, load the last t depth heightmaps, calculate numerical depth, and concatenate
         if depth_channels_history:
-            clearance_inds = np.array(self.clearance_log).flatten()
-
-            # append 1 channel of current timestep depth to depth_heightmap_history
-            depth_heightmap_history = [sample_depth_heightmap]
-
-            for i in range(1, history_len):
-                # if it is a 0-dim array, expand dims
-                if clearance_inds.shape[0] == 0:
-                    trial_start = 0
-
-                else:
-                    # if we are sampling from before the first reset, trial start is 0 (hard-code edge condition to avoid indexing issues)
-                    if sample_iteration <= clearance_inds[0]:
-                        trial_start = 0
-
-                    else:
-                        # find beginning of current trial (iteration after last reset prior to trainer.iteration)
-                        trial_start = clearance_inds[np.searchsorted(clearance_inds, sample_iteration) - 1] + 1
-
-                # if we try to load history before beginning of a trial, just repeat initial state
-                iter_num = max(sample_iteration - i, trial_start)
-
-                # load img at iter_num
-                h_i = cv2.imread(os.path.join(logger.depth_heightmaps_directory,
-                    '%06d.0.depth.png' % iter_num), -1)
-                h_i = h_i.astype(np.float32)/100000
-                depth_heightmap_history.append(h_i)
-
-            sample_depth_heightmap = np.stack(depth_heightmap_history, axis=-1)
+            sample_depth_heightmap = self.generate_hist_heightmap(sample_depth_heightmap, sample_iteration, logger)
 
         else:
             sample_depth_heightmap = np.stack([sample_depth_heightmap] * 3, axis=-1)
