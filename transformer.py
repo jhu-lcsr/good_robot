@@ -70,26 +70,40 @@ def image_to_tiles(image, tile_size):
     return new_image 
 
 def upsample_tiles(tiled_output, tile_size):
+    """
+    takes tiled output, which is a distribution per tile, and upsamples it to a per-pixel distribution.
+    All pixels corresponding to one tile get the same value (the tile value)
+    """
     tiled_output = tiled_output.squeeze(-1)
+    # rearrange so that the support of the dist is the channel dimension 
     tiled_output = rearrange(tiled_output, 'b n c -> b c n')
+    # n here is the number of tiles, i.e. the unrolled image 
     b, c, n = tiled_output.shape 
 
+    # get total number of pixels in the image 
     image_size = n * tile_size**2
+    # take the sqrt to get the image width 
     w = int(math.sqrt(image_size))
-   
+    # this list will contain each tile, which we'll later concatenate together  
     output_image = [[None for j in range(w // tile_size)] for i in range(w//tile_size)]
 
+    # iterate over valid row and column indices 
     for row_idx in range(int(w / tile_size)):
         for col_idx in range(int(w / tile_size)):
+            # get the tile index 
             abs_idx = (row_idx * (w // tile_size)) + col_idx 
+            # get the values of the tile at that index
             tile_values = tiled_output[:,:,abs_idx].unsqueeze(-1)
+            # repeat those for a pxp square in the image 
             # [b, c, p^2]
             tile = tile_values.repeat((1, 1, tile_size**2))
             # [b, c, p, p]
             tile = tile.reshape((b, c, tile_size, tile_size))
             output_image[row_idx][col_idx] = tile
 
+    # concatenate all the tiles in a row
     output_rows = [torch.cat(row, dim=3) for row in output_image]
+    # concatenate all the rows into a final image 
     output = torch.cat(output_rows, dim=2) 
     return output 
 
@@ -105,14 +119,13 @@ def tiles_to_image(tile_output, tile_size, output_type = "per-pixel", upsample =
         image = rearrange(image, 'b n (p1 p2 c) -> b c (n p1 p2)', p1 = p, p2 = p)
     elif output_type == "per-patch" and upsample: 
         # each of the n patches gets turned into a pxp image region 
-        #image = repeat(tile_output, 'b n c () -> b c n psq', psq = p**2) 
-        #image = rearrange(image, 'b c n psq -> b c (n psq)') 
         image = upsample_tiles(tile_output, tile_size) 
         return image 
     else:
         return tile_output 
 
     w = int(math.sqrt(image.shape[-1]))
+    # instead of having a flat sequence of tiles, return a wxw square of tiles 
     image = rearrange(image, 'b c (w1 w2) -> b c w1 w2', w1 = w, w2 = w) 
     return image 
 
