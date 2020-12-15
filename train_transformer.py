@@ -25,9 +25,8 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, image_to_tiles, tiles_to_image
+from metrics import TransformerTeleportationMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-
-
 from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 
@@ -51,6 +50,7 @@ class TransformerTrainer(FlatLanguageTrainer):
                  output_type: str = "per-pixel", 
                  depth: int = 7,
                  best_epoch: int = -1,
+                 seed: int = 12, 
                  zero_weight: float = 0.05):
         super(TransformerTrainer, self).__init__(train_data,
                                                   val_data,
@@ -70,9 +70,20 @@ class TransformerTrainer(FlatLanguageTrainer):
         total_steps = num_epochs * len(train_data) 
         print(f"total steps {total_steps}") 
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
+        self.xent_loss_fxn = torch.nn.CrossEntropyLoss() 
+
         self.scheduler = scheduler 
         self.patch_size = patch_size 
         self.output_type = output_type
+        self.teleportation_metric = TransformerTeleportationMetric(block_size = 4,
+                                                                   image_size = resolution,
+                                                                   patch_size = patch_size) 
+        self.set_all_seeds(seed) 
+
+    def set_all_seeds(self, seed):
+        np.random.seed(seed) 
+        torch.manual_seed(seed) 
+        torch.backends.cudnn.deterministic = True
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -105,20 +116,23 @@ class TransformerTrainer(FlatLanguageTrainer):
         total_prev_acc, total_next_acc = 0.0, 0.0
         total = 0 
         total_block_acc = 0.0 
+        total_tele_score = 0.0
 
         self.encoder.eval() 
         for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
             #prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
-            next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+            next_pixel_acc, prev_pixel_acc, block_acc, tele_score = self.validate(dev_batch_instance, epoch, b, 0) 
             total_prev_acc += prev_pixel_acc
             total_next_acc += next_pixel_acc
             total_block_acc += block_acc
+            total_tele_score += tele_score
             total += 1
 
         mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
-        print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
+        mean_tele_score = total_tele_score / total 
+        print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}") 
         #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
         #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
         return (mean_next_acc + mean_prev_acc)/2, mean_block_acc
@@ -231,6 +245,7 @@ class TransformerTrainer(FlatLanguageTrainer):
         outputs = self.encoder(batch_instance) 
         prev_position = outputs['prev_position']
         next_position = outputs['next_position']
+
         if self.output_type == 'per-patch': 
             prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
             next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
@@ -243,6 +258,17 @@ class TransformerTrainer(FlatLanguageTrainer):
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
             block_accuracy = -1.0
+
+        all_tele_scores = []
+        for batch_idx in range(prev_position.shape[0]):
+            teleportation_score = self.teleportation_metric.get_metric(batch_instance["next_pos_for_acc"][batch_idx].clone(),
+                                                                       batch_instance["prev_pos_for_acc"][batch_idx].clone(),
+                                                                       prev_position[batch_idx].clone(),
+                                                                       outputs["next_position"][batch_idx].clone(),
+                                                                       batch_instance["block_to_move"][batch_idx].clone())
+
+            all_tele_scores.append(teleportation_score)
+        total_tele_score = np.mean(all_tele_scores) 
             
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -265,7 +291,7 @@ class TransformerTrainer(FlatLanguageTrainer):
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
-        return next_f1, prev_f1, block_accuracy
+        return next_f1, prev_f1, block_accuracy, total_tele_score
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
@@ -457,6 +483,7 @@ def main(args):
                               output_type = args.output_type, 
                               patch_size = args.patch_size,
                               best_epoch = best_epoch,
+                              seed = args.seed,
                               zero_weight = args.zero_weight) 
         trainer.train() 
 
@@ -479,6 +506,7 @@ def main(args):
                                    checkpoint_dir = args.checkpoint_dir,
                                    patch_size = args.patch_size,
                                    num_models_to_keep = 0, 
+                                   seed = args.seed,
                                    generate_after_n = 0) 
         print(f"evaluating") 
         eval_trainer.evaluate()
@@ -530,6 +558,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-epochs", type=int, default=3) 
     parser.add_argument("--generate-after-n", type=int, default=10) 
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
+    parser.add_argument("--seed", type=int, default=12) 
 
     args = parser.parse_args() 
     main(args) 

@@ -221,6 +221,7 @@ class LanguageTrainer:
         depth = 0
         fig = plt.figure(figsize=(16,12))
         gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
+        # add text command for debugging 
         text_ax = plt.subplot(gs[1])
         text_ax.axis([0, 1, 0, 1])
         text_ax.text(0.2, 0.02, legend_str, fontsize = 12)
@@ -231,8 +232,6 @@ class LanguageTrainer:
         text_ax.text(0.05, 0.95, caption, wrap=True, fontsize=14,
             verticalalignment='top', bbox=props)
         ax = plt.subplot(gs[0])
-        #ax.set_xticks([0, 16, 32, 48, 64])
-        #ax.set_yticks([0, 16, 32, 48, 64]) 
         ticks = [i for i in range(0, self.resolution + 16, 16)]
         ax.set_xticks(ticks)
         ax.set_yticks(ticks) 
