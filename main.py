@@ -961,7 +961,6 @@ def main(args):
             num_trials = trainer.num_trials()
             if do_continue:
                 do_continue = False
-                print("continuing")
                 continue
 
             # TODO(ahundt) update experience replay trial rewards
