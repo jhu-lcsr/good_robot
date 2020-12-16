@@ -829,7 +829,7 @@ def main(args):
             if not place and num_trials >= max_test_trials:
                 nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
 
-        return no_change_count, num_trials
+        return no_change_count
 
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
@@ -866,7 +866,8 @@ def main(args):
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
         if nonlocal_variables['trial_complete']:
-            no_change_count, num_trials = end_trial()
+            no_change_count = end_trial()
+            num_trials = trainer.num_trials()
 
         print('\n%s iteration: %d' % ('Testing' if is_testing else 'Training', trainer.iteration))
         iteration_time_0 = time.time()
@@ -882,8 +883,8 @@ def main(args):
             robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
 
         # Reset simulation or pause real-world training if table is empty
-        stuff_count = np.zeros(valid_depth_heightmap.shape)
-        stuff_count[valid_depth_heightmap > 0.02] = 1
+        stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
+        stuff_count[valid_depth_heightmap[:, :, 0] > 0.02] = 1
         if show_heightmap:
             # show the heightmap
             f = plt.figure()
@@ -956,7 +957,8 @@ def main(args):
 
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
-            no_change_count, num_trials = end_trial()
+            no_change_count = end_trial()
+            num_trials = trainer.num_trials()
             if do_continue:
                 do_continue = False
                 print("continuing")
@@ -1089,16 +1091,17 @@ def main(args):
                 # save the best model based on all tracked plotting metrics.
                 for k, v in best_dict.items():
                     if k in prev_best_dict and (prev_best_dict[k] is None or v > prev_best_dict[k]):
-                            best_model_name = method + '_' + k
-                            logger.save_model(trainer.model, best_model_name)
-                            best_stats_file = os.path.join(logger.models_directory, best_model_name + '.json')
-                            print('Saving new best model with stats in: ' + best_stats_file)
-                            with open(best_stats_file, 'w') as f:
-                                json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
-                            current_stats_file = os.path.join(logger.models_directory, best_model_name + '_current_stats.json')
-                            print('Saving new best model current stats in: ' + current_stats_file)
-                            with open(best_stats_file, 'w') as f:
-                                json.dump(current_stats_file, f, cls=utils.NumpyEncoder, sort_keys=True)
+                        best_model_name = method + '_' + k
+                        logger.save_model(trainer.model, best_model_name)
+                        best_stats_file = os.path.join(logger.models_directory, best_model_name + '.json')
+                        print('Saving new best model with stats in: ' + best_stats_file)
+                        with open(best_stats_file, 'w') as f:
+                            json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
+                        current_stats_file = os.path.join(logger.models_directory, best_model_name + '_current_stats.json')
+                        print('Saving new best model current stats in: ' + current_stats_file)
+                        with open(best_stats_file, 'w') as f:
+                            json.dump(current_stats_file, f, cls=utils.NumpyEncoder, sort_keys=True)
+
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
                     nonlocal_variables['save_state_this_iteration'] = False
