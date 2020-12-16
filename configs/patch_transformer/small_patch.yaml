@@ -1,0 +1,38 @@
+# DATA 
+train_path: "blocks_data/trainset_v2.json"
+val_path: "blocks_data/small_devset.json"
+num_blocks: 1
+binarize_blocks: True
+traj_type: "flat"
+batch_size: 128 
+max_seq_length: 60
+do_filter: True
+do_one_hot: True
+top_only: True
+resolution: 64
+zero_weight: 0.01
+
+# LANGUAGE EMBEDDER
+embedder: "glove" 
+embedding_file: "/home/estengel/glove/glove.6B.100d.txt" 
+embedding_dim: 100
+
+# TRANSFORMER
+patch_size: 4
+n_shared_layers: 2
+n_split_layers: 4
+n_classes: 2
+n_heads: 8
+hidden_dim: 256
+ff_dim: 1024
+dropout: 0.33
+embed_dropout: 0.33
+output_type: "per-patch"
+
+# MISC
+cuda: 0
+learn_rate: 0.00
+warmup: 4000
+checkpoint_dir: "" 
+num_epochs: 200
+generate_after_n: 201

@@ -10,6 +10,7 @@ import traceback
 import copy
 from simulation import vrep
 from scipy import ndimage, misc
+from glob import glob
 try:
     from gripper.robotiq_2f_gripper_ctrl import RobotiqCGripper
 except ImportError:
@@ -186,7 +187,9 @@ class Robot(object):
             self.obj_mesh_dir = obj_mesh_dir
             self.num_obj = num_obj
             # TODO(HK) specify which objects to load here from a command line parameter, should be able ot load one repeatedly
-            self.mesh_list = os.listdir(self.obj_mesh_dir)
+            #self.mesh_list = os.listdir(self.obj_mesh_dir)
+            # Restrict only the .obj files 
+            self.mesh_list = glob(os.path.join(self.obj_mesh_dir, "*.obj"))
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
@@ -209,6 +212,7 @@ class Robot(object):
                 print("WARNING: default tcp port changed to 19997 for is_sim")
                 tcp_port = 19997
             self.tcp_port = tcp_port
+            print(f"bp 1") 
             self.restart_sim(connect=True)
             # initialize some startup state values and handles for
             # the joint configurations and home position
@@ -219,6 +223,7 @@ class Robot(object):
             self.go_home()
             # set the home joint config based on the initialized simulation
             self.home_joint_config = self.get_joint_position()
+            print(f"got joints")
 
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
@@ -228,7 +233,9 @@ class Robot(object):
             self.setup_sim_camera()
 
             # If testing, read object meshes and poses from test case file
+            print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}") 
             if self.is_testing and self.test_preset_cases:
+                print(f"loading preset case") 
                 self.load_preset_case()
 
             # Add objects to simulation environment
@@ -334,6 +341,7 @@ class Robot(object):
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
+            print(f"present file is {self.test_preset_file}") 
             test_preset_file = self.test_preset_file
         file = open(test_preset_file, 'r')
         file_content = file.readlines()
@@ -348,29 +356,35 @@ class Robot(object):
             self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
             self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
         file.close()
+
         self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
 
 
     def setup_sim_camera(self):
-
+        print(f"getting camera data") 
         # Get handle to camera
         sim_ret, self.cam_handle = vrep.simxGetObjectHandle(self.sim_client, 'Vision_sensor_persp', vrep.simx_opmode_blocking)
 
+        print(f"camera bp 1") 
         # Get camera pose and intrinsics in simulation
         sim_ret, cam_position = vrep.simxGetObjectPosition(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         sim_ret, cam_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         cam_trans = np.eye(4,4)
         cam_trans[0:3,3] = np.asarray(cam_position)
         cam_orientation = [-cam_orientation[0], -cam_orientation[1], -cam_orientation[2]]
+        print(f"camera bp 2") 
         cam_rotm = np.eye(4,4)
         cam_rotm[0:3,0:3] = np.linalg.inv(utils.euler2rotm(cam_orientation))
         self.cam_pose = np.dot(cam_trans, cam_rotm) # Compute rigid transformation representating camera pose
         self.cam_intrinsics = np.asarray([[618.62, 0, 320], [0, 618.62, 240], [0, 0, 1]])
         self.cam_depth_scale = 1
 
+        print(f"camera bp 3") 
         # Get background image
         self.bg_color_img, self.bg_depth_img = self.get_camera_data()
         self.bg_depth_img = self.bg_depth_img * self.cam_depth_scale
+
+        print(f"camera bp 4") 
 
     def generate_random_object_pose(self):
         drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
@@ -427,6 +441,7 @@ class Robot(object):
                     object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
                     object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
                 # Set the colors in order
+                print(f"setting color at idx {object_idx} to {self.obj_mesh_color[object_idx]}") 
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
                 # If there are more objects than total colors this line will break,
                 # applies mod to loop back to the first color.
@@ -438,7 +453,12 @@ class Robot(object):
                 ret_ints = []
                 while len(ret_ints) == 0:
                     do_break = False
-                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    print(f"obj pos {object_position}") 
+                    print(f"obj ori {object_orientation}") 
+                    print(f"obj col {object_color}") 
+                    print(curr_mesh_file)
+                    print(curr_shape_name) 
+                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0, 0, 255, 0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
                     if ret_resp == 8:
                         print('Failed to add ' + curr_mesh_file + ' to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
@@ -1336,6 +1356,7 @@ class Robot(object):
             else:
                 # hard set the joint position to the home position to work around IK choosing
                 # elbow down positions, which leads to physically impossible simulator states.
+                print(f"moving to home joint config {self.home_joint_config}") 
                 return self.move_joints(self.home_joint_config)
         else:
             self.move_joints(self.home_joint_config)
