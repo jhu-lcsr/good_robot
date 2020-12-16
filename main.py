@@ -1046,6 +1046,7 @@ def main(args):
                 logger.write_to_log('trial', trainer.trial_log)
                 logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                 best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                # if we exceeded max_train_actions at the end of the last trial, stop training
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
                 print('Trial logging complete: ' + str(num_trials) + ' --------------------------------------------------------------')
