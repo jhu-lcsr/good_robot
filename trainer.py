@@ -443,7 +443,7 @@ class Trainer(object):
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
         depth_heightmap_2x = ndimage.zoom(depth_heightmap, zoom=[2,2,1], order=0)
-        assert(color_heightmap_2x.shape == depth_heightmap_2x.shape)
+        assert color_heightmap_2x.shape == depth_heightmap_2x.shape, print(color_heightmap_2x.shape, depth_heightmap_2x.shape)
 
         # Add extra padding (to handle rotations inside network)
         diag_length = float(color_heightmap_2x.shape[0]) * np.sqrt(2)
