@@ -56,7 +56,7 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                         'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
-    def get_heightmaps(self, action_str, stack_height, use_hist=False, action_dict_ind=None, history_len=3):
+    def get_heightmaps(self, action_str, stack_height, use_hist=False, history_len=3):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
         if action_str != 'orig' and self.task_type == 'stack':
             action_str = str(stack_height) + action_str
@@ -74,16 +74,17 @@ class Demonstration():
         # if using history, need to modify depth heightmap
         if use_hist:
             depth_heightmap_history = [depth_heightmap]
-            image_ind = self.image_names.index(rgb_filename)
+            image_ind = self.image_names.index(rgb_filename.split('/')[-1])
             hist_ind = image_ind
 
             # iterate through last history_len frames and add to list
-            for i in range(history_len):
+            for i in range(history_len - 1):
                 # calculate previous index
                 hist_ind = max(0, hist_ind - 1)
 
                 # load heightmap and add to list
-                hist_depth = cv2.imread(self.image_names[image_ind].replace('color', 'depth'), -1).astype(np.float32)/100000
+                heightmap_path = os.path.join(self.depth_dir, self.image_names[image_ind].replace('color', 'depth'))
+                hist_depth = cv2.imread(heightmap_path, -1).astype(np.float32)/100000
                 depth_heightmap_history.append(hist_depth)
 
             return rgb_heightmap, np.stack(depth_heightmap_history, axis=-1)
