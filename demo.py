@@ -56,7 +56,7 @@ class Demonstration():
                         ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                         'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
-    def get_heightmaps(self, action_str, stack_height, use_hist=False):
+    def get_heightmaps(self, action_str, stack_height, use_hist=False, action_dict_ind=None, history_len=3):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
         if action_str != 'orig' and self.task_type == 'stack':
             action_str = str(stack_height) + action_str
@@ -67,12 +67,28 @@ class Demonstration():
                 '%06d.%s.depth.png' % (stack_height, action_str))
         print("Processing:", rgb_filename, depth_filename)
 
+        # read rgb and depth heightmap
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
         depth_heightmap = cv2.imread(depth_filename, -1).astype(np.float32)/100000
-        if use_hist:
-            raise NotImplementedError
 
-        return rgb_heightmap, depth_heightmap
+        # if using history, need to modify depth heightmap
+        if use_hist:
+            depth_heightmap_history = [depth_heightmap]
+            image_ind = self.image_names.index(rgb_filename)
+            hist_ind = image_ind
+
+            # iterate through last history_len frames and add to list
+            for i in range(history_len):
+                # calculate previous index
+                hist_ind = max(0, hist_ind - 1)
+
+                # load heightmap and add to list
+                hist_depth = cv2.imread(self.image_names[image_ind].replace('color', 'depth'), -1).astype(np.float32)/100000
+                depth_heightmap_history.append(hist_depth)
+
+            return rgb_heightmap, np.stack(depth_heightmap_history, axis=-1)
+
+        return rgb_heightmap, np.stack([depth_heightmap] * 3, axis=-1)
 
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
             row_trainer=None, use_hist=False):
