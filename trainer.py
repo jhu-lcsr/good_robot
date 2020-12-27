@@ -603,8 +603,8 @@ class Trainer(object):
                             push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
                     place_predictions = np.ma.masked_array(place_predictions)
                 else:
-                    push_predictions, grasp_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
-                            push_predictions, grasp_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                            push_predictions, grasp_predictions, place_predictions=None, place_dilation=self.place_dilation, show_heightmap=self.show_heightmap, color_heightmap=color_heightmap)
 
             else:
                 # Mask pixels we know cannot lead to progress
