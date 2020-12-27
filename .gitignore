@@ -18,6 +18,7 @@ realsense/realsense
 *.zip
 *.pdf
 *.pyc
+*.png
 *__pycache__*
 
 commands.txt
