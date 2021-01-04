@@ -364,7 +364,6 @@ class Trainer(object):
 
             # if we try to load history before beginning of a trial, just repeat initial state
             iter_num = max(iteration - i, trial_start)
-            print(trial_start, iteration - i, iter_num)
 
             # load img at iter_num
             h_i_path = os.path.join(logger.depth_heightmaps_directory, '%06d.0.depth.png' % iter_num)
