@@ -1100,8 +1100,8 @@ def main(args):
                             json.dump(best_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
                         current_stats_file = os.path.join(logger.models_directory, best_model_name + '_current_stats.json')
                         print('Saving new best model current stats in: ' + current_stats_file)
-                        with open(best_stats_file, 'w') as f:
-                            json.dump(current_stats_file, f, cls=utils.NumpyEncoder, sort_keys=True)
+                        with open(current_stats_file, 'w') as f:
+                            json.dump(current_dict, f, cls=utils.NumpyEncoder, sort_keys=True)
 
                 # saves once every time logs are finalized
                 if nonlocal_variables['save_state_this_iteration']:
