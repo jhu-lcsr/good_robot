@@ -56,6 +56,8 @@ class BaseTrajectory:
         self.next_positions_for_acc = copy.deepcopy(self.next_positions_for_pred) 
         #self.blocks_to_move = self.get_blocks_to_move()
 
+        self.previous_positions = previous_positions
+        self.next_positions = next_positions
         self.previous_rotations = previous_rotations
         self.next_rotations = next_rotations
 
@@ -329,10 +331,10 @@ class DatasetReader:
                         trajectory = SimpleTrajectory(line_id,
                                                     command, 
                                                     [previous_positions[timestep]],
-                                                    [None],
+                                                    [previous_rotations[timestep]],
                                                     [next_positions[timestep]],
-                                                    [None],
-                                                    images=[images[timestep]],
+                                                    [next_rotations[timestep]],
+                                                    images=[images[timestep],images[timestep+1]],
                                                     lengths = [None],
                                                     tokenizer=self.tokenizer,
                                                     traj_type=self.traj_type,

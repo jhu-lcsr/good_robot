@@ -109,8 +109,8 @@ class Robot(object):
     """
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
-                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None, place=False, grasp_color_task=False,
+                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -149,6 +149,7 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+        
 
         # If in simulation...
         if self.is_sim:
@@ -189,7 +190,8 @@ class Robot(object):
             # TODO(HK) specify which objects to load here from a command line parameter, should be able ot load one repeatedly
             #self.mesh_list = os.listdir(self.obj_mesh_dir)
             # Restrict only the .obj files 
-            self.mesh_list = glob(os.path.join(self.obj_mesh_dir, "*.obj"))
+            self.mesh_list = sorted(glob(os.path.join(self.obj_mesh_dir, "*.obj")))
+            print(f"self.meshlist: {self.mesh_list}")
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
@@ -228,9 +230,15 @@ class Robot(object):
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
             self.test_preset_file = test_preset_file
+            self.test_preset_arr = test_preset_arr
 
             # Setup virtual camera in simulation
             self.setup_sim_camera()
+            
+            # Scaling used when importing objects
+            self.obj_scale = obj_scale
+            self.textured = textured 
+            self.capture_logoblock_dataset = capture_logoblock_dataset
 
             # If testing, read object meshes and poses from test case file
             print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}") 
@@ -341,7 +349,7 @@ class Robot(object):
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
-            print(f"present file is {self.test_preset_file}") 
+            print(f"preset file is {self.test_preset_file}") 
             test_preset_file = self.test_preset_file
         file = open(test_preset_file, 'r')
         file_content = file.readlines()
@@ -408,6 +416,15 @@ class Robot(object):
         self.reposition_object_randomly(object_handle)
 
 
+    def reposition_object_at_list_index_to_location(self, obj_pos, obj_ori, index):
+        """ Reposition the object to a specified position and orientation """
+        object_handle = self.object_handles[index]
+        success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
+        
+        vrep.simxSetObjectPosition(self.sim_client, object_handle, plane_handle, obj_pos, vrep.simx_opmode_blocking)
+        vrep.simxSetObjectOrientation(self.sim_client, object_handle, plane_handle, obj_ori, vrep.simx_opmode_blocking)
+
+
     def add_objects(self):
 
         # Add each object to robot workspace at x,y location and orientation (random or pre-loaded)
@@ -430,16 +447,29 @@ class Robot(object):
                 self.vrep_names = []
                 self.object_colors = []
             for object_idx in range(len(self.obj_mesh_ind)):
-                curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+            
+                # if setup for capture, no need for randomization / scrambling of the blocks.
+                if self.capture_logoblock_dataset:
+                    curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[object_idx])
+                else:
+                    curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+                
                 if self.is_testing and self.test_preset_cases:
                     curr_mesh_file = self.test_obj_mesh_files[object_idx]
                 # TODO(ahundt) define more predictable object names for when the number of objects is beyond the number of colors
+                print(f"Currently Trying to Import: {curr_mesh_file}")
                 curr_shape_name = 'shape_%02d' % object_idx
                 self.vrep_names.append(curr_shape_name)
                 drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
                 if self.is_testing and self.test_preset_cases:
                     object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
                     object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+                
+                # Loading object position and orientations from an array
+                if self.test_preset_arr is not None:
+                    object_position = self.test_preset_arr[object_idx][0]
+                    object_orientation = self.test_preset_arr[object_idx][1]
+                
                 # Set the colors in order
                 print(f"setting color at idx {object_idx} to {self.obj_mesh_color[object_idx]}") 
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
@@ -451,14 +481,23 @@ class Robot(object):
                 print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
                 do_break = False
                 ret_ints = []
+                ret_resp = 0
                 while len(ret_ints) == 0:
                     do_break = False
                     print(f"obj pos {object_position}") 
                     print(f"obj ori {object_orientation}") 
                     print(f"obj col {object_color}") 
                     print(curr_mesh_file)
-                    print(curr_shape_name) 
-                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0, 0, 255, 0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    print(curr_shape_name)
+                    
+                    # TODO: ZH, We don't really need this, remove this if statement after testing
+                    scale = [self.obj_scale]
+                    # print(object_position + object_orientation + object_color + scale)
+                    if self.textured:
+                        ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWTextureWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    else:
+                        ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    
                     if ret_resp == 8:
                         print('Failed to add ' + curr_mesh_file + ' to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
@@ -718,7 +757,7 @@ class Robot(object):
                 # time.sleep(1)
 
                 for object_handle in self.object_handles:
-
+                    
                     # Drop object at random x,y location and random orientation in robot workspace
                     self.reposition_object_randomly(object_handle)
                     time.sleep(0.5)
@@ -728,7 +767,7 @@ class Robot(object):
 
             # TODO(ahundt) add real robot support for reposition_objects
 
-    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
+    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3, median_filter_size=5, color_median_filter_size=5):
         """
         # Returns
 
@@ -746,7 +785,7 @@ class Robot(object):
             self.go_home(block_until_home=True)
 
         def get_color_depth():
-            """Get the raw color and depth images
+            """ Get the raw color and depth images
             """
             if self.is_sim:
                 sim_ret = None
@@ -790,13 +829,18 @@ class Robot(object):
             while max_z_height > z_height_retake_threshold:
                 scaled_depth_img = depth_img * self.cam_depth_scale  # Apply depth scale from calibration
                 color_heightmap, depth_heightmap = utils.get_heightmap(color_img, scaled_depth_img, self.cam_intrinsics, self.cam_pose,
-                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap)
+                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap,
+                                                                    median_filter_pixels=median_filter_size, color_median_filter_pixels=color_median_filter_size)
                 # TODO(ahundt) switch to masked array, then only have a regular heightmap
                 valid_depth_heightmap = depth_heightmap.copy()
                 valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
-
+                
+                # If just manipulating blocks for dataset image generation, no need to check height.
+                if self.capture_logoblock_dataset:
+                    break
+                
                 if max_z_height > z_height_retake_threshold:
                     if print_error > 3:
                         print('ERROR: depth_heightmap value too high. '

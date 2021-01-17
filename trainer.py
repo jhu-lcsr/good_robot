@@ -457,6 +457,7 @@ class Trainer(object):
                     push_predictions = np.concatenate((push_predictions, F.softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     if self.place:
+                        # TODO(zhe) Shouldn't the following line be using output_prob[rotate_idx][2]?
                         place_predictions = np.concatenate((place_predictions, F.softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,0,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
         elif self.method == 'reinforcement':
 
@@ -477,9 +478,10 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
+            # TODO(zhe) The common_sense_action_space function must also use the language mask, or we can implement a seperate function.
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_action_space_mask(depth_heightmap, push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
         else:
-            # Mask pixels we know cannot lead to progress
+            # Mask pixels we know cannot lead to progress, in this case we don't apply common sense masking
             push_predictions = np.ma.masked_array(push_predictions)
             grasp_predictions = np.ma.masked_array(grasp_predictions)
             if self.place:
