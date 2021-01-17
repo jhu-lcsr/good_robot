@@ -1,6 +1,8 @@
 from typing import Tuple
 import pdb 
+import math
 import torch
+from torch.nn import functional as F
 
 
 class SourceAttention(torch.nn.Module):
@@ -23,8 +25,12 @@ class SourceAttention(torch.nn.Module):
         q = q.reshape(bsz, width * height, hidden_dim) 
         # project keys queries and values 
         q, k, v = self.q_proj(q), self.k_proj(k), self.v_proj(v) 
-        # get image to input tokens attention weights
-        weights = torch.bmm(q, k.permute(0,2,1))
+        # get image to input tokens attention weights, scaled by dim 
+        weights = torch.bmm(q, k.permute(0,2,1)) 
+        weights = weights/math.sqrt(self.output_dim)
+
+        # softmax the weights
+        weights = F.softmax(weights, dim = 2) 
         # reweight values (langauge) by attention weight 
         output  = torch.bmm(weights, v) 
         # break back out to image shape 

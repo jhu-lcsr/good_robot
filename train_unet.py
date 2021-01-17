@@ -20,7 +20,7 @@ from torch.nn import functional as F
 import pandas as pd 
 
 from encoders import LSTMEncoder
-from language_embedders import RandomEmbedder, GloveEmbedder
+from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from unet_shared import SharedUNet
 from mlp import MLP 
@@ -324,6 +324,8 @@ def main(args):
         embedder = RandomEmbedder(tokenizer, train_vocab, args.embedding_dim, trainable=True)
     elif args.embedder == "glove":
         embedder = GloveEmbedder(tokenizer, train_vocab, args.embedding_file, args.embedding_dim, trainable=True) 
+    elif args.embedder.startswith("bert"): 
+        embedder = BERTEmbedder(model_name = args.embedder,  max_seq_len = args.max_seq_length) 
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
     # get the encoder from args  
@@ -335,7 +337,6 @@ def main(args):
                               bidirectional = args.bidirectional) 
     else:
         raise NotImplementedError(f"No encoder {args.encoder}") # construct the model 
-
 
     if args.top_only:
         depth = 1
@@ -353,6 +354,7 @@ def main(args):
                      stride = args.unet_stride,
                      num_layers = args.unet_num_layers,
                      num_blocks = args.num_blocks,
+                     unet_type = args.unet_type, 
                      dropout = args.dropout,
                      depth = depth,
                      device=device)
@@ -425,6 +427,7 @@ def main(args):
                                    num_epochs = 0, 
                                    num_blocks = args.num_blocks,
                                    device = device,
+                                   resolution = args.resolution, 
                                    checkpoint_dir = args.checkpoint_dir,
                                    num_models_to_keep = 0, 
                                    generate_after_n = 0) 
@@ -448,7 +451,7 @@ if __name__ == "__main__":
     parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     # language embedder 
-    parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove"])
+    parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # language encoder
@@ -461,6 +464,7 @@ if __name__ == "__main__":
     parser.add_argument("--mlp-hidden-dim", type=int, default = 128) 
     parser.add_argument("--mlp-num-layers", type=int, default = 3) 
     # unet parameters 
+    parser.add_argument("--unet-type", type=str, default="unet_with_attention", help = "type of unet to use") 
     parser.add_argument("--share-level", type=str, help="share the weights between predicting previous and next position") 
     parser.add_argument("--unet-out-channels", type=int, default=128)
     parser.add_argument("--unet-hc-large", type=int, default=32)
