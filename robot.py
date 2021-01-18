@@ -40,7 +40,6 @@ def gripper_control_pose_to_arm_control_pose(gripper_translation, gripper_orient
         arm_translation = arm_pose[0:3,3]
         return arm_translation, arm_orientation
 
-
 def orientation_and_angle_to_push_direction(heightmap_rotation_angle, push_orientation=None):
     if push_orientation is None:
         push_orientation = [1.0, 0.0]
@@ -96,7 +95,6 @@ def push_poses(heightmap_rotation_angle, position, workspace_limits, push_orient
     push_endpoint, tilted_tool_orientation = gripper_control_pose_to_arm_control_pose(push_endpoint, tilted_tool_orientation, gripper_to_arm_transform)
 
     return position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation
-
 
 class Robot(object):
     """
@@ -559,22 +557,22 @@ class Robot(object):
         return goal_reached
 
 
-    # def stop_sim(self):
-    #     if self.is_sim:
-    #         # Now send some data to V-REP in a non-blocking fashion:
-    #         # vrep.simxAddStatusbarMessage(sim_client,'Hello V-REP!',vrep.simx_opmode_oneshot)
+    def stop_sim(self):
+        if self.is_sim:
+            # Now send some data to V-REP in a non-blocking fashion:
+            # vrep.simxAddStatusbarMessage(sim_client,'Hello V-REP!',vrep.simx_opmode_oneshot)
 
-    #         # # Start the simulation
-    #         # vrep.simxStartSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
+            # # Start the simulation
+            # vrep.simxStartSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
 
-    #         # # Stop simulation:
-    #         # vrep.simxStopSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
+            # # Stop simulation:
+            # vrep.simxStopSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
 
-    #         # Before closing the connection to V-REP, make sure that the last command sent out had time to arrive. You can guarantee this with (for example):
-    #         vrep.simxGetPingTime(self.sim_client)
+            # Before closing the connection to V-REP, make sure that the last command sent out had time to arrive. You can guarantee this with (for example):
+            vrep.simxGetPingTime(self.sim_client)
 
-    #         # Now close the connection to V-REP:
-    #         vrep.simxFinish(self.sim_client)
+            # Now close the connection to V-REP:
+            vrep.simxFinish(self.sim_client)
 
 
     def get_obj_positions(self, relative_to_handle=-1):
@@ -657,7 +655,7 @@ class Robot(object):
                     time.sleep(1)
 
                 print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
-                
+
 
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
@@ -1590,7 +1588,6 @@ class Robot(object):
         midpos = (np.array(actual_tool_pose[:3]) + pos) / 2.0
         return midpos
 
-
     def push(self, position, heightmap_rotation_angle, workspace_limits=None, go_home=True):
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
@@ -1760,7 +1757,6 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-
     def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True):
         """ Place an object, currently only tested for blocks.
 
@@ -1916,7 +1912,6 @@ class Robot(object):
             else:
                 return move_to_result
 
-
     def check_row(self, object_color_sequence,
                   num_obj=4,
                   distance_threshold=0.02,
@@ -1953,7 +1948,7 @@ class Robot(object):
             # valid_depth_heightmap here used for row checking is delayed by one action
             # Figure out why.
             valid_depth_heightmap, _, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-            
+
             success, row_size = utils.check_row_success(valid_depth_heightmap, prev_z_height=prev_z_height)
             return success, row_size
 
@@ -1996,7 +1991,7 @@ class Robot(object):
                             success = specific_success
                             row_size = max(row_size, specific_row_size)
                             successful_block_indices = specific_successful_block_indices
-                    
+
 
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
@@ -2046,7 +2041,6 @@ class Robot(object):
             successful_block_indices = block_indices
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
-
 
     def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
@@ -2136,7 +2130,53 @@ class Robot(object):
         print('check_stack() current detected stack height: ' + str(detected_height))
         return goal_success, detected_height
 
-    def check_incremental_height(self,input_img, current_stack_goal):
+    def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
+                          separation_threshold=0.1, num_directions=64):
+        # get object positions (array with each object position)
+        pos = np.asarray(self.get_obj_positions())
+
+        # sort indices of blocks by z value
+        low2high_idx = np.array(pos[:, 2]).argsort()
+
+        # First see if there is one stack of height 2
+
+        # filter objects closest to the highest block in x, y based on the threshold
+        high_idx = low2high_idx[-1]
+        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
+                (stack_dist_thresh / 2))
+
+        # if the highest stack has height not equal to 2, task is not completed
+        # NOTE this could lead to false negatives if we are running with 8 objects in scene \
+        # and there are pre-existing stacks besides the main vertical square structures
+        if len(nearby_obj) != 2:
+            return False
+
+        # store the index of the bottom block of first 2-block stack
+        # first block in nearby_obj since the blocks are ordered low to high in the low2high_idx array
+        first_stack_ind = nearby_obj[0].item()
+
+        # check blocks in descending order, stop before block in nearby_obj since that has height 1
+        for i in range(2, len(pos) - first_stack_ind - 1):
+            high_idx = low2high_idx[-1 * i]
+            nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
+                    axis=1) < (stack_dist_thresh / 2))
+
+            if len(nearby_obj) != 2:
+                continue
+
+            # put both bottom block indicies in array
+            block_indices = np.array([nearby_obj[0].item(), first_stack_ind])
+
+            # we have another stack of height 2, now check if bottom blocks of each stack make row
+            row_success, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
+                    row_dist_thresh, separation_threshold, None, 1, False)
+
+            if row_success:
+                return True
+
+        return False
+
+    def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
         goal, max_z, decrease_threshold = self.check_z_height(input_img)
         #TODO(hkwon214) Double check this
