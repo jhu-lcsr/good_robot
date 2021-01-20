@@ -359,7 +359,7 @@ def main(args):
         nonlocal_variables['place_color_success'] = False
         nonlocal_variables['partial_stack_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None):
+    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None, action_loc=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -369,6 +369,9 @@ def main(args):
                 which will not have been placed yet.
             top_idx: The index of blocks sorted from high to low which is expected to contain the top stack block.
                 -1 will be the highest object in the scene, -2 will be the second highest in the scene, etc.
+            use_imitation: If use_imitation is True, we are doing an imitation task
+            task_type: Needs to be set if use_imitation is set (options are 'vertical_square', 'unstack')
+            action_loc: Coordinates (x, y, z) of selected action
 
         # Returns
 
@@ -384,9 +387,23 @@ def main(args):
             # only the place check expects the current goal to be met
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
+
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        if check_row:
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap, prev_z_height=nonlocal_variables['prev_stack_height'])
+
+        # TODO(adit98) see if we need to check if using cycle_consistency here or in the training loop itself
+        if use_imitation:
+            # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
+            if task_type == 'vertical_square':
+                # TODO(adit98) fill in args
+                stack_matches_goal, nonlocal_variables['stack_height'] = robot.vertical_square_partial_success(current_stack_goal,
+                        action_loc=None, prev_stack_height=None, check_z_height=check_z_height)
+            else:
+                raise NotImplementedError
+
+        elif check_row:
+            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                    num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                    prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             if not check_z_height:
                 stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
@@ -398,6 +415,7 @@ def main(args):
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
         if not check_z_height:
             if nonlocal_variables['stack_height'] == 1:
@@ -431,6 +449,9 @@ def main(args):
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
+            else:
+                print(mismatch_str)
+
         return needed_to_reset
 
     # Parallel thread to process network output and execute actions

@@ -1959,7 +1959,7 @@ class Robot(object):
 
             pos = np.asarray(self.get_obj_positions())
             posyx = copy.deepcopy(pos)
-            posyx[:, [0,1]] = posyx[:, [1,0]] 
+            posyx[:, [0,1]] = posyx[:, [1,0]]
             success = False
             row_size = 1
             row_length = len(object_color_sequence)
@@ -2175,6 +2175,100 @@ class Robot(object):
                 return True
 
         return False
+
+    def vertical_square_partial_success(self, current_stack_goal, check_z_height,
+            prev_z_height=None, row_dist_thresh=0.02, separation_threshold=0.1,
+            stack_dist_thresh=0.06):
+        """
+            Checks if the last action was successful.
+            NOTE: could be bugs with this, need to use location of last action to be sure
+            current_stack_goal: array with current goal (length represents goal structure size)
+            Returns:
+                success: whether the previous action was successful
+                structure_progress: step of task we are on (e.g. 2 if structure has 2 blocks)
+        """
+
+        # initially no stacks or rows
+        num_stacks = 0
+        has_row = False
+
+        if check_z_height:
+            raise NotImplementedError
+
+        # partial success is true if we meet the current stack goal (# of blocks in structure)
+
+        # get object positions (array with each object position)
+        pos = np.asarray(self.get_obj_positions())
+
+        # sort indices of blocks by z value
+        low2high_idx = np.array(pos[:, 2]).argsort()
+
+        # first check for any stacks
+        high_idx = low2high_idx[-1]
+        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
+                (stack_dist_thresh / 2))
+
+        if len(nearby_obj) > 1:
+            num_stacks += 1
+            first_stack_ind = high_idx
+
+            block_indices = []
+            # check for second stack (descending order, stop before block with known height 2)
+            for i in range(2, len(pos) - first_stack_ind - 1):
+                high_idx = low2high_idx[-1 * i]
+                nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
+                        axis=1) < (stack_dist_thresh / 2))
+
+                if len(nearby_obj) <= 1:
+                    continue
+
+                # append bottom block to block_indices
+                block_indices.append(nearby_obj[0].item())
+                num_stacks += 1
+                break
+
+        # now check for rows
+        if len(block_indices) > 1:
+            # we have 2 stacks
+            has_row, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
+                    row_dist_thresh, separation_threshold, None, 1, False)
+
+            if has_row:
+                # we have 2 stacks and they form a row
+                structure_size = 4
+
+        # if there is only 1 stack or the 2 stacks don't form a row, check the other blocks in scene for row
+        if len(block_indices) == 1 or not has_row:
+            for i in range(len(pos)):
+                if low2high_idx[i] == block_indices[0]:
+                    continue
+
+                block_inds = np.array(block_indices + [low2high_idx[i]])
+                has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+                        row_dist_thresh, separation_threshold, None, 1, False)
+
+                if has_row:
+                    # there is 1 stack and 1 row
+                    structure_size = 3
+                    break
+
+        # if there are no stacks, check for any row
+        else:
+            for i in range(len(pos)):
+                for j in range(i, len(pos)):
+                    block_inds = np.array([low2high_idx[i], low2high_idx[j]])
+                    has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+                            row_dist_thresh, separation_threshold, None, 1, False)
+
+                    if has_row:
+                        structure_size = 2
+                        break
+
+                if has_row:
+                    break
+
+        # success if we match or exceed current stack goal, also return structure size
+        return structure_size >= len(current_stack_goal), structure_size
 
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
