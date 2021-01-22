@@ -235,14 +235,15 @@ def main(args):
                           trial_reward='discounted' if discounted_reward else 'spot',
                           num_dilation=num_dilation)
 
-    trainer = Trainer(method, push_rewards, future_reward_discount,
-                      is_testing, snapshot_file, force_cpu,
-                      goal_condition_len, place, pretrained, flops,
-                      network=neural_network_name, common_sense=common_sense,
-                      place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                      place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
-                      trial_reward='discounted' if discounted_reward else 'spot',
-                      num_dilation=num_dilation)
+    else:
+        trainer = Trainer(method, push_rewards, future_reward_discount,
+                          is_testing, snapshot_file, force_cpu,
+                          goal_condition_len, place, pretrained, flops,
+                          network=neural_network_name, common_sense=common_sense,
+                          place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                          place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                          trial_reward='discounted' if discounted_reward else 'spot',
+                          num_dilation=num_dilation)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
