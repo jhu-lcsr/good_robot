@@ -235,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data")
     parser.add_argument("--num-blocks", type=int, default=20)
     parser.add_argument("--simulator", default="CoppeliaSim", help="simulator software name")
-    parser.add_argument("--trajectory-path", type=str, default = "blocks_data/singleset.json", help="trajectory motion of blocks")
+    # parser.add_argument("--trajectory-path", type=str, default = "blocks_data/singleset.json", help="trajectory motion of blocks")
     parser.add_argument("--blocks-path", type=str, default = "objects/bisk_blocks", help="trajectory values")
     parser.add_argument("--colorimg-folder", type=str, default = "data/color-images", help="output folder for color images")
     parser.add_argument("--depthimg-folder", type=str, default = "data/depth-images", help="output folder for depth images")

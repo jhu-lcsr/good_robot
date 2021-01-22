@@ -45,3 +45,6 @@ grid_logs
 grid_logs/*
 models
 models/*
+
+data/
+data/*

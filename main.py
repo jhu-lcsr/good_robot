@@ -133,6 +133,8 @@ def main(args):
     random_trunk_weights_reset_iters = args.random_trunk_weights_reset_iters
     random_trunk_weights_min_success = args.random_trunk_weights_min_success
     random_actions = args.random_actions
+    # TODO(zhe) Added static language mask option
+    static_language_mask = args.static_language_mask
 
 
     # -------------- Test grasping options --------------
@@ -485,6 +487,7 @@ def main(args):
             else:
                 print("WARNING: Missing /data/variables/process_action_var_values_%d.json on resume. Default values initialized. May cause log inconsistencies" % (trainer.iteration))
 
+        # NOTE(zhe) The loop continues to run until an exit signal appears. The loop doesn't run when not "executing action"
         while not nonlocal_pause['process_actions_exit_called']:
             if nonlocal_variables['executing_action']:
                 action_count += 1
@@ -507,12 +510,14 @@ def main(args):
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
 
+                # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
                 # If we just did a successful grasp, we always need to place
                 if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                     nonlocal_variables['primitive_action'] = 'place'
                 else:
                     nonlocal_variables['primitive_action'] = 'grasp'
 
+                # NOTE(zhe) Switch grasp to push if push has better score. NO PUSHING IN LANGUAGE MODEL.
                 # determine if the network indicates we should do a push or a grasp
                 # otherwise if we are exploring and not placing choose between push and grasp randomly
                 if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
@@ -532,6 +537,7 @@ def main(args):
                 # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                 # logger.write_to_log('trial', trainer.trial_log)
 
+                # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value.
                 if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
                     # Half the time we actually explore the full 2D action space
                     print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob/2))
@@ -565,12 +571,14 @@ def main(args):
                 trainer.predicted_value_log.append([predicted_value])
                 logger.write_to_log('predicted-value', trainer.predicted_value_log)
 
+                # NOTE(zhe) compute the best (rotAng, x, y)
                 # Compute 3D position of pixel
                 print('Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]))
                 best_rotation_angle = np.deg2rad(nonlocal_variables['best_pix_ind'][0]*(360.0/trainer.model.num_rotations))
                 best_pix_x = nonlocal_variables['best_pix_ind'][2]
                 best_pix_y = nonlocal_variables['best_pix_ind'][1]
 
+                # NOTE(zhe) calculate the action in terms of the robot pose
                 # Adjust start position of all actions, and make sure z value is safe and not too low
                 primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
 
@@ -598,6 +606,7 @@ def main(args):
                 if place:
                     current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
+                # NOTE(zhe) Execute the primitive action (grasp, push, or place)
                 # Execute primitive
                 if nonlocal_variables['primitive_action'] == 'push':
                     if skip_noncontact_actions and not push_may_contact_something:
@@ -739,6 +748,7 @@ def main(args):
                             nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
+                # NOTE(zhe) Update logs with success/failures in the trainer object
                 trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
                 if grasp_color_task:
                     trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
@@ -764,8 +774,10 @@ def main(args):
                             '  stack_successes: ' + str(stack_count) + ' trial_success_rate: ' + str(trial_rate) + ' stack goal: ' + str(current_stack_goal) +
                             ' current_height: ' + str(nonlocal_variables['stack_height']))
 
+                # NOTE(zhe) process action loop now stalls after setting executing_action to False
                 nonlocal_variables['executing_action'] = False
 
+            # NOTE(zhe) this is like a checkpoint to save the thread's variable when the log and model are saved.
             # save this thread's variables every time the log and model are saved
             if nonlocal_variables['finalize_prev_trial_log']:
                 # finalize_prev_trial_log gets set to false before all data is saved in the rest of the loop.
@@ -863,6 +875,8 @@ def main(args):
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
+    # TODO(zhe) Figure out how to input a sentence. We need a dataloader to load each image, and a scene reset at each iter.
+    # TODO(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
         if nonlocal_variables['trial_complete']:
@@ -910,6 +924,8 @@ def main(args):
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
+        
+        # NOTE(zhe) The pushing & grasping only task is to move items into a bin outside of the workspace.
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
             num_trials = trainer.num_trials()
@@ -920,6 +936,7 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
+        # NOTE(zhe) This is for the stacking task (BUG But it runs for place/grasp as well?), error is thrown when not enough objects are in the workspace or no change in workspace
         if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
@@ -950,6 +967,7 @@ def main(args):
             if trainer.iteration > 0:
                 # All other nonzero trials should be considered over,
                 # so mark the trial as complete and move on to the next one.
+                # NOTE(zhe) Continue to next trial after error or success determined above.
                 nonlocal_variables['trial_complete'] = True
                 # TODO(ahundt) might this continue statement increment trainer.iteration, break accurate indexing of the clearance log into the label, reward, and image logs?
                 do_continue = True
@@ -957,8 +975,29 @@ def main(args):
 
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
-            no_change_count = end_trial()
-            num_trials = trainer.num_trials()
+            # Check if the other thread ended the trial and reset the important values
+            no_change_count = [0, 0]
+            num_trials = trainer.end_trial()
+            if nonlocal_variables['stack'] is not None:
+                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
+                nonlocal_variables['stack'].trial = num_trials
+            logger.write_to_log('clearance', trainer.clearance_log)
+            # we've recorded the data to mark this trial as complete
+            nonlocal_variables['trial_complete'] = False
+            # we're still not totally done, we still need to finalize the log for the trial
+            nonlocal_variables['finalize_prev_trial_log'] = True
+            if is_testing:
+                # Do special testing mode update steps
+                # If at end of test run, re-load original weights (before test run)
+                trainer.model.load_state_dict(torch.load(snapshot_file))
+                if test_preset_cases:
+                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
+                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
+                    # load the current preset case, incrementing as trials are cleared
+                    print('loading case file: ' + str(case_file))
+                    robot.load_preset_case(case_file)
+                if not place and num_trials >= max_test_trials:
+                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
@@ -980,7 +1019,7 @@ def main(args):
             nonlocal_pause['exit_called'] = True
 
         if not nonlocal_pause['exit_called']:
-
+            # NOTE(zhe) setting the ordered stack goal.
             # Run forward pass with network to get affordances
             if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
@@ -1766,6 +1805,8 @@ if __name__ == '__main__':
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
 
+    # TODO(zhe) Added command line argument to use the static language mask
+    parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
