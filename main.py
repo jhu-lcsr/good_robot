@@ -1101,6 +1101,7 @@ def main(args):
                         push_predictions_stack, grasp_predictions_stack, place_predictions_stack
 
             else:
+                # TODO(zhe) Need to ensure that "predictions" also have language mask
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition)

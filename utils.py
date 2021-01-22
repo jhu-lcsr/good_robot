@@ -103,8 +103,12 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
     return cam_pts, rgb_pts
 
 
-def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5):
-
+def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5, color_median_filter_pixels=5):
+    """ Note:
+    Arg median_filter_pixels is used for the depth image. 
+    Arg color_median_filter_pixels is used for the color image.
+    """
+    
     if median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=median_filter_pixels)
 
@@ -157,10 +161,10 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     color_heightmap_r[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[0]]
     color_heightmap_g[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[1]]
     color_heightmap_b[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[2]]
-    if median_filter_pixels > 0:
-        color_heightmap_r = ndimage.median_filter(color_heightmap_r, size=median_filter_pixels)
-        color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=median_filter_pixels)
-        color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=median_filter_pixels)
+    if color_median_filter_pixels > 0:
+        color_heightmap_r = ndimage.median_filter(color_heightmap_r, size=color_median_filter_pixels)
+        color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=color_median_filter_pixels)
+        color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=color_median_filter_pixels)
     color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
 
 

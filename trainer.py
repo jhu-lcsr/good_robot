@@ -542,6 +542,7 @@ class Trainer(object):
                     push_predictions = np.concatenate((push_predictions, softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     if self.place:
+                        # TODO(zhe) Shouldn't the following line be using output_prob[rotate_idx][2]?
                         place_predictions = np.concatenate((place_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
 
         elif self.method == 'reinforcement':
@@ -581,7 +582,7 @@ class Trainer(object):
         if self.common_sense:
             # TODO(ahundt) "common sense" dynamic action space parameters should be accessible from the command line
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
-
+            # TODO(zhe) The common_sense_action_space function must also use the language mask, or we can implement a seperate function.
             # process feature masks if we need to return feature masks and final preds
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
@@ -612,7 +613,7 @@ class Trainer(object):
                     place_predictions = np.ma.masked_array(place_predictions)
 
         else:
-            # Mask pixels we know cannot lead to progress
+            # Mask pixels we know cannot lead to progress, in this case we don't apply common sense masking
             push_predictions = np.ma.masked_array(push_predictions)
             grasp_predictions = np.ma.masked_array(grasp_predictions)
             if self.place:
