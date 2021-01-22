@@ -433,9 +433,9 @@ def main(args):
         if use_imitation:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if task_type == 'vertical_square':
-                # TODO(adit98) fill in args
-                stack_matches_goal, nonlocal_variables['stack_height'] = robot.vertical_square_partial_success(current_stack_goal,
-                        action_loc=None, prev_stack_height=None, check_z_height=check_z_height)
+                stack_matches_goal, nonlocal_variables['stack_height'] = \
+                        robot.vertical_square_partial_success(current_stack_goal,
+                                check_z_height=check_z_height)
             else:
                 raise NotImplementedError
 
@@ -547,8 +547,7 @@ def main(args):
         while not nonlocal_pause['process_actions_exit_called']:
             if nonlocal_variables['executing_action']:
                 action_count += 1
-                # Determine whether grasping or pushing should be executed based on network predictions
-                # TODO(adit98) use demo here
+                # Determine whether grasping or pushing should be executed based on network predictions OR with demo
                 if use_demo:
                     # figure out primitive action (limited to grasp or place)
                     if nonlocal_variables['primitive_action'] != 'grasp':
@@ -565,7 +564,7 @@ def main(args):
                     # TODO(adit98) add stack_trainer and row_trainer args here
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
-                                    nonlocal_variables['stack_height'])
+                                    nonlocal_variables['stack_height'], stack_trainer, row_trainer)
 
                 else:
                     best_push_conf = np.ma.max(push_predictions)
