@@ -22,6 +22,8 @@ from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
+# TODO(adit98) move evaluate_l2_mask fn to utils
+from evaluate_demo_correspondence import evaluate_l2_mask
 import plot
 import json
 import copy
@@ -58,6 +60,9 @@ def run_title(args):
         title += 'Testing' if args.is_testing else 'Training'
     else:
         title += 'Challenging Arrangements'
+
+    if args.use_demo:
+        title += ', Imitation'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
@@ -127,6 +132,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
+    place_common_sense = args.common_sense and args.check_stack or args.check_row
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -134,6 +140,10 @@ def main(args):
     random_trunk_weights_min_success = args.random_trunk_weights_min_success
     random_actions = args.random_actions
 
+    # -------------- Demo options -----------------------
+    use_demo = args.use_demo
+    demo_path = args.demo_path
+    task_type = args.task_type
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -170,7 +180,15 @@ def main(args):
         print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
-    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+    stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory = \
+            parse_resume_and_snapshot_file_args(args)
+
+    if not use_demo:
+        if check_row:
+            snapshot_file = row_snapshot_file
+        else:
+            snapshot_file = stack_snapshot_file
+
     save_visualizations = args.save_visualizations  # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
     plot_window = args.plot_window
 
@@ -196,13 +214,33 @@ def main(args):
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
     place_dilation = 0.05 if check_row else 0.0
-    # Initialize trainer
+
+    # Initialize trainer(s)
+    if use_demo:
+        stack_trainer = Trainer(method, push_rewards, future_reward_discount,
+                          is_testing, stack_snapshot_file, force_cpu,
+                          goal_condition_len, place, pretrained, flops,
+                          network=neural_network_name, common_sense=common_sense,
+                          place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                          place_dilation=0, common_sense_backprop=common_sense_backprop,
+                          trial_reward='discounted' if discounted_reward else 'spot',
+                          num_dilation=num_dilation)
+
+        row_trainer = Trainer(method, push_rewards, future_reward_discount,
+                          is_testing, row_snapshot_file, force_cpu,
+                          goal_condition_len, place, pretrained, flops,
+                          network=neural_network_name, common_sense=common_sense,
+                          place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                          place_dilation=0.05, common_sense_backprop=common_sense_backprop,
+                          trial_reward='discounted' if discounted_reward else 'spot',
+                          num_dilation=num_dilation)
+
     trainer = Trainer(method, push_rewards, future_reward_discount,
                       is_testing, snapshot_file, force_cpu,
                       goal_condition_len, place, pretrained, flops,
                       network=neural_network_name, common_sense=common_sense,
-                      show_heightmap=show_heightmap, place_dilation=place_dilation,
-                      common_sense_backprop=common_sense_backprop,
+                      place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                      place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                       trial_reward='discounted' if discounted_reward else 'spot',
                       num_dilation=num_dilation)
 
@@ -457,7 +495,6 @@ def main(args):
     # Parallel thread to process network output and execute actions
     # -------------------------------------------------------------
     def process_actions():
-
         last_iteration_saved = -1  # used so the loop only saves one time while waiting
         action_count = 0
         grasp_count = 0
@@ -510,13 +547,33 @@ def main(args):
             if nonlocal_variables['executing_action']:
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions
-                best_push_conf = np.ma.max(push_predictions)
-                best_grasp_conf = np.ma.max(grasp_predictions)
-                if place:
-                    best_place_conf = np.ma.max(place_predictions)
-                    print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
+                # TODO(adit98) use demo here
+                if use_demo:
+                    # figure out primitive action (limited to grasp or place)
+                    if nonlocal_variables['primitive_action'] != 'grasp':
+                        nonlocal_variables['primitive_action'] = 'grasp'
+                        preds = [grasp_feat_row, grasp_feat_stack]
+                    else:
+                        if nonlocal_variables['grasp_success']:
+                            nonlocal_variables['primitive_action'] = 'place'
+                            preds = [place_feat_row, place_feat_stack]
+                        else:
+                            nonlocal_variables['primitive_action'] = 'grasp'
+                            preds = [grasp_feat_row, grasp_feat_stack]
+
+                    # TODO(adit98) add stack_trainer and row_trainer args here
+                    demo_row_action, demo_stack_action, action_id = \
+                            demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
+                                    nonlocal_variables['stack_height'])
+
                 else:
-                    print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
+                    best_push_conf = np.ma.max(push_predictions)
+                    best_grasp_conf = np.ma.max(grasp_predictions)
+                    if place:
+                        best_place_conf = np.ma.max(place_predictions)
+                        print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
+                    else:
+                        print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
 
                 # Exploitation (do best action) vs exploration (do random action)
                 if is_testing:
@@ -528,30 +585,30 @@ def main(args):
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
 
-                # If we just did a successful grasp, we always need to place
-                if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
-                    nonlocal_variables['primitive_action'] = 'place'
-                else:
-                    nonlocal_variables['primitive_action'] = 'grasp'
-
-                # determine if the network indicates we should do a push or a grasp
-                # otherwise if we are exploring and not placing choose between push and grasp randomly
-                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
-                    if is_testing and method == 'reactive':
-                        if best_push_conf > 2 * best_grasp_conf:
-                            nonlocal_variables['primitive_action'] = 'push'
+                    # If we just did a successful grasp, we always need to place
+                    if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
+                        nonlocal_variables['primitive_action'] = 'place'
                     else:
-                        if best_push_conf > best_grasp_conf:
-                            nonlocal_variables['primitive_action'] = 'push'
-                    if explore_actions:
-                        # explore the choices of push actions vs place actions
-                        push_frequency_one_in_n = 5
-                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                trainer.is_exploit_log.append([0 if explore_actions else 1])
-                logger.write_to_log('is-exploit', trainer.is_exploit_log)
-                # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
-                # trainer.trial_log.append([nonlocal_variables['stack'].trial])
-                # logger.write_to_log('trial', trainer.trial_log)
+                        nonlocal_variables['primitive_action'] = 'grasp'
+
+                    # determine if the network indicates we should do a push or a grasp
+                    # otherwise if we are exploring and not placing choose between push and grasp randomly
+                    if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
+                        if is_testing and method == 'reactive':
+                            if best_push_conf > 2 * best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        else:
+                            if best_push_conf > best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        if explore_actions:
+                            # explore the choices of push actions vs place actions
+                            push_frequency_one_in_n = 5
+                            nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
+                    trainer.is_exploit_log.append([0 if explore_actions else 1])
+                    logger.write_to_log('is-exploit', trainer.is_exploit_log)
+                    # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
+                    # trainer.trial_log.append([nonlocal_variables['stack'].trial])
+                    # logger.write_to_log('trial', trainer.trial_log)
 
                 if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
                     # Half the time we actually explore the full 2D action space
@@ -559,8 +616,16 @@ def main(args):
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
                 else:
-                    # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
-                    nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_argmax(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+                    if use_demo:
+                        # select preds based on primitive action selected in demo
+                        correspondences, nonlocal_variables['best_pix_ind'] = \
+                                evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
+                        predicted_value = correspondences[*nonlocal_variables['best_pix_ind']]
+                    else:
+                        # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
+                        nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
+                            predicted_value = action_space_argmax(nonlocal_variables['primitive_action'],
+                                    push_predictions, grasp_predictions, place_predictions)
 
                 # If heuristic bootstrapping is enabled: if change has not been detected more than 2 times, execute heuristic algorithm to detect grasps/pushes
                 # NOTE: typically not necessary and can reduce final performance.
@@ -599,6 +664,7 @@ def main(args):
                 trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
+                # TODO(adit98) set this up to work with demos
                 # Visualize executed primitive, and affordances
                 if save_visualizations:
                     # Q values are mostly 0 to 1 for pushing/grasping, mostly 0 to 4 for multi-step tasks with placing
@@ -877,6 +943,11 @@ def main(args):
         robot.shutdown()
         return
 
+    if use_demo:
+        # TODO(adit98) set demo number to be cmd line arg, 0 right now
+        demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height,
+                task_type=args.task_type)
+
     num_trials = trainer.num_trials()
     do_continue = False
     best_dict = {}
@@ -1008,8 +1079,31 @@ def main(args):
             else:
                 goal_condition = None
 
-            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = trainer.forward(
-                color_heightmap, valid_depth_heightmap, is_volatile=True, goal_condition=goal_condition)
+            # here, we run forward pass on imitation video
+            # TODO(adit98) refactor demo.get_action to get the saved embedding
+            if args.use_demo:
+                # run forward pass, keep action features and get softmax predictions
+
+                # stack features
+                push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
+                        grasp_predictions_stack, place_predictions_stack, _, _ = \
+                        stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                            goal_condition=goal_condition, keep_action_feat=True)
+
+                # row features
+                push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
+                        grasp_predictions_row, place_predictions_row, _, _ = \
+                        row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                            goal_condition=goal_condition, keep_action_feat=True)
+
+                # TODO(adit98) may need to refactor, for now just store stack predictions
+                push_predictions, grasp_predictions, place_predictions = \
+                        push_predictions_stack, grasp_predictions_stack, place_predictions_stack
+
+            else:
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                        trainer.forward(color_heightmap, valid_depth_heightmap,
+                                is_volatile=True, goal_condition=goal_condition)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1355,18 +1449,30 @@ def parse_resume_and_snapshot_file_args(args):
         continue_logging = False
         logging_directory = os.path.abspath('logs')
 
-    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
-    if continue_logging and not snapshot_file:
-        snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
-        print('loading snapshot file: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot-backup.reinforcement.pth')
-            print('snapshot file does not exist, trying backup: ' + snapshot_file)
-        if not os.path.isfile(snapshot_file):
-            print('cannot resume, no snapshots exist, check the code and your log directory for errors')
-            exit(1)
-    return snapshot_file, continue_logging, logging_directory
+    stack_snapshot_file = os.path.abspath(args.stack_snapshot_file) if args.stack_snapshot_file \
+            else ''
+    row_snapshot_file = os.path.abspath(args.row_snapshot_file) if args.row_snapshot_file else ''
 
+    # if neither snapshot file is provided
+    if continue_logging:
+        if (not check_row and not stack_snapshot_file) or (check_row and not row_snapshot_file):
+            snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
+            print('loading snapshot file: ' + snapshot_file)
+            if not os.path.isfile(snapshot_file):
+                snapshot_file = os.path.join(logging_directory, 'models',
+                        'snapshot-backup.reinforcement.pth')
+                print('snapshot file does not exist, trying backup: ' + snapshot_file)
+            if not os.path.isfile(snapshot_file):
+                print('cannot resume, no snapshots exist, check the code and your \
+                        log directory for errors')
+                exit(1)
+
+            if check_row:
+                row_snapshot_file = snapshot_file
+            else:
+                stack_snapshot_file = snapshot_file
+
+    return stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
     if preset_files is not None:
@@ -1785,6 +1891,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_common_sense_backprop', dest='no_common_sense_backprop', action='store_true', default=False,                        help='Disables backprop on masked actions, to evaluate SPOT-Q RL algorithm.')
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
+    parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
 
 
     # -------------- Testing options --------------
@@ -1806,9 +1913,16 @@ if __name__ == '__main__':
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
     parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
+    parser.add_argument('--demo_path', dest='demo_path', type=str, default=None)
+    parser.add_argument('--task_type', dest='task_type', type=str, default=None)
 
     # Parse args
     args = parser.parse_args()
+
+
+    # if use_demo is specified, we need a demo_path
+    if args.use_demo and args.demo_path is None:
+        raise ValueError('Must specify --demo_path if --use_demo is set')
 
     if not args.ablation:
         one_train_test_run(args)
