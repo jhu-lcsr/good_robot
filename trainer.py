@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, apply_language_mask=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -44,6 +44,7 @@ class Trainer(object):
         self.common_sense = common_sense
         self.place_common_sense = self.common_sense and place_common_sense
         self.common_sense_backprop = common_sense_backprop
+        self.apply_language_mask=apply_language_mask
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
@@ -437,6 +438,7 @@ class Trainer(object):
         return sample_stack_height, sample_primitive_action_id, sample_grasp_success, sample_change_detected, sample_push_predictions, sample_grasp_predictions, next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success, exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap, sample_depth_heightmap
 
     # Compute forward pass through model to compute affordances/Q
+    # TODO(zhe) Input values needed to run Elias's model (sentence, color_heightmap). Ask Elias to be sure.
     def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False, demo_mask=False):
 
         # Apply 2x scale to input heightmaps
@@ -628,7 +630,13 @@ class Trainer(object):
                 return push_predictions, grasp_predictions, masked_place_predictions
             else:
                 return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
-
+        
+        # TODO(zhe) Assign value to language_masks variable using Elias's model.
+        if self.apply_language_mask:
+            language_masks = None # Fill this in
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_masks, push_predictions, grasp_predictions, place_predictions)
+        
+        # NOTE(zhe) This needs to be off when running the language masking
         if self.place_common_sense:
             return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
         else:

@@ -235,6 +235,10 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
         plt.show(block=True)
     return push_predictions, grasp_predictions, place_predictions
 
+# TODO(zhe) implement language model masking using language model output
+def common_sense_language_model_mask(language_masks, push_predictions=None, grasp_predictions=None, place_predictions=None):
+    pass
+
 # Save a 3D point cloud to a binary .ply file
 def pcwrite(xyz_pts, filename, rgb_pts=None):
     assert xyz_pts.shape[1] == 3, 'input XYZ points should be an Nx3 matrix'
