@@ -30,6 +30,7 @@ import copy
 import shutil
 import matplotlib
 import matplotlib.pyplot as plt
+from data import DatasetReader
 
 
 def run_title(args):
@@ -980,6 +981,19 @@ def main(args):
     prev_best_dict = {}
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
+    # Instantiate the DatasetReader in order to provide language commands during training
+    language_data = None
+    if static_language_mask:
+        # TODO(zhe) create variables to 
+        dataset_reader = DatasetReader(args.train_path,
+                                       args.val_path,
+                                       None,
+                                       batch_by_line=True,
+                                       batch_size = 1)
+        print(f"Reading data from {args.train_path}, this may take a few minutes.")
+        language_data = 
+
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     # TODO(zhe) Figure out how to input a sentence. We need a dataloader to load each image, and a scene reset at each iter.
     # TODO(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
@@ -997,6 +1011,11 @@ def main(args):
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
+        
+        # Get the command sentence if using language mask
+        language_command = None
+        if static_language_mask:
+            language_command = dataset_reader
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
@@ -1948,8 +1967,10 @@ if __name__ == '__main__':
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
     parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
 
-    # TODO(zhe) Added command line argument to use the static language mask
+    # Language Mask Options
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
+    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/')
+    parser.add_argument('--dev_language_inputs', dest='dev_language_inputs', type=str, default='')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
