@@ -147,7 +147,6 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
-        
 
         # If in simulation...
         if self.is_sim:
@@ -189,7 +188,7 @@ class Robot(object):
             #self.mesh_list = os.listdir(self.obj_mesh_dir)
             # Restrict only the .obj files 
             self.mesh_list = sorted(glob(os.path.join(self.obj_mesh_dir, "*.obj")))
-            print(f"self.meshlist: {self.mesh_list}")
+            #print(f"self.meshlist: {self.mesh_list}")
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
@@ -211,8 +210,9 @@ class Robot(object):
             if tcp_port is None or tcp_port == 30002 or tcp_port == 502:
                 print("WARNING: default tcp port changed to 19997 for is_sim")
                 tcp_port = 19997
+
             self.tcp_port = tcp_port
-            print(f"bp 1") 
+            #print(f"bp 1")
             self.restart_sim(connect=True)
             # initialize some startup state values and handles for
             # the joint configurations and home position
@@ -223,7 +223,7 @@ class Robot(object):
             self.go_home()
             # set the home joint config based on the initialized simulation
             self.home_joint_config = self.get_joint_position()
-            print(f"got joints")
+            #print(f"got joints")
 
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
@@ -232,16 +232,16 @@ class Robot(object):
 
             # Setup virtual camera in simulation
             self.setup_sim_camera()
-            
+
             # Scaling used when importing objects
             self.obj_scale = obj_scale
-            self.textured = textured 
+            self.textured = textured
             self.capture_logoblock_dataset = capture_logoblock_dataset
 
             # If testing, read object meshes and poses from test case file
-            print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}") 
+            print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}")
             if self.is_testing and self.test_preset_cases:
-                print(f"loading preset case") 
+                print(f"loading preset case")
                 self.load_preset_case()
 
             # Add objects to simulation environment
@@ -347,7 +347,7 @@ class Robot(object):
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
-            print(f"preset file is {self.test_preset_file}") 
+            #print(f"preset file is {self.test_preset_file}") 
             test_preset_file = self.test_preset_file
         file = open(test_preset_file, 'r')
         file_content = file.readlines()
@@ -367,30 +367,30 @@ class Robot(object):
 
 
     def setup_sim_camera(self):
-        print(f"getting camera data") 
+        #print(f"getting camera data") 
         # Get handle to camera
         sim_ret, self.cam_handle = vrep.simxGetObjectHandle(self.sim_client, 'Vision_sensor_persp', vrep.simx_opmode_blocking)
 
-        print(f"camera bp 1") 
+        #print(f"camera bp 1") 
         # Get camera pose and intrinsics in simulation
         sim_ret, cam_position = vrep.simxGetObjectPosition(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         sim_ret, cam_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         cam_trans = np.eye(4,4)
         cam_trans[0:3,3] = np.asarray(cam_position)
         cam_orientation = [-cam_orientation[0], -cam_orientation[1], -cam_orientation[2]]
-        print(f"camera bp 2") 
+        #print(f"camera bp 2") 
         cam_rotm = np.eye(4,4)
         cam_rotm[0:3,0:3] = np.linalg.inv(utils.euler2rotm(cam_orientation))
         self.cam_pose = np.dot(cam_trans, cam_rotm) # Compute rigid transformation representating camera pose
         self.cam_intrinsics = np.asarray([[618.62, 0, 320], [0, 618.62, 240], [0, 0, 1]])
         self.cam_depth_scale = 1
 
-        print(f"camera bp 3") 
+        #print(f"camera bp 3") 
         # Get background image
         self.bg_color_img, self.bg_depth_img = self.get_camera_data()
         self.bg_depth_img = self.bg_depth_img * self.cam_depth_scale
 
-        print(f"camera bp 4") 
+        #print(f"camera bp 4") 
 
     def generate_random_object_pose(self):
         drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
@@ -445,49 +445,48 @@ class Robot(object):
                 self.vrep_names = []
                 self.object_colors = []
             for object_idx in range(len(self.obj_mesh_ind)):
-            
                 # if setup for capture, no need for randomization / scrambling of the blocks.
                 if self.capture_logoblock_dataset:
                     curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[object_idx])
                 else:
                     curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
-                
+
                 if self.is_testing and self.test_preset_cases:
                     curr_mesh_file = self.test_obj_mesh_files[object_idx]
                 # TODO(ahundt) define more predictable object names for when the number of objects is beyond the number of colors
-                print(f"Currently Trying to Import: {curr_mesh_file}")
+                #print(f"Currently Trying to Import: {curr_mesh_file}")
                 curr_shape_name = 'shape_%02d' % object_idx
                 self.vrep_names.append(curr_shape_name)
                 drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
                 if self.is_testing and self.test_preset_cases:
                     object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
                     object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
-                
+
                 # Loading object position and orientations from an array
                 if self.test_preset_arr is not None:
                     object_position = self.test_preset_arr[object_idx][0]
                     object_orientation = self.test_preset_arr[object_idx][1]
-                
+
                 # Set the colors in order
-                print(f"setting color at idx {object_idx} to {self.obj_mesh_color[object_idx]}") 
+                #print(f"setting color at idx {object_idx} to {self.obj_mesh_color[object_idx]}") 
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
                 # If there are more objects than total colors this line will break,
                 # applies mod to loop back to the first color.
                 object_color_name = self.color_names[object_idx % len(self.color_names)]
                 # add the color of this object to the list.
                 self.object_colors.append(object_color_name)
-                print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
+                #print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
                 do_break = False
                 ret_ints = []
                 ret_resp = 0
                 while len(ret_ints) == 0:
                     do_break = False
-                    print(f"obj pos {object_position}") 
-                    print(f"obj ori {object_orientation}") 
-                    print(f"obj col {object_color}") 
-                    print(curr_mesh_file)
-                    print(curr_shape_name)
-                    
+                    #print(f"obj pos {object_position}") 
+                    #print(f"obj ori {object_orientation}") 
+                    #print(f"obj col {object_color}") 
+                    #print(curr_mesh_file)
+                    #print(curr_shape_name)
+
                     # TODO: ZH, We don't really need this, remove this if statement after testing
                     scale = [self.obj_scale]
                     # print(object_position + object_orientation + object_color + scale)
@@ -495,7 +494,7 @@ class Robot(object):
                         ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWTextureWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
                     else:
                         ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
-                    
+
                     if ret_resp == 8:
                         print('Failed to add ' + curr_mesh_file + ' to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
@@ -2138,9 +2137,9 @@ class Robot(object):
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
             object_color_sequence = low2high_idx[nearby_obj]
             if len(object_color_sequence) < num_obj:
-                print('check_stack() False, not enough nearby objects for a successful stack! '
-                      'expected at least ' + str(num_obj) +
-                      ' nearby objects, but only counted: ' + str(len(object_color_sequence)))
+                print('check_stack() False, not enough nearby objects for a successful stack! ' \
+                        'expected at least ' + str(num_obj) + ' nearby objects, but only counted: ' + \
+                        str(len(object_color_sequence)))
                 # there aren't enough nearby objects for a successful stack!
                 checks = len(object_color_sequence) - 1
                 # We know the goal won't be met, so goal_success is False
@@ -2357,8 +2356,9 @@ class Robot(object):
         max_workspace_height = prev_height - (decrease_threshold * reward_multiplier)
         if decrease_threshold is not None and max_z < max_workspace_height:
             needed_to_reset = True
-        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) +
-              ' goal_success: ' + str(goal_success) + ' needed to reset: ' + str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + \
+              ' goal_success: ' + str(goal_success) + ' needed to reset: ' + \
+              str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
         return goal_success, max_z, needed_to_reset
 
     def restart_real(self):

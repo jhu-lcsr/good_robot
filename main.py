@@ -132,7 +132,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and args.check_stack or args.check_row
+    place_common_sense = args.common_sense and not args.use_demo
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -208,9 +208,10 @@ def main(args):
     np.random.seed(random_seed)
 
     # Initialize pick-and-place system (camera and robot)
+    # TODO(zhe) modify the None here to ensure that the test_preset_arr option is set correctly
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                  is_testing, test_preset_cases, test_preset_file,
+                  is_testing, test_preset_cases, test_preset_file, None,
                   place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
 
     # Set the "common sense" dynamic action space region around objects,
@@ -400,7 +401,7 @@ def main(args):
         nonlocal_variables['place_color_success'] = False
         nonlocal_variables['partial_stack_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None, action_loc=None):
+    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -412,7 +413,6 @@ def main(args):
                 -1 will be the highest object in the scene, -2 will be the second highest in the scene, etc.
             use_imitation: If use_imitation is True, we are doing an imitation task
             task_type: Needs to be set if use_imitation is set (options are 'vertical_square', 'unstack')
-            action_loc: Coordinates (x, y, z) of selected action
 
         # Returns
 
@@ -635,7 +635,8 @@ def main(args):
                         # select preds based on primitive action selected in demo
                         correspondences, nonlocal_variables['best_pix_ind'] = \
                                 evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
-                        predicted_value = correspondences[*nonlocal_variables['best_pix_ind']]
+                        print(nonlocal_variables['best_pix_ind'])
+                        predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                         nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
@@ -713,7 +714,8 @@ def main(args):
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
                     if place and check_row:
-                        needed_to_reset = check_stack_update_goal()
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
+                                task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
@@ -753,7 +755,8 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push)
+                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
+                                use_imitation=use_demo, task_type=task_type)
                     if not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -784,7 +787,8 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp,
+                                use_imitation=use_dmeo, task_type=task_type)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -812,7 +816,8 @@ def main(args):
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
+                            use_imitation=use_dmeo, task_type=task_type)
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
@@ -1751,7 +1756,8 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
 def check_training_complete(args):
     ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
     '''
-    snapshot_file, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
+    stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory = \
+            parse_resume_and_snapshot_file_args(args)
 
     training_complete = False
     iteration = 0
@@ -1762,7 +1768,7 @@ def check_training_complete(args):
         max_iter_complete = args.max_train_actions is None and (args.max_iter > 0 and iteration > args.max_iter)
         max_train_actions_complete = args.max_train_actions is not None and iteration > args.max_train_actions
         training_complete = max_iter_complete or max_train_actions_complete
-    
+
     return training_complete, logging_directory
 
 
@@ -1958,7 +1964,8 @@ if __name__ == '__main__':
     parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
 
     # ------ Pre-loading and logging options ------
-    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
+    parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                              help='stacking snapshot file to load for the model')
+    parser.add_argument('--row_snapshot_file', dest='row_snapshot_file', action='store', default='',                              help='row making snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--num_dilation', dest='num_dilation', type=int, action='store', default=0,                       help='Number of dilations to apply to efficientnet, each increment doubles output resolution and increases computational expense.')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
