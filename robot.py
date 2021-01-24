@@ -2292,7 +2292,7 @@ class Robot(object):
         # if there is only 1 stack or the 2 stacks don't form a row, check the other blocks in scene for row
         if len(block_indices) == 1 or not has_row:
             for i in range(len(pos)):
-                if low2high_idx[i] == block_indices[0]:
+                if len(block_indices) > 0 and low2high_idx[i] == block_indices[0]:
                     continue
 
                 block_inds = np.array(block_indices + [low2high_idx[i]])
