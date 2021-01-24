@@ -30,7 +30,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm 
 import cv2
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from scipy.spatial.transform import Rotation as R
 
 from robot import Robot
@@ -40,12 +40,14 @@ from data import DatasetReader, SimpleTrajectory
 class BlockSetter(object):
     """ Class to manipulate logo blocks and capture images used for training. """
 
+    # Initialization Function. You either have to input a robot or {pos, rot, and block_path}
     def __init__(self,
-                 pos: List[Tuple[float]], 
-                 rot: List[Tuple[float]], 
-                 blocks_path: str,
                  num_obj: int,
-                 shift: List[float]):
+                 shift: List[float],
+                 pos: Optional[List[Tuple[float]]], 
+                 rot: Optional[List[Tuple[float]]], 
+                 blocks_path: Optional[str],
+                 robot=None):
         """
         Load an initial setup, returns a new instance of the Robot 
         object. If robot class is already initialized, run "load_setup"
@@ -73,13 +75,21 @@ class BlockSetter(object):
         # 14x14 grid
         self.grid_dim = 14
         self.grid_len = self.grid_dim*self.side_len
+
+        # If we are passing in a Robot object as an initialization argument, we can return early.
+        if robot is not None:
+            # If num blocks is mismatched, throw error.
+            if robot.num_obj != self.num_obj:
+                print("ERROR in Blocksetter: The argument num_obj does not match the number of objects in the robot argument.")
+            else:
+                self.robot = robot
         
         # Create array to pass initial position of blocks
-        for i in range(len(pos[0])):
+        for i in range(len(pos)):
             # Convert values from dataset to match vrep axes
-            state = [(pos[0][i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]
+            state = [(pos[i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]
             state[1] = -state[1]
-            orient = rot[0][i]
+            orient = rot[i]
             
             # Convert quaternion to euler angles
             if len(orient)==4:
@@ -88,7 +98,7 @@ class BlockSetter(object):
             test_preset_arr.append([state, orient])
         
         # Move unused objects out of the camera frame
-        for i in range(self.num_obj-len(pos[0])):
+        for i in range(self.num_obj-len(pos)):
             out_state, out_ori = [-0.75 - i*(self.side_len+0.01), 0, self.side_len], [0, 0, 0]
             test_preset_arr.append([out_state, out_ori])
         
@@ -107,7 +117,8 @@ class BlockSetter(object):
         return [r.item() for r in temp]
 
 
-    def load_setup(self, positions, orientations, prevPositions, prevOrientations):
+    # TODO(zhe) To make this function work with physics, we must make sure that the stacking order reflects the current history.
+    def load_setup(self, positions, orientations, prevPositions=None, prevOrientations=None):
         """ Teleports the blocks into a specified position / orientation """
         for i in range(len(positions)):
             # If the position/orientation did not change, skip moving this block
@@ -214,9 +225,9 @@ def main(args):
         
         # Load the setup
         if imc is None:
-            imc = BlockSetter(pos, rot, args.blocks_path, args.num_blocks, args.offset)
+            imc = BlockSetter(args.num_blocks, args.offset, pos=pos[0], rot=rot[0], blocks_path=args.blocks_path)
         else:
-            imc.load_setup(pos[0], rot[0], ppos[0], prot[0])
+            imc.load_setup(pos[0], rot[0], prevPositions=ppos[0], prevOrientations=prot[0])
         
         # Capture the image and save it
         imc.captureAndSaveImages(trajectory.images[0], args.colorimg_folder, args.depthimg_folder, args.colorHm_folder, args.depthHm_folder)
@@ -224,7 +235,7 @@ def main(args):
         # Repeat the process with the next state
         npos = trajectory.next_positions
         nrot = trajectory.next_rotations
-        imc.load_setup(npos[0], nrot[0], pos[0], rot[0])
+        imc.load_setup(npos[0], nrot[0], prevPositions=pos[0], prevOrientations=rot[0])
         imc.captureAndSaveImages(trajectory.images[1], args.colorimg_folder, args.depthimg_folder, args.colorHm_folder, args.depthHm_folder)
 
 

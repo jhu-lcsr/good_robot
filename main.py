@@ -31,6 +31,7 @@ import shutil
 import matplotlib
 import matplotlib.pyplot as plt
 from data import DatasetReader
+from generate_logoblocks_images import BlockSetter
 
 
 def run_title(args):
@@ -983,6 +984,8 @@ def main(args):
 
     # Instantiate the DatasetReader in order to provide language commands during training
     language_data = None
+    blockMover = None
+    language_model = None
     if static_language_mask:
         dataset_reader = DatasetReader(args.train_path,
                                        None,
@@ -991,7 +994,8 @@ def main(args):
                                        batch_size = 1)
         print(f"Reading data from {args.train_path}, this may take a few minutes.")
         language_data = dataset_reader.data['train']
-
+        if is_sim:
+            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot=robot)
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
     # TODO(zhe) Figure out how to input a sentence. We need a dataloader to load each image, and a scene reset at each iter.
@@ -1011,24 +1015,26 @@ def main(args):
         if is_sim:
             robot.check_sim()
         
-        # If using the language map Get the command sentence and set up the scene
+        # If using the language map get the command sentence and set up the scene (if using )
         language_data_instance = None
         if static_language_mask:
             # Obtain the a random sample from the training set
             randIndex = random.randrange(0, len(language_data))
             language_data_instance = language_data[randIndex]
             
-            # Reset the scene to match the "previous" state
-            # NOTE(zhe) This requires the dynamics to be turned off. This may not be the best idea.
-            # HACK(zhe) Can we use the block setter? It would create a second robot object. Would this cause issues? Maybe the solution is to move load_setup to utils.py...
-            # TODO(zhe) ^
+            # Reset the scene to match the "previous" state if we are in the simulator
+            # NOTE(zhe) This currently requires the dynamics to be turned off. TODO(zhe) Allow dynamics in future.
+            if is_sim:
+                pos = language_data_instance.previous_positions[0]
+                rot = language_data_instance.previous_rotations[0]
+                blockMover.load_setup(pos, rot)
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
             robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
 
         # TODO Generate the language mask using the language model.
-        language_mask = None
+        language_mask = None # 
         if static_language_mask:
             pass
 
