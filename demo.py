@@ -65,7 +65,6 @@ class Demonstration():
                 '%06d.%s.color.png' % (stack_height, action_str))
         depth_filename = os.path.join(self.depth_dir,
                 '%06d.%s.depth.png' % (stack_height, action_str))
-        print("Processing:", rgb_filename, depth_filename)
 
         # read rgb and depth heightmap
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)

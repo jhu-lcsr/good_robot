@@ -22,6 +22,7 @@ from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
+from demo import Demonstration
 # TODO(adit98) move evaluate_l2_mask fn to utils
 from evaluate_demo_correspondence import evaluate_l2_mask
 import plot
@@ -237,6 +238,9 @@ def main(args):
                           place_dilation=0.05, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
                           num_dilation=num_dilation)
+
+        # set trainer reference to stack_trainer to get metadata (e.g. iteration)
+        trainer = stack_trainer
 
     else:
         trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -568,6 +572,7 @@ def main(args):
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
                                     nonlocal_variables['stack_height'], stack_trainer, row_trainer)
+                    print("main.py nonlocal_variables['executing_action']: got demo actions")
 
                 else:
                     best_push_conf = np.ma.max(push_predictions)
@@ -1142,12 +1147,14 @@ def main(args):
                         grasp_predictions_stack, place_predictions_stack, _, _ = \
                         stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
                             goal_condition=goal_condition, keep_action_feat=True)
+                print("main.py nonlocal_pause['exit_called'] got stack features")
 
                 # row features
                 push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
                         grasp_predictions_row, place_predictions_row, _, _ = \
                         row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
                             goal_condition=goal_condition, keep_action_feat=True)
+                print("main.py nonlocal_pause['exit_called'] got row features")
 
                 # TODO(adit98) may need to refactor, for now just store stack predictions
                 push_predictions, grasp_predictions, place_predictions = \
@@ -1471,7 +1478,12 @@ def main(args):
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
         print('Trainer iteration: %d complete' % int(trainer.iteration))
-        trainer.iteration += 1
+        if use_demo:
+            stack_trainer.iteration += 1
+            row_trainer.iteration += 1
+
+        else:
+            trainer.iteration += 1
 
     nonlocal_pause['process_actions_exit_called'] = True
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
