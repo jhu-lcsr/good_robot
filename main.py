@@ -936,7 +936,12 @@ def main(args):
         if is_testing:
             # Do special testing mode update steps
             # If at end of test run, re-load original weights (before test run)
-            trainer.model.load_state_dict(torch.load(snapshot_file))
+            if use_demo:
+                stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+            else:
+                trainer.model.load_state_dict(torch.load(snapshot_file))
+
             if test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                 # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
@@ -1034,7 +1039,7 @@ def main(args):
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
-        
+
         # NOTE(zhe) The pushing & grasping only task is to move items into a bin outside of the workspace.
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
@@ -1054,7 +1059,11 @@ def main(args):
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
-                    trainer.model.load_state_dict(torch.load(snapshot_file))
+                    if use_demo:
+                        stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                        row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                    else:
+                        trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
                     set_nonlocal_success_variables_false()
                     nonlocal_variables['stack'].reset_sequence()
@@ -1099,7 +1108,12 @@ def main(args):
             if is_testing:
                 # Do special testing mode update steps
                 # If at end of test run, re-load original weights (before test run)
-                trainer.model.load_state_dict(torch.load(snapshot_file))
+                if use_demo:
+                    stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                    row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                else:
+                    trainer.model.load_state_dict(torch.load(snapshot_file))
+
                 if test_preset_cases:
                     case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
                     # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
