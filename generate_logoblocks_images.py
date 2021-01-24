@@ -111,7 +111,7 @@ class BlockSetter(object):
         """ Teleports the blocks into a specified position / orientation """
         for i in range(len(positions)):
             # If the position/orientation did not change, skip moving this block
-            if len(positions)==len(prevPositions) and np.abs((np.array(positions[i])-np.array(prevPositions[i]))).sum() < 1e-6:
+            if prevPositions is not None and prevOrientations is not None and len(positions)==len(prevPositions) and np.abs((np.array(positions[i])-np.array(prevPositions[i]))).sum() < 1e-6:
                 continue
             
             state = [(positions[i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]

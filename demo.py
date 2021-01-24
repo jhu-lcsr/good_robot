@@ -180,7 +180,7 @@ class Demonstration():
             if stack_trainer is not None:
                 best_action_stack = stack_grasp[best_rot_ind, :, best_action_xy[0],
                         best_action_xy[1]]
-            
+
             if row_trainer is not None:
                 best_action_row = row_grasp[best_rot_ind, :, best_action_xy[0],
                         best_action_xy[1]]
@@ -189,7 +189,7 @@ class Demonstration():
             if stack_trainer is not None:
                 best_action_stack = stack_place[best_rot_ind, :, best_action_xy[0],
                         best_action_xy[1]]
-            
+
             if row_trainer is not None:
                 best_action_row = row_place[best_rot_ind, :, best_action_xy[0],
                         best_action_xy[1]]
