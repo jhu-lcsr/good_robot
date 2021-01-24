@@ -2246,16 +2246,25 @@ class Robot(object):
         # sort indices of blocks by z value
         low2high_idx = np.array(pos[:, 2]).argsort()
 
+
         # first check for any stacks
+        # NOTE if there isn't a first stack, then all blocks must be on the table so
+        # we don't need to check for a second stack
+
+        # store the bottom block index of each stack
+        block_indices = []
+
+        # get index of highest block, see if it forms a stack
         high_idx = low2high_idx[-1]
         nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
                 (stack_dist_thresh / 2))
 
         if len(nearby_obj) > 1:
+            # we have at least 1 stack
             num_stacks += 1
             first_stack_ind = high_idx
+            block_indices.append(nearby_obj[0].item())
 
-            block_indices = []
             # check for second stack (descending order, stop before block with known height 2)
             for i in range(2, len(pos) - first_stack_ind - 1):
                 high_idx = low2high_idx[-1 * i]

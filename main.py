@@ -640,7 +640,6 @@ def main(args):
                         # select preds based on primitive action selected in demo
                         correspondences, nonlocal_variables['best_pix_ind'] = \
                                 evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
-                        print(nonlocal_variables['best_pix_ind'])
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
