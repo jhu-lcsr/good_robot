@@ -1038,6 +1038,7 @@ def main(args):
                 nonlocal_variables['executing_action'] = True
 
         # Run training iteration in current thread (aka training thread)
+        # NOTE(zhe) First time the loop doesn't run.
         if 'prev_color_img' in locals():
 
             # Detect changes
