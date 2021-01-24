@@ -984,14 +984,13 @@ def main(args):
     # Instantiate the DatasetReader in order to provide language commands during training
     language_data = None
     if static_language_mask:
-        # TODO(zhe) create variables to 
         dataset_reader = DatasetReader(args.train_path,
-                                       args.val_path,
+                                       None,
                                        None,
                                        batch_by_line=True,
                                        batch_size = 1)
         print(f"Reading data from {args.train_path}, this may take a few minutes.")
-        language_data = 
+        language_data = dataset_reader.data['train']
 
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
@@ -1012,14 +1011,26 @@ def main(args):
         if is_sim:
             robot.check_sim()
         
-        # Get the command sentence if using language mask
-        language_command = None
+        # If using the language map Get the command sentence and set up the scene
+        language_data_instance = None
         if static_language_mask:
-            language_command = dataset_reader
+            # Obtain the a random sample from the training set
+            randIndex = random.randrange(0, len(language_data))
+            language_data_instance = language_data[randIndex]
+            
+            # Reset the scene to match the "previous" state
+            # NOTE(zhe) This requires the dynamics to be turned off. This may not be the best idea.
+            # HACK(zhe) Can we use the block setter? It would create a second robot object. Would this cause issues? Maybe the solution is to move load_setup to utils.py...
+            # TODO(zhe) ^
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
             robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
+
+        # TODO Generate the language mask using the language model.
+        language_mask = None
+        if static_language_mask:
+            pass
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -1969,8 +1980,7 @@ if __name__ == '__main__':
 
     # Language Mask Options
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
-    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/')
-    parser.add_argument('--dev_language_inputs', dest='dev_language_inputs', type=str, default='')
+    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json'                   help='specify the language data file to use during reinforcement learning')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
