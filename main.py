@@ -77,6 +77,7 @@ def main(args):
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
     num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
     num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
+    timeout = args.timeout # time to wait before simulator reset
     if num_obj is not None:
         num_obj += num_extra_obj
     if args.check_row:
@@ -1419,7 +1420,7 @@ def main(args):
                     print('The robot was not at home after the current action finished running. '
                           'Make sure the robot did not experience either an error or security stop. '
                           'WARNING: The robot will attempt to go home again in a few seconds.')
-            elif is_sim and int(time_elapsed) > 60:
+            elif is_sim and int(time_elapsed) > timeout:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
@@ -1941,6 +1942,7 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', dest='force_cpu', action='store_true', default=False,                                    help='force code to run in CPU mode')
     parser.add_argument('--flops', dest='flops', action='store_true', default=False,                                      help='calculate floating point operations of a forward pass then exit')
     parser.add_argument('--show_heightmap', dest='show_heightmap', action='store_true', default=False,                    help='show the background heightmap for collecting a new one and debugging')
+    parser.add_argument('--timeout', dest='timeout', type=int, default=60,                                                help='time to wait before environment reset')
 
     # ------------- Algorithm options -------------
     parser.add_argument('--method', dest='method', action='store', default='reinforcement',                               help='set to \'reactive\' (supervised learning) or \'reinforcement\' (reinforcement learning ie Q-learning)')
