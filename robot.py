@@ -2231,9 +2231,10 @@ class Robot(object):
                 structure_progress: step of task we are on (e.g. 2 if structure has 2 blocks)
         """
 
-        # initially no stacks or rows
+        # initially no stacks or rows, 1 block in structure
         num_stacks = 0
         has_row = False
+        structure_size = 1
 
         if check_z_height:
             raise NotImplementedError
@@ -2318,6 +2319,9 @@ class Robot(object):
 
                 if has_row:
                     break
+
+        print("vertical square partial success: structure height:" structure_size, "has_row:",
+                has_row, "num stacks:", num_stacks)
 
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
