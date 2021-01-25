@@ -2320,7 +2320,7 @@ class Robot(object):
                 if has_row:
                     break
 
-        print("vertical square partial success: structure height:" structure_size, "has_row:",
+        print("vertical square partial success: structure height:", structure_size, "has_row:",
                 has_row, "num stacks:", num_stacks)
 
         # success if we match or exceed current stack goal, also return structure size
