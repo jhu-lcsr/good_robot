@@ -1162,14 +1162,14 @@ def main(args):
                 push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
                         grasp_predictions_stack, place_predictions_stack, _, _ = \
                         stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                            goal_condition=goal_condition, keep_action_feat=True)
+                            goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
                 print("main.py nonlocal_pause['exit_called'] got stack features")
 
                 # row features
                 push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
                         grasp_predictions_row, place_predictions_row, _, _ = \
                         row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                            goal_condition=goal_condition, keep_action_feat=True)
+                            goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
                 print("main.py nonlocal_pause['exit_called'] got row features")
 
                 # TODO(adit98) may need to refactor, for now just store stack predictions

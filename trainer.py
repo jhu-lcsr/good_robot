@@ -558,7 +558,7 @@ class Trainer(object):
                         if self.place:
                             place_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                     int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                        
+
                     push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     grasp_predictions = output_prob[rotate_idx][1].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                     if self.place:
@@ -630,12 +630,12 @@ class Trainer(object):
                 return push_predictions, grasp_predictions, masked_place_predictions
             else:
                 return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
-        
+
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.apply_language_mask:
             language_masks = None # Fill this in
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_masks, push_predictions, grasp_predictions, place_predictions)
-        
+
         # NOTE(zhe) This needs to be off when running the language masking
         if self.place_common_sense:
             return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
@@ -731,8 +731,6 @@ class Trainer(object):
             print(reward_str)
             return expected_reward, current_reward
 
-
-    # TODO(adit98) here is where we need to incorporate imitation loss
     def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
@@ -928,7 +926,6 @@ class Trainer(object):
             print('Training loss: %f' % (loss_value))
             self.optimizer.step()
 
-
     def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=8):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again
         canvas = None
@@ -1026,7 +1023,6 @@ class Trainer(object):
         best_pix_ind = np.unravel_index(np.argmax(push_predictions), push_predictions.shape)
         return best_pix_ind
 
-
     def grasp_heuristic(self, depth_heightmap):
 
         num_rotations = 16
@@ -1049,7 +1045,6 @@ class Trainer(object):
         best_pix_ind = np.unravel_index(np.argmax(grasp_predictions), grasp_predictions.shape)
         return best_pix_ind
 
-
     def place_heuristic(self, depth_heightmap):
 
         num_rotations = 16
@@ -1071,4 +1066,3 @@ class Trainer(object):
 
         best_pix_ind = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
         return best_pix_ind
-
