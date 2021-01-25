@@ -995,10 +995,9 @@ def main(args):
         print(f"Reading data from {args.train_path}, this may take a few minutes.")
         language_data = dataset_reader.data['train']
         if is_sim:
-            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot=robot)
+            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0])
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
-    # TODO(zhe) Figure out how to input a sentence. We need a dataloader to load each image, and a scene reset at each iter.
     # TODO(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
@@ -1015,7 +1014,7 @@ def main(args):
         if is_sim:
             robot.check_sim()
         
-        # If using the language map get the command sentence and set up the scene (if using )
+        # If using the language map, get the command sentence and set up the scene
         language_data_instance = None
         if static_language_mask:
             # Obtain the a random sample from the training set
