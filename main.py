@@ -558,6 +558,8 @@ def main(args):
                 # Determine whether grasping or pushing should be executed based on network predictions OR with demo
                 if use_demo:
                     # figure out primitive action (limited to grasp or place)
+                    print("last action", nonlocal_variables['primitive_action'])
+                    print("last action success:", nonlocal_variables['grasp_success'])
                     if nonlocal_variables['primitive_action'] != 'grasp':
                         nonlocal_variables['primitive_action'] = 'grasp'
                         preds = [grasp_feat_row, grasp_feat_stack]
