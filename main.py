@@ -561,9 +561,11 @@ def main(args):
                     print("last action", nonlocal_variables['primitive_action'])
                     print("last action success:", nonlocal_variables['grasp_success'])
                     if nonlocal_variables['primitive_action'] != 'grasp':
+                        print('1st branch')
                         nonlocal_variables['primitive_action'] = 'grasp'
                         preds = [grasp_feat_row, grasp_feat_stack]
                     else:
+                        print('2nd branch')
                         if nonlocal_variables['grasp_success']:
                             nonlocal_variables['primitive_action'] = 'place'
                             preds = [place_feat_row, place_feat_stack]
@@ -571,6 +573,7 @@ def main(args):
                             nonlocal_variables['primitive_action'] = 'grasp'
                             preds = [grasp_feat_row, grasp_feat_stack]
 
+                    print("selected action:", nonlocal_variables['primitive_action'])
                     # TODO(adit98) add stack_trainer and row_trainer args here
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
@@ -596,12 +599,13 @@ def main(args):
                     else:
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
 
-                # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
-                # If we just did a successful grasp, we always need to place
-                if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
-                    nonlocal_variables['primitive_action'] = 'place'
-                else:
-                    nonlocal_variables['primitive_action'] = 'grasp'
+                if not use_demo:
+                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
+                    # If we just did a successful grasp, we always need to place
+                    if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
+                        nonlocal_variables['primitive_action'] = 'place'
+                    else:
+                        nonlocal_variables['primitive_action'] = 'grasp'
 
                 # NOTE(zhe) Switch grasp to push if push has better score. NO PUSHING IN LANGUAGE MODEL.
                 # determine if the network indicates we should do a push or a grasp
@@ -644,6 +648,7 @@ def main(args):
                         correspondences, nonlocal_variables['best_pix_ind'] = \
                                 evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
+                        # TODO(adit98) add code to save visualizations here
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                         nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
