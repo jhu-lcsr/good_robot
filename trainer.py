@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
-from utils_torch import action_space_argmax
+from utils_torch import action_space_argmax, demo_space_argmax
 
 try:
     import ptflops
