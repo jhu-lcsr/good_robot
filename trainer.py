@@ -891,6 +891,7 @@ class Trainer(object):
                                     grasp_predictions, place_predictions)
 
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
+                print('trainer.backprop: array shapes for debugging', predictions[action_id].shape, each_action_max_coordinate[primitive_action])
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
                     # The tmp_label value will already be 0, so just set the weight.
                     tmp_label_weights[each_action_max_coordinate[primitive_action]] = 1
