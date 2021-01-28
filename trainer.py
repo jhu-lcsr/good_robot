@@ -69,6 +69,8 @@ class Trainer(object):
             self.grasp_reward = 1.0
             self.grasp_color_reward = 2.0
 
+        self.use_demo = use_demo
+
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
