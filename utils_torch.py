@@ -41,18 +41,22 @@ def action_space_argmax(primitive_action, push_predictions, grasp_predictions, p
 
 def demo_space_argmax(primitive_action, demo_best_pix_ind, push_predictions, grasp_predictions, place_predictions=None):
     # TODO(adit98) add code to do l2 mask comparison here eventually (move from main)
+
+    # modify demo_best_pix_ind to have rotation ind 0 (since we only run the best rotation)
+    demo_best_pix_ind[0] = 0
+
     # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
     each_action_max_coordinate = {
         'push': demo_best_pix_ind,
         'grasp': demo_best_pix_ind,
     }
     each_action_predicted_value = {
-        'push': push_predictions[0][demo_best_pix_ind[1:]], # push, index 0
-        'grasp': grasp_predictions[0][demo_best_pix_ind[1:]],
+        'push': push_predictions[demo_best_pix_ind], # push, index 0
+        'grasp': grasp_predictions[demo_best_pix_ind],
     }
     if place_predictions is not None:
         each_action_max_coordinate['place'] = demo_best_pix_ind,
-        each_action_predicted_value['place'] = place_predictions[0][demo_best_pix_ind[1:]]
+        each_action_predicted_value['place'] = place_predictions[demo_best_pix_ind]
 
     # we will actually execute the best pixel index of the selected action
     best_pixel_index = each_action_max_coordinate[primitive_action]
