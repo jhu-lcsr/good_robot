@@ -876,8 +876,7 @@ class Trainer(object):
                 # This new common sense reward will have the same weight as the actual historically executed action.
                 if self.use_demo:
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
-                            demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
-                                    grasp_predictions, place_predictions)
+                            demo_space_argmax(primitive_action, best_pix_ind)
                 else:
                     # Do forward pass with specified rotation (to save gradients)
                     push_predictions, grasp_predictions, place_predictions, state_feat, \
