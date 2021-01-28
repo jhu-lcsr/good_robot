@@ -32,7 +32,8 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, apply_language_mask=False):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, use_demo=False,
+                 apply_language_mask=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320

@@ -229,7 +229,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=0, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+                          num_dilation=num_dilation, use_demo=use_demo)
 
         row_trainer = Trainer(method, push_rewards, future_reward_discount,
                           is_testing, row_snapshot_file, force_cpu,
@@ -238,7 +238,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=0.05, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+                          num_dilation=num_dilation, use_demo=use_demo)
 
         # set trainer reference to stack_trainer to get metadata (e.g. iteration)
         trainer = stack_trainer
@@ -251,7 +251,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+                          num_dilation=num_dilation, use_demo=use_demo)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
