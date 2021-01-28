@@ -1362,7 +1362,16 @@ def main(args):
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 print('Running two step backprop()')
-                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap, prev_primitive_action, prev_best_pix_ind, label_value, goal_condition=prev_goal_condition)
+                #if use_demo:
+                #    demo_color_heightmap, demo_depth_heightmap = \
+                #            demo.get_heightmaps(prev_primitive_action, prev_stack_height)
+                #    trainer.backprop(demo_color_heightmap, demo_depth_heightmap,
+                #            prev_primitive_action, prev_best_dict, label_value,
+                #            goal_condition=prev_goal_condition)
+
+                trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
+                        prev_primitive_action, prev_best_pix_ind, label_value,
+                        goal_condition=prev_goal_condition)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid

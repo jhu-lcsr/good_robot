@@ -875,29 +875,17 @@ class Trainer(object):
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
 
+                # Do forward pass with specified rotation (to save gradients)
+                push_predictions, grasp_predictions, place_predictions, state_feat, \
+                        output_prob = self.forward(color_heightmap, depth_heightmap,
+                                is_volatile=False, specific_rotation=best_pix_ind[0],
+                                goal_condition=goal_condition)
+
                 if self.use_demo:
-                    demo_color_heightmap, demo_depth_heightmap = \
-                            demo.get_heightmaps(prev_primitive_action, prev_stack_height)
-                    # Do forward pass with specified rotation (to save gradients)
-                    push_predictions, grasp_predictions, place_predictions, state_feat, \
-                            output_prob = self.forward(demo_color_heightmap, demo_depth_heightmap,
-                                    is_volatile=False, specific_rotation=best_pix_ind[0],
-                                    goal_condition=goal_condition)
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
                             demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
                                     grasp_predictions, place_predictions)
                 else:
-                    # Do forward pass with specified rotation (to save gradients)
-                    push_predictions, grasp_predictions, place_predictions, state_feat, \
-                            output_prob = self.forward(color_heightmap, depth_heightmap,
-                                    is_volatile=False, specific_rotation=best_pix_ind[0],
-                                    goal_condition=goal_condition)
-
-                    # Do forward pass with specified rotation (to save gradients)
-                    push_predictions, grasp_predictions, place_predictions, state_feat, \
-                            output_prob = self.forward(color_heightmap, depth_heightmap,
-                                    is_volatile=False, specific_rotation=best_pix_ind[0],
-                                    goal_condition=goal_condition)
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
                             action_space_argmax(primitive_action, push_predictions,
                                     grasp_predictions, place_predictions)
