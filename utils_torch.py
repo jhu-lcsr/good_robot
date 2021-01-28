@@ -39,6 +39,26 @@ def action_space_argmax(primitive_action, push_predictions, grasp_predictions, p
     predicted_value = each_action_predicted_value[primitive_action]
     return best_pixel_index, each_action_max_coordinate, predicted_value
 
+def demo_space_argmax(primitive_action, demo_best_pix_ind, push_predictions, grasp_predictions,
+        place_predictions=None):
+    # TODO(adit98) add code to do l2 mask comparison here eventually (move from main)
+    # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
+    each_action_max_coordinate = {
+        'push': demo_best_pix_ind,
+        'grasp': demo_best_pix_ind,
+    }
+    each_action_predicted_value = {
+        'push': push_predictions[demo_best_pix_ind], # push, index 0
+        'grasp': grasp_predictions[demo_best_pix_ind],
+    }
+    if place_predictions is not None:
+        each_action_max_coordinate['place'] = demo_best_pix_ind,
+        each_action_predicted_value['place'] = place_predictions[demo_best_pix_ind]
+
+    # we will actually execute the best pixel index of the selected action
+    best_pixel_index = each_action_max_coordinate[primitive_action]
+    predicted_value = each_action_predicted_value[primitive_action]
+    return best_pixel_index, each_action_max_coordinate, predicted_value
 
 def random_unmasked_index_in_mask_array(maskarray):
     """ Return an index in a masked array which is selected with a uniform random distribution from the valid aka unmasked entries where the masked value is 0.

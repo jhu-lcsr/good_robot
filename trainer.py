@@ -867,13 +867,24 @@ class Trainer(object):
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label_weights[action_area > 0] = 1
 
-            # Do forward pass with specified rotation (to save gradients)
-            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = self.forward(color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
             if self.common_sense and self.common_sense_backprop:
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
-                new_best_pix_ind, each_action_max_coordinate, predicted_value = action_space_argmax(primitive_action, push_predictions, grasp_predictions, place_predictions)
+                if self.use_demo:
+                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
+                            demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
+                                    grasp_predictions, place_predictions)
+                else:
+                    # Do forward pass with specified rotation (to save gradients)
+                    push_predictions, grasp_predictions, place_predictions, state_feat, \
+                            output_prob = self.forward(color_heightmap, depth_heightmap,
+                                    is_volatile=False, specific_rotation=best_pix_ind[0],
+                                    goal_condition=goal_condition)
+                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
+                            action_space_argmax(primitive_action, push_predictions,
+                                    grasp_predictions, place_predictions)
+
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
                     # The tmp_label value will already be 0, so just set the weight.
