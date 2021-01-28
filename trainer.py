@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, use_demo=False,
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True,
                  apply_language_mask=False):
 
         self.heightmap_pixels = 224
@@ -68,9 +68,6 @@ class Trainer(object):
             self.push_reward = 0.5
             self.grasp_reward = 1.0
             self.grasp_color_reward = 2.0
-
-        self.use_demo = use_demo
-
 
         # Check if CUDA can be used
         if torch.cuda.is_available() and not force_cpu:
@@ -734,7 +731,7 @@ class Trainer(object):
             print(reward_str)
             return expected_reward, current_reward
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, use_demo=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -870,18 +867,17 @@ class Trainer(object):
             tmp_label_weights = np.zeros((self.heightmap_pixels,self.heightmap_pixels))
             tmp_label_weights[action_area > 0] = 1
 
+            # Do forward pass with specified rotation (to save gradients)
+            push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                    self.forward(color_heightmap, depth_heightmap, is_volatile=False,
+                            specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
+
             if self.common_sense and self.common_sense_backprop:
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
 
-                # Do forward pass with specified rotation (to save gradients)
-                push_predictions, grasp_predictions, place_predictions, state_feat, \
-                        output_prob = self.forward(color_heightmap, depth_heightmap,
-                                is_volatile=False, specific_rotation=best_pix_ind[0],
-                                goal_condition=goal_condition)
-
-                if self.use_demo:
+                if use_demo:
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
                             demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
                                     grasp_predictions, place_predictions)
@@ -907,13 +903,15 @@ class Trainer(object):
             #     tmp_label_weights[action_area > 0] = 1
             #     # since we are now taking the mean loss, in this case we switch to the size of tmp_label_weights to counteract dividing by the number of entries
             #     # tmp_label_weights[action_area > 0] = max(tmp_label_weights.size, 1)
-            label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
+            label_weights[0,self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff),
+                    self.half_heightmap_diff:(self.buffered_heightmap_pixels-self.half_heightmap_diff)] = tmp_label_weights
 
             loss_value = 0
             # Compute loss and backward pass
 
             if self.use_cuda:
-                loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
+                loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels),
+                        Variable(torch.from_numpy(label).float().cuda())) * Variable(torch.from_numpy(label_weights).float().cuda(),requires_grad=False)
             else:
                 loss = self.criterion(output_prob[0][action_id].view(1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels), Variable(torch.from_numpy(label).float())) * Variable(torch.from_numpy(label_weights).float(),requires_grad=False)
             loss = loss.sum()

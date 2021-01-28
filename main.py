@@ -1368,10 +1368,9 @@ def main(args):
                 #    trainer.backprop(demo_color_heightmap, demo_depth_heightmap,
                 #            prev_primitive_action, prev_best_dict, label_value,
                 #            goal_condition=prev_goal_condition)
-
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
                         prev_primitive_action, prev_best_pix_ind, label_value,
-                        goal_condition=prev_goal_condition)
+                        goal_condition=prev_goal_condition, use_demo=use_demo)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
