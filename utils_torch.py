@@ -43,6 +43,7 @@ def demo_space_argmax(primitive_action, demo_best_pix_ind, push_predictions, gra
     # TODO(adit98) add code to do l2 mask comparison here eventually (move from main)
 
     # modify demo_best_pix_ind to have rotation ind 0 (since we only run the best rotation)
+    demo_best_pix_ind = (0, demo_best_pix_ind[1], demo_best_pix_ind[2])
     demo_best_pix_ind[0] = 0
 
     # Get pixel location and rotation with highest affordance prediction from heuristic algorithms (rotation, y, x)
