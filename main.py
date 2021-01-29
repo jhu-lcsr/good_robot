@@ -807,7 +807,6 @@ def main(args):
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
                             nonlocal_variables['stack'].next()
 
-
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -827,7 +826,8 @@ def main(args):
                         grasp_str += ' color success rate: %r' % (color_grasp_rate)
                     if not place:
                         print(grasp_str)
-               elif nonlocal_variables['primitive_action'] == 'place':
+
+                elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     nonlocal_variables['place_success'] = robot.place(primitive_position,
                             best_rotation_angle, over_block=not check_row)
