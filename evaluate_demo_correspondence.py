@@ -100,15 +100,38 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
     else:
         # calculate l2 distance between example action embedding and preds for each policy (row and stack)
         l2_dist = np.zeros_like(mask).astype(float)
+        #if example_action_row is not None:
+        #    # normalize sum at every pixel, ax='all' normalizes across all axes
+        #    l2_dist += normalize(np.sum(np.square(example_action_row - row_preds), axis=1), ax='all')
+        #if example_action_stack is not None:
+        #    l2_dist += normalize(np.sum(np.square(example_action_stack - stack_preds), axis=1), ax='all')
         if example_action_row is not None:
-            # normalize sum at every pixel, ax='all' normalizes across all axes
-            l2_dist += normalize(np.sum(np.square(example_action_row - row_preds), axis=1), ax='all')
-        if example_action_stack is not None:
-            l2_dist += normalize(np.sum(np.square(example_action_stack - stack_preds), axis=1), ax='all')
+            row_dist = np.sum(np.square(example_action_row - row_preds), axis=1)
+        else:
+            row_dist = None
 
-    # set masked spaces to have max of l2_dist*1.1 distance
-    l2_dist[mask] = np.max(l2_dist) * 1.1
-    match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
+        if example_action_stack is not None:
+            stack_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
+        else:
+            stack_dist = None
+
+    # select best action as max bw row_dist and stack_dist
+    if row_dist is None:
+        l2_dist = stack_dist
+        match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
+    elif stack_dist is None:
+        l2_dist = row_dist
+        match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
+    else:
+        row_match_ind = np.unravel_index(np.argmin(row_dist), row_dist.shape)
+        stack_match_ind = np.unravel_index(np.argmin(stack_dist), stack_dist.shape)
+        if row_dist[row_match_ind] < stack_dist[stack_match_ind]:
+            match_ind = row_match_ind
+        else:
+            match_ind = stack_match_ind
+
+        # get best_matches from both row and stack distances
+        l2_dist = np.minimum(row_dist, stack_dist)
 
     # make l2_dist range from 0 to 1
     l2_dist = l2_dist - np.min(l2_dist)
