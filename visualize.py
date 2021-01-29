@@ -8,6 +8,7 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data_dir', required=True, help='path to logged run')
+    args = parser.parse_args()
 
     # load executed actions
     action_log = np.loadtxt(os.path.join(args.data_dir, 'transitions', 'executed_action.log.txt'))
