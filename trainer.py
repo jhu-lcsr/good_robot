@@ -872,7 +872,8 @@ class Trainer(object):
                     self.forward(color_heightmap, depth_heightmap, is_volatile=False,
                             specific_rotation=best_pix_ind[0], goal_condition=goal_condition)
 
-            if self.common_sense and self.common_sense_backprop:
+            if self.common_sense and self.common_sense_backprop and \
+                    (primitive_action != 'place' or self.place_common_sense):
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
@@ -887,7 +888,6 @@ class Trainer(object):
                                     grasp_predictions, place_predictions)
 
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
-                print('trainer.backprop: array shapes for debugging', predictions[action_id].shape, each_action_max_coordinate[primitive_action])
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
                     # The tmp_label value will already be 0, so just set the weight.
                     tmp_label_weights[each_action_max_coordinate[primitive_action]] = 1
