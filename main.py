@@ -435,8 +435,6 @@ def main(args):
             stack_shift = 0
 
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-
-        # TODO(adit98) see if we need to check if using cycle_consistency here or in the training loop itself
         if use_imitation:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if task_type == 'vertical_square':
@@ -788,7 +786,8 @@ def main(args):
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot,
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, \
+                            color_img_grasp, depth_img_grasp = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
 
                     if place:
@@ -800,8 +799,14 @@ def main(args):
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print("main.py: running check_stack_update_goal")
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp,
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx,
+                                depth_img=valid_depth_heightmap_grasp,
                                 use_imitation=use_demo, task_type=task_type)
+
+                        # if the stack height increased, increment the StackSequence
+                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                            nonlocal_variables['stack'].next()
+
 
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
@@ -822,9 +827,10 @@ def main(args):
                         grasp_str += ' color success rate: %r' % (color_grasp_rate)
                     if not place:
                         print(grasp_str)
-                elif nonlocal_variables['primitive_action'] == 'place':
+               elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position,
+                            best_rotation_angle, over_block=not check_row)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
