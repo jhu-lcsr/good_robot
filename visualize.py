@@ -1,6 +1,8 @@
 import cv2
-from utils import get_prediction_vis
+import os
+import argparse
 import numpy as np
+from utils import get_prediction_vis
 
 if __name__ == '__main__':
     # parse arguments
