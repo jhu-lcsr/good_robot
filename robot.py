@@ -2298,6 +2298,8 @@ class Robot(object):
 
         # if there is only 1 stack, check the other blocks in scene for row
         elif len(block_indices) == 1:
+            # structure_size is at least 2
+            structure_size = 2
             for i in range(len(pos)):
                 if low2high_idx[i] == block_indices[0]:
                     continue
