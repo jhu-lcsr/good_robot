@@ -147,6 +147,7 @@ class Demonstration():
                         self.action_dict[stack_height]['place_image_ind'], use_hist=use_hist)
 
         # get stack features if stack_trainer is provided
+        # TODO(adit98) can add specific rotation to these forward calls for speedup
         if stack_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
@@ -166,10 +167,10 @@ class Demonstration():
 
         # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
-        best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
+        best_action_rc = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
 
-        # need to swap x and y coordinates for best_action_xy
-        best_action_xy = [best_action_xy[1], best_action_xy[0]]
+        # need to swap row and column coordinates for best_action_xy
+        best_action_xy = [best_action_rc[1], best_action_rc[0]]
 
         # initialize best actions for stacking and row making
         best_action_stack, best_action_row = None, None

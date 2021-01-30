@@ -116,6 +116,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             stack_dist = None
 
     # select best action as max bw row_dist and stack_dist
+    # match_ind is in the form (theta, y, x)
     if row_dist is None:
         l2_dist = stack_dist
         match_ind = np.unravel_index(np.argmin(l2_dist), l2_dist.shape)
@@ -142,6 +143,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
 
     return im_mask, match_ind
 
+# TODO(adit98) replace this with utils function
 # function to visualize prediction signal on heightmap (with rotations)
 def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, prob_exp=1):
     canvas = None
@@ -218,9 +220,9 @@ if __name__ == '__main__':
 
     # create both demo classes
     example_demo = Demonstration(path=args.example_demo, demo_num=0,
-            check_z_height=True, task_type=args.task_type)
+            check_z_height=False, task_type=args.task_type)
     imitation_demo = Demonstration(path=args.imitation_demo, demo_num=0,
-            check_z_height=True, task_type=args.task_type)
+            check_z_height=False, task_type=args.task_type)
 
     # set whether place common sense masks should be used
     # TODO(adit98) make this a cmd line argument and think about whether it should ever be set

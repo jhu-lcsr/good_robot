@@ -637,11 +637,10 @@ def main(args):
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
                 else:
                     if use_demo:
-                        # select preds based on primitive action selected in demo
+                        # select preds based on primitive action selected in demo (theta, y, x)
                         correspondences, nonlocal_variables['best_pix_ind'] = \
                                 evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
-                        # TODO(adit98) add code to save visualizations here
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                         nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
