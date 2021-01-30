@@ -558,14 +558,16 @@ def main(args):
                     # figure out primitive action (limited to grasp or place)
                     if nonlocal_variables['primitive_action'] != 'grasp':
                         nonlocal_variables['primitive_action'] = 'grasp'
-                        preds = [grasp_feat_row, grasp_feat_stack]
+                        print(type(grasp_feat_row))
+                        # fill the masked arrays and put in preds
+                        preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
                     else:
                         if nonlocal_variables['grasp_success']:
                             nonlocal_variables['primitive_action'] = 'place'
-                            preds = [place_feat_row, place_feat_stack]
+                            preds = [place_feat_row.filled(0.0), place_feat_stack.filled(0.0)]
                         else:
                             nonlocal_variables['primitive_action'] = 'grasp'
-                            preds = [grasp_feat_row, grasp_feat_stack]
+                            preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
 
                     # TODO(adit98) add stack_trainer and row_trainer args here
                     demo_row_action, demo_stack_action, action_id = \

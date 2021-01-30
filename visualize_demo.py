@@ -17,8 +17,8 @@ if __name__ == '__main__':
     heightmap_paths = os.listdir(os.path.join(args.demo_dir, 'data', 'depth-heightmaps'))
 
     # filter out the initially saved heightmaps and get the full path
-    heightmap_paths = [os.path.join(args.demo_dir, 'data', 'depth-heightmaps', h) \
-            for h in heightmap_paths]
+    heightmap_paths = sorted([os.path.join(args.demo_dir, 'data', 'depth-heightmaps', h) \
+            for h in heightmap_paths])
 
     # define workspace limits
     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]])
