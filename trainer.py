@@ -586,6 +586,8 @@ class Trainer(object):
             # "common sense" dynamic action space, mask pixels we know cannot lead to progress
             # TODO(zhe) The common_sense_action_space function must also use the language mask, or we can implement a seperate function.
             # process feature masks if we need to return feature masks and final preds
+
+            # TODO(adit98) see if this should be uncommented (masking demo features)
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:
@@ -600,15 +602,20 @@ class Trainer(object):
             # mask action, if we are not in demo or if demo_mask is set
             if not use_demo or demo_mask:
                 if self.place:
-                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
-                            push_predictions, grasp_predictions, place_predictions, self.place_dilation, self.show_heightmap, color_heightmap)
+                    push_predictions, grasp_predictions, masked_place_predictions = \
+                            utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                            push_predictions, grasp_predictions, place_predictions,
+                            self.place_dilation, self.show_heightmap, color_heightmap)
                     place_predictions = np.ma.masked_array(place_predictions)
                 else:
-                    push_predictions, grasp_predictions, masked_place_predictions = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
-                            push_predictions, grasp_predictions, place_predictions=None, place_dilation=self.place_dilation, show_heightmap=self.show_heightmap, color_heightmap=color_heightmap)
+                    push_predictions, grasp_predictions = \
+                            utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                            push_predictions, grasp_predictions, place_predictions=None,
+                            place_dilation=self.place_dilation, show_heightmap=self.show_heightmap,
+                            color_heightmap=color_heightmap)
 
             else:
-                # Mask pixels we know cannot lead to progress
+                # convert to masked arrays
                 push_predictions = np.ma.masked_array(push_predictions)
                 grasp_predictions = np.ma.masked_array(grasp_predictions)
                 if self.place:
