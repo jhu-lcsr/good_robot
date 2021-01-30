@@ -835,8 +835,11 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
     return success, row_size
 
 # function to visualize prediction signal on heightmap (with rotations)
-def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, prob_exp=1, \
-        specific_rotation=None, num_rotations=None):
+def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
+        prob_exp=1, specific_rotation=False, num_rotations=None):
+
+    best_rot_ind = best_pix_ind[0]
+    best_action_xy = best_pix_ind[1:]
     canvas = None
 
     # clip values <0 or >1
@@ -845,7 +848,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, pr
     # apply exponential
     predictions = predictions ** prob_exp
 
-    if specific_rotation is not None:
+    if not specific_rotation:
         num_rotations = predictions.shape[0]
 
         # populate canvas
@@ -860,13 +863,16 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, pr
                 prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
 
                 # if this is the correct rotation, draw circle on action coord
-                if rotate_idx == best_pix_ind[0]:
-                    # need to flip best_pix_ind row and col since cv2.circle reads this as (x, y)
-                    prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (221,211,238), 2)
+                if rotate_idx == best_rot_ind:
+                    # need to flip best_action_xy row and col since cv2.circle reads this as (x, y)
+                    prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]),
+                        int(best_action_xy[0])), 7, (221,211,238), 2)
 
                 # rotate probability map and image to gripper rotation
-                prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
-                background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
+                prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
+                background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
 
                 # blend image and colorized probability heatmap
                 prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
@@ -894,13 +900,13 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, pr
         prediction_vis = cv2.applyColorMap((predictions*255).astype(np.uint8), cv2.COLORMAP_JET)
 
         # need to flip best_pix_ind row and col since cv2.circle reads in as (x, y)
-        prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])),
+        prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]), int(best_action_xy[0])),
                 7, (221,211,238), 2)
 
         # rotate probability map and image to gripper rotation
-        prediction_vis = ndimage.rotate(prediction_vis, specific_rotation*(360.0/num_rotations),
+        prediction_vis = ndimage.rotate(prediction_vis, best_rot_ind*(360.0/num_rotations),
                 reshape=False, order=0).astype(np.uint8)
-        background_image = ndimage.rotate(heightmap, specific_rotation*(360.0/num_rotations),
+        background_image = ndimage.rotate(heightmap, best_rot_ind*(360.0/num_rotations),
                 reshape=False, order=0).astype(np.uint8)
 
         # blend image and colorized probability heatmap
