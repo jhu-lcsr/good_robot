@@ -48,8 +48,10 @@ class Demonstration():
             # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
             # divide num actions by 2 to get number of grasp/place pairs
             self.action_dict = {}
-            for action_pair in range(self.num_actions // 2):
-                demo_ind = action_pair * 2
+
+            # start at 1 since the structure starts with size 1
+            for action_pair in range(1, (self.num_actions // 2) + 1):
+                demo_ind = (action_pair - 1) * 2
                 grasp_image_ind = int(self.image_names[demo_ind].split('.')[0])
                 place_image_ind = int(self.image_names[demo_ind + 1].split('.')[0])
                 self.action_dict[action_pair] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
