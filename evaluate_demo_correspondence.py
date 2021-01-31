@@ -108,11 +108,19 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         #    l2_dist += normalize(np.sum(np.square(example_action_stack - stack_preds), axis=1), ax='all')
         if example_action_row is not None:
             row_dist = np.sum(np.square(example_action_row - row_preds), axis=1)
+
+            # set all masked spaces to have max l2 distance
+            row_dist[np.sum(row_preds, axis=1) == 0] = np.max(row_dist) * 1.1
+
         else:
             row_dist = None
 
         if example_action_stack is not None:
             stack_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
+
+            # set all masked spaces to have max l2 distance
+            stack_dist[np.sum(row_preds, axis=1) == 0] = np.max(row_dist) * 1.1
+
         else:
             stack_dist = None
 
