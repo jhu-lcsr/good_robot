@@ -110,7 +110,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             row_dist = np.sum(np.square(example_action_row - row_preds), axis=1)
 
             # set all masked spaces to have max l2 distance
-            row_dist[np.sum(row_preds, axis=1) == 0] = np.max(row_dist) * 1.1
+            row_dist[mask] = np.max(row_dist) * 1.1
 
         else:
             row_dist = None
@@ -119,7 +119,7 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
             stack_dist = np.sum(np.square(example_action_stack - stack_preds), axis=1)
 
             # set all masked spaces to have max l2 distance
-            stack_dist[np.sum(row_preds, axis=1) == 0] = np.max(row_dist) * 1.1
+            stack_dist[mask] = np.max(stack_dist) * 1.1
 
         else:
             stack_dist = None
@@ -143,9 +143,9 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         # get best_matches from both row and stack distances
         l2_dist = np.minimum(row_dist, stack_dist)
 
-    # make l2_dist range from 0 to 1
+    # make l2_dist >=0 and sum-normalize
     l2_dist = l2_dist - np.min(l2_dist)
-    l2_dist = l2_dist / np.max(l2_dist)
+    l2_dist = l2_dist / np.sum(l2_dist)
 
     # invert values of l2_dist so that large values indicate correspondence
     im_mask = (1 - l2_dist)

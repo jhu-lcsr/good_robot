@@ -222,23 +222,26 @@ def main(args):
 
     # Initialize trainer(s)
     if use_demo:
-        stack_trainer = Trainer(method, push_rewards, future_reward_discount,
-                          is_testing, stack_snapshot_file, force_cpu,
-                          goal_condition_len, place, pretrained, flops,
-                          network=neural_network_name, common_sense=common_sense,
-                          place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                          place_dilation=0, common_sense_backprop=common_sense_backprop,
-                          trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+        stack_trainer, row_trainer = None, None
+        if stack_snapshot_file != '':
+            stack_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, stack_snapshot_file, force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=0, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
 
-        row_trainer = Trainer(method, push_rewards, future_reward_discount,
-                          is_testing, row_snapshot_file, force_cpu,
-                          goal_condition_len, place, pretrained, flops,
-                          network=neural_network_name, common_sense=common_sense,
-                          place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                          place_dilation=0.05, common_sense_backprop=common_sense_backprop,
-                          trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+        if row_snapshot_file != '':
+            row_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, row_snapshot_file, force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=0.05, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
 
         # set trainer reference to stack_trainer to get metadata (e.g. iteration)
         trainer = stack_trainer
@@ -559,18 +562,36 @@ def main(args):
                     if nonlocal_variables['primitive_action'] != 'grasp':
                         nonlocal_variables['primitive_action'] = 'grasp'
                         # fill the masked arrays and put in preds
-                        preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
+                        if stack_trainer is not None and row_trainer is not None:
+                            preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
+                        elif stack_trainer is not None:
+                            preds = [None, grasp_feat_stack.filled(0.0)]
+                        else:
+                            preds = [grasp_feat_row.filled(0.0), None]
+
                     else:
                         if nonlocal_variables['grasp_success']:
                             nonlocal_variables['primitive_action'] = 'place'
-                            preds = [place_feat_row.filled(0.0), place_feat_stack.filled(0.0)]
+
+                            # fill the masked arrays and put in preds
+                            if stack_trainer is not None and row_trainer is not None:
+                                preds = [place_feat_row.filled(0.0), place_feat_stack.filled(0.0)]
+                            elif stack_trainer is not None:
+                                preds = [None, place_feat_stack.filled(0.0)]
+                            else:
+                                preds = [place_feat_row.filled(0.0), None]
+
                         else:
                             nonlocal_variables['primitive_action'] = 'grasp'
-                            preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
 
-                    breakpoint()
+                            # fill the masked arrays and put in preds
+                            if stack_trainer is not None and row_trainer is not None:
+                                preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
+                            elif stack_trainer is not None:
+                                preds = [None, grasp_feat_stack.filled(0.0)]
+                            else:
+                                preds = [grasp_feat_row.filled(0.0), None]
 
-                    # TODO(adit98) add stack_trainer and row_trainer args here
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
                                     nonlocal_variables['stack_height'], stack_trainer, row_trainer)
@@ -950,8 +971,10 @@ def main(args):
             # Do special testing mode update steps
             # If at end of test run, re-load original weights (before test run)
             if use_demo:
-                stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                if stack_snapshot_file != '':
+                    stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                if row_snapshot_file != '':
+                    row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
             else:
                 trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1073,8 +1096,10 @@ def main(args):
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
                     if use_demo:
-                        stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                        row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                        if stack_snapshot_file != '':
+                            stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                        if row_snapshot_file != '':
+                            row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
                     else:
                         trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
@@ -1122,8 +1147,10 @@ def main(args):
                 # Do special testing mode update steps
                 # If at end of test run, re-load original weights (before test run)
                 if use_demo:
-                    stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                    row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                    if stack_snapshot_file != '':
+                        stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
+                    if row_snapshot_file != '':
+                        row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
                 else:
                     trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1169,22 +1196,28 @@ def main(args):
                 # run forward pass, keep action features and get softmax predictions
 
                 # stack features
-                push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
-                        grasp_predictions_stack, place_predictions_stack, _, _ = \
-                        stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                            goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
-                print("main.py nonlocal_pause['exit_called'] got stack features")
+                if stack_trainer is not None:
+                    push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
+                            grasp_predictions_stack, place_predictions_stack, _, _ = \
+                            stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                    print("main.py nonlocal_pause['exit_called'] got stack features")
 
-                # row features
-                push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
-                        grasp_predictions_row, place_predictions_row, _, _ = \
-                        row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                            goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
-                print("main.py nonlocal_pause['exit_called'] got row features")
+                    # TODO(adit98) may need to refactor, for now just store stack predictions
+                    push_predictions, grasp_predictions, place_predictions = \
+                            push_predictions_stack, grasp_predictions_stack, place_predictions_stack
 
-                # TODO(adit98) may need to refactor, for now just store stack predictions
-                push_predictions, grasp_predictions, place_predictions = \
-                        push_predictions_stack, grasp_predictions_stack, place_predictions_stack
+                if row_trainer is not None:
+                    # row features
+                    push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
+                            grasp_predictions_row, place_predictions_row, _, _ = \
+                            row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                    print("main.py nonlocal_pause['exit_called'] got row features")
+
+                    if stack_trainer is None:
+                        push_predictions, grasp_predictions, place_predictions = \
+                                push_predictions_stack, grasp_predictions_stack, place_predictions_stack
 
             else:
                 # TODO(zhe) Need to ensure that "predictions" also have language mask
