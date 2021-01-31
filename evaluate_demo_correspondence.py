@@ -296,7 +296,6 @@ if __name__ == '__main__':
             example_action_row, example_action_stack, _ = example_demo.get_action(workspace_limits,
                     action, k, stack_trainer=stack_trainer, row_trainer=row_trainer, use_hist=args.depth_channels_history)
 
-            # TODO(adit98) add depth_channels_history options here
             # get imitation heightmaps
             if args.task_type == 'unstack':
                 if action == 'grasp':
@@ -325,13 +324,13 @@ if __name__ == '__main__':
 
             # get stack features if stack_trainer is provided
             if stack_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color, im_depth,
                         is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
 
             # get row features if row_trainer is provided
             if row_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 row_push, row_grasp, row_place = row_trainer.forward(im_color, im_depth,
                         is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
 
