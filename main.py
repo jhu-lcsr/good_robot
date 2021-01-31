@@ -1546,8 +1546,10 @@ def main(args):
 
         print('Trainer iteration: %d complete' % int(trainer.iteration))
         if use_demo:
-            stack_trainer.iteration += 1
-            row_trainer.iteration += 1
+            if stack_trainer is not None:
+                stack_trainer.iteration += 1
+            if row_trainer is not None:
+                row_trainer.iteration += 1
 
         else:
             trainer.iteration += 1
