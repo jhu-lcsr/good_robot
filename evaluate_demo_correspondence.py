@@ -173,16 +173,20 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, pr
 
             # reshape to 224x224 (or whatever image size is), and color
             prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
-            prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
+            prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8),
+                    cv2.COLORMAP_JET)
 
             # if this is the correct rotation, draw circle on action coord
             if rotate_idx == best_pix_ind[0]:
                 # need to flip best_pix_ind row and col since cv2.circle reads this as (x, y)
-                prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]), int(best_pix_ind[1])), 7, (221,211,238), 2)
+                prediction_vis = cv2.circle(prediction_vis, (int(best_pix_ind[2]),
+                    int(best_pix_ind[1])), 7, (221,211,238), 2)
 
             # rotate probability map and image to gripper rotation
-            prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
-            background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations), reshape=False, order=0).astype(np.uint8)
+            prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations),
+                    reshape=False, order=0).astype(np.uint8)
+            background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations),
+                    reshape=False, order=0).astype(np.uint8)
 
             # blend image and colorized probability heatmap
             prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
@@ -347,6 +351,7 @@ if __name__ == '__main__':
                 if row_trainer is not None:
                     row_preds = row_place.filled(0.0)
 
+            print("Evaluating l2 distance for stack height:", k)
             # evaluate l2 distance based action mask
             im_mask, match_ind = evaluate_l2_mask(preds=[row_preds, stack_preds],
                     example_actions=[example_action_row, example_action_stack],
