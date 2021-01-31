@@ -9,6 +9,7 @@ from utils import ACTION_TO_ID
 from trainer import Trainer
 from demo import Demonstration
 
+# TODO(adit98) move this to utils and refactor
 # function to evaluate l2 distance and generate demo-signal mask
 def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None):
     # TODO(adit98) modify normalize to do L2 normalization (makes more sense for later steps taking inner product similarity)

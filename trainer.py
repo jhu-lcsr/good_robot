@@ -587,7 +587,6 @@ class Trainer(object):
             # TODO(zhe) The common_sense_action_space function must also use the language mask, or we can implement a seperate function.
             # process feature masks if we need to return feature masks and final preds
 
-            # TODO(adit98) see if this should be uncommented (masking demo features)
             if keep_action_feat and not use_demo:
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:

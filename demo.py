@@ -153,11 +153,19 @@ class Demonstration():
             stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
                     valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
 
+            # fill all masked arrays (convert to regular np arrays)
+            stack_push, stack_grasp, stack_place = stack_push.filled(0.0), \
+                    stack_grasp.filled(0.0), stack_place.filled(0.0)
+
         # get row features if row_trainer is provided
         if row_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
                     valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+
+            # fill all masked arrays (convert to regular np arrays)
+            row_push, row_grasp, row_place = row_push.filled(0.0), \
+                    row_grasp.filled(0.0), row_place.filled(0.0)
 
         # get demo action index vector
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
@@ -167,32 +175,31 @@ class Demonstration():
 
         # convert robot coordinates to pixel
         workspace_pixel_offset = workspace_limits[:2, 0] * -1 * 1000
-        best_action_rc = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
-
-        # need to swap row and column coordinates for best_action_xy
-        best_action_xy = [best_action_rc[1], best_action_rc[0]]
+        best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
 
         # initialize best actions for stacking and row making
         best_action_stack, best_action_row = None, None
 
         # index predictions to obtain best action
         if primitive_action == 'grasp':
+            # NOTE that we swap the order that the best_action_xy coordinates are passed in since
+            # the NN output expects (theta, :, y, x)
             if stack_trainer is not None:
-                best_action_stack = stack_grasp[best_rot_ind, :, best_action_xy[0],
-                        best_action_xy[1]]
+                best_action_stack = stack_grasp[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
 
             if row_trainer is not None:
-                best_action_row = row_grasp[best_rot_ind, :, best_action_xy[0],
-                        best_action_xy[1]]
+                best_action_row = row_grasp[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
 
         elif primitive_action == 'place':
             if stack_trainer is not None:
-                best_action_stack = stack_place[best_rot_ind, :, best_action_xy[0],
-                        best_action_xy[1]]
+                best_action_stack = stack_place[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
 
             if row_trainer is not None:
-                best_action_row = row_place[best_rot_ind, :, best_action_xy[0],
-                        best_action_xy[1]]
+                best_action_row = row_place[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
 
         # return best action for row and stack (None if only using 1 or the other) and action
         return best_action_row, best_action_stack, ACTION_TO_ID[primitive_action]
