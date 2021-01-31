@@ -592,9 +592,13 @@ def main(args):
                             else:
                                 preds = [grasp_feat_row.filled(0.0), None]
 
+                    print("main.py: running demo.get_action for stack height",
+                            nonlocal_variables['stack_height'], "and primitive action",
+                            nonlocal_variables['primitive_action'])
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
                                     nonlocal_variables['stack_height'], stack_trainer, row_trainer)
+
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
                 else:
@@ -1622,7 +1626,6 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
     return best_dict, prev_best_dict, current_dict
 
-
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
     """ Detect changes
 
@@ -1973,8 +1976,7 @@ def ablation(args):
     args_run_one.common_sense = True
 
 
-if __name__ == '__main__':
-
+if __name__ == '__main__': 
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
     matplotlib.use('Agg')
 

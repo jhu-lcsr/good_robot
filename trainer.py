@@ -588,10 +588,13 @@ class Trainer(object):
             # process feature masks if we need to return feature masks and final preds
 
             if keep_action_feat and not use_demo:
+                # TODO(adit98) add if place condition here
                 # only mask action feature maps from robot obs if demo_mask is set
                 if demo_mask:
-                    push_feat, grasp_feat, place_feat = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                    push_feat, grasp_feat, masked_place_feat = utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
                             push_feat, grasp_feat, place_feat, self.place_dilation, self.show_heightmap, color_heightmap)
+                    place_feat = np.ma.masked_array(place_feat)
+
                 else:
                     push_feat = np.ma.masked_array(push_feat)
                     grasp_feat = np.ma.masked_array(grasp_feat)
@@ -629,7 +632,12 @@ class Trainer(object):
 
         # return components depending on flags
         if keep_action_feat and not use_demo:
-            return push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+            if place_common_sense:
+                return push_feat, grasp_feat, masked_place_feat, push_predictions, \
+                        grasp_predictions, masked_place_predictions, state_feat, output_prob
+            else:
+                return push_feat, grasp_feat, place_feat, push_predictions, \
+                        grasp_predictions, place_predictions, state_feat, output_prob
 
         elif use_demo:
             if self.place_common_sense:

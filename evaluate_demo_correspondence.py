@@ -143,9 +143,9 @@ def evaluate_l2_mask(preds, example_actions, demo_hist=None, execution_hist=None
         # get best_matches from both row and stack distances
         l2_dist = np.minimum(row_dist, stack_dist)
 
-    # make l2_dist >=0 and sum-normalize
+    # make l2_dist >=0 and max_normalize
     l2_dist = l2_dist - np.min(l2_dist)
-    l2_dist = l2_dist / np.sum(l2_dist)
+    l2_dist = l2_dist / np.max(l2_dist)
 
     # invert values of l2_dist so that large values indicate correspondence
     im_mask = (1 - l2_dist)
@@ -298,7 +298,8 @@ if __name__ == '__main__':
         for action in ['grasp', 'place']:
             # get action embeddings from example demo
             example_action_row, example_action_stack, _ = example_demo.get_action(workspace_limits,
-                    action, k, stack_trainer=stack_trainer, row_trainer=row_trainer, use_hist=args.depth_channels_history)
+                    action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
+                    use_hist=args.depth_channels_history)
 
             # get imitation heightmaps
             if args.task_type == 'unstack':
