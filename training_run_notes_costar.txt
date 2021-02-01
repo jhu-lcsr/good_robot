@@ -1819,9 +1819,7 @@ Maybe had a bad step? this doesn't match past efficientnet runs. May need to re-
 
 
 
-
-
-DEPTH CHANNEL HISTORY, EFFICIENTNET - SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-12-27
+DEPTH CHANNEL HISTORY, EFFICIENTNET - SIM ROW - Task Progress SPOT-Q MASKED - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-01-09
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --save_visualizations --check_row --tcp_port 19998 --place --future_reward_discount 0.65 --max_train_actions 40000 --random_actions --common_sense --depth_channels_history --nn efficientnet --num_dilation 1
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-01-09-11-53-31_Sim-Rows-Two-Step-Reward-Masked-Training                         
@@ -1852,7 +1850,7 @@ GPU 1, Tab 1, port 19998, left v-rep window, v-rep tab 8
 
 
 
-DEPTH CHANNEL HISTORY, EFFICIENTNET - SIM STACK - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-12-05
+DEPTH CHANNEL HISTORY, EFFICIENTNET - SIM STACK - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - TRIAL REWARD - FULL FEATURED RUN - SORT TRIAL REWARD - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-01-09
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 40000 --random_actions --depth_channels_history --nn efficientnet --num_dilation 1
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-01-09-12-02-05_Sim-Stack-SPOT-Trial-Reward-Masked-Training
@@ -1880,3 +1878,14 @@ GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
     > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-01-09-12-02-05_Sim-Stack-SPOT-Trial-Reward-Masked-Training
     > Training results:
     >  {'trial_success_rate_best_value': 0.9459459459459459, 'trial_success_rate_best_index': 29701, 'grasp_success_rate_best_value': 0.9609375, 'grasp_success_rate_best_index': 30730, 'place_success_rate_best_value': 0.9401709401709402, 'place_success_rate_best_index': 28296, 'action_efficiency_best_value': 1.752, 'action_efficiency_best_index': 12895}
+
+
+
+
+
+DEPTH CHANNEL HISTORY, EFFICIENTNET, PUSHING AND GRASPING WITH ALL FEATURES & SAVE ALL MODELS ACCORDING TO BEST STATS  - costar 2021-01-21
+--------------------------------------
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/toys --num_obj 10 --push_rewards --experience_replay --explore_rate_decay --common_sense --trial_reward --save_visualizations --future_reward_discount 0.65  --tcp_port 19990 --random_actions --depth_channels_history --max_train_actions 20000 --nn efficientnet --num_dilation 1
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-01-21-15-59-44_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training
+Commit: 0094dce46d68927f57869f7ba0a75122c5423a64
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 
