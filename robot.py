@@ -2286,7 +2286,7 @@ class Robot(object):
                 # if we have a stack of 3 or higher, need lowest block to check row
                 if len(nearby_obj) > 2:
                     # sort nearby_obj by z height, append lowest block
-                block_indices.append(nearby_obj[np.argmin(pos[nearby_obj], axis=-1)].item())
+                    block_indices.append(nearby_obj[np.argmin(pos[nearby_obj], axis=-1)].item())
 
                 else:
                     block_indices.append(nearby_obj[0].item())
