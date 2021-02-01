@@ -331,13 +331,13 @@ if __name__ == '__main__':
             if stack_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color, im_depth,
-                        is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
+                        is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
 
             # get row features if row_trainer is provided
             if row_trainer is not None:
                 # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 row_push, row_grasp, row_place = row_trainer.forward(im_color, im_depth,
-                        is_volatile=True, keep_action_feat=True, use_demo=True, demo_mask=True)
+                        is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
 
             # TODO(adit98) add logic for pushing here
             if action == 'grasp':
