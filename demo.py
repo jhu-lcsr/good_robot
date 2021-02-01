@@ -153,7 +153,7 @@ class Demonstration():
         if stack_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             stack_push, stack_grasp, stack_place = stack_push.filled(0.0), \
@@ -163,7 +163,7 @@ class Demonstration():
         if row_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True, use_demo=True)
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             row_push, row_grasp, row_place = row_push.filled(0.0), \

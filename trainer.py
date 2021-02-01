@@ -504,7 +504,7 @@ class Trainer(object):
         output_prob, state_feat, output_prob_feat = self.model.forward(input_color_data, input_depth_data,
                 is_volatile, specific_rotation, goal_condition=goal_condition, keep_action_feat=keep_action_feat, use_demo=use_demo)
 
-        # TODO(adit98) remove this part if it no longer makes sense
+        # TODO(adit98) remove this part and deprecate use_demo option
         # if we are keeping action feat, no softmax
         if keep_action_feat and use_demo:
             softmax = nn.Identity()
