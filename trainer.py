@@ -521,10 +521,10 @@ class Trainer(object):
                     if keep_action_feat and not use_demo:
                         push_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                        grasp_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                        grasp_feat = output_prob_feat[rotate_idx][1].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                         if self.place:
-                            place_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                            place_feat = output_prob_feat[rotate_idx][2].cpu().data.numpy()[:,:,int(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                     int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
 
                     push_predictions = softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]
@@ -535,17 +535,16 @@ class Trainer(object):
                     if keep_action_feat and not use_demo:
                         push_feat = np.concatenate((push_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][1].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                         if self.place:
-                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][2].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                     int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
 
                     push_predictions = np.concatenate((push_predictions, softmax(output_prob[rotate_idx][0], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     grasp_predictions = np.concatenate((grasp_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                     if self.place:
-                        # TODO(zhe) Shouldn't the following line be using output_prob[rotate_idx][2]?
-                        place_predictions = np.concatenate((place_predictions, softmax(output_prob[rotate_idx][1], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
+                        place_predictions = np.concatenate((place_predictions, softmax(output_prob[rotate_idx][2], dim=1).cpu().data.numpy()[:,channel_ind,(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2),(padding_width/2):(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
 
         elif self.method == 'reinforcement':
             # Return Q values (and remove extra padding)
@@ -553,10 +552,10 @@ class Trainer(object):
                 if rotate_idx == 0:
                     if keep_action_feat and not use_demo:
                         push_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
-                        grasp_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                        grasp_feat = output_prob_feat[rotate_idx][1].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
                         if self.place:
-                            place_feat = output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                            place_feat = output_prob_feat[rotate_idx][2].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                     int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
 
                     push_predictions = output_prob[rotate_idx][0].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]
@@ -567,10 +566,10 @@ class Trainer(object):
                     if keep_action_feat and not use_demo:
                         push_feat = np.concatenate((push_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
-                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                        grasp_feat = np.concatenate((grasp_feat, output_prob_feat[rotate_idx][1].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                 int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
                         if self.place:
-                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][0].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
+                            place_feat = np.concatenate((place_feat, output_prob_feat[rotate_idx][2].cpu().data.numpy()[:,:,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),
                                     int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
 
                     push_predictions = np.concatenate((push_predictions, output_prob[rotate_idx][0].cpu().data.numpy()[:,channel_ind,int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2),int(padding_width/2):int(color_heightmap_2x.shape[0]/2 - padding_width/2)]), axis=0)
@@ -632,7 +631,7 @@ class Trainer(object):
 
         # return components depending on flags
         if keep_action_feat and not use_demo:
-            if place_common_sense:
+            if self.place_common_sense:
                 return push_feat, grasp_feat, masked_place_feat, push_predictions, \
                         grasp_predictions, masked_place_predictions, state_feat, output_prob
             else:
@@ -643,7 +642,7 @@ class Trainer(object):
             if self.place_common_sense:
                 return push_predictions, grasp_predictions, masked_place_predictions
             else:
-                return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
+                return push_predictions, grasp_predictions, place_predictions
 
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.apply_language_mask:
