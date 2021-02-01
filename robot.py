@@ -2263,8 +2263,16 @@ class Robot(object):
         if len(nearby_obj) > 1:
             # we have at least 1 stack
             num_stacks += 1
+
             first_stack_ind = high_idx
-            block_indices.append(nearby_obj[0].item())
+
+            # if we have a stack of 3 or higher, need lowest block to check row
+            if len(nearby_obj) > 2:
+                # sort nearby_obj by z height, append lowest block
+                block_indices.append(nearby_obj[np.argmin(pos[nearby_obj][:, -1]].item())
+
+            else:
+                block_indices.append(nearby_obj[0].item())
 
             # check for second stack (descending order, stop before block with known height 2)
             for i in range(2, len(pos) - first_stack_ind - 1):
@@ -2275,8 +2283,15 @@ class Robot(object):
                 if len(nearby_obj) <= 1:
                     continue
 
-                # append bottom block to block_indices
-                block_indices.append(nearby_obj[0].item())
+                # if we have a stack of 3 or higher, need lowest block to check row
+                if len(nearby_obj) > 2:
+                    # sort nearby_obj by z height, append lowest block
+                    block_indices.append(nearby_obj[np.argmin(pos[nearby_obj][:, -1]].item())
+
+                else:
+                    block_indices.append(nearby_obj[0].item())
+                    # append bottom block to block_indices
+
                 num_stacks += 1
                 break
 
