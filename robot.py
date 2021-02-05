@@ -2247,83 +2247,56 @@ class Robot(object):
         # sort indices of blocks by z value
         low2high_idx = np.array(pos[:, 2]).argsort()
 
-
         # first check for any stacks
         # NOTE if there isn't a first stack, then all blocks must be on the table so
         # we don't need to check for a second stack
 
-        # store the bottom block index of each stack
-        block_indices = []
+        # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=low2high_idx[-1], return_inds=True)
+        second_stack_inds = None
 
-        # get index of highest block, see if it forms a stack
-        high_idx = low2high_idx[-1]
-        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
-                (stack_dist_thresh / 2))
-
-        if len(nearby_obj) > 1:
+        if stack_height > 1:
             # we have at least 1 stack
             num_stacks += 1
 
-            first_stack_ind = high_idx
+            # iterate through all blocks except blocks in first stack to check for another stack
+            for block_ind in low2high_idx[::-1]:
+                # skip blocks in first stack
+                if block_ind in first_stack_inds: continue
 
-            # if we have a stack of 3 or higher, need lowest block to check row
-            if len(nearby_obj) > 2:
-                # sort nearby_obj by z height, append lowest block
-                print(pos[nearby_obj])
-                print(np.argmin(pos[nearby_obj], axis=-1))
-                print(nearby_obj, nearby_obj.shape)
-                block_indices.append(nearby_obj[np.argmin(pos[nearby_obj], axis=-1)].item())
+                # check for 2nd stack
+                _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
+                        top_idx=block_ind, return_inds=True)
 
-            else:
-                block_indices.append(nearby_obj[0].item())
-
-            # check for second stack (descending order, stop before block with known height 2)
-            for i in range(2, len(pos) - first_stack_ind - 1):
-                high_idx = low2high_idx[-1 * i]
-                nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
-                        axis=1) < (stack_dist_thresh / 2))
-
-                if len(nearby_obj) <= 1:
-                    continue
-
-                # if we have a stack of 3 or higher, need lowest block to check row
-                if len(nearby_obj) > 2:
-                    # sort nearby_obj by z height, append lowest block
-                    block_indices.append(nearby_obj[np.argmin(pos[nearby_obj], axis=-1)].item())
-
-                else:
-                    block_indices.append(nearby_obj[0].item())
-                    # append bottom block to block_indices
-
-                num_stacks += 1
-                break
+                if stack_height > 1:
+                    num_stacks += 1
+                    break
 
         # now check for rows
 
-        # check if we have 2 stacks
-        if len(block_indices) > 1:
-            has_row, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
+        # if we have 2 stacks, check the bottom blocks of each stack
+        if num_stacks == 2:
+            lowest_blocks = np.array([first_stack_inds[0], second_stack_inds[0]])
+            has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                     row_dist_thresh, separation_threshold, None, 1, False)
 
             if has_row:
                 # we have 2 stacks and they form a row (structure is complete)
                 structure_size = 4
-
             else:
-                # NOTE will need to modify this check if we have more than 4 blocks
-                # (possiblity of both a size-3 structure and a stack of 2 blocks)
-                structure_size = 3
+                structure_size = 2
 
-        # if there is only 1 stack, check the other blocks in scene for row
-        elif len(block_indices) == 1:
+        # if we have 1 stack, check bottom block of stack with all other blocks
+        elif num_stacks == 1:
             # structure_size is at least 2
             structure_size = 2
-            for i in range(len(pos)):
-                if low2high_idx[i] == block_indices[0]:
-                    continue
+            lowest_block = first_stack_inds[0]
+            for block_ind in low2high_idx:
+                # skip blocks already in stack
+                if block_ind in first_stack_inds: continue
 
-                block_inds = np.array(block_indices + [low2high_idx[i]])
-                has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+                lowest_blocks = np.array([lowest_block, block_ind])
+                has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                         row_dist_thresh, separation_threshold, None, 1, False)
 
                 if has_row:
@@ -2331,12 +2304,12 @@ class Robot(object):
                     structure_size = 3
                     break
 
-        # if there are no stacks, check for any row
+        # if we have 0 stacks, check all pairs of blocks
         else:
-            for i in range(len(pos)):
-                for j in range(i + 1, len(pos)):
-                    block_inds = np.array([low2high_idx[i], low2high_idx[j]])
-                    has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+            for i in range(len(low2_high_idx)):
+                for j in range(i+1, len(low2high_idx)):
+                    lowest_blocks = np.array([low2high_idx[i], low2high_idx[j]])
+                    has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                             row_dist_thresh, separation_threshold, None, 1, False)
 
                     if has_row:
@@ -2351,6 +2324,29 @@ class Robot(object):
 
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
+
+    def unstacking_partial_success(prev_stack_height, distance_threshold=0.06, top_idx=-1):
+        """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
+
+        # Arguments
+
+        prev_stack_height: height of stack before last action was taken
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+
+        # Returns
+
+        List [success, stack_height].
+        success: will be True if the stack matches the specified order from bottom to top, False otherwise.
+        stack_height: number of blocks in stack
+        """
+
+        # run check stack to get height of stack
+        _, stack_height = self.check_stack(np.ones(4))
+
+        # check if we decreased or maintained last stack height
+        goal_success = (stack_height <= prev_stack_height)
+
+        return goal_success, stack_height
 
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
