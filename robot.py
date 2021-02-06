@@ -2279,22 +2279,15 @@ class Robot(object):
         if stack_height > 1:
             # we have at least 1 stack
             num_stacks += 1
-            print('found first stack')
 
             # iterate through all blocks except blocks in first stack to check for another stack
             for i, block_ind in enumerate(low2high_idx[::-1]):
-                print('block_ind:', block_ind)
-                print('first stack inds:', first_stack_inds)
                 # skip blocks in first stack
                 if block_ind in first_stack_inds:
-                    print('skipping block ind:', block_ind)
                     continue
 
                 # check for 2nd stack (use index of block_ind in low2high_idx)
                 top_idx = len(low2high_idx) - 1 - i
-                #print('i:', i, 'top_idx:', top_idx, 'low2high_idx length:', len(low2high_idx))
-                #print('low2high_pos:', pos[low2high_idx])
-                #print("pos:", pos)
                 _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
                         top_idx=top_idx, pos=pos, return_inds=True)
 
@@ -2326,7 +2319,6 @@ class Robot(object):
                 if block_ind in first_stack_inds: continue
 
                 lowest_blocks = np.array([lowest_block, block_ind]).astype(int)
-                print(lowest_blocks, lowest_blocks.dtype)
                 has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                         row_dist_thresh, separation_threshold, None, 1, False)
 
