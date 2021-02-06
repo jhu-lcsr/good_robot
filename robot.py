@@ -678,6 +678,7 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
+    # TODO(adit98) add unstacking option here (initialize blocks in stack instead of randomly)
     def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None, goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
@@ -842,8 +843,6 @@ class Robot(object):
             return action_log
 
         return True
-
-            # TODO(ahundt) add real robot support for reposition_objects
 
     def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3, median_filter_size=5, color_median_filter_size=5):
         """
@@ -2085,7 +2084,7 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
+    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -2113,7 +2112,11 @@ class Robot(object):
 
         # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
 
-        pos = np.asarray(self.get_obj_positions())
+        # if block positions aren't specified, call get_obj_positions
+        if pos is None:
+            print('regenerating pos')
+            pos = np.asarray(self.get_obj_positions())
+
         # Assume the stack will work out successfully
         # in the end until proven otherwise
         goal_success = True
@@ -2129,9 +2132,12 @@ class Robot(object):
             # low2high_idx = object_z_positions.argsort()
             low2high_idx = np.array(pos[:, 2]).argsort()
             high_idx = low2high_idx[top_idx]
+            print('top_idx:', top_idx, 'high_idx:', high_idx)
             low2high_pos = pos[low2high_idx, :]
             # filter objects closest to the highest block in x, y based on the threshold
-            nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
+            # ordered from low to high, boolean mask array
+            nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1) < \
+                    (distance_threshold/2)
             # print('nearby:', nearby_obj)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
@@ -2156,21 +2162,35 @@ class Robot(object):
         for idx in range(checks):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
+            print('bottom_pos:', bottom_pos, 'top_pos', top_pos, 'idx:', idx, 'object_color_sequence:',
+                    object_color_sequence)
             # Check that Z is higher by at least half the distance threshold
             # print('bottom_pos:', bottom_pos)
             # print('top_pos:', top_pos)
             # print('distance_threshold: ', distance_threshold)
             if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
                 print('check_stack(): not high enough for idx: ' + str(idx))
+                if return_inds:
+                    return False, idx + 1, object_color_sequence
+
                 return False, idx + 1
+
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ', dist)
             if dist > distance_threshold:
                 print('check_stack(): too far apart')
+                if return_inds:
+                    return False, idx + 1, object_color_sequence
+
                 return False, idx + 1
+
         detected_height = min(idx + 2, len(object_color_sequence))
         print('check_stack() current detected stack height: ' + str(detected_height))
+
+        if return_inds:
+            return goal_success, detected_height, object_color_sequence
+
         return goal_success, detected_height
 
     def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
@@ -2220,8 +2240,7 @@ class Robot(object):
         return False
 
     def vertical_square_partial_success(self, current_stack_goal, check_z_height,
-            prev_z_height=None, row_dist_thresh=0.02, separation_threshold=0.1,
-            stack_dist_thresh=0.06):
+            row_dist_thresh=0.02, separation_threshold=0.1, stack_dist_thresh=0.06):
         """
             Checks if the last action was successful.
             NOTE: could be bugs with this, need to use location of last action to be sure
@@ -2252,21 +2271,32 @@ class Robot(object):
         # we don't need to check for a second stack
 
         # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
-        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=low2high_idx[-1], return_inds=True)
+        # top_idx is set to the index of low2high_idx we want to check the stack at
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=-1,
+                distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
         second_stack_inds = None
 
         if stack_height > 1:
             # we have at least 1 stack
             num_stacks += 1
+            print('found first stack')
 
             # iterate through all blocks except blocks in first stack to check for another stack
-            for block_ind in low2high_idx[::-1]:
+            for i, block_ind in enumerate(low2high_idx[::-1]):
+                print('block_ind:', block_ind)
+                print('first stack inds:', first_stack_inds)
                 # skip blocks in first stack
-                if block_ind in first_stack_inds: continue
+                if block_ind in first_stack_inds:
+                    print('skipping block ind:', block_ind)
+                    continue
 
-                # check for 2nd stack
+                # check for 2nd stack (use index of block_ind in low2high_idx)
+                top_idx = len(low2high_idx) - 1 - i
+                #print('i:', i, 'top_idx:', top_idx, 'low2high_idx length:', len(low2high_idx))
+                #print('low2high_pos:', pos[low2high_idx])
+                #print("pos:", pos)
                 _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
-                        top_idx=block_ind, return_inds=True)
+                        top_idx=top_idx, pos=pos, return_inds=True)
 
                 if stack_height > 1:
                     num_stacks += 1
@@ -2276,7 +2306,7 @@ class Robot(object):
 
         # if we have 2 stacks, check the bottom blocks of each stack
         if num_stacks == 2:
-            lowest_blocks = np.array([first_stack_inds[0], second_stack_inds[0]])
+            lowest_blocks = np.array([first_stack_inds[0], second_stack_inds[0]]).astype(int)
             has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                     row_dist_thresh, separation_threshold, None, 1, False)
 
@@ -2295,7 +2325,8 @@ class Robot(object):
                 # skip blocks already in stack
                 if block_ind in first_stack_inds: continue
 
-                lowest_blocks = np.array([lowest_block, block_ind])
+                lowest_blocks = np.array([lowest_block, block_ind]).astype(int)
+                print(lowest_blocks, lowest_blocks.dtype)
                 has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                         row_dist_thresh, separation_threshold, None, 1, False)
 
@@ -2306,9 +2337,9 @@ class Robot(object):
 
         # if we have 0 stacks, check all pairs of blocks
         else:
-            for i in range(len(low2_high_idx)):
+            for i in range(len(low2high_idx)):
                 for j in range(i+1, len(low2high_idx)):
-                    lowest_blocks = np.array([low2high_idx[i], low2high_idx[j]])
+                    lowest_blocks = np.array([low2high_idx[i], low2high_idx[j]]).astype(int)
                     has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                             row_dist_thresh, separation_threshold, None, 1, False)
 

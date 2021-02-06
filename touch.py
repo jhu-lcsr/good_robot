@@ -217,6 +217,7 @@ class HumanControlOfRobot(object):
         state_str = 'Current action: ' + str(self.action) + '. '
         state_str += 'Grasp, HOLD, PLACE object task, ' if self.robot.place_task else 'Grasp then drop in box task, '
         state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
+        print(self.robot.vertical_square_partial_success(np.ones(4), False))
         print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
