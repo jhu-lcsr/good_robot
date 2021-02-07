@@ -863,6 +863,10 @@ class Trainer(object):
             self.optimizer.step()
 
         elif self.method == 'reinforcement':
+            # TODO(adit98) figure out backprop for use_demo
+            if use_demo:
+                raise NotImplementedError
+
             self.optimizer.zero_grad()
             # Compute labels
             label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))
@@ -891,10 +895,12 @@ class Trainer(object):
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
 
+                # TODO(adit98) figure out common sense backprop for use_demo
                 if use_demo:
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
                             demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
                                     grasp_predictions, place_predictions)
+                    raise NotImplementedError
                 else:
                     new_best_pix_ind, each_action_max_coordinate, predicted_value = \
                             action_space_argmax(primitive_action, push_predictions,

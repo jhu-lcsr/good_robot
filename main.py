@@ -444,7 +444,18 @@ def main(args):
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.vertical_square_partial_success(current_stack_goal,
                                 check_z_height=check_z_height)
+            elif task_type == 'unstacking':
+                # NOTE(adit98) set up structure size as # of blocks removed from stack (0, 1, 2, 3)
+                raise NotImplementedError
             else:
+                raise NotImplementedError
+
+        elif task_type is not None:
+            if task_type == 'vertical_square':
+                stack_matches_goal, nonlocal_variables['stack_height'] = \
+                        robot.vertical_square_partial_success(current_stack_goal,
+                                check_z_height=check_z_height)
+            elif task_type == 'unstacking':
                 raise NotImplementedError
 
         elif check_row:
@@ -851,6 +862,8 @@ def main(args):
 
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
+                    # TODO(adit98) set over_block when calling demo.get_action()
+                    # NOTE we always assume we are placing over a block when using imitation mode
                     nonlocal_variables['place_success'] = robot.place(primitive_position,
                             best_rotation_angle, over_block=not check_row)
 
@@ -862,7 +875,8 @@ def main(args):
                             use_imitation=use_demo, task_type=task_type)
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
-                             (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
+                             (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
+                             (use_demo and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
@@ -1975,8 +1989,7 @@ def ablation(args):
     # SPOT, masking, FULL FEATURED RUN
     args_run_one.common_sense = True
 
-
-if __name__ == '__main__': 
+if __name__ == '__main__':
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
     matplotlib.use('Agg')
 
@@ -2031,6 +2044,7 @@ if __name__ == '__main__':
     parser.add_argument('--random_actions', dest='random_actions', action='store_true', default=False,                              help='By default we select both the action type randomly, like push or place, enabling random_actions will ensure the action x, y, theta is also selected randomly from the allowed regions.')
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
     parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
+    parser.add_argument('--task_type', dest='task_type', type=str, default=None)
 
     # TODO(zhe) Added command line argument to use the static language mask
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
@@ -2056,7 +2070,6 @@ if __name__ == '__main__':
     parser.add_argument('--save_visualizations', dest='save_visualizations', action='store_true', default=False,          help='save visualizations of FCN predictions? Costs about 0.6 seconds per action.')
     parser.add_argument('--plot_window', dest='plot_window', type=int, action='store', default=500,                       help='Size of action time window to use when plotting current training progress. The testing mode window is set automatically.')
     parser.add_argument('--demo_path', dest='demo_path', type=str, default=None)
-    parser.add_argument('--task_type', dest='task_type', type=str, default=None)
 
     # Parse args
     args = parser.parse_args()

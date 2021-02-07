@@ -1816,7 +1816,6 @@ class Robot(object):
                 self.place_pose_history.pop(0)
 
         if self.is_sim:
-
             # Ensure gripper is closed
             gripper_fully_closed = self.close_gripper()
             if gripper_fully_closed:
