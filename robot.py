@@ -2132,7 +2132,6 @@ class Robot(object):
             # low2high_idx = object_z_positions.argsort()
             low2high_idx = np.array(pos[:, 2]).argsort()
             high_idx = low2high_idx[top_idx]
-            print('top_idx:', top_idx, 'high_idx:', high_idx)
             low2high_pos = pos[low2high_idx, :]
             # filter objects closest to the highest block in x, y based on the threshold
             # ordered from low to high, boolean mask array
@@ -2146,6 +2145,7 @@ class Robot(object):
                 print('check_stack() False, not enough nearby objects for a successful stack! ' \
                         'expected at least ' + str(num_obj) + ' nearby objects, but only counted: ' + \
                         str(len(object_color_sequence)))
+                print(np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1))
                 # there aren't enough nearby objects for a successful stack!
                 checks = len(object_color_sequence) - 1
                 # We know the goal won't be met, so goal_success is False
@@ -2162,8 +2162,6 @@ class Robot(object):
         for idx in range(checks):
             bottom_pos = pos[object_color_sequence[idx]]
             top_pos = pos[object_color_sequence[idx+1]]
-            print('bottom_pos:', bottom_pos, 'top_pos', top_pos, 'idx:', idx, 'object_color_sequence:',
-                    object_color_sequence)
             # Check that Z is higher by at least half the distance threshold
             # print('bottom_pos:', bottom_pos)
             # print('top_pos:', top_pos)
@@ -2266,13 +2264,19 @@ class Robot(object):
         # sort indices of blocks by z value
         low2high_idx = np.array(pos[:, 2]).argsort()
 
+        # check if we are currently holding a block, then we need to use -2 for top_idx
+        if pos[low2high_idx[-1], 2] > 0.2:
+            top_idx = -2
+        else:
+            top_idx = -1
+
         # first check for any stacks
         # NOTE if there isn't a first stack, then all blocks must be on the table so
         # we don't need to check for a second stack
 
         # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
         # top_idx is set to the index of low2high_idx we want to check the stack at
-        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=-1,
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=top_idx,
                 distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
         second_stack_inds = None
 
@@ -2363,8 +2367,12 @@ class Robot(object):
         stack_height: number of blocks in stack
         """
 
+        # check if we are currently holding a block, then we need to use -2 for top_idx
+        if pos[low2high_idx[-1], 2] > 0.2:
+            top_idx = -2
+
         # run check stack to get height of stack
-        _, stack_height = self.check_stack(np.ones(4))
+        _, stack_height = self.check_stack(np.ones(4), top_idx=top_idx)
 
         # check if we decreased or maintained last stack height
         goal_success = (stack_height <= prev_stack_height)
