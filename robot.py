@@ -779,7 +779,7 @@ class Robot(object):
                             # reposition object as (x,y) position of first block, set z pos depending on stack height
                             # same orientation (TODO(adit98) add noise later?)
                             obj_pos[-1] = i * 0.06 + 0.05
-                            reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
+                            self.reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
                             time.sleep(0.5)
 
                         # continue to retry until we have a successful stack of 4 blocks
