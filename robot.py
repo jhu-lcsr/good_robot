@@ -783,7 +783,7 @@ class Robot(object):
                             time.sleep(0.5)
 
                         # continue to retry until we have a successful stack of 4 blocks
-                        successful_stack, stack_height = self.check_stack(len(self.object_handles))
+                        successful_stack, stack_height = self.check_stack(np.ones(len(self.object_handles)))
                         if stack_height >= len(self.object_handles):
                             successful_stack = True
 
