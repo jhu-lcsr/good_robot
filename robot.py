@@ -109,7 +109,8 @@ class Robot(object):
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None,
                  place=False, grasp_color_task=False, real_gripper_ip='192.168.1.11', calibrate=False,
-                 unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
+                 unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1,
+                 textured=False, task_type=None):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -148,6 +149,9 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+
+        # task type (defaults to None)
+        self.task_type = task_type
 
         # If in simulation...
         if self.is_sim:
@@ -2370,7 +2374,7 @@ class Robot(object):
     def restart_real(self):
         # reset objects for stacking
         if self.place_task:
-            return self.reposition_objects()
+            return self.reposition_objects(task_type=self.task_type)
 
         # reset objects for pushing and grasping
         # position just over the box to dump

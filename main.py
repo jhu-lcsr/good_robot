@@ -214,7 +214,8 @@ def main(args):
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, None,
-                  place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
+                  place, grasp_color_task, unstack=unstack,
+                  heightmap_resolution=heightmap_resolution, task_type=task_type)
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
@@ -496,7 +497,7 @@ def main(args):
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.reposition_objects()
+                robot.reposition_objects(task_type=task_type)
                 nonlocal_variables['stack'].reset_sequence()
                 nonlocal_variables['stack'].next()
                 # We needed to reset, so the stack must have been knocked over!
@@ -783,7 +784,7 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                robot.reposition_objects()
+                                robot.reposition_objects(task_type=task_type)
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
                                     nonlocal_variables['stack'].reset_sequence()
@@ -848,7 +849,7 @@ def main(args):
                                 successful_color_grasp_count += 1
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
-                                robot.reposition_objects()
+                                robot.reposition_objects(task_type=task_type)
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
@@ -898,7 +899,7 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
+                            robot.reposition_objects(task_type=task_type)
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -1494,7 +1495,7 @@ def main(args):
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.check_sim()
-                if not robot.reposition_objects():
+                if not robot.reposition_objects(task_type=task_type):
                     # This can happen if objects are in impossible positions (NaN),
                     # so set the variable to immediately and completely restart
                     # the simulation below.
