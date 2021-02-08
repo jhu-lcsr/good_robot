@@ -446,8 +446,11 @@ def main(args):
                         robot.vertical_square_partial_success(current_stack_goal,
                                 check_z_height=check_z_height)
             elif task_type == 'unstacking':
-                # NOTE(adit98) set up structure size as # of blocks removed from stack (0, 1, 2, 3)
-                raise NotImplementedError
+                # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
+                stack_matches_goal, nonlocal_variables['stack_height'] = \
+                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'],
+                                check_z_height=check_z_height)
+
             else:
                 raise NotImplementedError
 
@@ -497,7 +500,7 @@ def main(args):
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.reposition_objects(task_type=task_type)
+                robot.reposition_objects()
                 nonlocal_variables['stack'].reset_sequence()
                 nonlocal_variables['stack'].next()
                 # We needed to reset, so the stack must have been knocked over!
@@ -784,7 +787,7 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                robot.reposition_objects(task_type=task_type)
+                                robot.reposition_objects()
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
                                     nonlocal_variables['stack'].reset_sequence()
@@ -849,7 +852,7 @@ def main(args):
                                 successful_color_grasp_count += 1
                             if not place:
                                 # reposition the objects if we aren't also attempting to place correctly.
-                                robot.reposition_objects(task_type=task_type)
+                                robot.reposition_objects()
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
@@ -878,6 +881,11 @@ def main(args):
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
                              (use_demo and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
+
+                        # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table
+                        if use_demo:
+                            nonlocal_variables['place_success'] = True
+
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
@@ -899,7 +907,7 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects(task_type=task_type)
+                            robot.reposition_objects()
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -1495,7 +1503,7 @@ def main(args):
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                 robot.check_sim()
-                if not robot.reposition_objects(task_type=task_type):
+                if not robot.reposition_objects():
                     # This can happen if objects are in impossible positions (NaN),
                     # so set the variable to immediately and completely restart
                     # the simulation below.

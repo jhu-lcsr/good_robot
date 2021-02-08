@@ -521,6 +521,9 @@ class Robot(object):
         self.prev_obj_positions = []
         self.obj_positions = []
 
+        # now reposition objects if we are unstacking
+        if self.task_type == 'unstacking':
+            self.reposition_objects()
 
     def restart_sim(self, connect=False):
         if connect:
@@ -684,7 +687,7 @@ class Robot(object):
         return primitive_position, push_may_contact_something
 
     def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None,
-            goal_condition=None, workspace_limits=None, task_type=None):
+            goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -759,7 +762,7 @@ class Robot(object):
                 # time.sleep(1)
 
                 # if not unstacking, place all objects randomly
-                if task_type is None or task_type != 'unstacking':
+                if self.task_type is None or self.task_type != 'unstacking':
                     for object_handle in self.object_handles:
                         # Drop object at random x,y location and random orientation in robot workspace
                         self.reposition_object_randomly(object_handle)
@@ -2296,7 +2299,7 @@ class Robot(object):
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
 
-    def unstacking_partial_success(prev_stack_height, distance_threshold=0.06, top_idx=-1):
+    def unstacking_partial_success(prev_structure_progress, distance_threshold=0.06, top_idx=-1):
         """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
 
         # Arguments
@@ -2318,8 +2321,11 @@ class Robot(object):
         # run check stack to get height of stack
         _, stack_height = self.check_stack(np.ones(4), top_idx=top_idx)
 
+        # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
+        structure_progress = 5 - stack_height
+
         # check if we decreased or maintained last stack height
-        goal_success = (stack_height <= prev_stack_height)
+        goal_success = (structure_progress >= prev_structure_progress)
 
         return goal_success, stack_height
 
@@ -2374,7 +2380,7 @@ class Robot(object):
     def restart_real(self):
         # reset objects for stacking
         if self.place_task:
-            return self.reposition_objects(task_type=self.task_type)
+            return self.reposition_objects()
 
         # reset objects for pushing and grasping
         # position just over the box to dump
