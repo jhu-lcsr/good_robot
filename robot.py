@@ -107,8 +107,9 @@ class Robot(object):
     """
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
-                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None,
+                 place=False, grasp_color_task=False, real_gripper_ip='192.168.1.11', calibrate=False,
+                 unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -408,6 +409,7 @@ class Robot(object):
         vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
+        return object_position, object_orientation
 
     def reposition_object_at_list_index_randomly(self, list_index):
         object_handle = self.object_handles[list_index]
@@ -418,7 +420,6 @@ class Robot(object):
         """ Reposition the object to a specified position and orientation """
         object_handle = self.object_handles[index]
         success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
-        
         vrep.simxSetObjectPosition(self.sim_client, object_handle, plane_handle, obj_pos, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, plane_handle, obj_ori, vrep.simx_opmode_blocking)
 
@@ -678,8 +679,8 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    # TODO(adit98) add unstacking option here (initialize blocks in stack instead of randomly)
-    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None, goal_condition=None, workspace_limits=None):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None,
+            goal_condition=None, workspace_limits=None, task_type=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -695,12 +696,11 @@ class Robot(object):
 
                 print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
 
-
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
-            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot. 
-            place_pose_history.append(place_pose_history[-1])  
+            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
+            place_pose_history.append(place_pose_history[-1])
 
             holding_object = not(self.close_gripper())
             # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
@@ -713,136 +713,77 @@ class Robot(object):
             else:
                 self.open_gripper()
 
-            # go to x,y position of previous places and pick up the z height from the depthmap (top of the stack)
-            for ind in range(len(place_pose_history)):
-                x, y, z, angle = place_pose_history[ind]
+            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+            for pose in place_pose_history:
+                x, y, z, angle = pose
 
-                # TODO(adit98) need to find a way to make sure this picks up block
-                # keep grasping until stack height decreases
-                while 1:
-                    # data before grasp
-                    grasp_depth, grasp_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-                    _, z_height = self.check_stack(np.arange(4))
+                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
-                    # get depth_heightmap pixel_coordinates of where the previous place was
-                    x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                    x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+                # get depth_heightmap pixel_coordinates of where the previous place was
+                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
 
-                    y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                    y_pixel = min(y_pixel, 223)
+                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                y_pixel = min(y_pixel, 223)
 
-                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', grasp_depth)
+                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
 
-                    # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
-                    # plus an offset. There
-                    z = primitive_position[2]
+                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                # plus an offset. There
+                z = primitive_position[2]
 
-                    # execute grasp action
-                    grasp_success, color_success = self.grasp([x, y, z], angle)
-
-                    # data before place
-                    place_depth, place_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-                    _, z_height = self.check_stack(np.arange(4))
-
-                    # move on if z_height has decreased
-                    print("Z height", z_height, "stack height", stack_height)
-                    if z_height < stack_height or z_height == 1: break
-
-                # log (run forward pass and save embeddings)
-                # assume if demo is given, trainer, logger are also given
-                if demo is not None:
-                    # run forward pass on grasp heightmaps, keep action features and get softmax predictions
-                    push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(grasp_color,
-                                grasp_depth, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
-                    action_feat = [push_feat, grasp_feat, place_feat]
-
-                    # get demo action
-                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                            'grasp', stack_height)
-
-                    # log action vector from embedding
-                    trainer.im_action_log.append(im_action)
-                    trainer.im_action_embed_log.append(im_action_embedding)
-                    trainer.executed_action_log.append([utils.ACTION_TO_ID['grasp'], x, y, z])
-                    trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['grasp']].filled(fill_value=0))
-
-                    # write demo related stuff
-                    logger.write_to_log('im_action', trainer.im_action_log)
-                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log,
-                            pickle=True)
-                    logger.write_to_log('executed-action', trainer.executed_action_log)
-                    logger.write_to_log('executed-action-embed',
-                            trainer.executed_action_embed_log, pickle=True)
-
-                    # save images
-                    #logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
-                    logger.save_heightmaps(stack_height, grasp_color, grasp_depth, 'grasp_unstack')
-
-                    # run forward pass for place and save embeddings
-                    push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(place_color,
-                                place_depth, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
-                    action_feat = [push_feat, grasp_feat, place_feat]
-
-                    # get demo action
-                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                            'place', stack_height)
-
-                    # TODO(adit98) log action vector from embedding
-                    # don't really need to store im_action since they *SHOULD* line up
-                    trainer.im_action_log.append(im_action)
-                    trainer.im_action_embed_log.append(im_action_embedding)
-                    trainer.executed_action_log.append([utils.ACTION_TO_ID['place'], x, y, z])
-                    trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['place']].filled(fill_value=0))
-
-                    # TODO(adit98) find best spot for this (write demo related stuff)
-                    logger.write_to_log('im_action', trainer.im_action_log)
-                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
-                    logger.write_to_log('executed-action', trainer.executed_action_log)
-                    logger.write_to_log('executed-action-embed',
-                            trainer.executed_action_embed_log, pickle=True)
-
-                    # save images
-                    #logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
-                    logger.save_heightmaps(stack_height, place_color, place_depth, 'place_unstack')
-
-                # place block if grasp was successful
+                grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
-                    # generate place action randomly
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle, save_history=False)
 
-                # stack height has decreased
-                stack_height = z_height
-
             # clear the place hisory after unstacking
             self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
 
-        if self.is_sim:
-            # Move gripper out of the way to the home position
-            success = self.go_home()
-            if not success:
-                return success
-            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-            # time.sleep(1)
+        else:
+            if self.is_sim:
+                # Move gripper out of the way to the home position
+                success = self.go_home()
+                if not success:
+                    return success
+                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+                # time.sleep(1)
 
-            for object_handle in self.object_handles:
-                # Drop object at random x,y location and random orientation in robot workspace
-                self.reposition_object_randomly(object_handle)
+                # if not unstacking, place all objects randomly
+                if task_type is None or task_type != 'unstacking':
+                    for object_handle in self.object_handles:
+                        # Drop object at random x,y location and random orientation in robot workspace
+                        self.reposition_object_randomly(object_handle)
+                        time.sleep(0.5)
+
+                # if unstacking, need to create a stack at a random location
+                else:
+                    successful_stack = False
+                    while not successful_stack:
+                        obj_pos, obj_ori = self.reposition_object_randomly(self.object_handles[0])
+
+                        # iterate through remaining object handles and place them on top of existing stack
+                        for i in range(1, len(self.object_handles)):
+                            # reposition object as (x,y) position of first block, set z pos depending on stack height
+                            # same orientation (TODO(adit98) add noise later?)
+                            obj_pos[-1] = i * 0.06 + 0.05
+                            reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
+                            time.sleep(0.5)
+
+                        # continue to retry until we have a successful stack of 4 blocks
+                        successful_stack, stack_height = self.check_stack(len(self.object_handles))
+                        if stack_height >= len(self.object_handles):
+                            successful_stack = True
+
+                # an extra half second so things settle down
                 time.sleep(0.5)
 
-            # an extra half second so things settle down
-            time.sleep(0.5)
-
-        if action_log is not None:
-            # return action log
-            return action_log
-
-        return True
+                return True
 
     def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3, median_filter_size=5, color_median_filter_size=5):
         """
