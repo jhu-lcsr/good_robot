@@ -180,8 +180,8 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
 
     if push_length > 0.0:
         # For push, skip regions where the gripper would be too high
-        reigonal_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
-        block_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
+        regional_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
+        block_pixels = (heightmap > (regional_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
         # the blocks and the gripper width around them are set to zero.
