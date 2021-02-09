@@ -2345,6 +2345,9 @@ class Robot(object):
 
         # check if we decreased or maintained last stack height
         goal_success = (structure_progress >= prev_structure_progress)
+        print('unstacking_partial_success() structure_progress:', structure_progress,
+                'prev_structure_progress:', prev_structure_progress, 'goal_success:',
+                goal_success)
 
         return goal_success, structure_progress
 
