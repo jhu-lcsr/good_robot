@@ -487,6 +487,7 @@ def main(args):
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
 
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
+
         if not check_z_height:
             if nonlocal_variables['stack_height'] == 1:
                 # A stack of size 1 does not meet the criteria for a partial stack success
@@ -867,7 +868,7 @@ def main(args):
 
                     else:
                         # if we had a failed grasp which led to task progress, consider this progress reversal
-                        if nonlocal_variables['stack_height'] >= nonlocal_variables['prev_stack_height']:
+                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
                             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + \
                                     str(nonlocal_variables['stack'].num_obj) + ' and current workspace stack height: ' + \
                                     str(nonlocal_variables['stack_height'])
