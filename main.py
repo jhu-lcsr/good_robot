@@ -236,6 +236,7 @@ def main(args):
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
     place_dilation = 0.05 if check_row else 0.0
+    # TODO(adit98) modify place_dilation if task_type is set
 
     # Initialize trainer(s)
     if use_demo:
@@ -514,7 +515,7 @@ def main(args):
                 # all rewards and success checks are False!
                 set_nonlocal_success_variables_false()
                 nonlocal_variables['trial_complete'] = True
-                if check_row:
+                if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
                     # on reset get the current row state
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
@@ -868,7 +869,7 @@ def main(args):
                         # if we had a failed grasp which led to task progress, consider this progress reversal
                         if nonlocal_variables['stack_height'] >= nonlocal_variables['prev_stack_height']:
                             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + \
-                                    str(max_workspace_height) + ' and current workspace stack height: ' + \
+                                    str(nonlocal_variables['stack'].num_obj) + ' and current workspace stack height: ' + \
                                     str(nonlocal_variables['stack_height'])
 
                             # only reset if situation_removal is enabled or we are doing an unstacking task
@@ -884,10 +885,12 @@ def main(args):
                                 # all rewards and success checks are False!
                                 set_nonlocal_success_variables_false()
                                 nonlocal_variables['trial_complete'] = True
-                                if check_row:
+                                if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
                                     # on reset get the current row state
-                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
+                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj,
+                                            check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
+
                             else:
                                 print(mismatch_str)
 
