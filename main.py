@@ -865,25 +865,31 @@ def main(args):
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
 
                     else:
-                        # if we had a failed grasp which led to a successful unstack and trial completion, end the trial
-                        if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
-                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                            if is_testing:
-                                # we are in testing mode which is frequently recorded,
-                                # so sleep for 10 seconds to show off our results!
-                                time.sleep(10)
-                            nonlocal_variables['stack_success'] = True
-                            #nonlocal_variables['place_success'] = True
-                            nonlocal_variables['partial_stack_success'] = True
-                            stack_count += 1
-                            # full stack complete! reset the scene
-                            successful_trial_count += 1
-                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
-                            # We don't need to reset here because the algorithm already reset itself
-                            # nonlocal_variables['stack'].reset_sequence()
-                            nonlocal_variables['stack'].next()
-                            nonlocal_variables['trial_complete'] = True
+                        # if we had a failed grasp which led to task progress, consider this progress reversal
+                        if nonlocal_variables['stack_height'] >= nonlocal_variables['prev_stack_height']:
+                            mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + \
+                                    str(max_workspace_height) + ' and current workspace stack height: ' + \
+                                    str(nonlocal_variables['stack_height'])
+
+                            # only reset if situation_removal is enabled or we are doing an unstacking task
+                            if not disable_situation_removal or (task_type is not None and task_type == 'unstacking'):
+                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
+                                print(mismatch_str)
+                                # this reset is appropriate for stacking, but not checking rows
+                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                robot.reposition_objects()
+                                nonlocal_variables['stack'].reset_sequence()
+                                nonlocal_variables['stack'].next()
+                                # We needed to reset, so the stack must have been knocked over!
+                                # all rewards and success checks are False!
+                                set_nonlocal_success_variables_false()
+                                nonlocal_variables['trial_complete'] = True
+                                if check_row:
+                                    # on reset get the current row state
+                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
+                                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
+                            else:
+                                print(mismatch_str)
 
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
