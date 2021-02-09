@@ -866,7 +866,7 @@ def main(args):
 
                     else:
                         # if we had a failed grasp which led to a successful unstack and trial completion, end the trial
-                        if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj
+                        if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
                                 # we are in testing mode which is frequently recorded,
