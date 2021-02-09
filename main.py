@@ -150,7 +150,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and not args.use_demo and (args.task_type is None)
+    place_common_sense = args.common_sense and ((args.task_type is None) and args.task_type != 'unstacking')
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -235,8 +235,12 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    place_dilation = 0.05 if check_row else 0.0
-    # TODO(adit98) modify place_dilation if task_type is set
+    if check_row:
+        place_dilation = 0.05
+    elif task_type is not None:
+        place_dilation = 0.10
+    else:
+        place_dilation = 0.00
 
     # Initialize trainer(s)
     if use_demo:
