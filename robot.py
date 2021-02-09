@@ -2313,7 +2313,7 @@ class Robot(object):
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
 
-    def unstacking_partial_success(prev_structure_progress, distance_threshold=0.06, top_idx=-1):
+    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1):
         """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
 
         # Arguments
