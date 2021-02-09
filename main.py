@@ -464,8 +464,7 @@ def main(args):
             elif task_type == 'unstacking':
                 # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'],
-                                check_z_height=check_z_height)
+                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
 
             else:
                 raise NotImplementedError
