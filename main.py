@@ -42,18 +42,34 @@ def run_title(args):
     title = ''
     title += 'Sim ' if args.is_sim else 'Real '
 
-    if args.check_row:
+    if args.task_type is not None:
+        if args.task_type == 'vertical_square':
+            title += 'Vertical Square, '
+        elif args.task_type == 'unstacking':
+            title += 'Unstacking, '
+        elif args.task_type == 'stack':
+            title += 'Stack, '
+        elif args.task_type == 'row':
+            title += 'Row, '
+
+    elif args.check_row:
         title += 'Rows, '
+
     elif args.place:
         title += 'Stack, '
+
     elif not args.place and not args.check_row:
         title += 'Push and Grasp, '
-    if args.trial_reward:
+
+    if args.use_demo:
+        title += 'Imitation, '
+    elif args.trial_reward:
         title += 'SPOT Trial Reward, '
     elif args.discounted_reward:
         title += 'Discounted Reward, '
     else:
         title += 'Two Step Reward, '
+
     if args.common_sense:
         title += 'Masked, '
 
@@ -61,9 +77,6 @@ def run_title(args):
         title += 'Testing' if args.is_testing else 'Training'
     else:
         title += 'Challenging Arrangements'
-
-    if args.use_demo:
-        title += ', Imitation'
 
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
