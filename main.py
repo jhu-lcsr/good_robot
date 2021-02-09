@@ -863,6 +863,28 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
+
+                    else:
+                        # if we had a failed grasp which led to a successful unstack and trial completion, end the trial
+                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                            if is_testing:
+                                # we are in testing mode which is frequently recorded,
+                                # so sleep for 10 seconds to show off our results!
+                                time.sleep(10)
+                            nonlocal_variables['stack_success'] = True
+                            #nonlocal_variables['place_success'] = True
+                            nonlocal_variables['partial_stack_success'] = True
+                            stack_count += 1
+                            # full stack complete! reset the scene
+                            successful_trial_count += 1
+                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                            robot.reposition_objects()
+                            # We don't need to reset here because the algorithm already reset itself
+                            # nonlocal_variables['stack'].reset_sequence()
+                            nonlocal_variables['stack'].next()
+                            nonlocal_variables['trial_complete'] = True
+
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
@@ -875,8 +897,12 @@ def main(args):
                     place_count += 1
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block when using imitation mode
+                    if task_type is not None and task_type == 'unstacking':
+                        over_block = False
+                    else:
+                        over_block = not check_row
                     nonlocal_variables['place_success'] = robot.place(primitive_position,
-                            best_rotation_angle, over_block=not check_row)
+                            best_rotation_angle, over_block=over_block)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
@@ -887,10 +913,10 @@ def main(args):
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
-                             (use_demo and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
+                             (task_type is not None and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
 
-                        # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table
-                        if use_demo:
+                        # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table)
+                        if task_type is not None:
                             nonlocal_variables['place_success'] = True
 
                         partial_stack_count += 1
