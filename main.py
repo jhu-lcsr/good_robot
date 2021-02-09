@@ -150,7 +150,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and not args.use_demo
+    place_common_sense = args.common_sense and not args.use_demo and (args.task_type is None)
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max

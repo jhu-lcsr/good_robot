@@ -2346,7 +2346,7 @@ class Robot(object):
         # check if we decreased or maintained last stack height
         goal_success = (structure_progress >= prev_structure_progress)
 
-        return goal_success, stack_height
+        return goal_success, structure_progress
 
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
