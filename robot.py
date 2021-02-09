@@ -423,7 +423,11 @@ class Robot(object):
     def reposition_object_at_list_index_to_location(self, obj_pos, obj_ori, index):
         """ Reposition the object to a specified position and orientation """
         object_handle = self.object_handles[index]
-        success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
+        # TODO(adit98) figure out significance of plane_handle, set to -1 for now
+        if self.task_type is not None and self.task_type == 'unstacking':
+            plane_handle=-1
+        else:
+            success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, object_handle, plane_handle, obj_pos, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, plane_handle, obj_ori, vrep.simx_opmode_blocking)
 
@@ -772,18 +776,29 @@ class Robot(object):
                 else:
                     successful_stack = False
                     while not successful_stack:
-                        obj_pos, obj_ori = self.reposition_object_randomly(self.object_handles[0])
+                        # get random obj pose
+                        _, _, obj_pos, obj_ori = self.generate_random_object_pose()
+                        obj_ori[:2] = [0, 0]
 
                         # iterate through remaining object handles and place them on top of existing stack
-                        for i in range(1, len(self.object_handles)):
+                        for i in range(len(self.object_handles)):
                             # reposition object as (x,y) position of first block, set z pos depending on stack height
                             # same orientation (TODO(adit98) add noise later?)
                             obj_pos[-1] = i * 0.06 + 0.05
+
+                            # reposition object
                             self.reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
-                            time.sleep(0.5)
+
+                            # regenerate object orientation and keep only the top block rotation
+                            _, _, _, obj_ori = self.generate_random_object_pose()
+                            obj_ori[:2] = [0, 0]
+
+                            # wait for objects to settle
+                            time.sleep(0.75)
 
                         # continue to retry until we have a successful stack of 4 blocks
                         successful_stack, stack_height = self.check_stack(np.ones(len(self.object_handles)))
+                        print('reposition_objects(): successful stack:', successful_stack, 'stack_height:', stack_height)
                         if stack_height >= len(self.object_handles):
                             successful_stack = True
 
@@ -861,11 +876,11 @@ class Robot(object):
                 valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
-                
+
                 # If just manipulating blocks for dataset image generation, no need to check height.
                 if self.capture_logoblock_dataset:
                     break
-                
+
                 if max_z_height > z_height_retake_threshold:
                     if print_error > 3:
                         print('ERROR: depth_heightmap value too high. '
@@ -2092,7 +2107,6 @@ class Robot(object):
                 print('check_stack() False, not enough nearby objects for a successful stack! ' \
                         'expected at least ' + str(num_obj) + ' nearby objects, but only counted: ' + \
                         str(len(object_color_sequence)))
-                print(np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1))
                 # there aren't enough nearby objects for a successful stack!
                 checks = len(object_color_sequence) - 1
                 # We know the goal won't be met, so goal_success is False
