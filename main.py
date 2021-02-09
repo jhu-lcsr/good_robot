@@ -78,6 +78,9 @@ def run_title(args):
     else:
         title += 'Challenging Arrangements'
 
+    if args.depth_channels_history:
+        title += ', Three Step History'
+
     save_file = os.path.basename(title).replace(':', '-').replace('.', '-').replace(',','').replace(' ','-')
     dirname = utils.timeStamped(save_file)
     return title, dirname
