@@ -452,7 +452,7 @@ def main(args):
             stack_shift = 0
 
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
-        if use_imitation:
+        if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if task_type == 'vertical_square':
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
@@ -465,14 +465,6 @@ def main(args):
                                 check_z_height=check_z_height)
 
             else:
-                raise NotImplementedError
-
-        elif task_type is not None:
-            if task_type == 'vertical_square':
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.vertical_square_partial_success(current_stack_goal,
-                                check_z_height=check_z_height)
-            elif task_type == 'unstacking':
                 raise NotImplementedError
 
         elif check_row:
