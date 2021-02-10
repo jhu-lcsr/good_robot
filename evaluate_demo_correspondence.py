@@ -287,8 +287,7 @@ if __name__ == '__main__':
 
                 # fill all masked arrays (convert to regular np arrays)
                 vertical_square_push, vertical_square_grasp, vertical_square_place = \
-                        vertical_square_push.filled(0.0), vertical_square_grasp.filled(0.0),
-                        vertical_square_place.filled(0.0)
+                        vertical_square_push.filled(0.0), vertical_square_grasp.filled(0.0), vertical_square_place.filled(0.0)
 
             # TODO(adit98) add logic for pushing here
             if action == 'grasp':
@@ -312,10 +311,10 @@ if __name__ == '__main__':
                     vertical_square_preds = vertical_square_place
 
             print("Evaluating l2 distance for stack height:", k)
-            elif task_type == 'row':
+            if task_type == 'row':
                 preds = [stack_preds, unstack_preds, vertical_square_preds]
                 example_actions = [example_action_stack, example_action_unstack, example_action_vertical_square]
-            if task_type == 'stack':
+            elif task_type == 'stack':
                 preds = [row_preds, unstack_preds, vertical_square_preds]
                 example_actions = [example_action_row, example_action_unstack, example_action_vertical_square]
             elif task_type == 'unstack':
