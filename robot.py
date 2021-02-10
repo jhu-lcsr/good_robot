@@ -780,11 +780,13 @@ class Robot(object):
                         _, _, obj_pos, obj_ori = self.generate_random_object_pose()
                         obj_ori[:2] = [0, 0]
 
-                        # iterate through remaining object handles and place them on top of existing stack
-                        for i in range(len(self.object_handles)):
+                        # iterate through remaining object handles and place them on top of existing stack (randomize order)
+                        obj_handles_rand = np.arange(len(self.object_handles))
+                        np.random.shuffle(obj_handles_rand)
+                        for ind, i in enumerate(obj_handles_rand):
                             # reposition object as (x,y) position of first block, set z pos depending on stack height
                             # same orientation (TODO(adit98) add noise later?)
-                            obj_pos[-1] = i * 0.06 + 0.05
+                            obj_pos[-1] = ind * 0.06 + 0.05
 
                             # reposition object
                             self.reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
