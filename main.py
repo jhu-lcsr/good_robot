@@ -897,8 +897,8 @@ def main(args):
                     # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
                     if task_type is not None and task_type == 'unstack':
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! 
-                            Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! ' + \
+                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                     str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
                             print(mismatch_str)
 
@@ -970,8 +970,8 @@ def main(args):
                     else:
                         # if we had a failed grasp which led to task progress, consider this progress reversal
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple! 
-                            Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple!' + \
+                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                     str(nonlocal_variables['stack_height'])
 
                             # only reset if situation_removal is enabled or we are doing an unstacking task
