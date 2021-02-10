@@ -1676,7 +1676,7 @@ def parse_resume_and_snapshot_file_args(args):
                         log directory for errors')
                 exit(1)
 
-            if check_row:
+            if args.check_row:
                 row_snapshot_file = snapshot_file
             else:
                 stack_snapshot_file = snapshot_file
