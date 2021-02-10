@@ -10,13 +10,19 @@ class Demonstration():
             'executed-actions-0.log.txt'))
         self.rgb_dir = os.path.join(path, 'data', 'color-heightmaps')
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
-        self.image_names = sorted(os.listdir(self.rgb_dir))
         self.demo_num = demo_num
         self.check_z_height = check_z_height
         self.task_type = task_type
 
+        # image_names should contain all heightmaps that have demo_num as their poststring
+        self.image_names = sorted([i for i in os.listdir(self.rgb_dir) if i.split('.')[-2] == demo_num])
+
         # get number of actions in demo
         self.num_actions = len(self.action_log)
+
+        # check to make sure action log and image_names line up
+        if len(self.image_names) != self.num_actions:
+            raise ValueError("MISMATCH: Number of images does not match number of actions in demo for demo number:", demo_num)
 
         # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
         # divide num actions by 2 to get number of grasp/place pairs
