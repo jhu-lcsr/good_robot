@@ -1454,7 +1454,8 @@ def main(args):
                 logger.write_to_log('trial-success', trainer.trial_success_log)
                 logger.write_to_log('trial', trainer.trial_log)
                 logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
-                best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict)
+                best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing,
+                        num_trials, best_dict, logger, title, place, prev_best_dict, task_type=task_type)
                 # if we exceeded max_train_actions at the end of the last trial, stop training
                 if max_train_actions is not None and trainer.iteration > max_train_actions:
                     nonlocal_pause['exit_called'] = True
@@ -1732,7 +1733,8 @@ def main(args):
 
     nonlocal_pause['process_actions_exit_called'] = True
     # Save the final plot when the run has completed cleanly, plus specifically handle preset cases
-    best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files)
+    best_dict, prev_best_dict, current_dict = save_plot(trainer, plot_window, is_testing, num_trials,
+            best_dict, logger, title, place, prev_best_dict, preset_files, task_type=task_type)
     if not is_testing:
         # save a backup of the best training stats from the original run, this is because plotting updates
         # or other utilities might modify or overwrite the real stats fom the original run.
@@ -1787,7 +1789,7 @@ def parse_resume_and_snapshot_file_args(args):
 
     return stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory
 
-def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
+def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None, task_type=None):
     if preset_files is not None:
         # note preset_files is changing from a list of strings to an integer
         preset_files = len(preset_files)
@@ -1797,7 +1799,8 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         if is_testing:
             # when testing the plot data should be averaged across the whole run
             plot_window = trainer.iteration - 3
-        best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place, window=plot_window, num_preset_arrangements=preset_files)
+        best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place,
+                window=plot_window, num_preset_arrangements=preset_files, task_type=task_type)
     return best_dict, prev_best_dict, current_dict
 
 def detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count, change_threshold=300):
