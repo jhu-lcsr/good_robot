@@ -15,48 +15,21 @@ class Demonstration():
         self.check_z_height = check_z_height
         self.task_type = task_type
 
-        if self.task_type == 'stack':
-            # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
-            self.action_dict = {}
-            for s in range(3):
-                # store push, grasp, and place actions for demo at stack height s
-                # TODO(adit98) figure out how to incorporate push actions into this paradigm
-                # TODO(adit98) note this assumes perfect demo
-                # if stack height is 0, indices 0 and 1 of the action log correspond to grasp and place respectively
-                demo_first_ind = 2 * s
-                self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_first_ind],
-                        ACTION_TO_ID['place'] : self.action_log[demo_first_ind + 1]}
+        # get number of actions in demo
+        self.num_actions = len(self.action_log)
 
-        elif self.task_type == 'unstack':
-            # get number of actions in demo
-            self.num_actions = len(self.action_log)
+        # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
+        # divide num actions by 2 to get number of grasp/place pairs
+        self.action_dict = {}
 
-            # populate actions in dict keyed by stack height {stack_height : {action : (x, y, z, theta)}}
-            self.action_dict = {}
-            for s in range(1, 5):
-                # store push, grasp, and place actions for demo at stack height s
-                demo_ind = -2 * (5 - s)
-                self.action_dict[s] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
-                        ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
-                        'demo_ind': self.num_actions + demo_ind}
-
-        else:
-            # task type is some grasp-place sequence
-            # get number of actions in demo
-            self.num_actions = len(self.action_log)
-
-            # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
-            # divide num actions by 2 to get number of grasp/place pairs
-            self.action_dict = {}
-
-            # start at 1 since the structure starts with size 1
-            for action_pair in range(1, (self.num_actions // 2) + 1):
-                demo_ind = (action_pair - 1) * 2
-                grasp_image_ind = int(self.image_names[demo_ind].split('.')[0])
-                place_image_ind = int(self.image_names[demo_ind + 1].split('.')[0])
-                self.action_dict[action_pair] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
-                        ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
-                        'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
+        # start at 1 since the structure starts with size 1
+        for action_pair in range(1, (self.num_actions // 2) + 1):
+            demo_ind = (action_pair - 1) * 2
+            grasp_image_ind = int(self.image_names[demo_ind].split('.')[0])
+            place_image_ind = int(self.image_names[demo_ind + 1].split('.')[0])
+            self.action_dict[action_pair] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
+                    ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
+                    'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
     def get_heightmaps(self, action_str, stack_height, use_hist=False, history_len=3):
         # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
