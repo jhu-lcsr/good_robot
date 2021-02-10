@@ -93,7 +93,7 @@ class Demonstration():
         return rgb_heightmap, np.stack([depth_heightmap] * 3, axis=-1)
 
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
-            row_trainer=None, use_hist=False):
+            row_trainer=None, unstack_trainer=False, vertical_square_trainer=False, use_hist=False):
         # ensure one of stack trainer or row trainer is provided
         if stack_trainer is None and row_trainer is None:
             raise ValueError("Must provide one of stack_trainer or row_trainer")

@@ -150,7 +150,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and ((args.task_type is None) and args.task_type != 'unstacking')
+    place_common_sense = args.common_sense and ((args.task_type is None) or (args.task_type != 'unstacking'))
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -200,7 +200,7 @@ def main(args):
         print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
-    stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory = \
+    stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory =
             parse_resume_and_snapshot_file_args(args)
 
     if not use_demo:
@@ -251,7 +251,7 @@ def main(args):
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=0, common_sense_backprop=common_sense_backprop,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
@@ -261,7 +261,27 @@ def main(args):
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=0.05, common_sense_backprop=common_sense_backprop,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
+
+        if unstack_snapshot_file != '':
+            unstack_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, unstack_snapshot_file, force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
+
+        if vertical_square_snapshot_file != '':
+            vertical_square_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, vertical_square_snapshot_file, force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
@@ -586,46 +606,97 @@ def main(args):
                 action_count += 1
                 # Determine whether grasping or pushing should be executed based on network predictions OR with demo
                 if use_demo:
+                    # initialize preds array
+                    preds = []
                     # figure out primitive action (limited to grasp or place)
                     if nonlocal_variables['primitive_action'] != 'grasp':
+                        # next action is grasp if we didn't grasp already
                         nonlocal_variables['primitive_action'] = 'grasp'
-                        # fill the masked arrays and put in preds
-                        if stack_trainer is not None and row_trainer is not None:
-                            preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
-                        elif stack_trainer is not None:
-                            preds = [None, grasp_feat_stack.filled(0.0)]
+
+                        # get grasp predictions (since next action is grasp)
+                        # fill the masked arrays and add to preds
+                        if row_trainer is not None:
+                            preds.append(grasp_feat_row.filled(0.0))
                         else:
-                            preds = [grasp_feat_row.filled(0.0), None]
+                            preds.append(None)
+
+                        if stack_trainer is not None:
+                            preds.append(grasp_feat_stack.filled(0.0))
+                        else:
+                            preds.append(None)
+
+                        if unstack_trainer is not None:
+                            preds.append(grasp_feat_unstack.filled(0.0))
+                        else:
+                            preds.append(None)
+
+                        if vertical_square_trainer is not None:
+                            preds.append(grasp_feat_vertical_square.filled(0.0))
+                        else:
+                            preds.append(None)
 
                     else:
                         if nonlocal_variables['grasp_success']:
+                            # if we had a successful grasp, set next action to place
                             nonlocal_variables['primitive_action'] = 'place'
 
-                            # fill the masked arrays and put in preds
-                            if stack_trainer is not None and row_trainer is not None:
-                                preds = [place_feat_row.filled(0.0), place_feat_stack.filled(0.0)]
-                            elif stack_trainer is not None:
-                                preds = [None, place_feat_stack.filled(0.0)]
+                            # get place predictions (since next action is place)
+                            # fill the masked arrays and add to preds
+                            if row_trainer is not None:
+                                preds.append(place_feat_row.filled(0.0))
                             else:
-                                preds = [place_feat_row.filled(0.0), None]
+                                preds.append(None)
+
+                            if stack_trainer is not None:
+                                preds.append(place_feat_stack.filled(0.0))
+                            else:
+                                preds.append(None)
+
+                            if unstack_trainer is not None:
+                                preds.append(place_feat_unstack.filled(0.0))
+                            else:
+                                preds.append(None)
+
+                            if vertical_square_trainer is not None:
+                                preds.append(place_feat_vertical_square.filled(0.0))
+                            else:
+                                preds.append(None)
 
                         else:
+                            # last grasp was unsuccessful, so we need to grasp again
                             nonlocal_variables['primitive_action'] = 'grasp'
 
-                            # fill the masked arrays and put in preds
-                            if stack_trainer is not None and row_trainer is not None:
-                                preds = [grasp_feat_row.filled(0.0), grasp_feat_stack.filled(0.0)]
-                            elif stack_trainer is not None:
-                                preds = [None, grasp_feat_stack.filled(0.0)]
+                            # get grasp predictions (since next action is grasp)
+                            # fill the masked arrays and add to preds
+                            if row_trainer is not None:
+                                preds.append(grasp_feat_row.filled(0.0))
                             else:
-                                preds = [grasp_feat_row.filled(0.0), None]
+                                preds.append(None)
+
+                            if stack_trainer is not None:
+                                preds.append(grasp_feat_stack.filled(0.0))
+                            else:
+                                preds.append(None)
+
+                            if unstack_trainer is not None:
+                                preds.append(grasp_feat_unstack.filled(0.0))
+                            else:
+                                preds.append(None)
+
+                            if vertical_square_trainer is not None:
+                                preds.append(grasp_feat_vertical_square.filled(0.0))
+                            else:
+                                preds.append(None)
 
                     print("main.py: running demo.get_action for stack height",
                             nonlocal_variables['stack_height'], "and primitive action",
                             nonlocal_variables['primitive_action'])
+
+                    # TODO(adit98) create trainers list with all the trainers, pass that to demo.get_action
                     demo_row_action, demo_stack_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
-                                    nonlocal_variables['stack_height'], stack_trainer, row_trainer)
+                                    nonlocal_variables['stack_height'], stack_trainer, row_trainer,
+                                    unstack_trainer, vertical_square_trainer)
 
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
@@ -910,8 +981,8 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
                     # TODO(adit98) set over_block when calling demo.get_action()
-                    # NOTE we always assume we are placing over a block when using imitation mode
-                    if task_type is not None and task_type == 'unstacking':
+                    # NOTE we always assume we are placing over a block for vertical square and stacking
+                    if task_type is not None and ((task_type == 'unstacking') or (task_type == 'row')):
                         over_block = False
                     else:
                         over_block = not check_row
@@ -968,6 +1039,7 @@ def main(args):
                 if place:
                     # place trainer logs are updated in process_actions()
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
+                    print("main.py() process_actions: place_success:", nonlocal_variables['place_success'])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
                     trainer.trial_success_log.append([int(successful_trial_count)])
@@ -1289,9 +1361,39 @@ def main(args):
                                 goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
                     print("main.py nonlocal_pause['exit_called'] got row features")
 
+                    # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
+                    # set predictions variables to row predictions if stack trainer not specified
                     if stack_trainer is None:
                         push_predictions, grasp_predictions, place_predictions = \
-                                push_predictions_stack, grasp_predictions_stack, place_predictions_stack
+                                push_predictions_row, grasp_predictions_row, place_predictions_row
+
+                if unstack_trainer is not None:
+                    # unstack features
+                    push_feat_unstack, grasp_feat_unstack, place_feat_unstack, push_predictions_unstack, \
+                            grasp_predictions_unstack, place_predictions_unstack, _, _ = \
+                            unstack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                    print("main.py nonlocal_pause['exit_called'] got unstack features")
+
+                    # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
+                    # set predictions variables to unstack predictions if stack trainer not specified
+                    if stack_trainer is None:
+                        push_predictions, grasp_predictions, place_predictions = \
+                                push_predictions_unstack, grasp_predictions_unstack, place_predictions_unstack
+
+                if vertical_square_trainer is not None:
+                    # vertical_square features
+                    push_feat_vertical_square, grasp_feat_vertical_square, place_feat_vertical_square, push_predictions_vertical_square, \
+                            grasp_predictions_vertical_square, place_predictions_vertical_square, _, _ = \
+                            vertical_square_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
+                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                    print("main.py nonlocal_pause['exit_called'] got vertical_square features")
+
+                    # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
+                    # set predictions variables to vertical_square predictions if stack trainer not specified
+                    if stack_trainer is None:
+                        push_predictions, grasp_predictions, place_predictions = \
+                                push_predictions_vertical_square, grasp_predictions_vertical_square, place_predictions_vertical_square
 
             else:
                 # TODO(zhe) Need to ensure that "predictions" also have language mask
@@ -2118,8 +2220,10 @@ if __name__ == '__main__':
     parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
 
     # ------ Pre-loading and logging options ------
-    parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                              help='stacking snapshot file to load for the model')
-    parser.add_argument('--row_snapshot_file', dest='row_snapshot_file', action='store', default='',                              help='row making snapshot file to load for the model')
+    parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                  help='stacking snapshot file to load for the model')
+    parser.add_argument('--row_snapshot_file', dest='row_snapshot_file', action='store', default='',                      help='row making snapshot file to load for the model')
+    parser.add_argument('--vertical_square_snapshot_file', dest='vertical_square_snapshot_file', action='store', default='', help='vertical_square making snapshot file to load for the model')
+    parser.add_argument('--unstack_snapshot_file', dest='unstack_snapshot_file', action='store', default='',              help='unstack making snapshot file to load for the model')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--num_dilation', dest='num_dilation', type=int, action='store', default=0,                       help='Number of dilations to apply to efficientnet, each increment doubles output resolution and increases computational expense.')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
