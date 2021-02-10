@@ -2046,7 +2046,7 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
+    def check_stack(self, object_color_sequence, crop_stack_sequence=True, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -2112,9 +2112,11 @@ class Robot(object):
                 # We know the goal won't be met, so goal_success is False
                 # But we still need to count the actual stack height so set the variable for later
                 goal_success = False
-            else:
-                # cut out objects we don't need to check
+            elif crop_stack_sequence:
+                # cut out objects we don't need to check if crop_stack_sequence is set
                 object_color_sequence = object_color_sequence[:num_obj+1]
+            else:
+                checks = len(object_color_sequence) - 1
             # print('auto object_color_sequence: ' + str(object_color_sequence))
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
@@ -2237,8 +2239,8 @@ class Robot(object):
 
         # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
         # top_idx is set to the index of low2high_idx we want to check the stack at
-        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), top_idx=top_idx,
-                distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), crop_stack_sequence=False,
+                top_idx=top_idx, distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
         second_stack_inds = None
 
         if stack_height > 1:
@@ -2254,7 +2256,7 @@ class Robot(object):
                 # check for 2nd stack (use index of block_ind in low2high_idx)
                 top_idx = len(low2high_idx) - 1 - i
                 _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
-                        top_idx=top_idx, pos=pos, return_inds=True)
+                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True)
 
                 if stack_height > 1:
                     num_stacks += 1
