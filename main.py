@@ -1760,9 +1760,11 @@ def parse_resume_and_snapshot_file_args(args):
         continue_logging = False
         logging_directory = os.path.abspath('logs')
 
-    stack_snapshot_file = os.path.abspath(args.stack_snapshot_file) if args.stack_snapshot_file \
-            else ''
+    # load all snapshots
+    stack_snapshot_file = os.path.abspath(args.stack_snapshot_file) if args.stack_snapshot_file else ''
     row_snapshot_file = os.path.abspath(args.row_snapshot_file) if args.row_snapshot_file else ''
+    unstack_snapshot_file = os.path.abspath(args.unstack_snapshot_file) if args.unstack_snapshot_file else ''
+    vertical_square_snapshot_file = os.path.abspath(args.vertical_square_snapshot_file) if args.vertical_square_snapshot_file else ''
 
     # if neither snapshot file is provided
     if continue_logging:
@@ -1783,7 +1785,7 @@ def parse_resume_and_snapshot_file_args(args):
             else:
                 stack_snapshot_file = snapshot_file
 
-    return stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory
+    return stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None):
     if preset_files is not None:
@@ -2012,7 +2014,7 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
 def check_training_complete(args):
     ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
     '''
-    stack_snapshot_file, row_snapshot_file, continue_logging, logging_directory = \
+    stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory = \
             parse_resume_and_snapshot_file_args(args)
 
     training_complete = False
