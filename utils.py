@@ -836,7 +836,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
 
 # function to visualize prediction signal on heightmap (with rotations)
 def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
-        prob_exp=1, specific_rotation=False, num_rotations=None):
+        prob_exp=1, specific_rotation=None, num_rotations=None):
 
     best_rot_ind = best_pix_ind[0]
     best_action_xy = best_pix_ind[1:]
@@ -848,7 +848,7 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
     # apply exponential
     predictions = predictions ** prob_exp
 
-    if not specific_rotation:
+    if specific_rotation is None:
         num_rotations = predictions.shape[0]
 
         # populate canvas
@@ -914,3 +914,72 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
                 blend_ratio, prediction_vis, 1-blend_ratio, 0)
 
         return prediction_vis
+
+def compute_demo_dist(preds, example_actions):
+    """
+    Function to evaluate l2 distance and generate demo-signal mask
+    """
+    # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
+    def cos_sim(pix_preds, best_pred):
+        """
+        Helper function to compute cosine similarity.
+        Arguments:
+            pix_preds: pixel-wise embedding array
+            best_pred: template embedding vector
+        """
+        best_pred = np.expand_dims(best_pred, (0, 2, 3))
+        cos_sim = np.multiply(pix_preds, best_pred)
+        return cos_sim
+
+    # reshape each example_action to 1 x 64 x 1 x 1
+    for i in range(len(example_actions)):
+        action = example_actions[i]
+
+        # skip if we didn't evaluate model i on demo frame
+        if action is None:
+            continue
+
+        # reshape and update list
+        example_actions[i] = np.expand_dims(action, (0, 2, 3))
+
+    # get mask from first available model (NOTE(adit98) see if we need a different strategy for this)
+    mask = None
+    for pred in preds:
+        if pred is not None:
+            mask = (preds == np.zeros([1, 64, 1, 1])).all(axis=1)
+
+    # ensure that at least one of the preds is not None
+    if mask is None:
+        raise ValueError("Must provide at least one non-null pixel-wise embedding array")
+
+    # calculate l2 distance between example action embedding and preds for each policy
+    l2_dists = []
+    for ind, action in enumerate(example_actions):
+        dist = np.sum(np.square(action - preds[ind]), axis=1)
+
+        # set all masked spaces to have max l2 distance
+        dist[mask] = np.max(dist) * 1.1
+
+        # append to l2_dists list
+        l2_dists.append(dist)
+
+    # select best action as min b/w all dists in l2_dists
+    l2_dists = np.stack(l2_dists)
+
+    # find overall minimum distance across all policies and get index
+    match_ind = np.unravel_index(np.argmin(l2_dists), l2_dists.shape)
+
+    # select distance array for policy which contained minimum distance index
+    l2_dist = l2_dists[match_ind[0]]
+
+    # discard first dimension of match_ind to get it in the form (theta, y, x)
+    match_ind = match_ind[1:]
+
+    # make l2_dist >=0 and max_normalize
+    l2_dist = l2_dist - np.min(l2_dist)
+    l2_dist = l2_dist / np.max(l2_dist)
+
+    # invert values of l2_dist so that large values indicate correspondence
+    im_mask = 1 - l2_dist
+
+    return im_mask, match_ind

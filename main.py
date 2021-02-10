@@ -20,18 +20,16 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
+from utils import compute_demo_dist
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
 from demo import Demonstration
-# TODO(adit98) move evaluate_l2_mask fn to utils
-from evaluate_demo_correspondence import evaluate_l2_mask
 import plot
 import json
 import copy
 import shutil
 import matplotlib
 import matplotlib.pyplot as plt
-
 
 def run_title(args):
     """
@@ -769,7 +767,7 @@ def main(args):
                     if use_demo:
                         # select preds based on primitive action selected in demo (theta, y, x)
                         correspondences, nonlocal_variables['best_pix_ind'] = \
-                                evaluate_l2_mask(preds, [demo_row_action, demo_stack_action,
+                                compute_demo_dist(preds, [demo_row_action, demo_stack_action,
                                     demo_unstack_action, demo_vertical_square_action])
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
                     else:
