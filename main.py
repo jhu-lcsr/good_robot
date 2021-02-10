@@ -886,14 +886,36 @@ def main(args):
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
+
                     if place:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
-                    if not place or not needed_to_reset:
+
+                    # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
+                    if task_type is not None and task_type == 'unstack':
+                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! 
+                            Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                                    str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
+                            print(mismatch_str)
+
+                            # this reset is appropriate for stacking, but not checking rows
+                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                            robot.reposition_objects()
+                            nonlocal_variables['stack'].reset_sequence()
+                            nonlocal_variables['stack'].next()
+
+                            # We needed to reset, so the stack must have been knocked over!
+                            # all rewards and success checks are False!
+                            set_nonlocal_success_variables_false()
+                            nonlocal_variables['trial_complete'] = True
+
+                    elif not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
+
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
@@ -948,8 +970,8 @@ def main(args):
                     else:
                         # if we had a failed grasp which led to task progress, consider this progress reversal
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + \
-                                    str(nonlocal_variables['stack'].num_obj) + ' and current workspace stack height: ' + \
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple! 
+                            Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                     str(nonlocal_variables['stack_height'])
 
                             # only reset if situation_removal is enabled or we are doing an unstacking task

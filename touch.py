@@ -301,6 +301,16 @@ class HumanControlOfRobot(object):
                 joint_position = self.robot.parse_tcp_state_data(state_data, 'joint_data')
                 robot_state += ' joint pos: ' + str(joint_position) + ' homogeneous cart_pose: ' + str(actual_tool_pose)
                 print(str(self.print_state_count) + ' ' + robot_state)
+        elif key == ord('f'):
+            # finish trial, write actions (only the successful ones), and move to next trial
+            self.logger.write_to_log('executed-actions-' + str(self.trial),
+                    self.successful_action_log)
+            self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
+            self.trial += 1
+
+            # finish trial and move to next trial
+            self.robot.reposition_objects()
+
         elif key == ord('c'):
             # we stopped the program, write actions (only the successful ones)
             self.logger.write_to_log('executed-actions-' + str(self.trial),
