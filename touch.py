@@ -8,6 +8,7 @@ import threading
 import os
 import utils
 from logger import Logger
+# TODO(adit98) put this in utils/get from somewhere else?
 from generate_sim_stacking_demo import get_and_save_images
 import argparse
 
@@ -123,7 +124,7 @@ class HumanControlOfRobot(object):
         self.print_config()
 
     def execute_action(self, target_position, heightmap_rotation_angle):
-        # log env state
+        # log env state (demo/trial num is the poststring for saved heightmaps)
         depth_heightmap, color_heightmap, _, _, _ = get_and_save_images(self.click_count,
                 self.robot, self.logger, self.action, save_image=False)
         self.heightmap_pairs.append((depth_heightmap, color_heightmap))
@@ -156,9 +157,9 @@ class HumanControlOfRobot(object):
 
                     # save images
                     self.logger.save_heightmaps(self.click_count, color_grasp,
-                            depth_grasp, 'grasp')
+                            depth_grasp, 'grasp', poststring=self.trial)
                     self.logger.save_heightmaps(self.click_count, color_place,
-                            depth_place, 'place')
+                            depth_place, 'place', poststring=self.trial)
 
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
