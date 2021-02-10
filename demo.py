@@ -5,9 +5,13 @@ from utils import ACTION_TO_ID
 
 class Demonstration():
     def __init__(self, path, demo_num, check_z_height, task_type='stack'):
-        # path is expected to be <logs/exp_name>
-        self.action_log = np.loadtxt(os.path.join(path, 'transitions',
-            'executed-actions-0.log.txt'))
+        try:
+            # path is expected to be <logs/exp_name>
+            self.action_log = np.loadtxt(os.path.join(path, 'transitions',
+                'executed-actions-' + str(demo_num) + '.log.txt'))
+        except OSError:
+            raise OSError("Demo Number " + str(demo_num) + " does not exist.")
+
         self.rgb_dir = os.path.join(path, 'data', 'color-heightmaps')
         self.depth_dir = os.path.join(path, 'data', 'depth-heightmaps')
         self.demo_num = demo_num

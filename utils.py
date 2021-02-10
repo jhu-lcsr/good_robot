@@ -7,6 +7,7 @@ from scipy import ndimage
 import datetime
 import os
 import json
+import demo
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -983,3 +984,24 @@ def compute_demo_dist(preds, example_actions):
     im_mask = 1 - l2_dist
 
     return im_mask, match_ind
+
+def load_all_demos(demo_path, check_z_height, task_type):
+    """
+    Function to load all demonstrations in a given path and return a list of demo objects.
+    Argument:
+        demo_path: Path to folder with demonstrations
+    """
+    demos = []
+    demo_ind = 0
+    while True:
+        try:
+            demos.append(Demonstration(path=demo_path, demo_num=demo_ind,
+                check_z_height=check_z_height, task_type=task_type))
+        except OSError:
+            # demo does not exist, we loaded all the demos in the directory
+            break
+
+        # increment demo_ind
+        demo_ind += 1
+
+    return demos

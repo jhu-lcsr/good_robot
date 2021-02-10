@@ -5,7 +5,7 @@ import argparse
 import cv2
 import torch
 from collections import OrderedDict
-from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis
+from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, load_all_demos
 from trainer import Trainer
 from demo import Demonstration
 
@@ -33,8 +33,8 @@ if __name__ == '__main__':
         os.makedirs(os.path.join(args.imitation_demo, 'correspondences'))
 
     # create both demo classes
-    example_demo = Demonstration(path=args.example_demo, demo_num=0,
-            check_z_height=False, task_type=args.task_type)
+    example_demos = load_all_demos(demo_path=args.example_demo, check_z_height=False,
+            task_type=args.task_type)
     imitation_demo = Demonstration(path=args.imitation_demo, demo_num=0,
             check_z_height=False, task_type=args.task_type)
 
@@ -95,14 +95,19 @@ if __name__ == '__main__':
         raise ValueError("Must provide at least one trained model")
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
-    action_keys = sorted(example_demo.action_dict.keys())
+    action_keys = sorted(example_demos[0].action_dict.keys())
+    example_actions = {}
     for k in action_keys:
         for action in ['grasp', 'place']:
-            # get action embeddings from example demo
-            example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _ = \
-                    example_demo.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
-                            unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
-                            use_hist=args.depth_channels_history)
+            for ind, d in enumerate(example_demos):
+                # get action embeddings from example demo
+                if ind not in example_actions:
+                    example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _ = \
+                            d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
+                                    unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
+                                    use_hist=args.depth_channels_history)
+                    example_actions[ind] = [example_action_row, example_action_stack,
+                            example_action_unstack, example_action_vertical_square]
 
             # get imitation heightmaps
             if args.task_type == 'unstack':
@@ -193,21 +198,25 @@ if __name__ == '__main__':
                     vertical_square_preds = vertical_square_place
 
             print("Evaluating l2 distance for stack height:", k)
+
+            # store preds we want to use (after leave one out) in preds, and get relevant example actions
+            # order of example actions is row, stack, unstack, vertical square
             if task_type == 'row':
                 preds = [stack_preds, unstack_preds, vertical_square_preds]
-                example_actions = [example_action_stack, example_action_unstack, example_action_vertical_square]
+                example_actions = list(zip(*list(example_actions.values())))[1:]
             elif task_type == 'stack':
                 preds = [row_preds, unstack_preds, vertical_square_preds]
-                example_actions = [example_action_row, example_action_unstack, example_action_vertical_square]
+                example_actions = list(zip(*list(example_actions.values())))[0, 2, 3]
             elif task_type == 'unstack':
                 preds = [row_preds, stack_preds, vertical_square_preds]
-                example_actions = [example_action_row, example_action_stack, example_action_vertical_square]
+                example_actions = list(zip(*list(example_actions.values())))[0, 1, 3]
             elif task_type == 'vertical_square':
                 preds = [row_preds, stack_preds, unstack_preds]
-                example_actions = [example_action_row, example_action_stack, example_action_unstack]
+                example_actions = list(zip(*list(example_actions.values())))[:3]
             else:
                 raise NotImplementedError(task_type + ' is not implemented.')
 
+            # TODO(adit98) modify compute_demo_dist in utils to work with multiple demo embeddings per policy
             # evaluate l2 distance based action mask - leave one out is above
             im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions)
 
