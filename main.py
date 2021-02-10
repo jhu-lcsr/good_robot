@@ -692,8 +692,10 @@ def main(args):
                             nonlocal_variables['stack_height'], "and primitive action",
                             nonlocal_variables['primitive_action'])
 
+                    # TODO(adit98) create an action_dict in nonlocal_variables to store each embedding
+                    # TODO(adit98) check action_dict before running demo.get_action, populate action_dict if it doesn't have embedding for time step
                     # TODO(adit98) create trainers list with all the trainers, pass that to demo.get_action
-                    demo_row_action, demo_stack_action, action_id = \
+                    demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
                             demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
                                     nonlocal_variables['stack_height'], stack_trainer, row_trainer,
                                     unstack_trainer, vertical_square_trainer)
@@ -762,11 +764,13 @@ def main(args):
                     print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob/2))
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+
                 else:
                     if use_demo:
                         # select preds based on primitive action selected in demo (theta, y, x)
                         correspondences, nonlocal_variables['best_pix_ind'] = \
-                                evaluate_l2_mask(preds, [demo_row_action, demo_stack_action])
+                                evaluate_l2_mask(preds, [demo_row_action, demo_stack_action,
+                                    demo_unstack_action, demo_vertical_square_action])
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)

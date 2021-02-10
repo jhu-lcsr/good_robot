@@ -95,8 +95,8 @@ class Demonstration():
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
             row_trainer=None, unstack_trainer=False, vertical_square_trainer=False, use_hist=False):
         # ensure one of stack trainer or row trainer is provided
-        if stack_trainer is None and row_trainer is None:
-            raise ValueError("Must provide one of stack_trainer or row_trainer")
+        if stack_trainer is None and row_trainer is None and unstack_trainer is None and vertical_square_trainer is None:
+            raise ValueError("Must provide at least one trainer")
 
         # TODO(adit98) clean up the way demo heightmaps are saved to reduce confusion
         # set action_str based on primitive action
@@ -169,6 +169,26 @@ class Demonstration():
             row_push, row_grasp, row_place = row_push.filled(0.0), \
                     row_grasp.filled(0.0), row_place.filled(0.0)
 
+        # get unstack features if unstack_trainer is provided
+        if unstack_trainer is not None:
+            # to get vector of 64 vals, run trainer.forward with get_action_feat
+            unstack_push, unstack_grasp, unstack_place = unstack_trainer.forward(color_heightmap,
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+
+            # fill all masked arrays (convert to regular np arrays)
+            unstack_push, unstack_grasp, unstack_place = unstack_push.filled(0.0), \
+                    unstack_grasp.filled(0.0), unstack_place.filled(0.0)
+
+        # get vertical_square features if vertical_square_trainer is provided
+        if vertical_square_trainer is not None:
+            # to get vector of 64 vals, run trainer.forward with get_action_feat
+            vertical_square_push, vertical_square_grasp, vertical_square_place = vertical_square_trainer.forward(color_heightmap,
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+
+            # fill all masked arrays (convert to regular np arrays)
+            vertical_square_push, vertical_square_grasp, vertical_square_place = vertical_square_push.filled(0.0), \
+                    vertical_square_grasp.filled(0.0), vertical_square_place.filled(0.0)
+
         # get demo action index vector
         action_vec = self.action_dict[stack_height][ACTION_TO_ID[primitive_action]]
 
@@ -180,7 +200,7 @@ class Demonstration():
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
 
         # initialize best actions for stacking and row making
-        best_action_stack, best_action_row = None, None
+        best_action_stack, best_action_row, best_action_unstack, best_action_vertical_square = None, None, None, None
 
         # index predictions to obtain best action
         if primitive_action == 'grasp':
@@ -194,6 +214,14 @@ class Demonstration():
                 best_action_row = row_grasp[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
 
+            if unstack_trainer is not None:
+                best_action_unstack = unstack_grasp[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
+
+            if vertical_square_trainer is not None:
+                best_action_vertical_square = vertical_square_grasp[best_rot_ind, :,
+                        best_action_xy[1], best_action_xy[0]]
+
         elif primitive_action == 'place':
             if stack_trainer is not None:
                 best_action_stack = stack_place[best_rot_ind, :, best_action_xy[1],
@@ -203,5 +231,13 @@ class Demonstration():
                 best_action_row = row_place[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
 
-        # return best action for row and stack (None if only using 1 or the other) and action
-        return best_action_row, best_action_stack, ACTION_TO_ID[primitive_action]
+            if unstack_trainer is not None:
+                best_action_unstack = unstack_place[best_rot_ind, :, best_action_xy[1],
+                        best_action_xy[0]]
+
+            if vertical_square_trainer is not None:
+                best_action_vertical_square = vertical_square_place[best_rot_ind, :,
+                        best_action_xy[1], best_action_xy[0]]
+
+        # return best action for each model, primitive_action
+        return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
