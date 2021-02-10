@@ -9,6 +9,7 @@ import os
 import utils
 from logger import Logger
 from generate_sim_stacking_demo import get_and_save_images
+import argparse
 
 class HumanControlOfRobot(object):
     """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
@@ -358,6 +359,9 @@ class HumanControlOfRobot(object):
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--task_type', default='stack', type=str)
+    args = parser.parse_args()
 
     # User options (change me)
     # --------------- Setup options ---------------
@@ -385,8 +389,8 @@ if __name__ == '__main__':
     # Move robot to home pose
     # TODO(adit98) add cmd line args to select goal, task, etc.
     robot = Robot(is_sim, os.path.abspath('objects/blocks'), 4, workspace_limits,
-                tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None, place=True, calibrate=calibrate, unstack=False)
+                tcp_host_ip, tcp_port, rtc_host_ip, rtc_port, False, None, None,
+                place=True, calibrate=calibrate, unstack=False, task_type=args.task_type)
 
     # initialize logger
     logger = Logger(continue_logging=False, logging_directory='demos')
