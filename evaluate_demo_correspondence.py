@@ -5,9 +5,9 @@ import argparse
 import cv2
 import torch
 from collections import OrderedDict
-from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, load_all_demos
+from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis
 from trainer import Trainer
-from demo import Demonstration
+from demo import Demonstration, load_all_demos
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

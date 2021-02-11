@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import os
-from utils import ACTION_TO_ID
 
 class Demonstration():
     def __init__(self, path, demo_num, check_z_height, task_type='stack'):
@@ -224,3 +223,24 @@ class Demonstration():
 
         # return best action for each model, primitive_action
         return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
+
+def load_all_demos(demo_path, check_z_height, task_type):
+    """
+    Function to load all demonstrations in a given path and return a list of demo objects.
+    Argument:
+        demo_path: Path to folder with demonstrations
+    """
+    demos = []
+    demo_ind = 0
+    while True:
+        try:
+            demos.append(Demonstration(path=demo_path, demo_num=demo_ind,
+                check_z_height=check_z_height, task_type=task_type))
+        except OSError:
+            # demo does not exist, we loaded all the demos in the directory
+            break
+
+        # increment demo_ind
+        demo_ind += 1
+
+    return demos
