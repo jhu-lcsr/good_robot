@@ -107,8 +107,10 @@ class Robot(object):
     """
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
-                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None,
+                 place=False, grasp_color_task=False, real_gripper_ip='192.168.1.11', calibrate=False,
+                 unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1,
+                 textured=False, task_type=None):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -147,6 +149,9 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+
+        # task type (defaults to None)
+        self.task_type = task_type
 
         # If in simulation...
         if self.is_sim:
@@ -408,6 +413,7 @@ class Robot(object):
         vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
+        return object_position, object_orientation
 
     def reposition_object_at_list_index_randomly(self, list_index):
         object_handle = self.object_handles[list_index]
@@ -417,8 +423,11 @@ class Robot(object):
     def reposition_object_at_list_index_to_location(self, obj_pos, obj_ori, index):
         """ Reposition the object to a specified position and orientation """
         object_handle = self.object_handles[index]
-        success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
-        
+        # TODO(adit98) figure out significance of plane_handle, set to -1 for now
+        if self.task_type is not None and self.task_type == 'unstacking':
+            plane_handle=-1
+        else:
+            success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
         vrep.simxSetObjectPosition(self.sim_client, object_handle, plane_handle, obj_pos, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, plane_handle, obj_ori, vrep.simx_opmode_blocking)
 
@@ -516,6 +525,9 @@ class Robot(object):
         self.prev_obj_positions = []
         self.obj_positions = []
 
+        # now reposition objects if we are unstacking
+        if self.task_type == 'unstacking':
+            self.reposition_objects()
 
     def restart_sim(self, connect=False):
         if connect:
@@ -678,7 +690,8 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None, stack_height=4, trainer=None, demo=None, goal_condition=None, workspace_limits=None):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None,
+            goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
             print("------- UNSTACKING --------")
@@ -694,12 +707,11 @@ class Robot(object):
 
                 print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
 
-
             place_pose_history = self.place_pose_history.copy()
             place_pose_history.reverse()
 
-            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot. 
-            place_pose_history.append(place_pose_history[-1])  
+            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
+            place_pose_history.append(place_pose_history[-1])
 
             holding_object = not(self.close_gripper())
             # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
@@ -712,138 +724,90 @@ class Robot(object):
             else:
                 self.open_gripper()
 
-            # go to x,y position of previous places and pick up the z height from the depthmap (top of the stack)
-            for ind in range(len(place_pose_history)):
-                x, y, z, angle = place_pose_history[ind]
+            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+            for pose in place_pose_history:
+                x, y, z, angle = pose
 
-                # TODO(adit98) need to find a way to make sure this picks up block
-                # keep grasping until stack height decreases
-                while 1:
-                    # data before grasp
-                    grasp_depth, grasp_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-                    _, z_height = self.check_stack(np.arange(4))
+                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
 
-                    # get depth_heightmap pixel_coordinates of where the previous place was
-                    x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                    x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+                # get depth_heightmap pixel_coordinates of where the previous place was
+                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
 
-                    y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                    y_pixel = min(y_pixel, 223)
+                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                y_pixel = min(y_pixel, 223)
 
-                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', grasp_depth)
+                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
 
-                    # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
-                    # plus an offset. There
-                    z = primitive_position[2]
+                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                # plus an offset. There
+                z = primitive_position[2]
 
-                    # execute grasp action
-                    grasp_success, color_success = self.grasp([x, y, z], angle)
-
-                    # data before place
-                    place_depth, place_color, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-                    _, z_height = self.check_stack(np.arange(4))
-
-                    # move on if z_height has decreased
-                    print("Z height", z_height, "stack height", stack_height)
-                    if z_height < stack_height or z_height == 1: break
-
-                # log (run forward pass and save embeddings)
-                # assume if demo is given, trainer, logger are also given
-                if demo is not None:
-                    # run forward pass on grasp heightmaps, keep action features and get softmax predictions
-                    push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(grasp_color,
-                                grasp_depth, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
-                    action_feat = [push_feat, grasp_feat, place_feat]
-
-                    # get demo action
-                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                            'grasp', stack_height)
-
-                    # log action vector from embedding
-                    trainer.im_action_log.append(im_action)
-                    trainer.im_action_embed_log.append(im_action_embedding)
-                    trainer.executed_action_log.append([utils.ACTION_TO_ID['grasp'], x, y, z])
-                    trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['grasp']].filled(fill_value=0))
-
-                    # write demo related stuff
-                    logger.write_to_log('im_action', trainer.im_action_log)
-                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log,
-                            pickle=True)
-                    logger.write_to_log('executed-action', trainer.executed_action_log)
-                    logger.write_to_log('executed-action-embed',
-                            trainer.executed_action_embed_log, pickle=True)
-
-                    # save images
-                    #logger.save_images(stack_height, color_img, depth_img, 'grasp_unstack')
-                    logger.save_heightmaps(stack_height, grasp_color, grasp_depth, 'grasp_unstack')
-
-                    # run forward pass for place and save embeddings
-                    push_feat, grasp_feat, place_feat, push_predictions, grasp_predictions, place_predictions, _, _ = trainer.forward(place_color,
-                                place_depth, is_volatile=True, goal_condition=goal_condition, keep_action_feat=True)
-                    action_feat = [push_feat, grasp_feat, place_feat]
-
-                    # get demo action
-                    im_action_embedding, im_action = demo.get_action(trainer, workspace_limits,
-                            'place', stack_height)
-
-                    # TODO(adit98) log action vector from embedding
-                    # don't really need to store im_action since they *SHOULD* line up
-                    trainer.im_action_log.append(im_action)
-                    trainer.im_action_embed_log.append(im_action_embedding)
-                    trainer.executed_action_log.append([utils.ACTION_TO_ID['place'], x, y, z])
-                    trainer.executed_action_embed_log.append(action_feat[utils.ACTION_TO_ID['place']].filled(fill_value=0))
-
-                    # TODO(adit98) find best spot for this (write demo related stuff)
-                    logger.write_to_log('im_action', trainer.im_action_log)
-                    logger.write_to_log('im_action_embed', trainer.im_action_embed_log, pickle=True)
-                    logger.write_to_log('executed-action', trainer.executed_action_log)
-                    logger.write_to_log('executed-action-embed',
-                            trainer.executed_action_embed_log, pickle=True)
-
-                    # save images
-                    #logger.save_images(stack_height, color_img, depth_img, 'place_unstack')
-                    logger.save_heightmaps(stack_height, place_color, place_depth, 'place_unstack')
-
-                # place block if grasp was successful
+                grasp_success, color_success = self.grasp([x, y, z], angle)
                 if grasp_success:
-                    # generate place action randomly
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle, save_history=False)
 
-                # stack height has decreased
-                stack_height = z_height
-
             # clear the place hisory after unstacking
             self.place_pose_history = []
             print("------- UNSTACKING COMPLETE --------")
 
-        if self.is_sim:
-            # Move gripper out of the way to the home position
-            success = self.go_home()
-            if not success:
-                return success
-            # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
-            # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
-            # time.sleep(1)
+        else:
+            if self.is_sim:
+                # Move gripper out of the way to the home position
+                success = self.go_home()
+                if not success:
+                    return success
+                # sim_ret, UR5_target_handle = vrep.simxGetObjectHandle(self.sim_client,'UR5_target',vrep.simx_opmode_blocking)
+                # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
+                # time.sleep(1)
 
-            for object_handle in self.object_handles:
-                # Drop object at random x,y location and random orientation in robot workspace
-                self.reposition_object_randomly(object_handle)
+                # if not unstacking, place all objects randomly
+                if self.task_type is None or self.task_type != 'unstacking':
+                    for object_handle in self.object_handles:
+                        # Drop object at random x,y location and random orientation in robot workspace
+                        self.reposition_object_randomly(object_handle)
+                        time.sleep(0.5)
+
+                # if unstacking, need to create a stack at a random location
+                else:
+                    successful_stack = False
+                    while not successful_stack:
+                        # get random obj pose
+                        _, _, obj_pos, obj_ori = self.generate_random_object_pose()
+                        obj_ori[:2] = [0, 0]
+
+                        # iterate through remaining object handles and place them on top of existing stack (randomize order)
+                        obj_handles_rand = np.arange(len(self.object_handles))
+                        np.random.shuffle(obj_handles_rand)
+                        for ind, i in enumerate(obj_handles_rand):
+                            # reposition object as (x,y) position of first block, set z pos depending on stack height
+                            # same orientation (TODO(adit98) add noise later?)
+                            obj_pos[-1] = ind * 0.06 + 0.05
+
+                            # reposition object
+                            self.reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
+
+                            # regenerate object orientation and keep only the top block rotation
+                            _, _, _, obj_ori = self.generate_random_object_pose()
+                            obj_ori[:2] = [0, 0]
+
+                            # wait for objects to settle
+                            time.sleep(0.75)
+
+                        # continue to retry until we have a successful stack of 4 blocks
+                        successful_stack, stack_height = self.check_stack(np.ones(len(self.object_handles)))
+                        print('reposition_objects(): successful stack:', successful_stack, 'stack_height:', stack_height)
+                        if stack_height >= len(self.object_handles):
+                            successful_stack = True
+
+                # an extra half second so things settle down
                 time.sleep(0.5)
 
-            # an extra half second so things settle down
-            time.sleep(0.5)
-
-        if action_log is not None:
-            # return action log
-            return action_log
-
-        return True
-
-            # TODO(ahundt) add real robot support for reposition_objects
+                return True
 
     def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3, median_filter_size=5, color_median_filter_size=5):
         """
@@ -914,11 +878,11 @@ class Robot(object):
                 valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
-                
+
                 # If just manipulating blocks for dataset image generation, no need to check height.
                 if self.capture_logoblock_dataset:
                     break
-                
+
                 if max_z_height > z_height_retake_threshold:
                     if print_error > 3:
                         print('ERROR: depth_heightmap value too high. '
@@ -1817,7 +1781,6 @@ class Robot(object):
                 self.place_pose_history.pop(0)
 
         if self.is_sim:
-
             # Ensure gripper is closed
             gripper_fully_closed = self.close_gripper()
             if gripper_fully_closed:
@@ -2085,7 +2048,7 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
+    def check_stack(self, object_color_sequence, crop_stack_sequence=True, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -2113,7 +2076,11 @@ class Robot(object):
 
         # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
 
-        pos = np.asarray(self.get_obj_positions())
+        # if block positions aren't specified, call get_obj_positions
+        if pos is None:
+            print('regenerating pos')
+            pos = np.asarray(self.get_obj_positions())
+
         # Assume the stack will work out successfully
         # in the end until proven otherwise
         goal_success = True
@@ -2131,7 +2098,9 @@ class Robot(object):
             high_idx = low2high_idx[top_idx]
             low2high_pos = pos[low2high_idx, :]
             # filter objects closest to the highest block in x, y based on the threshold
-            nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
+            # ordered from low to high, boolean mask array
+            nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1) < \
+                    (distance_threshold/2)
             # print('nearby:', nearby_obj)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
@@ -2145,9 +2114,11 @@ class Robot(object):
                 # We know the goal won't be met, so goal_success is False
                 # But we still need to count the actual stack height so set the variable for later
                 goal_success = False
-            else:
-                # cut out objects we don't need to check
+            elif crop_stack_sequence:
+                # cut out objects we don't need to check if crop_stack_sequence is set
                 object_color_sequence = object_color_sequence[:num_obj+1]
+            else:
+                checks = len(object_color_sequence) - 1
             # print('auto object_color_sequence: ' + str(object_color_sequence))
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
@@ -2162,15 +2133,27 @@ class Robot(object):
             # print('distance_threshold: ', distance_threshold)
             if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
                 print('check_stack(): not high enough for idx: ' + str(idx))
+                if return_inds:
+                    return False, idx + 1, object_color_sequence
+
                 return False, idx + 1
+
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ', dist)
             if dist > distance_threshold:
                 print('check_stack(): too far apart')
+                if return_inds:
+                    return False, idx + 1, object_color_sequence
+
                 return False, idx + 1
+
         detected_height = min(idx + 2, len(object_color_sequence))
         print('check_stack() current detected stack height: ' + str(detected_height))
+
+        if return_inds:
+            return goal_success, detected_height, object_color_sequence
+
         return goal_success, detected_height
 
     def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
@@ -2220,8 +2203,7 @@ class Robot(object):
         return False
 
     def vertical_square_partial_success(self, current_stack_goal, check_z_height,
-            prev_z_height=None, row_dist_thresh=0.02, separation_threshold=0.1,
-            stack_dist_thresh=0.06):
+            row_dist_thresh=0.02, separation_threshold=0.1, stack_dist_thresh=0.06):
         """
             Checks if the last action was successful.
             NOTE: could be bugs with this, need to use location of last action to be sure
@@ -2231,9 +2213,10 @@ class Robot(object):
                 structure_progress: step of task we are on (e.g. 2 if structure has 2 blocks)
         """
 
-        # initially no stacks or rows
+        # initially no stacks or rows, 1 block in structure
         num_stacks = 0
         has_row = False
+        structure_size = 1
 
         if check_z_height:
             raise NotImplementedError
@@ -2246,48 +2229,66 @@ class Robot(object):
         # sort indices of blocks by z value
         low2high_idx = np.array(pos[:, 2]).argsort()
 
+        # check if we are currently holding a block, then we need to use -2 for top_idx
+        if pos[low2high_idx[-1], 2] > 0.2:
+            top_idx = -2
+        else:
+            top_idx = -1
+
         # first check for any stacks
-        high_idx = low2high_idx[-1]
-        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
-                (stack_dist_thresh / 2))
+        # NOTE if there isn't a first stack, then all blocks must be on the table so
+        # we don't need to check for a second stack
 
-        if len(nearby_obj) > 1:
+        # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
+        # top_idx is set to the index of low2high_idx we want to check the stack at
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), crop_stack_sequence=False,
+                top_idx=top_idx, distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
+        second_stack_inds = None
+
+        if stack_height > 1:
+            # we have at least 1 stack
             num_stacks += 1
-            first_stack_ind = high_idx
 
-            block_indices = []
-            # check for second stack (descending order, stop before block with known height 2)
-            for i in range(2, len(pos) - first_stack_ind - 1):
-                high_idx = low2high_idx[-1 * i]
-                nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
-                        axis=1) < (stack_dist_thresh / 2))
-
-                if len(nearby_obj) <= 1:
+            # iterate through all blocks except blocks in first stack to check for another stack
+            for i, block_ind in enumerate(low2high_idx[::-1]):
+                # skip blocks in first stack
+                if block_ind in first_stack_inds:
                     continue
 
-                # append bottom block to block_indices
-                block_indices.append(nearby_obj[0].item())
-                num_stacks += 1
-                break
+                # check for 2nd stack (use index of block_ind in low2high_idx)
+                top_idx = len(low2high_idx) - 1 - i
+                _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
+                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True)
+
+                if stack_height > 1:
+                    num_stacks += 1
+                    break
 
         # now check for rows
-        if len(block_indices) > 1:
-            # we have 2 stacks
-            has_row, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
+
+        # if we have 2 stacks, check the bottom blocks of each stack
+        if num_stacks == 2:
+            lowest_blocks = np.array([first_stack_inds[0], second_stack_inds[0]]).astype(int)
+            has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                     row_dist_thresh, separation_threshold, None, 1, False)
 
             if has_row:
-                # we have 2 stacks and they form a row
+                # we have 2 stacks and they form a row (structure is complete)
                 structure_size = 4
+            else:
+                structure_size = 2
 
-        # if there is only 1 stack or the 2 stacks don't form a row, check the other blocks in scene for row
-        if len(block_indices) == 1 or not has_row:
-            for i in range(len(pos)):
-                if low2high_idx[i] == block_indices[0]:
-                    continue
+        # if we have 1 stack, check bottom block of stack with all other blocks
+        elif num_stacks == 1:
+            # structure_size is at least 2
+            structure_size = 2
+            lowest_block = first_stack_inds[0]
+            for block_ind in low2high_idx:
+                # skip blocks already in stack
+                if block_ind in first_stack_inds: continue
 
-                block_inds = np.array(block_indices + [low2high_idx[i]])
-                has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+                lowest_blocks = np.array([lowest_block, block_ind]).astype(int)
+                has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                         row_dist_thresh, separation_threshold, None, 1, False)
 
                 if has_row:
@@ -2295,12 +2296,12 @@ class Robot(object):
                     structure_size = 3
                     break
 
-        # if there are no stacks, check for any row
+        # if we have 0 stacks, check all pairs of blocks
         else:
-            for i in range(len(pos)):
-                for j in range(i, len(pos)):
-                    block_inds = np.array([low2high_idx[i], low2high_idx[j]])
-                    has_row, _, _ = self.check_specific_blocks_for_row(pos, block_inds,
+            for i in range(len(low2high_idx)):
+                for j in range(i+1, len(low2high_idx)):
+                    lowest_blocks = np.array([low2high_idx[i], low2high_idx[j]]).astype(int)
+                    has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
                             row_dist_thresh, separation_threshold, None, 1, False)
 
                     if has_row:
@@ -2310,8 +2311,49 @@ class Robot(object):
                 if has_row:
                     break
 
+        print("vertical square partial success: structure height:", structure_size, "has_row:",
+                has_row, "num stacks:", num_stacks)
+
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
+
+    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1):
+        """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
+
+        # Arguments
+
+        prev_stack_height: height of stack before last action was taken
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+
+        # Returns
+
+        List [success, stack_height].
+        success: will be True if the stack matches the specified order from bottom to top, False otherwise.
+        stack_height: number of blocks in stack
+        """
+        # get object positions (array with each object position)
+        pos = np.asarray(self.get_obj_positions())
+
+        # sort indices of blocks by z value
+        low2high_idx = np.array(pos[:, 2]).argsort()
+
+        # check if we are currently holding a block, then we need to use -2 for top_idx
+        if pos[low2high_idx[-1], 2] > 0.2:
+            top_idx = -2
+
+        # run check stack to get height of stack
+        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx)
+
+        # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
+        structure_progress = 5 - stack_height
+
+        # check if we decreased or maintained last stack height
+        goal_success = (structure_progress >= prev_structure_progress)
+        print('unstacking_partial_success() structure_progress:', structure_progress,
+                'prev_structure_progress:', prev_structure_progress, 'goal_success:',
+                goal_success)
+
+        return goal_success, structure_progress
 
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False

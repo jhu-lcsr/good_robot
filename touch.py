@@ -8,7 +8,9 @@ import threading
 import os
 import utils
 from logger import Logger
+# TODO(adit98) put this in utils/get from somewhere else?
 from generate_sim_stacking_demo import get_and_save_images
+import argparse
 
 class HumanControlOfRobot(object):
     """Creates a color and depth opencv window from the robot camera, gets human keyboard/click, and moves the robot.
@@ -122,7 +124,7 @@ class HumanControlOfRobot(object):
         self.print_config()
 
     def execute_action(self, target_position, heightmap_rotation_angle):
-        # log env state
+        # log env state (demo/trial num is the poststring for saved heightmaps)
         depth_heightmap, color_heightmap, _, _, _ = get_and_save_images(self.click_count,
                 self.robot, self.logger, self.action, save_image=False)
         self.heightmap_pairs.append((depth_heightmap, color_heightmap))
@@ -132,19 +134,21 @@ class HumanControlOfRobot(object):
         def grasp(tp, ra, gh):
             # global self.grasp_success, self.grasp_color_success, self.mutex
             with self.mutex:
+                # log action (grasp)
+                self.all_action_log.append(tp.tolist() + [ra, utils.ACTION_TO_ID['grasp']])
                 self.grasp_success, self.grasp_color_success = robot.grasp(tp, ra, go_home=gh)
 
         def place(tp, ra, gh):
             # global self.grasp_success, self.mutex
             with self.mutex:
+                # log action (place)
+                self.all_action_log.append(tp.tolist() + [ra, utils.ACTION_TO_ID['place']])
                 self.place_success = self.robot.place(tp, ra, go_home=gh)
                 self.grasp_success = False
 
                 if self.place_success:
-                    # if we had a successful place, write the last 2 actions (grasp and place) to log
+                    # if we had a successful place, add the last 2 actions (grasp and place) to log
                     self.successful_action_log += self.all_action_log[-2:]
-                    self.logger.write_to_log('executed-actions-' + str(self.trial),
-                            self.successful_action_log)
 
                     # get last two pairs of heightmaps
                     heightmap_pairs = self.heightmap_pairs[-2:]
@@ -153,9 +157,9 @@ class HumanControlOfRobot(object):
 
                     # save images
                     self.logger.save_heightmaps(self.click_count, color_grasp,
-                            depth_grasp, 'grasp')
+                            depth_grasp, 'grasp', poststring=self.trial)
                     self.logger.save_heightmaps(self.click_count, color_place,
-                            depth_place, 'place')
+                            depth_place, 'place', poststring=self.trial)
 
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
@@ -170,22 +174,18 @@ class HumanControlOfRobot(object):
             if self.move_robot:
                 t = threading.Thread(target=move_to, args=(target_position, heightmap_rotation_angle))
                 t.start()
-        elif self.action == 'grasp':
-            if not self.robot.place_task or (self.robot.place_task and not self.grasp_success):
-                # log action
-                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
-                    utils.ACTION_TO_ID['grasp']])
 
+        elif self.action == 'grasp':
+            # make sure we should be grasping
+            if not self.robot.place_task or (self.robot.place_task and not self.grasp_success):
                 if self.move_robot:
                     t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                     t.start()
+
+            # above check failed, need to place
             else:
                 # adjust z height
                 target_position[-1] += 0.01
-
-                # log action
-                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
-                    utils.ACTION_TO_ID['place']])
 
                 if self.move_robot:
                     self.action = 'place'
@@ -200,21 +200,13 @@ class HumanControlOfRobot(object):
             t = threading.Thread(target=lambda: self.robot.push(target_position, heightmap_rotation_angle, go_home=self.go_home))
             t.start()
         elif self.action == 'place':
+            # check if we should be grasping even though place was specified
             if not self.grasp_success:
-                # log action
-                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
-                    utils.ACTION_TO_ID['grasp']])
-
                 t = threading.Thread(target=grasp, args=(target_position, heightmap_rotation_angle, self.go_home))
                 t.start()
             else:
                 # adjust z height
                 target_position[-1] += 0.01
-
-                # log action
-                self.all_action_log.append(target_position.tolist() + [heightmap_rotation_angle,
-                    utils.ACTION_TO_ID['place']])
-
                 t = threading.Thread(target=place, args=(target_position, heightmap_rotation_angle, self.go_home))
                 t.start()
 
@@ -227,6 +219,7 @@ class HumanControlOfRobot(object):
         state_str = 'Current action: ' + str(self.action) + '. '
         state_str += 'Grasp, HOLD, PLACE object task, ' if self.robot.place_task else 'Grasp then drop in box task, '
         state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
+        print(self.robot.vertical_square_partial_success(np.ones(4), False))
         print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
@@ -309,7 +302,21 @@ class HumanControlOfRobot(object):
                 joint_position = self.robot.parse_tcp_state_data(state_data, 'joint_data')
                 robot_state += ' joint pos: ' + str(joint_position) + ' homogeneous cart_pose: ' + str(actual_tool_pose)
                 print(str(self.print_state_count) + ' ' + robot_state)
+        elif key == ord('f'):
+            # finish trial, write actions (only the successful ones), and move to next trial
+            self.logger.write_to_log('executed-actions-' + str(self.trial),
+                    self.successful_action_log)
+            self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
+            self.trial += 1
+
+            # finish trial and move to next trial
+            self.robot.reposition_objects()
+
         elif key == ord('c'):
+            # we stopped the program, write actions (only the successful ones)
+            self.logger.write_to_log('executed-actions-' + str(self.trial),
+                    self.successful_action_log)
+            self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
             self.stop = True
         elif key == ord('h'):
             with self.mutex:
@@ -317,8 +324,8 @@ class HumanControlOfRobot(object):
                 t.start()
         elif key == ord('-'):
             with self.mutex:
-                t = threading.Thread(target=lambda: 
-                                        print('fully closed: ' + str(self.robot.close_gripper()) + ' obj detected: ' + str(self.robot.gripper.object_detected())))
+                t = threading.Thread(target=lambda: print('fully closed: ' + str(self.robot.close_gripper()) + \
+                        ' obj detected: ' + str(self.robot.gripper.object_detected())))
                 t.start()
         elif key == ord('='):
             with self.mutex:
@@ -348,7 +355,7 @@ class HumanControlOfRobot(object):
             #     calib = Calibrate(robot=self.robot)
             #     # calib.test()
             #     calib.calibrate()
-            
+
             # with self.mutex:
             #     t = threading.Thread(target=calibration)
             #     t.start()
@@ -359,44 +366,13 @@ class HumanControlOfRobot(object):
         while not hcr.stop:
             hcr.run_one()
 
-    #def get_action(self, camera_color_img=None, camera_depth_img=None, prev_click_count=None, block=True):
-    #    """ Get a human specified action
-    #    # Arguments
-    #        camera_color_img: show the human user a specific color image
-    #        camera_depth_img: show the human user a specific depth image
-    #        prev_click_count: pass the click count you saw most recently, used to determine if the user clicked in between calls to get_action.
-    #        block: when True this function will loop and get keypresses via run_one() until a click is received, when false it will just immediately return the current state.
-    #    # Returns
-    #        [action_name, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img]
-    #    """
-    #    running = True
-    #    if prev_click_count is None:
-    #        with self.mutex:
-    #            prev_click_count = self.click_count
-    #    while running:
-    #        self.run_one(camera_color_img, camera_depth_img)
-    #        with self.mutex:
-    #            cur_click_count = self.click_count
-    #            action = self.action
-    #            target_position = self.target_position
-    #            grasp_angle = self.grasp_angle
-    #            if running:
-    #                running = not self.stop
-
-    #        if not block:
-    #            running = False
-    #        elif cur_click_count > prev_click_count:
-    #            running = False
-    #    if camera_color_img is None:
-    #        with self.mutex:
-    #            camera_color_img = self.camera_color_img
-    #            camera_depth_img = self.camera_depth_img
-    #    return action, target_position, grasp_angle, cur_click_count, camera_color_img, camera_depth_img
-
     def __del__(self):
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--task_type', default='stack', type=str)
+    args = parser.parse_args()
 
     # User options (change me)
     # --------------- Setup options ---------------
@@ -424,8 +400,8 @@ if __name__ == '__main__':
     # Move robot to home pose
     # TODO(adit98) add cmd line args to select goal, task, etc.
     robot = Robot(is_sim, os.path.abspath('objects/blocks'), 4, workspace_limits,
-                tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
-                False, None, None, place=True, calibrate=calibrate, unstack=False)
+                tcp_host_ip, tcp_port, rtc_host_ip, rtc_port, False, None, None,
+                place=True, calibrate=calibrate, unstack=False, task_type=args.task_type)
 
     # initialize logger
     logger = Logger(continue_logging=False, logging_directory='demos')
