@@ -1248,6 +1248,8 @@ def main(args):
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
+            # Dump scene state information to a file.
+            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_0.json')
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
@@ -1802,6 +1804,16 @@ def main(args):
         best_stats_backup_path = os.path.join(logger.base_directory, 'models', 'training_best_stats.json')
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
+
+def dump_sim_object_state_to_json(robot, logger, filename):
+    # Dump scene state information to a file.
+    sim_positions, sim_orientations = robot.get_obj_positions_and_orientations()
+    save_location = os.path.join(logger.base_directory, 'data', 'variables')
+    if not os.path.exists(save_location):
+        os.mkdir(save_location)
+    with open(os.path.join(save_location, filename), 'w') as f:
+            json.dump({'positions': sim_positions, 'orientations': sim_orientations, 'color_names': robot.color_names, 'num_obj': robot.num_obj}, f, cls=utils.NumpyEncoder, sort_keys=True)
+
 
 def parse_resume_and_snapshot_file_args(args):
     if args.resume == 'last':
