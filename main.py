@@ -965,6 +965,42 @@ def main(args):
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
 
+                        elif task_type is not None and task_type == 'unstacking':
+                            trigger_reset = False
+                            # trigger progress reversal if no task progress (tries to grasp wrong block)
+                            if nonlocal_variables['stack_height'] <= nonlocal_variables['prev_stack_height']:
+                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress!' + \
+                                'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                                        str(nonlocal_variables['stack_height'])
+                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
+                                trigger_reset = True
+
+                            # trigger progress reversal if we progressed by more than 1 block with a successful grasp (topple)
+                            elif nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1:
+                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress!' + \
+                                'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                                        str(nonlocal_variables['stack_height'])
+                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
+                                trigger_reset = True
+
+                            if trigger_reset:
+                                print(mismatch_str)
+
+                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                robot.reposition_objects()
+                                nonlocal_variables['stack'].reset_sequence()
+                                nonlocal_variables['stack'].next()
+
+                                # We needed to reset, so the stack must have been knocked over!
+                                # all rewards and success checks are False!
+                                set_nonlocal_success_variables_false()
+                                nonlocal_variables['trial_complete'] = True
+                                if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
+                                    # on reset get the current row state
+                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj,
+                                            check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
+                                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
+
                     else:
                         # if we had a failed grasp which led to task progress, consider this progress reversal
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
@@ -1767,7 +1803,6 @@ def main(args):
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
 
-
 def parse_resume_and_snapshot_file_args(args):
     if args.resume == 'last':
         dirs = [os.path.join(os.path.abspath('logs'), p) for p in os.listdir(os.path.abspath('logs'))]
@@ -1989,7 +2024,6 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
         # print('Experience Replay: 0 prior training samples. Skipping experience replay.')
         time.sleep(0.01)
 
-
 def choose_testing_snapshot(training_base_directory, best_dict, prioritize_action_efficiency=False):
     """ Select the best test mode snapshot model file to load after training.
     """
@@ -2037,7 +2071,6 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
     print('Shapshot chosen: ' + testing_snapshot)
     return testing_snapshot
 
-
 def check_training_complete(args):
     ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
     '''
@@ -2055,7 +2088,6 @@ def check_training_complete(args):
         training_complete = max_iter_complete or max_train_actions_complete
 
     return training_complete, logging_directory
-
 
 def one_train_test_run(args):
     ''' One run of all necessary training and testing configurations.
@@ -2145,7 +2177,6 @@ def one_train_test_run(args):
     print('Training Complete! Dir: ' + training_base_directory)
     print('Training results: \n ' + str(best_dict))
     return training_base_directory, best_dict, testing_dest_dir, testing_best_dict
-
 
 def ablation(args):
 
