@@ -969,7 +969,7 @@ def main(args):
                             trigger_reset = False
                             # trigger progress reversal if no task progress (tries to grasp wrong block)
                             if nonlocal_variables['stack_height'] <= nonlocal_variables['prev_stack_height']:
-                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress!' + \
+                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress! ' + \
                                 'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                         str(nonlocal_variables['stack_height'])
                                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
@@ -977,7 +977,7 @@ def main(args):
 
                             # trigger progress reversal if we progressed by more than 1 block with a successful grasp (topple)
                             elif nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1:
-                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress!' + \
+                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp toppled stack! ' + \
                                 'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                         str(nonlocal_variables['stack_height'])
                                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
@@ -1004,7 +1004,7 @@ def main(args):
                     else:
                         # if we had a failed grasp which led to task progress, consider this progress reversal
                         if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple!' + \
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple! ' + \
                             'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
                                     str(nonlocal_variables['stack_height'])
 
