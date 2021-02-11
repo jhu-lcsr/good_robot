@@ -531,6 +531,7 @@ def main(args):
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                 robot.reposition_objects()
                 nonlocal_variables['stack'].reset_sequence()
                 nonlocal_variables['stack'].next()
@@ -873,6 +874,7 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                                 robot.reposition_objects()
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
@@ -902,6 +904,7 @@ def main(args):
 
                             # this reset is appropriate for stacking, but not checking rows
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                             robot.reposition_objects()
                             nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
@@ -987,6 +990,7 @@ def main(args):
                                 print(mismatch_str)
 
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                                 robot.reposition_objects()
                                 nonlocal_variables['stack'].reset_sequence()
                                 nonlocal_variables['stack'].next()
@@ -1014,6 +1018,7 @@ def main(args):
                                 print(mismatch_str)
                                 # this reset is appropriate for stacking, but not checking rows
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                                 robot.reposition_objects()
                                 nonlocal_variables['stack'].reset_sequence()
                                 nonlocal_variables['stack'].next()
@@ -1714,6 +1719,7 @@ def main(args):
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                 robot.check_sim()
                 if not robot.reposition_objects():
                     # This can happen if objects are in impossible positions (NaN),
