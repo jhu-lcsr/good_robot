@@ -934,35 +934,36 @@ def compute_demo_dist(preds, example_actions):
 
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
-        action = example_actions[i]
+        actions = list(example_actions[i])
 
-        # skip if we didn't evaluate model i on demo frame
-        if action is None:
-            continue
+        for j in actions:
+            actions[j] = np.expand_dims(actions[j], (0, 2, 3))
 
         # reshape and update list
-        example_actions[i] = np.expand_dims(action, (0, 2, 3))
+        example_actions[i] = actions
 
     # get mask from first available model (NOTE(adit98) see if we need a different strategy for this)
     mask = None
     for pred in preds:
         if pred is not None:
             mask = (preds == np.zeros([1, 64, 1, 1])).all(axis=1)
+            break
 
     # ensure that at least one of the preds is not None
     if mask is None:
         raise ValueError("Must provide at least one non-null pixel-wise embedding array")
 
-    # calculate l2 distance between example action embedding and preds for each policy
+    # calculate l2 distance between example action embedding and preds for each policy and demo
     l2_dists = []
-    for ind, action in enumerate(example_actions):
-        dist = np.sum(np.square(action - preds[ind]), axis=1)
+    for ind, actions in enumerate(example_actions):
+        for action in actions:
+            dist = np.sum(np.square(action - preds[ind]), axis=1)
 
-        # set all masked spaces to have max l2 distance
-        dist[mask] = np.max(dist) * 1.1
+            # set all masked spaces to have max l2 distance
+            dist[mask] = np.max(dist) * 1.1
 
-        # append to l2_dists list
-        l2_dists.append(dist)
+            # append to l2_dists list
+            l2_dists.append(dist)
 
     # select best action as min b/w all dists in l2_dists
     l2_dists = np.stack(l2_dists)
