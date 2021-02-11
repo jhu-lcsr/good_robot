@@ -1889,3 +1889,39 @@ DEPTH CHANNEL HISTORY, EFFICIENTNET, PUSHING AND GRASPING WITH ALL FEATURES & SA
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-01-21-15-59-44_Sim-Push-and-Grasp-SPOT-Trial-Reward-Masked-Training
 Commit: 0094dce46d68927f57869f7ba0a75122c5423a64
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 
+
+
+
+
+
+
+DEPTH CHANNEL HISTORY, DENSENET - SIM 2x2 VERTICAL SQUARE - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-08
+----------------------------------------------------------------------------------------
+
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_iter 40000 --random_actions --task_type vertical_square --depth_channels_history 
+CANCELLED due to place mask bug: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-12-47-05_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+CANCELLED due to place mask bug: Commit: d7a2e679edfdae0a0a7534fae0bb4ac1397f77ca
+CANCELLED Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-19-21_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+Commit: a98b11806fcd3e007b13daae66ed343badc9a94f
+# we found a bug
+CANCELLED RESUME: Commit: f67622f4d3ed5dbe24e4ff74646ccf425e8a71e5
+CANCELLED RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_iter 40000 --random_actions --task_type vertical_square --depth_channels_history --resume '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-19-21_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History' 
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+Commit: 1f61699ac1a29f00fcfd787fe5e4ce39b0fb46d0
+GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+
+
+DEPTH CHANNEL HISTORY, DENSENET - SIM UNSTACKING - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-08
+----------------------------------------------------------------------------------------
+
+± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_iter 40000 --random_actions --task_type unstacking --depth_channels_history 
+CANCELLED DUE TO PLACE COUNT BUG: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-11-28_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
+CANCELLED DUE TO PLACE COUNT BUG: Commit: a98b11806fcd3e007b13daae66ed343badc9a94f
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-37-32_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
+BUGGY Commit: 1f61699ac1a29f00fcfd787fe5e4ce39b0fb46d0
+RESUME (randomize block order during resets, start around iteration 3k): export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_iter 40000 --random_actions --task_type unstacking --depth_channels_history --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-37-32_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
+RESUME Commit: a8de19fcc5a137a4ac40b1a6204d72f164aa0a96
+RESUME2 (fix push knocking stack over not considered a progress reversal, resumed at around 3400 actions)
+Commit : 8c1f7c1ea7032b4743a75520af6d6bc697c77f12
+GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
