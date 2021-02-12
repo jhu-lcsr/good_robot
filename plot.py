@@ -197,7 +197,7 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     return success_rate, lower, upper, best_dict, current_dict
 
 
-def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4):
+def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, max_height=4, task_type=None, trial_success_log=None):
     """Calculate the running action efficiency from successful trials.
 
     trials: array giving the number of trials up to iteration i (TODO: unused?)
@@ -206,9 +206,17 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     Formula: successful_trial_count * ideal_actions_per_trial / window_size
     """
     # a stack is considered successful when the height is >= 4 blocks tall (~20cm)
+    # if unstacking, additionally check if trial was completed at that index
     # success = np.rint(stack_height) == max_height
     # TODO(ahundt) it may be better to drop this function and modify get_trial_success_rate() to calculate: max(trial_successes)-min(trial_successes)/(window/ideal_actions_per_trial)
     success = stack_height >= max_height
+    if task_type is not None and task_type == 'unstacking':
+        if trial_success_log is None:
+            raise ValueError("Must provide trial success log when evaluating unstacking action efficiency")
+
+        # successes are when trial was logged as successful
+        success = trial_success_log
+
     efficiency = np.zeros_like(stack_height, np.float64)
     lower = np.zeros_like(efficiency)
     upper = np.zeros_like(efficiency)
@@ -226,7 +234,6 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     # Print the best success rate ever, excluding actions before the initial window
     best_dict, current_dict = best_success_rate(efficiency, window, 'action efficiency')
     return efficiency, lower, upper, best_dict, current_dict
-
 
 def get_grasp_action_efficiency(actions, rewards, reward_threshold=0.5, window=200, ideal_actions_per_trial=3):
     """Get grasp efficiency from when the trial count increases.
@@ -356,7 +363,7 @@ def plot_it(log_dir, title, window=1000, colors=None,
             place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, window=window, task_type=task_type)
         best_dict.update(best)
         current_dict.update(current)
-        eff, eff_lower, eff_upper, best, current = get_action_efficiency(heights, window=window)
+        eff, eff_lower, eff_upper, best, current = get_action_efficiency(heights, window=window, trial_success_log=trial_successes)
         best_dict.update(best)
         current_dict.update(current)
     else:
