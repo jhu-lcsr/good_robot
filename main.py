@@ -1096,6 +1096,8 @@ def main(args):
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
                         if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                             nonlocal_variables['stack'].next()
+                            partial_stack_count += 1
+
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
