@@ -1062,7 +1062,28 @@ def main(args):
                     dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_2.json')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
                             use_imitation=use_demo, task_type=task_type)
-                    if (not needed_to_reset and
+
+                    # for unstacking, check if we toppled stack
+                    if task_type == 'unstacking' and nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']:
+                        # trigger progress reversal
+                        mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, place action caused stack to topple! ' + \
+                        'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                                str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
+                        print(mismatch_str)
+
+                        # this reset is appropriate for stacking, but not checking rows
+                        get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                        robot.reposition_objects()
+                        nonlocal_variables['stack'].reset_sequence()
+                        nonlocal_variables['stack'].next()
+
+                        # We needed to reset, so the stack must have been knocked over!
+                        # all rewards and success checks are False!
+                        set_nonlocal_success_variables_false()
+                        nonlocal_variables['trial_complete'] = True
+
+                    # otherwise do the normal success check
+                    elif (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
                              (task_type is not None and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
@@ -1071,7 +1092,6 @@ def main(args):
                         if task_type is not None:
                             nonlocal_variables['place_success'] = True
 
-                        partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
                         if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
