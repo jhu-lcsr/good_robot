@@ -7,6 +7,20 @@ from scipy import ndimage
 import datetime
 import os
 import json
+import yaml
+import torch
+from scipy.special import softmax
+import pathlib
+
+# Import necessary packages
+try:
+    from spacy.lang.en import English
+    from spacy.tokenizer import Tokenizer
+    from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
+    from transformer import TransformerEncoder
+    from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
+except ImportError:
+    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -235,9 +249,121 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
         plt.show(block=True)
     return push_predictions, grasp_predictions, place_predictions
 
-# TODO(zhe) implement language model masking using language model output
-def common_sense_language_model_mask(language_masks, push_predictions=None, grasp_predictions=None, place_predictions=None):
-    pass
+
+# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
+    
+    # Convert inputs to np.ma.masked_array objects if they are inputted as np.ndarrays
+    if not np.ma.is_masked(grasp_predictions):
+        if isinstance(grasp_predictions, np.ndarray):
+            grasp_predictions = np.ma.masked_array(grasp_predictions)
+        else:
+            raise TypeError("grasp_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
+    
+    if not np.ma.is_masked(place_predictions):
+        if isinstance(place_predictions, np.ndarray):
+            place_predictions = np.ma.masked_array(place_predictions)
+        else:
+            raise TypeError("place_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
+    
+    # Extract current masks
+    graspMask = np.ma.get_mask(grasp_predictions)
+    placeMask = np.ma.get_mask(place_predictions)
+    
+    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
+    # NOTE(zhe) Should we erode part of the mask away? The current mask lets the whole block pass. We may want to mask the edges of the block.
+    
+    # Peform data processing on the language model output to convert float values to logits
+    # NOTE(zhe) should the function be more generic and take in a reformatted list?
+    languageGraspMask = softmax(language_output['prev_position'][0], axis=0)
+    languageGraspMask = languageGraspMask[1] > 0.5      # using mask index 1 here to use the negative mask.
+    languagePlaceMask = softmax(language_output['next_position'][0], axis=0)
+    languagePlaceMask = languagePlaceMask[1] > 0.5      # using mask index 1 here to use the negative mask.
+    
+    # Scale language masks to match the prediction array sizes
+    languageGraspMask = cv2.resize(languageGraspMask, graspMask.shape, interpolation=cv2.INTER_NEAREST)
+    languagePlaceMask = cv2.resize(languagePlaceMask, placeMask.shape, interpolation=cv2.INTER_NEAREST)
+
+    # Combine language mask with existing masks if necessary
+    if graspMask is np.ma.nomask:
+        grasp_predictions.mask = languageGraspMask
+    else:
+        grasp_predictions.mask = 1 - np.logical_and(1 - graspMask,  1 - languageGraspMask)
+    
+    if placeMask is np.ma.nomask:
+        place_predictions.mask = languageGraspMask
+    else:
+        place_predictions.mask = 1 - np.logical_and(1 - placeMask,  1 - languagePlaceMask)
+
+    return push_predictions, grasp_predictions, place_predictions
+
+# Loads a transformer model from a config file
+def load_language_model_from_config(configYamlPath, weightsPath):
+
+    # Load config yaml file if possible
+    if os.path.exists(configYamlPath):
+        with open(configYamlPath) as file:
+            config=yaml.load(file, Loader=yaml.FullLoader)
+    else:
+        raise FileNotFoundError(f'unable to find {configYamlPath}')
+    
+    # Move model to available gpu
+    device = "cpu"
+    if config["cuda is not None"]:
+        free_gpu_id = get_free_gpu()
+        if free_gpu_id > -1:
+            device = f"cuda:{free_gpu_id}"
+
+    device = torch.device(device)  
+    print(f"Language Model on device {device}") 
+    test = torch.ones((1))
+    test = test.to(device) 
+
+    # Read the vocab from a json file.
+    checkpoint_dir = pathlib.Path(config["checkpoint_dir"])
+    print(f"Reading vocab from {checkpoint_dir}")
+    if os.path.exists(checkpoint_dir.joinpath('vocab.json')):
+        with open(checkpoint_dir.joinpath("vocab.json")) as f1:
+            train_vocab = json.load(f1)
+    else:
+        raise FileNotFoundError(f'unable to find {checkpoint_dir.joinpath("vocab.json")}')
+    
+    # Load the embedder (type specified in the config.yaml)
+    nlp = English()
+    tokenizer = Tokenizer(nlp.vocab)
+    if config['embedder'] == "random":
+        embedder = RandomEmbedder(tokenizer, train_vocab, config["embedding_dim"], trainable=True)
+    elif config['embedder'] == "glove":
+        embedder = GloveEmbedder(tokenizer, train_vocab, config["embedding_file"], config["embedding_dim"], trainable=True) 
+    elif config['embedder'].startswith("bert"): 
+        embedder = BERTEmbedder(model_name = config["embedder"],  max_seq_len = config["max_seq_length"]) 
+    else:
+        raise NotImplementedError(f'No embedder {config["embedder"]}') 
+
+    # Initiate the encoder
+    encoder = TransformerEncoder(image_size = config["resolution"],
+                                 patch_size = config["patch_size"], 
+                                 language_embedder = embedder, 
+                                 n_layers_shared = config["n_shared_layers"],
+                                 n_layers_split  = config["n_split_layers"],
+                                 n_classes = 2,
+                                 channels = config["channels"], 
+                                 n_heads = config["n_heads"],
+                                 hidden_dim = config["hidden_dim"],
+                                 ff_dim = config["f_dim"],
+                                 dropout = config["dropout"],
+                                 embed_dropout = config["embed_dropout"],
+                                 output_type = config["output_type"], 
+                                 positional_encoding_type = config["pos_encoding_type"],
+                                 # device = device,
+                                 log_weights = config["test"])
+
+    # Load weights
+    print(f'loading model weights from {config["checkpoint_dir"]}') 
+    state_dict = torch.load(pathlib.Path(config["checkpoint_dir"]).joinpath("best.th"))
+    encoder.load_state_dict(state_dict, strict=True)
+
+    return encoder
 
 # Save a 3D point cloud to a binary .ply file
 def pcwrite(xyz_pts, filename, rgb_pts=None):
@@ -689,7 +815,7 @@ def is_jsonable(x):
 
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
+    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -707,6 +833,9 @@ class StackSequence(object):
         self.trial = trial
         self.reset_sequence()
         self.total_steps = total_steps
+        # TODO(zhe) add list of color names, as an optional argument
+        self.color_names = color_names
+        self.color_len = len(color_names)
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -729,6 +858,27 @@ class StackSequence(object):
             self.object_color_one_hot_encodings = None
             self.object_color_sequence = None
         self.trial += 1
+
+    def generate_color_command_string(self):
+        """ Generates an English command sentence for stacking the last block in the current stacking sequence
+            on top of the second to last block using block colors.
+
+            The command could follow the format:
+            Place a {color of object_color_index} on top of {color of (object_color_index - 1)}.
+        """
+        if self.is_goal_conditioned_task:   # generating commands sentences only work for 
+            if self.object_color_index == 0:    # If we are just starting a stack
+                firstBlockColor = self.color_names[(self.object_color_index) % self.color_len]
+                return f'Start with a {firstBlockColor} block.'
+            elif self.object_color_index > 0:    # If we are in the middle of stacking
+                colorStrs = {'bottom': self.color_names[self.object_color_sequence[self.object_color_index-1] % self.color_len],
+                             'top': self.color_names[self.object_color_sequence[self.object_color_index] % self.color_len]}
+                command = f'Place a {colorStrs["top"]} block on top of the highest {colorStrs["bottom"]} block.'
+                return command
+            else:
+                return None
+        else:
+            return None
 
     def current_one_hot(self):
         """ Return the one hot encoding for the current specific object.

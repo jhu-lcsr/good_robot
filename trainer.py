@@ -32,7 +32,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, apply_language_mask=False):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -42,9 +42,9 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
-        self.place_common_sense = self.common_sense and place_common_sense
+        self.place_common_sense = self.common_sense and place_common_sense and not static_language_mask
         self.common_sense_backprop = common_sense_backprop
-        self.apply_language_mask=apply_language_mask
+        self.static_language_mask=static_language_mask
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
@@ -439,7 +439,7 @@ class Trainer(object):
 
     # Compute forward pass through model to compute affordances/Q
     # TODO(zhe) Input values needed to run Elias's model (sentence, color_heightmap). Ask Elias to be sure.
-    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False, demo_mask=False):
+    def forward(self, color_heightmap, depth_heightmap, is_volatile=False, specific_rotation=-1, goal_condition=None, keep_action_feat=False, use_demo=False, demo_mask=False, language_mask=None):
 
         # Apply 2x scale to input heightmaps
         color_heightmap_2x = ndimage.zoom(color_heightmap, zoom=[2,2,1], order=0)
@@ -514,6 +514,7 @@ class Trainer(object):
             channel_ind = 0
 
         # TODO(adit98) if method is reactive, this will not work, see reinforcement method for correct implementation
+        # NOTE(zhe) Question: What is reactive learning?
         if self.method == 'reactive':
             # Return affordances (and remove extra padding)
             for rotate_idx in range(len(output_prob)):
@@ -632,12 +633,15 @@ class Trainer(object):
                 return push_predictions, grasp_predictions, np.ma.masked_array(place_predictions)
         
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
-        if self.apply_language_mask:
-            language_masks = None # Fill this in
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_masks, push_predictions, grasp_predictions, place_predictions)
+        if self.static_language_mask and language_output is not None:
+            # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
+            # language_output = None # Fill this in
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions)
+        elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is None):
+            raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
-        # NOTE(zhe) This needs to be off when running the language masking
-        if self.place_common_sense:
+        # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
+        if self.place_common_sense and not self.static_language_mask:
             return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
         else:
             return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
@@ -670,7 +674,8 @@ class Trainer(object):
 
             print('Label value: %d' % (label_value))
             return label_value, label_value
-
+        
+        # QUESTION(zhe) where is the reward shaping for stack progress?
         elif self.method == 'reinforcement':
             # Compute current reward
             current_reward = 0

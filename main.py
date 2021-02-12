@@ -143,6 +143,10 @@ def main(args):
     random_actions = args.random_actions
     # TODO(zhe) Added static language mask option
     static_language_mask = args.static_language_mask
+    logoblock_dataset = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
+    obj_scale = 0.00018 if static_language_mask else 1 # Hard coded value based on logoblock mesh size.
+    language_model_config = args.language_model_config
+    language_model_weights = args.language_model_weights
 
     # -------------- Demo options -----------------------
     use_demo = args.use_demo
@@ -214,7 +218,8 @@ def main(args):
     robot = Robot(is_sim, obj_mesh_dir, num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, None,
-                  place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution)
+                  place, grasp_color_task, unstack=unstack, heightmap_resolution=heightmap_resolution,
+                  logoblock_dataset=logoblock_dataset, obj_scale=obj_scale)
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
@@ -248,7 +253,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+                          num_dilation=num_dilation, static_language_mask=static_language_mask)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -790,7 +795,7 @@ def main(args):
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp,
-                                use_imitation=use_dmeo, task_type=task_type)
+                                use_imitation=use_demo, task_type=task_type)
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
@@ -812,14 +817,15 @@ def main(args):
                         print(grasp_str)
                 elif nonlocal_variables['primitive_action'] == 'place':
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
+                    # TODO(zhe): Check against bisk intended position (from nonlocal variables['intended_position']) as an extra parameter in place function
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row, intended_position=nonlocal_variables['intended_position'])
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
-                            use_imitation=use_dmeo, task_type=task_type)
+                            use_imitation=use_demo, task_type=task_type)
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
@@ -987,18 +993,24 @@ def main(args):
     blockMover = None
     language_model = None
     if static_language_mask:
-        dataset_reader = DatasetReader(args.train_path,
+        # TODO IF grasp_color_task don't load dataset reader else ...
+        dataset_reader = DatasetReader(args.train_language_inputs,
                                        None,
                                        None,
                                        batch_by_line=True,
                                        batch_size = 1)
-        print(f"Reading data from {args.train_path}, this may take a few minutes.")
+        print(f"Reading data from {args.train_language_inputs}, this may take a few minutes.")
         language_data = dataset_reader.data['train']
+        # END IF
+        
         if is_sim:
-            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0])
+            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot, side_len=0.027)
+        
+        language_model = utils.load_language_model_from_config(configYamlPath=language_model_config, weightsPath=language_model_weights)
+        language_model.eval()
 
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
-    # TODO(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
+    # NOTE(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
         if nonlocal_variables['trial_complete']:
@@ -1016,26 +1028,40 @@ def main(args):
         
         # If using the language map, get the command sentence and set up the scene
         language_data_instance = None
+        nonlocal_variables['intended_position'] = None
         if static_language_mask:
-            # Obtain the a random sample from the training set
-            randIndex = random.randrange(0, len(language_data))
-            language_data_instance = language_data[randIndex]
-            
-            # Reset the scene to match the "previous" state if we are in the simulator
-            # NOTE(zhe) This currently requires the dynamics to be turned off. TODO(zhe) Allow dynamics in future.
             if is_sim:
+                # OBTAIN A DATASAMPLE randomly from the training set
+                # TODO(zhe) Change to a randomized indices list instead to ensure all training examples are used.
+                # TODO(zhe) We should probably take an image of the scene instead of using a saved image from the dataset.
+                if is_testing:
+                    # language_data_instance = 
+                    pass
+                else:
+                    randIndex = random.randrange(0, len(language_data))
+                    language_data_instance = language_data[randIndex]
+
+                # Update nonlocal variables with bisk goal here
+                nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
+
+                # RESET THE SCENE to match the "previous" state if we are in the simulator
+                # NOTE(zhe) This currently requires the dynamics to be turned off. TODO(zhe) Allow dynamics in future.
                 pos = language_data_instance.previous_positions[0]
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
+            else:
+                # TODO(zhe) Implement training on the real robot. How are we going to reset? How do we recognize a reset case?
+                raise NotImplementedError('training the language model on the real robot has not yet been implemented')
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
             robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
 
-        # TODO Generate the language mask using the language model.
-        language_mask = None # 
+        # Generate the language mask using the language model.
+        language_output = None # 4 ndarrays with shape (batch_size, 2, 64, 64) where each pixel has two options (block is present, block is not present)
         if static_language_mask:
-            pass
+            with torch.no_grad():
+                language_output = language_model.forward(language_data_instance)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -1066,7 +1092,7 @@ def main(args):
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
         
-        # NOTE(zhe) The pushing & grasping only task is to move items into a bin outside of the workspace.
+        # NOTE(zhe) The pushing & grasping only task is to pick up items and teleport them to a bin outside of the workspace.
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
             num_trials = trainer.num_trials()
@@ -1189,10 +1215,11 @@ def main(args):
                         push_predictions_stack, grasp_predictions_stack, place_predictions_stack
 
             else:
-                # TODO(zhe) Need to ensure that "predictions" also have language mask
+                # DONE(zhe) Need to ensure that "predictions" also have language mask
+                # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
-                                is_volatile=True, goal_condition=goal_condition)
+                                is_volatile=True, goal_condition=goal_condition, language_output=language_output)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1217,6 +1244,8 @@ def main(args):
             # Compute training labels, returns are:
             # label_value == expected_reward (with future rewards)
             # prev_reward_value == current_reward (without future rewards)
+            # NOTE(zhe) label_value is y_t, prev_reward_value is R_P
+            # TODO(zhe) Edit label_value to include bisk stacking rewards.
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
@@ -1986,7 +2015,9 @@ if __name__ == '__main__':
 
     # Language Mask Options
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
-    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json'                   help='specify the language data file to use during reinforcement learning')
+    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json',                   help='specify the language data file to use during reinforcement learning')
+    parser.add_argument('--language_model_config', dest='language_model_config', type=str, default='blocks_data/config.yaml', help='relative path to the yaml file containing the model hyperparameters')
+    parser.add_argument('--language_model_weights', dest='language_model_weights', type=str, default='blocks_data/best.th', help='file containing the language model weights (*.th) as a state dict.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)

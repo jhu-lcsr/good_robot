@@ -108,7 +108,7 @@ class Robot(object):
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
                  is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002, capture_logoblock_dataset=False, obj_scale=1, textured=False):
+                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002, randomized=True, obj_scale=1):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -146,7 +146,10 @@ class Robot(object):
         #
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
-        self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+        if grasp_color_task:
+            self.color_names = ['blue', 'green', 'yellow', 'red']
+        else:        
+            self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink'] 
 
         # If in simulation...
         if self.is_sim:
@@ -170,7 +173,13 @@ class Robot(object):
             #                                [176, 122, 161], # purple
             #                                [118, 183, 178], # cyan
             #                                [255, 157, 167]])/255.0 #pink
-            self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+            if grasp_color_task:
+                self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+                                [89.0, 161.0, 79.0], # green
+                                [237.0, 201.0, 72.0], # yellow
+                                [255.0, 87.0, 89.0]])/255.0 # red
+            else:
+                self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
                                 [255.0, 87.0, 89.0], # red
@@ -192,7 +201,7 @@ class Robot(object):
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
-            self.obj_mesh_color = self.color_space[np.asarray(range(self.num_obj)) % 10, :]
+            self.obj_mesh_color = self.color_space[np.asarray(range(self.num_obj)) % self.color_space.shape[0], :]
 
             # Make sure to have the server side running in V-REP:
             # in a child script of a V-REP scene, add following command
@@ -235,8 +244,10 @@ class Robot(object):
 
             # Scaling used when importing objects
             self.obj_scale = obj_scale
-            self.textured = textured
-            self.capture_logoblock_dataset = capture_logoblock_dataset
+            self.png_list = sorted(glob(os.path.join(self.obj_mesh_dir, "*.png")))
+            self.textured = True if len(self.png_list) > 0 else False
+            self.logoblock_dataset = self.textured
+            self.randomized = randomized
 
             # If testing, read object meshes and poses from test case file
             print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}")
@@ -446,7 +457,7 @@ class Robot(object):
                 self.object_colors = []
             for object_idx in range(len(self.obj_mesh_ind)):
                 # if setup for capture, no need for randomization / scrambling of the blocks.
-                if self.capture_logoblock_dataset:
+                if not self.randomized:
                     curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[object_idx])
                 else:
                     curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
@@ -489,7 +500,7 @@ class Robot(object):
 
                     # TODO: ZH, We don't really need this, remove this if statement after testing
                     scale = [self.obj_scale]
-                    # print(object_position + object_orientation + object_color + scale)
+                    # Adding the objects via Lua script. If we are dealing with texture, different call to script.
                     if self.textured:
                         ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWTextureWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
                     else:
@@ -916,7 +927,7 @@ class Robot(object):
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
                 
                 # If just manipulating blocks for dataset image generation, no need to check height.
-                if self.capture_logoblock_dataset:
+                if self.logoblock_dataset:
                     break
                 
                 if max_z_height > z_height_retake_threshold:
@@ -1421,16 +1432,23 @@ class Robot(object):
         return tool_analog_input2 > 0.26
 
     # HK: added a function to check if the right color is grasped
+    # Done(zhe) handle duplicate object colors and real robot colors
     def check_correct_color_grasped(self, color_ind):
         '''
         color_ind: the index in color_names to grasp.
         '''
         object_positions = np.asarray(self.get_obj_positions())
         object_positions = object_positions[:,2]
+        # Get the index at the highest position (ie, the picked object)
         grasped_object_ind = np.argmax(object_positions)
         grasped_object_handle = self.object_handles[grasped_object_ind]
         # color_index = np.where(color==1)
         # if grasped_object_ind == color_index[0]:
+
+        if self.grasp_color_task:
+            color_ind = color_ind % self.color_space.shape[0]
+            grasped_object_ind = grasped_object_ind % self.color_space.shape[0]
+
         if grasped_object_ind == color_ind:
             return True
         else:
@@ -1800,10 +1818,11 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True, intended_position=None):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
+        intended_position   a python list containing a position array at index 0 and a rotation array at index 1.
         """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
@@ -1880,7 +1899,10 @@ class Robot(object):
             print('current_position: ' + str(placed_object_position))
             current_obj_z_location = placed_object_position[2]
             print('current_obj_z_location: ' + str(current_obj_z_location+distance_threshold/2))
-            near_goal = np.linalg.norm(placed_object_position - position, axis=0) < (distance_threshold)
+            if intended_position is None:
+                near_goal = np.linalg.norm(placed_object_position - position, axis=0) < (distance_threshold)
+            else:
+                near_goal = np.linalg.norm(placed_object_position - intended_position[0], axis=0) < (distance_threshold)
             print('goal_position: ' + str(position[2]) + ' goal_position_margin: ' + str(position[2] + place_location_margin))
             place_success = has_moved and near_goal
             print('has_moved: ' + str(has_moved) + ' near_goal: ' + str(near_goal) + ' place_success: ' + str(place_success))
@@ -2085,6 +2107,7 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
+    # TODO(zhe) Modify check_stack to allow exchanging block numbers if blocks are the same color
     def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
         """ Check for a complete stack in the correct order from bottom to top.
 
@@ -2149,29 +2172,71 @@ class Robot(object):
                 # cut out objects we don't need to check
                 object_color_sequence = object_color_sequence[:num_obj+1]
             # print('auto object_color_sequence: ' + str(object_color_sequence))
+        
+        
+        if self.grasp_color_task:
+            sequences = []
+            # The following function fills in the sequences variable with possible sequences
+            self.generate_possible_color_stack_sequences(object_color_sequence, 0, [], sequences)
+        else:
+            sequences = [object_color_sequence]
+        # print(f'(ZHE):\t\t Possible Sequences: {sequences}')
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
         # print('top: ' + str(object_color_sequence[1:]))
         idx = 0
-        for idx in range(checks):
-            bottom_pos = pos[object_color_sequence[idx]]
-            top_pos = pos[object_color_sequence[idx+1]]
-            # Check that Z is higher by at least half the distance threshold
-            # print('bottom_pos:', bottom_pos)
-            # print('top_pos:', top_pos)
-            # print('distance_threshold: ', distance_threshold)
-            if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
-                print('check_stack(): not high enough for idx: ' + str(idx))
-                return False, idx + 1
-            # Check that the blocks are near each other
-            dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
-            # print('distance: ', dist)
-            if dist > distance_threshold:
-                print('check_stack(): too far apart')
-                return False, idx + 1
+        found = False
+        max_height = 0
+        for sequence in sequences:
+            found=True
+            for idx in range(checks):
+                # if color order matters, we should get all blocks with the same color
+                bottom_pos = pos[sequence[idx]]
+                top_pos = pos[sequence[idx+1]]
+                # Check that Z is higher by at least half the distance threshold
+                # print('bottom_pos:', bottom_pos)
+                # print('top_pos:', top_pos)
+                # print('distance_threshold: ', distance_threshold)
+                if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
+                    if not self.grasp_color_task:
+                        print('check_stack(): not high enough for idx: ' + str(idx))
+                    found=False
+                    max_height=max(max_height, idx + 1)
+                # Check that the blocks are near each other
+                dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
+                # print('distance: ', dist)
+                if dist > distance_threshold:
+                    if not self.grasp_color_task:
+                        print('check_stack(): too far apart')
+                    found=False
+                    max_height=max(max_height, idx + 1)
+            
+            if found:
+                break
+        
+        if not found:
+            return False, max_height
+
         detected_height = min(idx + 2, len(object_color_sequence))
         print('check_stack() current detected stack height: ' + str(detected_height))
         return goal_success, detected_height
+
+
+    def generate_possible_color_stack_sequences(self, object_color_sequence, index, used_indicies, output):
+        # Recursive function to help check the stack
+        if index == len(object_color_sequence):
+            output.append(used_indicies)
+            return
+        
+        bottom_color_index = object_color_sequence[index] % self.color_space.shape[0]
+        bottom_index_options = [i for i in range(bottom_color_index, self.num_obj, self.color_space.shape[0]) if i not in used_indicies]
+
+        for ib in bottom_index_options:
+            new_used_indicies = used_indicies.copy()
+            new_used_indicies.append(ib)
+            self.generate_possible_color_stack_sequences(object_color_sequence, index+1, new_used_indicies, output)
+        
+        return
 
     def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
                           separation_threshold=0.1, num_directions=64):

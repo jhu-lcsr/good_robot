@@ -23,6 +23,7 @@
 #  
 
 import os
+import sys
 import math
 import json
 import argparse
@@ -43,16 +44,25 @@ class BlockSetter(object):
     # Initialization Function. You either have to input a robot or {pos, rot, and block_path}
     def __init__(self,
                  num_obj: int,
-                 shift: List[float],
-                 pos: Optional[List[Tuple[float]]], 
-                 rot: Optional[List[Tuple[float]]], 
-                 blocks_path: Optional[str],
-                 robot=None):
+                 shift: List[float]=None,
+                 pos: Optional[List[Tuple[float]]]=None, 
+                 rot: Optional[List[Tuple[float]]]=None, 
+                 blocks_path: Optional[str]=None,
+                 robot=None,
+                 side_len=0.035):
         """
         Load an initial setup, returns a new instance of the Robot 
         object. If robot class is already initialized, run "load_setup"
         instead.
         """
+        if robot is not None and (pos is None and rot is None and blocks_path is None):
+            init_using_robot_obj = True
+        elif robot is None and (pos is not None and rot is not None and blocks_path is not None):
+            init_using_robot_obj = False
+        else:
+            sys.exit("ERROR: the BlockSetter object needs either a robot object or three lists (pos, rot, and blocks_path)")
+
+        
         self.num_obj = num_obj
         self.shift = shift
         
@@ -70,8 +80,9 @@ class BlockSetter(object):
         # Reordering JSON values (y axis is up in sim, z axis is up in JSON)
         self.ordering = [2,0,1]
         # 5cm Blocks
-        self.side_len = 0.035
+        self.side_len = side_len
         self.scale = self.side_len*0.001/0.15
+        print(f'Object scale is {self.scale}')
         # 14x14 grid
         self.grid_dim = 14
         self.grid_len = self.grid_dim*self.side_len
@@ -80,7 +91,7 @@ class BlockSetter(object):
         if robot is not None:
             # If num blocks is mismatched, throw error.
             if robot.num_obj != self.num_obj:
-                print("ERROR in Blocksetter: The argument num_obj does not match the number of objects in the robot argument.")
+                sys.exit("ERROR in Blocksetter: The argument num_obj does not match the number of objects in the robot argument.")
             else:
                 self.robot = robot
         
@@ -107,7 +118,7 @@ class BlockSetter(object):
         self.robot = Robot(is_sim, self.obj_mesh_dir, self.num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, test_preset_arr, 
-                  capture_logoblock_dataset=True, obj_scale=self.scale, textured=True)
+                  randomized=False, obj_scale=self.scale)
 
 
     def quat2euler(self, quatArr):
@@ -225,7 +236,7 @@ def main(args):
         
         # Load the setup
         if imc is None:
-            imc = BlockSetter(args.num_blocks, args.offset, pos=pos[0], rot=rot[0], blocks_path=args.blocks_path)
+            imc = BlockSetter(args.num_blocks, args.offset, pos=pos[0], rot=rot[0], blocks_path=args.blocks_path, side_len=args.side_length)
         else:
             imc.load_setup(pos[0], rot[0], prevPositions=ppos[0], prevOrientations=prot[0])
         
@@ -242,17 +253,17 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
-    parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data")
-    parser.add_argument("--num-blocks", type=int, default=20)
-    parser.add_argument("--simulator", default="CoppeliaSim", help="simulator software name")
-    # parser.add_argument("--trajectory-path", type=str, default = "blocks_data/singleset.json", help="trajectory motion of blocks")
-    parser.add_argument("--blocks-path", type=str, default = "objects/bisk_blocks", help="trajectory values")
-    parser.add_argument("--colorimg-folder", type=str, default = "data/color-images", help="output folder for color images")
-    parser.add_argument("--depthimg-folder", type=str, default = "data/depth-images", help="output folder for depth images")
-    parser.add_argument("--colorHm-folder", type=str, default = "data/color-heightmaps", help="output folder for color heightmaps")
-    parser.add_argument("--depthHm-folder", type=str, default = "data/depth-heightmaps", help="output folder for depth heightmaps")
-    parser.add_argument("--quaternions", action='store_true')
-    parser.add_argument("--offset", type=float, nargs=3, default=[0.15, 0.0, 0.0],  help="enter three float values to shift blocks on plane")
+    parser.add_argument("--train-path",         type=str,   default = "blocks_data/trainset_v2.json",   help="path to train data")
+    parser.add_argument("--val-path",           type=str,   default="blocks_data/devset.json",          help = "path to dev data")
+    parser.add_argument("--num-blocks",         type=int,   default=20)
+    parser.add_argument("--simulator",          type=str,   default="CoppeliaSim",                      help="simulator software name")
+    parser.add_argument("--blocks-path",        type=str,   default="objects/bisk_blocks",              help="trajectory values")
+    parser.add_argument("--colorimg-folder",    type=str,   default="data/color-images",                help="output folder for color images")
+    parser.add_argument("--depthimg-folder",    type=str,   default="data/depth-images",                help="output folder for depth images")
+    parser.add_argument("--colorHm-folder",     type=str,   default="data/color-heightmaps",            help="output folder for color heightmaps")
+    parser.add_argument("--depthHm-folder",     type=str,   default="data/depth-heightmaps",            help="output folder for depth heightmaps")
+    parser.add_argument("--quaternions",        action='store_true')
+    parser.add_argument("--side-length",        type=float, default=0.035,                              help='side length of the cubes in meters (approximate)')
+    parser.add_argument("--offset",             type=float, nargs=3, default=[0.0, 0.0, 0.0],           help="enter three float values to shift blocks on plane")
     args = parser.parse_args()
     main(args)
