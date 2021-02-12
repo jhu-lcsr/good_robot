@@ -1091,7 +1091,7 @@ def main(args):
                         # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table)
                         if task_type is not None:
                             nonlocal_variables['place_success'] = True
-                            if self.task_type == 'unstacking':
+                            if task_type == 'unstacking':
                                 partial_stack_count += 1
 
                         # Only increment our progress checks if we've surpassed the current goal
@@ -1099,7 +1099,7 @@ def main(args):
                         if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                             nonlocal_variables['stack'].next()
                             # don't increment partial_stack_count again for unstacking (should never reach this point bc of prog reversal
-                            if self.task_type != 'unstacking':
+                            if task_type != 'unstacking':
                                 partial_stack_count += 1
 
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
