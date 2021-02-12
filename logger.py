@@ -72,14 +72,27 @@ class Logger():
         depth_image = np.round(depth_image * 10000).astype(np.uint16) # Save depth in 1e-4 meters
         cv2.imwrite(os.path.join(self.depth_images_directory, '%06d.%s.depth.png' % (iteration, mode)), depth_image)
 
-    def save_heightmaps(self, iteration, color_heightmap, depth_heightmap, mode, debug=False):
+    def save_heightmaps(self, iteration, color_heightmap, depth_heightmap, mode, poststring=None, debug=False):
         color_heightmap = cv2.cvtColor(color_heightmap, cv2.COLOR_RGB2BGR)
         if debug:
             original_depth_heightmap = depth_heightmap.copy()
-        cv2.imwrite(os.path.join(self.color_heightmaps_directory, '%06d.%s.color.png' % (iteration, mode)), color_heightmap)
+
+        if poststring is not None:
+            color_filename = '%06d.%s.%s.color.png' % (iteration, mode, str(poststring))
+            depth_filename = '%06d.%s.%s.depth.png' % (iteration, mode, str(poststring))
+
+        else:
+            color_filename = '%06d.%s.color.png' % (iteration, mode)
+            depth_filename = '%06d.%s.depth.png' % (iteration, mode)
+
+        # save color
+        cv2.imwrite(os.path.join(self.color_heightmaps_directory, color_filename), color_heightmap)
+
+        # save depth
         depth_heightmap = np.round(depth_heightmap * 100000).astype(np.uint16) # Save depth in 1e-5 meters
-        depth_heightmap_path = os.path.join(self.depth_heightmaps_directory, '%06d.%s.depth.png' % (iteration, mode))
+        depth_heightmap_path = os.path.join(self.depth_heightmaps_directory, depth_filename)
         cv2.imwrite(depth_heightmap_path, depth_heightmap)
+
         if debug:
             converted_depth_heightmap = depth_heightmap.astype(np.float32) / 100000
             saved_reloaded_depth_heightmap = np.array(cv2.imread(depth_heightmap_path, cv2.IMREAD_ANYDEPTH)).astype(np.float32) / 100000
@@ -94,11 +107,15 @@ class Logger():
             plt.imshow(saved_reloaded_depth_heightmap)
             plt.show(block=True)
 
-    def write_to_log(self, log_name, log):
-        np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
-        shortlog = np.squeeze(log)
-        if len(shortlog.shape) > 0:
-            np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
+    def write_to_log(self, log_name, log, pickle=False):
+        # need to pickle and use savez when saving embeddings (>1 dim)
+        if pickle:
+            np.savez(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log)
+        else:
+            np.savetxt(os.path.join(self.transitions_directory, '%s.log.txt' % log_name), log, delimiter=' ')
+            shortlog = np.squeeze(log)
+            if len(shortlog.shape) > 0:
+                np.savetxt(os.path.join(self.transitions_directory, '%s.log.csv' % log_name), shortlog, delimiter=', ', header=log_name)
 
     def save_model(self, model, name):
         torch.save(model.state_dict(), os.path.join(self.models_directory, 'snapshot.%s.pth' % (name)))

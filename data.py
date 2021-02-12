@@ -13,7 +13,6 @@ np.random.seed(12)
 
 PAD = "<PAD>"
 
-
 class BaseTrajectory:
     """
     Trajectories are basic data-loading unit,
@@ -33,6 +32,7 @@ class BaseTrajectory:
                  batch_size: int = None,
                  resolution: int = 64,
                  do_filter: bool = False,
+                 do_one_hot: bool = True,
                  top_only: bool = True, 
                  binarize_blocks: bool = False):
 
@@ -40,6 +40,7 @@ class BaseTrajectory:
             batch_size = len(commands)
         self.batch_size = batch_size 
         self.do_filter = do_filter
+        self.do_one_hot = do_one_hot
         self.top_only = top_only
         self.binarize_blocks = binarize_blocks
         self.resolution = resolution
@@ -56,6 +57,8 @@ class BaseTrajectory:
         self.next_positions_for_acc = copy.deepcopy(self.next_positions_for_pred) 
         #self.blocks_to_move = self.get_blocks_to_move()
 
+        self.previous_positions = previous_positions
+        self.next_positions = next_positions
         self.previous_rotations = previous_rotations
         self.next_rotations = next_rotations
 
@@ -69,7 +72,10 @@ class BaseTrajectory:
                                                                 self.next_positions_for_acc)
 
         # set as input but one-hot 
-        self.previous_positions_input = self.one_hot(copy.deepcopy(self.previous_positions_for_acc)) 
+        if self.do_one_hot:
+            self.previous_positions_input = self.one_hot(copy.deepcopy(self.previous_positions_for_acc)) 
+        else:
+            self.previous_positions_input = [x.reshape(-1, 1, self.resolution, self.resolution) for x in copy.deepcopy(self.previous_positions_for_acc)]
 
         if self.do_filter: 
             # for loss, only look at the single block moved 
@@ -236,6 +242,7 @@ class SimpleTrajectory(BaseTrajectory):
                  traj_type: str,
                  batch_size: int,
                  do_filter: bool,
+                 do_one_hot: bool, 
                  resolution: int, 
                  top_only: bool,
                  binarize_blocks: bool):
@@ -251,6 +258,7 @@ class SimpleTrajectory(BaseTrajectory):
                                                batch_size=batch_size,
                                                resolution=resolution, 
                                                do_filter=do_filter,
+                                               do_one_hot = do_one_hot,
                                                top_only=top_only,
                                                binarize_blocks=binarize_blocks) 
         self.tokenizer = tokenizer
@@ -275,6 +283,7 @@ class DatasetReader:
                        batch_size = 32,
                        max_seq_length = 65,
                        do_filter: bool = False,
+                       do_one_hot: bool = False,
                        resolution: int = 64, 
                        top_only: bool = True, 
                        binarize_blocks: bool = False): 
@@ -286,6 +295,7 @@ class DatasetReader:
         self.batch_size = batch_size
         self.max_seq_length = max_seq_length
         self.do_filter = do_filter
+        self.do_one_hot = do_one_hot
         self.top_only = top_only 
         self.binarize_blocks = binarize_blocks
         self.resolution = resolution
@@ -329,15 +339,16 @@ class DatasetReader:
                         trajectory = SimpleTrajectory(line_id,
                                                     command, 
                                                     [previous_positions[timestep]],
-                                                    [None],
+                                                    [previous_rotations[timestep]],
                                                     [next_positions[timestep]],
-                                                    [None],
-                                                    images=[images[timestep]],
+                                                    [next_rotations[timestep]],
+                                                    images=[images[timestep],images[timestep+1]],
                                                     lengths = [None],
                                                     tokenizer=self.tokenizer,
                                                     traj_type=self.traj_type,
                                                     batch_size=1,
                                                     do_filter=self.do_filter,
+                                                    do_one_hot = self.do_one_hot, 
                                                     resolution=self.resolution, 
                                                     top_only = self.top_only,
                                                     binarize_blocks = self.binarize_blocks) 

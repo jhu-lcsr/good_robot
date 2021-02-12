@@ -18,6 +18,7 @@ realsense/realsense
 *.zip
 *.pdf
 *.pyc
+*.png
 *__pycache__*
 
 commands.txt
@@ -27,7 +28,7 @@ visualization.place.png
 calibration*/
 
 logs
-
+demos
 
 *calibration/
 
@@ -44,3 +45,9 @@ grid_logs
 grid_logs/*
 models
 models/*
+
+data/
+data/*
+
+.vscode
+.vscode/*
