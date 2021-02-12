@@ -1086,7 +1086,7 @@ def main(args):
                     elif (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
-                             (task_type is not None and nonlocal_variables['stack_height'] >= len(current_stack_goal)))):
+                             (task_type is not None and nonlocal_variables['partial_stack_success']))):
 
                         # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table)
                         if task_type is not None:
