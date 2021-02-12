@@ -1128,6 +1128,7 @@ def main(args):
                     # place trainer logs are updated in process_actions()
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
                     print("main.py() process_actions: place_success:", nonlocal_variables['place_success'])
+                    print("main.py() process_actions: partial_stack_success:", nonlocal_variables['partial_stack_success'])
                     trainer.partial_stack_success_log.append([int(nonlocal_variables['partial_stack_success'])])
                     trainer.place_success_log.append([int(nonlocal_variables['place_success'])])
                     trainer.trial_success_log.append([int(successful_trial_count)])
