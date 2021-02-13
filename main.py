@@ -847,6 +847,31 @@ def main(args):
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
+                    # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
+                    # for other tasks, progress reversal check in check_stack_update_goal will handle it
+                    if task_type is not None and task_type == 'unstacking':
+                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
+                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! ' + \
+                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
+                                    str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
+                            print(mismatch_str)
+
+                            # this reset is appropriate for stacking, but not checking rows
+                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
+                            robot.reposition_objects()
+                            nonlocal_variables['stack'].reset_sequence()
+                            nonlocal_variables['stack'].next()
+
+                            # We needed to reset, so the stack must have been knocked over!
+                            # all rewards and success checks are False!
+                            set_nonlocal_success_variables_false()
+                            nonlocal_variables['trial_complete'] = True
+
+                    elif not place or not needed_to_reset:
+                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
+
+
                     # check if task is complete
                     if place and (check_row or task_type is not None):
                         needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
@@ -895,29 +920,6 @@ def main(args):
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
-
-                    # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
-                    if task_type is not None and task_type == 'unstacking':
-                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! ' + \
-                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                    str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
-                            print(mismatch_str)
-
-                            # this reset is appropriate for stacking, but not checking rows
-                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
-                            robot.reposition_objects()
-                            nonlocal_variables['stack'].reset_sequence()
-                            nonlocal_variables['stack'].next()
-
-                            # We needed to reset, so the stack must have been knocked over!
-                            # all rewards and success checks are False!
-                            set_nonlocal_success_variables_false()
-                            nonlocal_variables['trial_complete'] = True
-
-                    elif not place or not needed_to_reset:
-                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
 
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
