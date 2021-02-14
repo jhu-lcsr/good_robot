@@ -847,6 +847,10 @@ def main(args):
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
+                    # check progress
+                    needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
+                            task_type=task_type)
+
                     # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
                     # for other tasks, progress reversal check in check_stack_update_goal will handle it
                     if task_type is not None and task_type == 'unstacking':
@@ -874,8 +878,6 @@ def main(args):
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
-                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
-                                task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
