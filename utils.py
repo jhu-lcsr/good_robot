@@ -835,7 +835,7 @@ class StackSequence(object):
         self.total_steps = total_steps
         # TODO(zhe) add list of color names, as an optional argument
         self.color_names = color_names
-        self.color_len = len(color_names)
+        self.color_len = len(color_names) if color_names is not None else 0
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -866,7 +866,7 @@ class StackSequence(object):
             The command could follow the format:
             Place a {color of object_color_index} on top of {color of (object_color_index - 1)}.
         """
-        if self.is_goal_conditioned_task:   # generating commands sentences only work for 
+        if self.is_goal_conditioned_task and self.color_names is not None:   # generating commands sentences only work for 
             if self.object_color_index == 0:    # If we are just starting a stack
                 firstBlockColor = self.color_names[(self.object_color_index) % self.color_len]
                 return f'Start with a {firstBlockColor} block.'
