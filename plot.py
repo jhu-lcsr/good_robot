@@ -146,7 +146,7 @@ def get_grasp_success_rate(actions, rewards=None, window=200, reward_threshold=0
     return success_rate, lower, upper, best_dict, current_dict
 
 
-def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4):
+def get_place_success_rate(stack_height, actions, include_push=False, window=200, hot_fix=False, max_height=4, task_type=None):
     """
     stack_heights: length N array of integer stack heights
     actions: Nx4 array of actions giving [id, rotation, i, j]
@@ -167,8 +167,13 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
 
     stack_height_increased = np.zeros_like(stack_height, np.bool)
     stack_height_increased[0] = False
-    # the stack height increased if the next stack height is higher than the previous
-    stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
+
+    if task_type is None or task_type != 'unstacking':
+        # the stack height increased if the next stack height is higher than the previous
+        stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
+    else:
+        # the action was sucessful if the next stack height is equal to or higher than the previous
+        stack_height_increased[1:] = stack_height[1:] >= stack_height[:-1]
 
     success_rate = np.zeros_like(stack_height)
     lower = np.zeros_like(success_rate)
@@ -268,7 +273,8 @@ def real_robot_speckle_noise_hotfix(heights, trial, trial_success, clearance, ov
 def plot_it(log_dir, title, window=1000, colors=None,
             alpha=0.16, mult=100, max_iter=None, place=None, rasterized=True, clear_figure=True,
             apply_real_robot_speckle_noise_hotfix=False, num_preset_arrangements=None,
-            label=None, categories=None, ylabel=None, save=True, save_dir=''):
+            label=None, categories=None, ylabel=None, save=True, save_dir='',
+            task_type=None):
 
     # set the global plot font to Times New Roman https://stackoverflow.com/a/40734893
     plt.rcParams["font.family"] = "Times New Roman"
@@ -345,9 +351,9 @@ def plot_it(log_dir, title, window=1000, colors=None,
     current_dict.update(current)
     if place:
         if 'row' in log_dir or 'row' in title.lower():
-            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window)
+            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, include_push=True, hot_fix=True, window=window, task_type=task_type)
         else:
-            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, window=window)
+            place_rate, place_lower, place_upper, best, current = get_place_success_rate(heights, actions, window=window, task_type=task_type)
         best_dict.update(best)
         current_dict.update(current)
         eff, eff_lower, eff_upper, best, current = get_action_efficiency(heights, window=window)

@@ -48,3 +48,6 @@ models/*
 
 data/
 data/*
+
+.vscode
+.vscode/*

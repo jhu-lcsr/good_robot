@@ -194,8 +194,8 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
 
     if push_length > 0.0:
         # For push, skip regions where the gripper would be too high
-        reigonal_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
-        block_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
+        regional_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
+        block_pixels = (heightmap > (regional_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
         # the blocks and the gripper width around them are set to zero.
@@ -983,3 +983,154 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
     print("ROW CHECK PIXEL COUNT: ", true_count, ", success: ", success, ", row size: ", row_size)
 
     return success, row_size
+
+# function to visualize prediction signal on heightmap (with rotations)
+def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
+        prob_exp=1, specific_rotation=None, num_rotations=None):
+
+    best_rot_ind = best_pix_ind[0]
+    best_action_xy = best_pix_ind[1:]
+    canvas = None
+
+    # clip values <0 or >1
+    predictions = np.clip(predictions, 0, 1)
+
+    # apply exponential
+    predictions = predictions ** prob_exp
+
+    if specific_rotation is None:
+        num_rotations = predictions.shape[0]
+
+        # populate canvas
+        for canvas_row in range(int(num_rotations/4)):
+            tmp_row_canvas = None
+            for canvas_col in range(4):
+                rotate_idx = canvas_row*4+canvas_col
+                prediction_vis = predictions[rotate_idx,:,:].copy()
+
+                # reshape to 224x224 (or whatever image size is), and color
+                prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
+                prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
+
+                # if this is the correct rotation, draw circle on action coord
+                if rotate_idx == best_rot_ind:
+                    # need to flip best_action_xy row and col since cv2.circle reads this as (x, y)
+                    prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]),
+                        int(best_action_xy[0])), 7, (221,211,238), 2)
+
+                # rotate probability map and image to gripper rotation
+                prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
+                background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
+
+                # blend image and colorized probability heatmap
+                prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
+                        blend_ratio, prediction_vis, 1-blend_ratio, 0)
+
+                # add image to row canvas
+                if tmp_row_canvas is None:
+                    tmp_row_canvas = prediction_vis
+                else:
+                    tmp_row_canvas = np.concatenate((tmp_row_canvas,prediction_vis), axis=1)
+
+            # add row canvas to overall image canvas
+            if canvas is None:
+                canvas = tmp_row_canvas
+            else:
+                canvas = np.concatenate((canvas,tmp_row_canvas), axis=0)
+
+        return canvas
+
+    else:
+        if num_rotations is None:
+            raise ValueError("Must specify number of rotations if providing a specific rotation")
+
+        # reshape to 224x224 (or whatever image size is), and color
+        prediction_vis = cv2.applyColorMap((predictions*255).astype(np.uint8), cv2.COLORMAP_JET)
+
+        # need to flip best_pix_ind row and col since cv2.circle reads in as (x, y)
+        prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]), int(best_action_xy[0])),
+                7, (221,211,238), 2)
+
+        # rotate probability map and image to gripper rotation
+        prediction_vis = ndimage.rotate(prediction_vis, best_rot_ind*(360.0/num_rotations),
+                reshape=False, order=0).astype(np.uint8)
+        background_image = ndimage.rotate(heightmap, best_rot_ind*(360.0/num_rotations),
+                reshape=False, order=0).astype(np.uint8)
+
+        # blend image and colorized probability heatmap
+        prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
+                blend_ratio, prediction_vis, 1-blend_ratio, 0)
+
+        return prediction_vis
+
+def compute_demo_dist(preds, example_actions):
+    """
+    Function to evaluate l2 distance and generate demo-signal mask
+    """
+    # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
+    def cos_sim(pix_preds, best_pred):
+        """
+        Helper function to compute cosine similarity.
+        Arguments:
+            pix_preds: pixel-wise embedding array
+            best_pred: template embedding vector
+        """
+        best_pred = np.expand_dims(best_pred, (0, 2, 3))
+        cos_sim = np.multiply(pix_preds, best_pred)
+        return cos_sim
+
+    # reshape each example_action to 1 x 64 x 1 x 1
+    for i in range(len(example_actions)):
+        actions = list(example_actions[i])
+
+        for j in actions:
+            actions[j] = np.expand_dims(actions[j], (0, 2, 3))
+
+        # reshape and update list
+        example_actions[i] = actions
+
+    # get mask from first available model (NOTE(adit98) see if we need a different strategy for this)
+    mask = None
+    for pred in preds:
+        if pred is not None:
+            mask = (preds == np.zeros([1, 64, 1, 1])).all(axis=1)
+            break
+
+    # ensure that at least one of the preds is not None
+    if mask is None:
+        raise ValueError("Must provide at least one non-null pixel-wise embedding array")
+
+    # calculate l2 distance between example action embedding and preds for each policy and demo
+    l2_dists = []
+    for ind, actions in enumerate(example_actions):
+        for action in actions:
+            dist = np.sum(np.square(action - preds[ind]), axis=1)
+
+            # set all masked spaces to have max l2 distance
+            dist[mask] = np.max(dist) * 1.1
+
+            # append to l2_dists list
+            l2_dists.append(dist)
+
+    # select best action as min b/w all dists in l2_dists
+    l2_dists = np.stack(l2_dists)
+
+    # find overall minimum distance across all policies and get index
+    match_ind = np.unravel_index(np.argmin(l2_dists), l2_dists.shape)
+
+    # select distance array for policy which contained minimum distance index
+    l2_dist = l2_dists[match_ind[0]]
+
+    # discard first dimension of match_ind to get it in the form (theta, y, x)
+    match_ind = match_ind[1:]
+
+    # make l2_dist >=0 and max_normalize
+    l2_dist = l2_dist - np.min(l2_dist)
+    l2_dist = l2_dist / np.max(l2_dist)
+
+    # invert values of l2_dist so that large values indicate correspondence
+    im_mask = 1 - l2_dist
+
+    return im_mask, match_ind
