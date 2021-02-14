@@ -872,10 +872,6 @@ def main(args):
                             set_nonlocal_success_variables_false()
                             nonlocal_variables['trial_complete'] = True
 
-                    elif not place or not needed_to_reset:
-                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
-
-
                     # check if task is complete
                     if place and (check_row or task_type is not None):
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
@@ -910,6 +906,9 @@ def main(args):
                                 # goal is 2 blocks in a row
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
+
+                    elif not place or not needed_to_reset:
+                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
