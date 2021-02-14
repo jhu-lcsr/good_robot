@@ -853,9 +853,10 @@ def main(args):
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
-                    # check progress
-                    needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
-                            task_type=task_type)
+                    # check progress (only if place is set)
+                    if place:
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
+                                task_type=task_type)
 
                     # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
                     # for other tasks, progress reversal check in check_stack_update_goal will handle it
@@ -877,10 +878,6 @@ def main(args):
                             # all rewards and success checks are False!
                             set_nonlocal_success_variables_false()
                             nonlocal_variables['trial_complete'] = True
-
-                    elif not place or not needed_to_reset:
-                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
-
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
@@ -916,6 +913,9 @@ def main(args):
                                 # goal is 2 blocks in a row
                                 nonlocal_variables['stack'].next()
                                 nonlocal_variables['trial_complete'] = True
+
+                    elif not place or not needed_to_reset:
+                        print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
 
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
