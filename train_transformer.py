@@ -82,9 +82,11 @@ class TransformerTrainer(FlatLanguageTrainer):
         self.patch_size = patch_size 
         self.output_type = output_type
         self.next_to_prev_weight = (next_weight, prev_weight) 
+
         self.teleportation_metric = TransformerTeleportationMetric(block_size = 4,
                                                                    image_size = resolution,
                                                                    patch_size = patch_size) 
+
         self.set_all_seeds(seed) 
 
     def set_all_seeds(self, seed):
