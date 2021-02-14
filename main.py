@@ -847,9 +847,10 @@ def main(args):
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
-                    # check progress
-                    needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
-                            task_type=task_type)
+                    # check progress (only if place is set)
+                    if place:
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
+                                task_type=task_type)
 
                     # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
                     # for other tasks, progress reversal check in check_stack_update_goal will handle it
