@@ -521,16 +521,20 @@ def main(args):
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
             if task_type is not None and task_type == 'unstacking':
+                print('checking toppled')
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
                     toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
+                elif nonlocal_variables['primitive_action'] == 'grasp' and not nonlocal_variables['grasp_success']:
+                    # can't progress legally if we have failed grasp
+                    toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
                 else:
                     # caused decrease of more than 1 block during push/grasp
-                    toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1
+                    toppled = nonlocal_variables['stack_height'] > (nonlocal_variables['prev_stack_height'] + 1)
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
-                str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset), + ' Does the code think the stack toppled: ' +
+                str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
@@ -938,7 +942,9 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
+                        print('running check_stack_update_goal for grasp action')
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx,
+                                depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo)
 
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
@@ -952,6 +958,7 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
+
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
@@ -974,7 +981,8 @@ def main(args):
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
+                    needed_to_reset = check_stack_update_goal(place_check=True,
+                            depth_img=valid_depth_heightmap_place, task_type=task_type, use_imitation=use_demo)
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
