@@ -469,6 +469,7 @@ def main(args):
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
         # no need to reset by default
         needed_to_reset = False
+        toppled = None
         if place_check:
             # Only reset while placing if the stack decreases in height!
             stack_shift = 1
@@ -516,16 +517,27 @@ def main(args):
                 nonlocal_variables['partial_stack_success'] = False
                 nonlocal_variables['stack_success'] = False
             max_workspace_height = len(current_stack_goal) - stack_shift
+
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
+            if task_type is not None and task_type == 'unstacking':
+                # also reset if we toppled while unstacking
+                if nonlocal_variables['primitive_action'] == 'place':
+                    # can't progress unstacking with place action, so this must have been a topple
+                    toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
+                else:
+                    # caused decrease of more than 1 block during push/grasp
+                    toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
               str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
-        if needed_to_reset or evaluate_random_objects:
+        if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            if toppled is not None and toppled:
+                mismatch_str += ', TOPPLED stack'
             if not disable_situation_removal:
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
                 print(mismatch_str)
@@ -847,34 +859,9 @@ def main(args):
                     else:
                         nonlocal_variables['push_success'] = robot.push(primitive_position, best_rotation_angle, workspace_limits)
 
-                    # check progress (only if place is set)
-                    if place:
-                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo,
-                                task_type=task_type)
-
-                    # if the task type is unstacking and we had task progress, then we caused a topple (progress reversal)
-                    # for other tasks, progress reversal check in check_stack_update_goal will handle it
-                    if task_type is not None and task_type == 'unstacking':
-                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, push action caused stack to topple! ' + \
-                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                    str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
-                            print(mismatch_str)
-
-                            # this reset is appropriate for stacking, but not checking rows
-                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
-                            robot.reposition_objects()
-                            nonlocal_variables['stack'].reset_sequence()
-                            nonlocal_variables['stack'].next()
-
-                            # We needed to reset, so the stack must have been knocked over!
-                            # all rewards and success checks are False!
-                            set_nonlocal_success_variables_false()
-                            nonlocal_variables['trial_complete'] = True
-
                     # check if task is complete
                     if place and (check_row or task_type is not None):
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
@@ -899,7 +886,6 @@ def main(args):
                                 # full stack complete! reset the scene
                                 successful_trial_count += 1
                                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                                 robot.reposition_objects()
                                 if len(next_stack_goal) > 1:
                                     # if multiple parts of a row are completed in one action, we need to reset the trial counter.
@@ -916,14 +902,15 @@ def main(args):
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
                     dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_2.json')
 
-                    if place:
+                    # this check is important for original row making and stacking modes, don't need if task type is set
+                    if place and task_type is None:
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
 
-                elif nonlocal_variables['primitive_action'] == 'grasp':
+                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
                     if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
@@ -940,10 +927,7 @@ def main(args):
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot,
-                            workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_2.json')
-
+                    valid_depth_heightmap_grasp, color_heightmap_grasp, depth_heightmap_grasp, color_img_grasp, depth_img_grasp = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
                     if place:
                         # when we are stacking we must also check the stack in case we caused it to topple
                         top_idx = -1
@@ -952,14 +936,7 @@ def main(args):
                             top_idx = -2
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
-                        print("main.py: running check_stack_update_goal")
-                        needed_to_reset = check_stack_update_goal(top_idx=top_idx,
-                                depth_img=valid_depth_heightmap_grasp,
-                                use_imitation=use_demo, task_type=task_type)
-
-                        # if the stack height increased, increment the StackSequence
-                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            nonlocal_variables['stack'].next()
+                        needed_to_reset = check_stack_update_goal(top_idx=top_idx, depth_img=valid_depth_heightmap_grasp)
 
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
@@ -973,74 +950,6 @@ def main(args):
                                 nonlocal_variables['trial_complete'] = True
 
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
-
-                        elif task_type is not None and task_type == 'unstacking':
-                            trigger_reset = False
-                            # trigger progress reversal if no task progress (tries to grasp wrong block)
-                            if nonlocal_variables['stack_height'] <= nonlocal_variables['prev_stack_height']:
-                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp did not lead to task progress! ' + \
-                                'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                        str(nonlocal_variables['stack_height'])
-                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
-                                trigger_reset = True
-
-                            # trigger progress reversal if we progressed by more than 1 block with a successful grasp (topple)
-                            elif nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1:
-                                mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, successful grasp toppled stack! ' + \
-                                'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                        str(nonlocal_variables['stack_height'])
-                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
-                                trigger_reset = True
-
-                            if trigger_reset:
-                                print(mismatch_str)
-
-                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
-                                robot.reposition_objects()
-                                nonlocal_variables['stack'].reset_sequence()
-                                nonlocal_variables['stack'].next()
-
-                                # We needed to reset, so the stack must have been knocked over!
-                                # all rewards and success checks are False!
-                                set_nonlocal_success_variables_false()
-                                nonlocal_variables['trial_complete'] = True
-                                if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
-                                    # on reset get the current row state
-                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj,
-                                            check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
-                                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
-
-                    else:
-                        # if we had a failed grasp which led to task progress, consider this progress reversal
-                        if nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                            mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, grasp action caused stack to topple! ' + \
-                            'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                    str(nonlocal_variables['stack_height'])
-
-                            # only reset if situation_removal is enabled or we are doing an unstacking task
-                            if not disable_situation_removal or (task_type is not None and task_type == 'unstacking'):
-                                mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
-                                print(mismatch_str)
-                                # this reset is appropriate for stacking, but not checking rows
-                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
-                                robot.reposition_objects()
-                                nonlocal_variables['stack'].reset_sequence()
-                                nonlocal_variables['stack'].next()
-                                # We needed to reset, so the stack must have been knocked over!
-                                # all rewards and success checks are False!
-                                set_nonlocal_success_variables_false()
-                                nonlocal_variables['trial_complete'] = True
-                                if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
-                                    # on reset get the current row state
-                                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj,
-                                            check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
-                                    nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
-
-                            else:
-                                print(mismatch_str)
-
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
                     color_grasp_rate = float(successful_color_grasp_count) / float(grasp_count)
                     grasp_str = 'Grasp Count: %r, grasp success rate: %r' % (grasp_count, grasp_rate)
@@ -1050,59 +959,31 @@ def main(args):
                         print(grasp_str)
 
                 elif nonlocal_variables['primitive_action'] == 'place':
-                    place_count += 1
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block for vertical square and stacking
                     if task_type is not None and ((task_type == 'unstacking') or (task_type == 'row')):
                         over_block = False
                     else:
                         over_block = not check_row
-                    nonlocal_variables['place_success'] = robot.place(primitive_position,
-                            best_rotation_angle, over_block=over_block)
+
+                    place_count += 1
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot,
-                            workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_2.json')
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
-                            use_imitation=use_demo, task_type=task_type)
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place)
 
-                    # for unstacking, check if we toppled stack
-                    if task_type == 'unstacking' and nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']:
-                        # trigger progress reversal
-                        mismatch_str = 'main.py unstacking_partial_success() DETECTED PROGRESS REVERSAL, place action caused stack to topple! ' + \
-                        'Previous Task Progress: ' + str(nonlocal_variables['prev_stack_height']) + ' Current Task Progress: ' + \
-                                str(nonlocal_variables['stack_height']) + ', RESETTING the objects, goals, and action success to FALSE...'
-                        print(mismatch_str)
-
-                        # this reset is appropriate for stacking, but not checking rows
-                        get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                        robot.reposition_objects()
-                        nonlocal_variables['stack'].reset_sequence()
-                        nonlocal_variables['stack'].next()
-
-                        # We needed to reset, so the stack must have been knocked over!
-                        # all rewards and success checks are False!
-                        set_nonlocal_success_variables_false()
-                        nonlocal_variables['trial_complete'] = True
-
-                    # otherwise do the normal success check
-                    elif (not needed_to_reset and
+                    # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
+                    if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
-                             (task_type is not None and nonlocal_variables['partial_stack_success']))):
+                             (task_type is not None and nonlocal_variables['partial_stack_success'])):
                         partial_stack_count += 1
-
-                        # if we ran into the last case, set place_success to True (can happen when we are near the edge of the table)
-                        if task_type is not None:
-                            nonlocal_variables['place_success'] = True
-
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
                         if not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal):
                             nonlocal_variables['stack'].next()
-
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
@@ -1119,7 +1000,6 @@ def main(args):
                             # full stack complete! reset the scene
                             successful_trial_count += 1
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                             robot.reposition_objects()
                             # We don't need to reset here because the algorithm already reset itself
                             # nonlocal_variables['stack'].reset_sequence()

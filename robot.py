@@ -2156,52 +2156,6 @@ class Robot(object):
 
         return goal_success, detected_height
 
-    def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
-                          separation_threshold=0.1, num_directions=64):
-        # get object positions (array with each object position)
-        pos = np.asarray(self.get_obj_positions())
-
-        # sort indices of blocks by z value
-        low2high_idx = np.array(pos[:, 2]).argsort()
-
-        # First see if there is one stack of height 2
-
-        # filter objects closest to the highest block in x, y based on the threshold
-        high_idx = low2high_idx[-1]
-        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
-                (stack_dist_thresh / 2))
-
-        # if the highest stack has height not equal to 2, task is not completed
-        # NOTE this could lead to false negatives if we are running with 8 objects in scene \
-        # and there are pre-existing stacks besides the main vertical square structures
-        if len(nearby_obj) != 2:
-            return False
-
-        # store the index of the bottom block of first 2-block stack
-        # first block in nearby_obj since the blocks are ordered low to high in the low2high_idx array
-        first_stack_ind = nearby_obj[0].item()
-
-        # check blocks in descending order, stop before block in nearby_obj since that has height 1
-        for i in range(2, len(pos) - first_stack_ind - 1):
-            high_idx = low2high_idx[-1 * i]
-            nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
-                    axis=1) < (stack_dist_thresh / 2))
-
-            if len(nearby_obj) != 2:
-                continue
-
-            # put both bottom block indicies in array
-            block_indices = np.array([nearby_obj[0].item(), first_stack_ind])
-
-            # we have another stack of height 2, now check if bottom blocks of each stack make row
-            row_success, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
-                    row_dist_thresh, separation_threshold, None, 1, False)
-
-            if row_success:
-                return True
-
-        return False
-
     def vertical_square_partial_success(self, current_stack_goal, check_z_height,
             row_dist_thresh=0.02, separation_threshold=0.1, stack_dist_thresh=0.06):
         """
