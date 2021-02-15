@@ -521,7 +521,6 @@ def main(args):
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
             if task_type is not None and task_type == 'unstacking':
-                print('checking toppled')
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
