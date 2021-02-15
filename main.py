@@ -547,7 +547,6 @@ def main(args):
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                 robot.reposition_objects()
                 nonlocal_variables['stack'].reset_sequence()
                 nonlocal_variables['stack'].next()
@@ -904,7 +903,6 @@ def main(args):
                     #TODO(hkwon214) Get image after executing push action. save also? better place to put?
                     valid_depth_heightmap_push, color_heightmap_push, depth_heightmap_push, color_img_push, depth_img_push = get_and_save_images(robot,
                             workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_2.json')
 
                     # this check is important for original row making and stacking modes, don't need if task type is set
                     if place and task_type is None:
@@ -1173,8 +1171,6 @@ def main(args):
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
-            # Dump scene state information to a file.
-            dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_0.json')
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
@@ -1639,7 +1635,6 @@ def main(args):
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_1.json')
                 robot.check_sim()
                 if not robot.reposition_objects():
                     # This can happen if objects are in impossible positions (NaN),
@@ -1843,6 +1838,10 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
     # otherwise, repeat depth values in each channel
     else:
         valid_depth_heightmap = np.stack([valid_depth_heightmap] * 3, axis=-1)
+
+    if robot.is_sim:
+        # Dump scene state information to a file for analysis, training, and language models.
+        dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
