@@ -910,7 +910,8 @@ def main(args):
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
 
-                 elif nonlocal_variables['primitive_action'] == 'grasp':
+
+                elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
                     if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
@@ -978,7 +979,7 @@ def main(args):
                     if (not needed_to_reset and
                             ((nonlocal_variables['place_success'] and nonlocal_variables['partial_stack_success']) or
                              (check_row and not check_z_height and nonlocal_variables['stack_height'] >= len(current_stack_goal)) or
-                             (task_type is not None and nonlocal_variables['partial_stack_success'])):
+                             (task_type is not None and nonlocal_variables['partial_stack_success']))):
                         partial_stack_count += 1
                         # Only increment our progress checks if we've surpassed the current goal
                         # TODO(ahundt) check for a logic error between rows and stack modes due to if height ... next() check.
