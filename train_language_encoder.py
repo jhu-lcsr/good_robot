@@ -10,6 +10,7 @@ import re
 import logging 
 from io import StringIO
 from typing import List, Dict
+from collections import defaultdict
 
 from tqdm import tqdm 
 from spacy.tokenizer import Tokenizer
@@ -28,6 +29,9 @@ from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder
 from mlp import MLP 
 from data import DatasetReader
+
+np.random.seed(12) 
+torch.manual_seed(12) 
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +68,9 @@ class LanguageTrainer:
                  generate_after_n: int,
                  resolution: int = 64, 
                  depth: int = 4,
-                 best_epoch: int = -1): 
+                 score_type: str = "acc",
+                 best_epoch: int = -1,
+                 do_regression: bool = False): 
         self.train_data = train_data
         self.val_data   = val_data
         self.encoder = encoder
@@ -77,27 +83,42 @@ class LanguageTrainer:
         self.best_epoch = best_epoch
         self.depth = depth 
         self.resolution = resolution
+        self.do_regression = do_regression 
 
         self.loss_fxn = torch.nn.CrossEntropyLoss()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
-
     
         self.nll_loss_fxn = torch.nn.NLLLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
         self.device = device
         self.compute_block_dist = self.encoder.compute_block_dist
 
+        self.score_type = score_type
+
+    def is_better(self, score, best_score):
+        if self.score_type in ['block_acc', 'acc']:
+            if score > best_score:
+                return True
+            else:
+                return False
+        else:
+            if score < best_score:
+                return True
+            else:
+                return False
+        
+
     def train(self):
-        all_accs = []
-        max_acc = 0.0 
+        best_score = 0.0 if self.score_type in ['block_acc', 'acc'] else np.inf   
+
         for epoch in range(self.best_epoch + 1, self.num_epochs, 1): 
-            acc, __ = self.train_and_validate_one_epoch(epoch)
+            score, __ = self.train_and_validate_one_epoch(epoch)
             # handle checkpointing 
-            all_accs.append(acc) 
             is_best = False
-            if acc > max_acc:
+
+            if self.is_better(score, best_score):
                 is_best = True
-                max_acc = acc 
+                best_score = score
             self.save_model(epoch, is_best) 
 
     def train_and_validate_one_epoch(self, epoch): 
@@ -203,7 +224,14 @@ class LanguageTrainer:
         text = "\n".join(text)
         return text
 
-    def generate_debugging_image(self, true_data, pred_data, out_path, is_input=False, caption = None):
+    def generate_debugging_image(self, 
+                                 true_data, 
+                                 pred_data, 
+                                 out_path, 
+                                 is_input=False, 
+                                 caption = None, 
+                                 pred_center = None,
+                                 true_center = None):
         order = ["adidas", "bmw", "burger king", "coca cola", "esso", "heineken", "hp", 
                  "mcdonalds", "mercedes benz", "nvidia", "pepsi", "shell", "sri", "starbucks", 
                  "stella artois", "target", "texaco", "toyota", "twitter", "ups"]
@@ -213,7 +241,11 @@ class LanguageTrainer:
         
         cmap = plt.get_cmap("Reds")
         # num_blocks x depth x 64 x 64 
-        pred_data = pred_data[1,:,:,:]
+        c = pred_data.shape[0]
+        if c == 2:
+            pred_data = pred_data[1,:,:,:]
+        else:
+            pred_data = pred_data[0,:,:,:]
         
         xs = np.arange(0, self.resolution, 1)
         zs = np.arange(0, self.resolution, 1)
@@ -259,6 +291,11 @@ class LanguageTrainer:
         ax.plot(to_plot_xs_lab, to_plot_zs_lab, ".")
         for x,z, lab in zip(to_plot_xs_lab, to_plot_zs_lab, to_plot_labels):
             ax.annotate(lab, xy=(x,z), fontsize = 12)
+        
+        # plot centers if availalbe 
+        if pred_center is not None and true_center is not None:
+            plt.plot(*pred_center, marker = "D", color='0000')
+            plt.plot(*true_center, marker = "X", color='0000')
 
         # plot as grid squares at all positions
         squares = []
@@ -270,6 +307,8 @@ class LanguageTrainer:
             ax.add_patch(sq)
 
         file_path =  f"{out_path}-{depth}.png"
+        #data_path = f"{out_path}.npy"
+        #np.save(data_path, true_data) 
                 
         print(f"saving to {file_path}") 
         plt.savefig(file_path) 
@@ -297,6 +336,7 @@ class LanguageTrainer:
         true_image = true_image.reshape((bsz, width, height, depth)).long()
                 
         true_image = true_image.to(self.device) 
+    
         
         if self.compute_block_dist:
             # loss per pixel 
@@ -316,6 +356,7 @@ class LanguageTrainer:
             foreground_loss = self.fore_loss_fxn(pred_image, true_image) 
             #print(f"computing loss no blocks {pixel_loss.item()}") 
             total_loss = pixel_loss + foreground_loss
+    
 
         #print(f"loss {total_loss.item()}")
         return total_loss
@@ -373,22 +414,26 @@ class FlatLanguageTrainer(LanguageTrainer):
                  checkpoint_dir: str,
                  num_models_to_keep: int,
                  generate_after_n: int,
+                 score_type: str = "acc",
                  resolution: int = 64, 
                  depth: int = 4,
-                 best_epoch: int = -1): 
-        super(FlatLanguageTrainer, self).__init__(train_data,
-                                                  val_data,
-                                                  encoder,
-                                                  optimizer,
-                                                  num_epochs,
-                                                  num_blocks,
-                                                  device,
-                                                  checkpoint_dir,
-                                                  num_models_to_keep,
-                                                  generate_after_n,
-                                                  resolution,
-                                                  depth, 
-                                                  best_epoch)
+                 best_epoch: int = -1,
+                 do_regression: bool = False): 
+        super(FlatLanguageTrainer, self).__init__(train_data=train_data,
+                                                  val_data=val_data,
+                                                  encoder=encoder,
+                                                  optimizer=optimizer,
+                                                  num_epochs=num_epochs,
+                                                  num_blocks=num_blocks,
+                                                  device=device,
+                                                  checkpoint_dir=checkpoint_dir,
+                                                  num_models_to_keep=num_models_to_keep,
+                                                  generate_after_n=generate_after_n,
+                                                  score_type=score_type,
+                                                  resolution=resolution,
+                                                  depth=depth, 
+                                                  best_epoch=best_epoch,
+                                                  do_regression = do_regression)
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -424,21 +469,42 @@ class FlatLanguageTrainer(LanguageTrainer):
         # TODO (elias): change back to pixel acc after debugging 
         return mean_acc, mean_block_acc 
 
-    def evaluate(self):
-        total_acc = 0.0 
-        total = 0 
-        total_block_acc = 0.0 
+    def evaluate(self, out_path = None):
         self.encoder.eval() 
-        for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
-            pixel_acc, block_acc = self.validate(dev_batch_instance, 1, b, 0) 
-            total_acc += pixel_acc
-            total_block_acc += block_acc
-            total += 1
+        all_res_dicts = []
 
-        mean_acc = total_acc / total 
-        mean_block_acc = total_block_acc / total
-        print(f"Test-time pixel acc {mean_acc * 100}, block acc {mean_block_acc * 100}") 
-        return mean_acc 
+        bin_dict = defaultdict(list) 
+        for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
+            all_res_dicts.append(self.validate(dev_batch_instance, 1, b, 0))
+            batch_bin_dict = all_res_dicts[-1]['bin_dict']
+            for k,v in batch_bin_dict.items():
+                bin_dict[k] += v
+
+        with open(self.checkpoint_dir.joinpath("bin_dict.json"), "w") as f1: json.dump(bin_dict, f1) 
+        if len(all_res_dicts) == 0:
+            return None
+        mean_dict = {k: [] for k in all_res_dicts[0].keys()}
+
+        print(all_res_dicts) 
+        for res_d in all_res_dicts:
+            for k, v in res_d.items():
+                if type(v) in [float, int, np.float64, np.int]:
+                    mean_dict[k].append(v)
+
+        for k, v in mean_dict.items():
+            if k in ["next_f1", "prev_f1", "block_acc"]: 
+                v = 100 * np.mean(v) 
+            else:
+                v = np.mean(v) 
+            mean_dict[k] = v
+
+        if out_path is None: 
+            out_path = "val_metrics.json"
+
+        with open(self.checkpoint_dir.joinpath(out_path), "w") as f1:
+            json.dump(mean_dict, f1) 
+
+        return mean_dict 
 
 
 def get_free_gpu():
@@ -452,7 +518,7 @@ def get_free_gpu():
     gpu_df['memory.free'] = gpu_df['memory.free'].astype(np.int64)
     gpu_df['memory.used'] = gpu_df['memory.used'].astype(np.int64)
     idx = gpu_df['memory.free'].idxmax()
-    if gpu_df["memory.used"][idx] > 3.0:
+    if gpu_df["memory.used"][idx] > 60.0:
         print(f"No free gpus!") 
         sys.exit() 
         return -1
@@ -608,7 +674,8 @@ def main(args):
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,
                               generate_after_n = args.generate_after_n, 
-                              best_epoch = best_epoch) 
+                              best_epoch = best_epoch,
+                              score_type=args.score_type) 
         print(encoder)
         trainer.train() 
 
@@ -618,8 +685,15 @@ def main(args):
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
         encoder.load_state_dict(state_dict, strict=True)  
 
+        if "test" in dataset_reader.data.keys():
+            eval_data = dataset_reader.data['test']
+            out_path = "test_metrics.json"
+        else:
+            eval_data = dataset_reader.data['dev']
+            out_path = "val_metrics.json"
+
         eval_trainer = trainer_cls(train_data = dataset_reader.data["train"], 
-                                           val_data = dataset_reader.data["dev"], 
+                                           val_data = eval_data, 
                                            encoder = encoder,
                                            optimizer = None, 
                                            num_epochs = 0, 
@@ -627,9 +701,10 @@ def main(args):
                                            resolution = args.resolution, 
                                            checkpoint_dir = args.checkpoint_dir,
                                            num_models_to_keep = 0, 
-                                           generate_after_n = 0) 
+                                           generate_after_n = 0,
+                                           score_type=args.score_type) 
         print(f"evaluating") 
-        eval_trainer.evaluate()
+        eval_trainer.evaluate(out_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -673,6 +748,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-models-to-keep", type=int, default = 5) 
     parser.add_argument("--num-epochs", type=int, default=3) 
     parser.add_argument("--generate-after-n", type=int, default=10) 
+    parser.add_argument("--score-type", type=str, default="acc", choices = ["acc", "block_acc", "tele_score"])
 
     args = parser.parse_args()
     main(args) 
