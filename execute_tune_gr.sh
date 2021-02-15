@@ -16,6 +16,7 @@ do
     nh=${stringarray[3]}
     warm=${stringarray[4]}
     w=${stringarray[5]}
+    init_scale=${stringarray[6]}
     
     #export CONFIG=configs/patch_transformer/tune_fixed.yaml;
     #export CONFIG=configs/image_transformer/bert.yaml
@@ -26,7 +27,8 @@ do
     export SHARED_LAYERS=${n_sh};
     export SPLIT_LAYERS=${n_sp};
     export NHEADS=${nh};
-    export WARMUP=${warm} 
+    export WARMUP=${warm};
+    export INIT_SCALE=${init_scale};
     echo ${CHECKPOINT_DIR} &> grid_logs/tmux_test_${NUM} 
     echo "executing grid_scripts in $(pwd)" >> grid_logs/tmux_test_${NUM};
     bash grid_scripts/tune_transformer_gr.sh;
