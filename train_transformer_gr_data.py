@@ -31,12 +31,13 @@ import pandas as pd
 from transformer import TransformerEncoder, image_to_tiles, tiles_to_image
 from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-from data import DatasetReader
+from data import DatasetReader, GoodRobotDatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
+from train_transformer import TransformerTrainer
 
 logger = logging.getLogger(__name__)
 
-class TransformerTrainer(FlatLanguageTrainer): 
+class GoodRobotTransformerTrainer(TransformerTrainer): 
     def __init__(self,
                  train_data: List,
                  val_data: List,
@@ -62,10 +63,11 @@ class TransformerTrainer(FlatLanguageTrainer):
                  prev_weight: float = 1.0,
                  do_regression: bool = False,
                  do_reconstruction: bool = False):
-        super(TransformerTrainer, self).__init__(train_data=train_data,
+        super(GoodRobotTransformerTrainer, self).__init__(train_data=train_data,
                                                  val_data=val_data,
                                                  encoder=encoder,
                                                  optimizer=optimizer,
+                                                 scheduler=scheduler,
                                                  num_epochs=num_epochs,
                                                  num_blocks=num_blocks,
                                                  device=device,
@@ -73,45 +75,24 @@ class TransformerTrainer(FlatLanguageTrainer):
                                                  num_models_to_keep=num_models_to_keep,
                                                  generate_after_n=generate_after_n,
                                                  score_type=score_type,
+                                                 patch_size=patch_size,
+                                                 block_size=block_size,
+                                                 output_type=output_type,
                                                  resolution=resolution, 
                                                  depth=depth, 
                                                  best_epoch=best_epoch,
+                                                 seed=seed,
+                                                 zero_weight=zero_weight,
+                                                 next_weight=next_weight,
+                                                 prev_weight=prev_weight,
+                                                 do_reconstruction=do_reconstruction,
                                                  do_regression=do_regression)
-
-        weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
-        total_steps = num_epochs * len(train_data) 
-        print(f"total steps {total_steps}") 
-        self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
-        self.xent_loss_fxn = torch.nn.CrossEntropyLoss() 
-
-        self.scheduler = scheduler 
-        self.patch_size = patch_size 
-        self.output_type = output_type
-        self.next_to_prev_weight = (next_weight, prev_weight) 
-        self.do_reconstruction = do_reconstruction
-        self.teleportation_metric = TransformerTeleportationMetric(block_size = block_size,
-                                                                   image_size = resolution,
-                                                                   patch_size = patch_size) 
-        if self.do_regression: 
-            self.mse_metric = MSEMetric()
-            self.reg_loss_fxn = torch.nn.MSELoss()
-
-        if self.do_reconstruction:
-            self.reconstruction_metric = AccuracyMetric() 
-
-        self.set_all_seeds(seed) 
-
-    def set_all_seeds(self, seed):
-        np.random.seed(seed) 
-        torch.manual_seed(seed) 
-        torch.backends.cudnn.deterministic = True
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
         skipped = 0
         for b, batch_instance in tqdm(enumerate(self.train_data)): 
-
             self.optimizer.zero_grad() 
             outputs = self.encoder(batch_instance) 
             #next_outputs, prev_outputs = self.encoder(batch_instance) 
@@ -147,30 +128,13 @@ class TransformerTrainer(FlatLanguageTrainer):
             score_dict = self.validate(dev_batch_instance, epoch, b, 0) 
             total_prev_acc += score_dict['prev_f1']
             total_next_acc += score_dict['next_f1']
-            total_block_acc += score_dict['block_acc']
-            total_tele_score += score_dict['tele_score']
-            total_mse += score_dict['mse']
-            total_prev_recon += score_dict['prev_recon_acc']
-            total_next_recon += score_dict['next_recon_acc']
-
             total += 1
 
         mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
-        mean_block_acc = total_block_acc / total
-        mean_tele_score = total_tele_score / total 
-        mean_mse = total_mse / total
-        mean_prev_recon = total_prev_recon / total
-        mean_next_recon = total_next_recon / total
-        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}, MSE: {mean_mse}, prev recon acc: {mean_prev_recon*100}, next recon acc {mean_next_recon*100}")
-        #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
-        #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
+        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}")
         if self.score_type == "acc":
-            return (mean_next_acc + mean_prev_acc)/2, mean_block_acc
-        elif self.score_type == "block_acc":
-            return mean_block_acc, 0.0
-        elif self.score_type == "tele_score":
-            return mean_tele_score, 0.0
+            return (mean_next_acc + mean_prev_acc)/2, -1.0
         else:
             raise AssertionError(f"invalid score type {self.score_type}")
 
@@ -303,82 +267,87 @@ class TransformerTrainer(FlatLanguageTrainer):
 
         return total_loss
 
+    def generate_debugging_image(self, true_img, pred_data, out_path, caption):
+        caption = self.wrap_caption(caption)
+        c = pred_data.shape[0]
+
+        cmap = plt.get_cmap("Reds")
+        if c == 2:
+            pred_data = pred_data[1,:,:]
+
+        fig, ax = plt.subplots(2,2, figsize=(16,16))
+
+        # gs = gridspec.GridSpec(2, 2, width_ratios=[2, 1])
+        text_ax = ax[0,1]
+        text_ax.axis([0, 1, 0, 1])
+        text_ax.text(0.2, 0.02, caption, fontsize = 12)
+        text_ax.axis("off") 
+
+        props = dict(boxstyle='round', 
+                     facecolor='wheat', alpha=0.5)
+        text_ax.text(0.05, 0.95, caption, wrap=True, fontsize=14,
+            verticalalignment='top', bbox=props)
+        # img_ax = plt.subplot(gs[2])
+        img_ax = ax[1,0]
+        true_img = true_img.detach().cpu().numpy().astype(int)
+        img_ax.imshow(true_img)
+
+        # pred_ax = plt.subplot(gs[0], figsize=(6,6))
+        pred_ax = ax[0,0]
+        pdb.set_trace() 
+        xs = np.arange(0, self.resolution, 1)
+        zs = np.arange(0, self.resolution, 1)
+
+        ticks = [i for i in range(0, self.resolution + 16, 16)]
+        pred_ax.set_xticks(ticks)
+        pred_ax.set_yticks(ticks) 
+        pred_ax.set_ylim(0, self.resolution)
+        pred_ax.set_xlim(0, self.resolution)
+        plt.grid() 
+        to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
+        to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
+        for x_pos in xs:
+            for z_pos in zs:
+                to_plot_xs_lab.append(x_pos)
+                to_plot_zs_lab.append(z_pos)
+
+                prob = pred_data[x_pos, z_pos].item()
+                to_plot_xs_prob.append(x_pos)
+                to_plot_zs_prob.append(z_pos)
+                to_plot_probs.append(prob)
+
+        squares = []
+        for x,z, lab in zip(to_plot_xs_prob, to_plot_zs_prob, to_plot_probs):
+            rgba = list(cmap(lab))
+            # make opaque
+            rgba[-1] = 0.4
+            sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
+            pred_ax.add_patch(sq)
+
+        file_path =  f"{out_path}.png"
+        print(f"saving to {file_path}") 
+        plt.savefig(file_path) 
+        plt.close() 
+
     def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
         self.encoder.eval() 
         outputs = self.encoder(batch_instance) 
         prev_position = outputs['prev_position']
         next_position = outputs['next_position']
 
-        if self.output_type == 'per-patch': 
-            prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
-            next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
-            prev_position = prev_position.unsqueeze(-1)
-            next_position = next_position.unsqueeze(-1)
+        prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
+        next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
 
-        elif self.output_type == "patch-softmax":
-            prev_position = tiles_to_image(prev_position, self.patch_size, output_type="patch-softmax", upsample=True) 
-            next_position = tiles_to_image(next_position, self.patch_size, output_type="patch-softmax", upsample=True) 
-            prev_position = prev_position.unsqueeze(-1)
-            next_position = next_position.unsqueeze(-1)
-            
-        else:
-            pass
 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_position) 
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_position) 
+        if True: 
+            print(batch_instance["prev_pos_for_pred"][0,0,40:60,10:30,0].long()) 
+            print(torch.argmax(prev_position[0,:,40:60,10:30], dim = 0))
 
-        all_tele_scores = []
-        all_oracle_tele_scores = []
-        all_tele_dicts = []
-        block_accs = []
-        pred_centers, true_centers = [], []
-        bsz = prev_position.shape[0]
-        for batch_idx in range(bsz): 
-            if self.do_regression:
-                # NOT AS ACCURATE 
-                # next_xyz = outputs['next_pos_xyz'].reshape(bsz, 3)[batch_idx]
-                #pdb.set_trace() 
-                next_xyz_batch = None
-            else:
-                next_xyz_batch = None
+        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
+        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
 
-            tele_dict = self.teleportation_metric.get_metric(batch_instance["next_pos_for_acc"][batch_idx].clone(),
-                                                             batch_instance["prev_pos_for_acc"][batch_idx].clone(),
-                                                             prev_position[batch_idx].clone(),
-                                                             outputs["next_position"][batch_idx].clone(),
-                                                             batch_instance["block_to_move"][batch_idx].clone(),
-                                                             next_xyz = next_xyz_batch) 
-            all_tele_dicts.append(tele_dict)
-            all_tele_scores.append(tele_dict['distance']) 
-            all_oracle_tele_scores.append(tele_dict['oracle_distance']) 
-            block_accs.append(tele_dict['block_acc']) 
-            pred_centers.append(tele_dict['pred_center'])
-            true_centers.append(tele_dict['true_center']) 
-
-        total_tele_score = np.mean(all_tele_scores) 
-        total_oracle_tele_score = np.mean(all_oracle_tele_scores) 
-        block_accuracy = np.mean(block_accs) 
-
-        bin_dict = defaultdict(list) 
-
-        if self.do_regression:
-            mse = self.mse_metric(batch_instance['next_pos_for_regression'],
-                                  outputs['next_pos_xyz']) 
-        else:
-            mse = 100
-
-        if self.do_reconstruction:
-            bsz, w, h, __, __ = batch_instance["next_pos_for_acc"].shape
-            true_next_image_recon = image_to_tiles(batch_instance["next_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size) 
-            true_prev_image_recon = image_to_tiles(batch_instance["prev_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size)       
-            # take max of each patch so that even mixed patches count as having a block 
-            true_next_image_recon, __= torch.max(true_next_image_recon, dim=2) 
-            true_prev_image_recon, __ = torch.max(true_prev_image_recon, dim=2) 
-            next_recon_metric = self.reconstruction_metric(true_next_image_recon,
-                                                           outputs['next_per_patch_class'])
-            prev_recon_metric = self.reconstruction_metric(true_prev_image_recon,
-                                                           outputs['prev_per_patch_class']) 
-
+        print(prev_p, prev_r, prev_f1)
+        print(next_p, next_r, next_f1)
 
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -389,34 +358,16 @@ class TransformerTrainer(FlatLanguageTrainer):
                 command = " ".join(command) 
                 next_pos = batch_instance["next_pos_for_acc"][i]
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
-
-                if "prev_per_patch_class" in outputs.keys() and outputs["prev_per_patch_class"] is not None:
-                    self.generate_reconstruction_image(prev_pos,
-                                                    outputs['prev_per_patch_class'][i],
-                                                    output_path.joinpath("prev_recon"),
-                                                    caption = command)
-                    self.generate_reconstruction_image(next_pos,
-                                                    outputs['next_per_patch_class'][i],
-                                                    output_path.joinpath("next_recon"),
-                                                    caption = command)
-
                  
                 self.generate_debugging_image(next_pos,
                                              next_position[i], 
                                              output_path.joinpath("next"),
-                                             caption = command,
-                                             pred_center = pred_centers[i],
-                                             true_center = true_centers[i])
+                                             caption = command) 
 
                 self.generate_debugging_image(prev_pos, 
                                               prev_position[i], 
                                               output_path.joinpath("prev"),
                                               caption = command) 
-                bin_distance = int(all_tele_dicts[i]["distance"])
-                bin_dict[bin_distance].append(str(output_path) )
-
-
-
                 try:
                     with open(output_path.joinpath("attn_weights"), "w") as f1:
                         # for now, just take the last layer 
@@ -430,20 +381,13 @@ class TransformerTrainer(FlatLanguageTrainer):
                     pass
 
         return {"next_f1": next_f1, 
-                "prev_f1": prev_f1, 
-                "block_acc": block_accuracy, 
-                "mse": mse,
-                "prev_recon_acc": prev_recon_metric,
-                "next_recon_acc": next_recon_metric,
-                "tele_score": total_tele_score,
-                "oracle_tele_score": total_oracle_tele_score,
-                "bin_dict": bin_dict} 
+                "prev_f1": prev_f1} 
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
         values, pred_pixels = torch.max(pred_pos, dim=1) 
         gold_pixels = true_pos 
-        pred_pixels = pred_pixels.unsqueeze(-1) 
+        pred_pixels = pred_pixels.unsqueeze(1) 
 
         pred_pixels = pred_pixels.detach().cpu().float() 
         gold_pixels = gold_pixels.detach().cpu().float() 
@@ -459,134 +403,8 @@ class TransformerTrainer(FlatLanguageTrainer):
         f1 = 2 * (precision * recall) / (precision + recall + eps) 
         return precision, recall, f1
 
-    def compute_localized_accuracy(self, true_pos, pred_pos, waste): 
-        values, pred_pixels = torch.max(pred_pos, dim=1) 
-        pred_pixels = pred_pixels.unsqueeze(-1) 
-
-        gold_pixels_ones = true_pos[true_pos == 1]
-        pred_pixels_ones = pred_pixels[true_pos == 1]
-
-        # flatten  
-        pred_pixels_ones = pred_pixels_ones.reshape(-1).detach().cpu()
-        gold_pixels_ones = gold_pixels_ones.reshape(-1).detach().cpu()
-
-        # compare 
-        total_foreground = gold_pixels_ones.shape[0]
-        matching_foreground = torch.sum(pred_pixels_ones == gold_pixels_ones).item() 
-        try:
-            foreground_acc = matching_foreground/total_foreground
-        except ZeroDivisionError:
-            foreground_acc = 0.0 
-
-        gold_pixels_zeros = true_pos[true_pos == 0]
-        pred_pixels_zeros = pred_pixels[true_pos == 0]
-        # flatten  
-        pred_pixels_zeros = pred_pixels_zeros.reshape(-1).detach().cpu()
-        gold_pixels_zeros = gold_pixels_zeros.reshape(-1).detach().cpu()
-
-        total_background = gold_pixels_zeros.shape[0]
-        matching_background = torch.sum(pred_pixels_zeros == gold_pixels_zeros).item() 
-        try:
-            background_acc = matching_background/total_background
-        except ZeroDivisionError:
-            background_acc = 0.0 
-
-        #print(f"foreground {foreground_acc} background {background_acc}") 
-        return (foreground_acc + background_acc ) / 2
-
-    def generate_reconstruction_image(self, 
-                                 true_data, 
-                                 pred_data, 
-                                 out_path, 
-                                 is_input=False, 
-                                 caption = None, 
-                                 pred_center = None,
-                                 true_center = None):
-
-        # upsample predictions 
-        pred_data = pred_data.unsqueeze(0).unsqueeze(-1)
-        pred_data_image = tiles_to_image(pred_data, self.patch_size, output_type="per-patch", upsample=True)
-        pred_classes = torch.argmax(pred_data_image, dim=1)
-
-        order = ["adidas", "bmw", "burger king", "coca cola", "esso", "heineken", "hp", 
-                 "mcdonalds", "mercedes benz", "nvidia", "pepsi", "shell", "sri", "starbucks", 
-                 "stella artois", "target", "texaco", "toyota", "twitter", "ups"]
-        legend = [f"{i+1}: {name}" for i, name in enumerate(order)]
-        legend_str = "\n".join(legend)
-        caption = self.wrap_caption(caption)
-        
-        cmap = plt.get_cmap("tab20b")
-        # num_blocks x depth x 64 x 64 
-        xs = np.arange(0, self.resolution, 1)
-        zs = np.arange(0, self.resolution, 1)
-
-        depth = 0
-        fig = plt.figure(figsize=(16,12))
-        gs = gridspec.GridSpec(1, 2, width_ratios=[4, 1])
-        # add text command for debugging 
-        text_ax = plt.subplot(gs[1])
-        text_ax.axis([0, 1, 0, 1])
-        text_ax.text(0.2, 0.02, legend_str, fontsize = 12)
-        text_ax.axis("off") 
-
-        props = dict(boxstyle='round', 
-                     facecolor='wheat', alpha=0.5)
-        text_ax.text(0.05, 0.95, caption, wrap=True, fontsize=14,
-            verticalalignment='top', bbox=props)
-        ax = plt.subplot(gs[0])
-        ticks = [i for i in range(0, self.resolution + 16, 16)]
-        ax.set_xticks(ticks)
-        ax.set_yticks(ticks) 
-        ax.set_ylim(0, self.resolution)
-        ax.set_xlim(0, self.resolution)
-        plt.grid() 
-        to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
-        to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
-        for x_pos in xs:
-            for z_pos in zs:
-                label = true_data[x_pos, z_pos, depth].item()
-                # don't plot background 
-                if label > 0:
-                    to_plot_xs_lab.append(x_pos)
-                    to_plot_zs_lab.append(z_pos)
-                    to_plot_labels.append(int(label))
-                prob = pred_classes[0, x_pos, z_pos].item()
-                to_plot_xs_prob.append(x_pos)
-                to_plot_zs_prob.append(z_pos)
-                to_plot_probs.append(prob)
-
-
-        ax.plot(to_plot_xs_lab, to_plot_zs_lab, ".")
-        for x,z, lab in zip(to_plot_xs_lab, to_plot_zs_lab, to_plot_labels):
-            ax.annotate(lab, xy=(x,z), fontsize = 12)
-        
-        # plot centers if availalbe 
-        if pred_center is not None and true_center is not None:
-            plt.plot(*pred_center, marker = "D", color='0000')
-            plt.plot(*true_center, marker = "X", color='0000')
-
-        # plot as grid squares at all positions
-        squares = []
-        for x,z, lab in zip(to_plot_xs_prob, to_plot_zs_prob, to_plot_probs):
-            rgba = list(cmap(lab))
-            # make opaque
-            rgba[-1] = 0.4
-            sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
-            ax.add_patch(sq)
-
-        file_path =  f"{out_path}.png"
-        #data_path = f"{out_path}.npy"
-        #np.save(data_path, true_data) 
-                
-        print(f"saving to {file_path}") 
-        plt.savefig(file_path) 
-        plt.close() 
-
 
 def main(args):
-    if args.binarize_blocks:
-        args.num_blocks = 1
-
     device = "cpu"
     if args.cuda is not None:
         free_gpu_id = get_free_gpu()
@@ -600,46 +418,29 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
-    dataset_reader = DatasetReader(args.train_path,
-                                   args.val_path,
-                                   args.test_path,
-                                   image_path = args.image_path, 
-                                   batch_by_line = args.traj_type != "flat",
-                                   traj_type = args.traj_type,
-                                   batch_size = args.batch_size,
-                                   max_seq_length = args.max_seq_length,
-                                   do_filter = args.do_filter,
-                                   do_one_hot = args.do_one_hot, 
-                                   top_only = args.top_only,
-                                   resolution = args.resolution, 
-                                   is_bert = "bert" in args.embedder,
-                                   binarize_blocks = args.binarize_blocks)  
+    dataset_reader = GoodRobotDatasetReader(path=args.path,
+                                            split_type=args.split_type,
+                                            task_type=args.task_type,
+                                            augment_by_flipping = args.augment_by_flipping,
+                                            augment_language = args.augment_language,
+                                            leave_out_color = args.leave_out_color,
+                                            batch_size=args.batch_size,
+                                            max_seq_length=args.max_seq_length,
+                                            resolution = args.resolution,
+                                            is_bert = "bert" in args.embedder,
+                                            overfit=args.overfit) 
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
     if not args.test:
-        print(f"Reading data from {args.train_path}")
-        train_vocab = dataset_reader.read_data("train") 
-        try:
-            os.mkdir(checkpoint_dir)
-        except FileExistsError:
-            pass
+        train_vocab = dataset_reader.vocab
         with open(checkpoint_dir.joinpath("vocab.json"), "w") as f1:
             json.dump(list(train_vocab), f1) 
     else:
         print(f"Reading vocab from {checkpoint_dir}") 
         with open(checkpoint_dir.joinpath("vocab.json")) as f1:
             train_vocab = json.load(f1) 
-        
-    print(f"Reading data from {args.val_path}")
-    dev_vocab = dataset_reader.read_data("dev") 
-
-    if args.test_path is not None:
-        test_vocab = dataset_reader.read_data("test")
-    # no test then delete
-    else:
-        del(dataset_reader.data['test'])
-
     print(f"got data")  
+
     # construct the vocab and tokenizer 
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
@@ -654,19 +455,14 @@ def main(args):
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
-    if args.top_only:
-        depth = 1
-    else:
-        # TODO (elias): confirm this number 
-        depth = 7
-
+    depth = 1
     encoder = TransformerEncoder(image_size = args.resolution,
                                  patch_size = args.patch_size, 
                                  language_embedder = embedder, 
                                  n_layers_shared = args.n_shared_layers,
                                  n_layers_split  = args.n_split_layers,
                                  n_classes = 2,
-                                 channels = args.channels, 
+                                 channels = 3,
                                  n_heads = args.n_heads,
                                  hidden_dim = args.hidden_dim,
                                  ff_dim = args.ff_dim,
@@ -676,13 +472,10 @@ def main(args):
                                  positional_encoding_type = args.pos_encoding_type,
                                  device = device,
                                  log_weights = args.test,
-                                 do_regression = args.do_regression,
-                                 do_reconstruction = args.do_reconstruction)
-
-
+                                 do_regression = False,
+                                 do_reconstruction = False) 
     if args.cuda is not None:
         encoder = encoder.cuda(device) 
-                         
     print(encoder) 
     # construct optimizer 
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.learn_rate) 
@@ -724,14 +517,16 @@ def main(args):
             # dump 
             yaml.safe_dump(to_dump, f1, encoding='utf-8', allow_unicode=True) 
 
+
+        num_blocks = 1
         # construct trainer 
-        trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
+        trainer = GoodRobotTransformerTrainer(train_data = dataset_reader.data["train"], 
                               val_data = dataset_reader.data["dev"], 
                               encoder = encoder,
                               optimizer = optimizer, 
                               scheduler = scheduler, 
                               num_epochs = args.num_epochs,
-                              num_blocks = args.num_blocks,
+                              num_blocks = num_blocks,
                               device = device,
                               checkpoint_dir = args.checkpoint_dir,
                               num_models_to_keep = args.num_models_to_keep,
@@ -747,8 +542,8 @@ def main(args):
                               zero_weight = args.zero_weight,
                               next_weight = args.next_weight,
                               prev_weight = args.prev_weight,
-                              do_regression = args.do_regression,
-                              do_reconstruction = args.do_reconstruction)
+                              do_regression = False,
+                              do_reconstruction = False) 
         trainer.train() 
 
     else:
@@ -769,13 +564,13 @@ def main(args):
             eval_data = dataset_reader.data['dev']
             out_path = "val_metrics.json"
 
-        eval_trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
+        eval_trainer = GoodRobotTransformerTrainer(train_data = dataset_reader.data["train"], 
                                    val_data = eval_data, 
                                    encoder = encoder,
                                    optimizer = None, 
                                    scheduler = None, 
                                    num_epochs = 0, 
-                                   num_blocks = args.num_blocks,
+                                   num_blocks = num_blocks,
                                    device = device,
                                    resolution = args.resolution, 
                                    output_type = args.output_type, 
@@ -786,8 +581,8 @@ def main(args):
                                    seed = args.seed,
                                    generate_after_n = args.generate_after_n,
                                    score_type=args.score_type,
-                                   do_regression = args.do_regression,
-                                   do_reconstruction = args.do_reconstruction)
+                                   do_regression = False, 
+                                   do_reconstruction = False) 
         print(f"evaluating") 
         eval_trainer.evaluate(out_path)
 
@@ -805,22 +600,22 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="load model and test")
     parser.add_argument("--resume", action="store_true", help="resume training a model")
     # data 
-    parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
-    parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
-    parser.add_argument("--test-path", default = None, help = "path to test data" )
-    parser.add_argument("--image-path", default = None, help = "path to simulation-generated heighmap images of scenes")
-    parser.add_argument("--num-blocks", type=int, default=20) 
-    parser.add_argument("--binarize-blocks", action="store_true", help="flag to treat block prediction as binary task instead of num-blocks-way classification") 
-    parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
+    parser.add_argument("--path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
-    parser.add_argument("--do-filter", action="store_true", help="set if we want to restrict prediction to the block moved") 
-    parser.add_argument("--do-one-hot", action="store_true", help="set if you want input representation to be one-hot" )
-    parser.add_argument("--channels", type=int, default=21)
-    parser.add_argument("--top-only", action="store_true", help="set if we want to train/predict only the top-most slice of the top-down view") 
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     parser.add_argument("--next-weight", type=float, default=1)
     parser.add_argument("--prev-weight", type=float, default=1) 
+    parser.add_argument("--split-type", type=str, choices= ["random", "leave-out-color",
+                                                             "train-stack-test-row",
+                                                             "train-row-test-stack"],
+                                                             default="random")
+    parser.add_argument("--task-type", type=str, choices = ["rows", "stacks", "rows-and-stacks"],
+                        default="rows-and-stacks") 
+    parser.add_argument("--leave-out-color", type=str, default=None) 
+    parser.add_argument("--augment-by-flipping", action="store_true")
+    parser.add_argument("--augment-language", action="store_true")
+    parser.add_argument("--overfit", action = "store_true")
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
@@ -850,12 +645,7 @@ if __name__ == "__main__":
     parser.add_argument("--score-type", type=str, default="acc", choices = ["acc", "block_acc", "tele_score"])
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
     parser.add_argument("--seed", type=int, default=12) 
-    parser.add_argument("--do-regression", action="store_true", help="add a regression task to learning") 
-    parser.add_argument("--do-reconstruction", action="store_true", help="add a reconstruction task to learning") 
 
     args = parser.parse_args() 
-    if args.do_one_hot:
-        args.channels = 21
-
 
     main(args) 

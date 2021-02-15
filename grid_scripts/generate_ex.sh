@@ -13,4 +13,4 @@
 
 source activate blocks 
 
-python -u train_unet.py  --cfg ${CHECKPOINT_DIR}/config.yaml --test --batch-size 1 --generate-after-n 1000
+python -u train_transformer.py  --cfg ${CHECKPOINT_DIR}/config.yaml --test --val-path blocks_data/tinyset.json --generate-after-n 0
