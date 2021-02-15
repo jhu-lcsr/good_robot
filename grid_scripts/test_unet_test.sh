@@ -13,4 +13,9 @@
 
 source activate blocks 
 
-python -u train_unet.py  --cfg ${CHECKPOINT_DIR}/config.yaml --test --batch-size 1 --generate-after-n 1000
+python -u train_unet.py  \
+    --cfg ${CHECKPOINT_DIR}/config.yaml \
+    --test \
+    --test-path blocks_data/testset_v2.json \
+    --batch-size 1 \
+    --generate-after-n 1000

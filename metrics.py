@@ -7,6 +7,24 @@ import pdb
 np.random.seed(12) 
 torch.manual_seed(12) 
 
+
+class MSEMetric():
+    def __call__(self, true, pred):
+        total = 0
+        total_mse = 0 
+        true = true.reshape(-1).detach().cpu().numpy()
+        pred = pred.reshape(-1).detach().cpu().numpy() 
+        mse_val = (true - pred)**2
+        mse_avg = np.mean(mse_val) 
+        return mse_avg
+
+class AccuracyMetric():
+    def __call__(self, true, pred):
+        pred_idxs = torch.argmax(pred, dim = 2).detach().cpu() 
+        tp = torch.eq(true, pred_idxs) 
+        tp = tp.detach().cpu().numpy()
+        return np.mean(tp) 
+
 class EuclideanMetric:
     def __init__(self, 
                  block_size: int = 4,
@@ -130,7 +148,7 @@ class TransformerTeleportationMetric(TeleportationMetric):
         distance_normalized = distance_pix / self.block_size
         return distance_normalized, pred_block_center, true_block_center
 
-    def get_metric(self, true_next_image, true_prev_image, pred_prev_image, pred_next_patches, block_to_move): 
+    def get_metric(self, true_next_image, true_prev_image, pred_prev_image, pred_next_patches, block_to_move, next_xyz = None): 
         true_next_image = true_next_image.detach().cpu() 
         true_prev_image = true_prev_image.detach().cpu() 
         pred_prev_image = pred_prev_image.detach().cpu() 
@@ -145,8 +163,20 @@ class TransformerTeleportationMetric(TeleportationMetric):
         # get a block id to move 
         prev_block_id, pred_idx, pred_value = self.select_prev_block(true_prev_image_oh, true_prev_image, pred_prev_image) 
 
-        # get the center of the most likely next location, to move the block to 
-        pred_block_center, pred_block_corner = self.select_next_location(pred_next_patches) 
+        if next_xyz is None: 
+            # get the center of the most likely next location, to move the block to 
+            pred_block_center, pred_block_corner = self.select_next_location(pred_next_patches) 
+        else:
+            next_xyz = next_xyz.detach().cpu()
+            pred_block_corner = np.array([next_xyz[1], next_xyz[2]]) 
+            pred_block_corner += 1
+            pred_block_corner /= 2
+            # TODO(elias) replace with resolution
+            pred_block_corner *= 64
+            pred_block_corner = np.rint(pred_block_corner).astype(int) 
+            #pred_block_corner = [int(x) for x in pred_block_corner]
+            # map from -1 to 1 to 0 
+            
 
         distance_normalized, pred_block_center, true_block_center  = self.compute_distance(pred_block_corner, prev_block_id, block_to_move, true_prev_image, true_next_image) 
         # given gold source block, what is predicted distance 

@@ -52,20 +52,27 @@ def add_positional_features_2d(
     return tensor
 
 def image_to_tiles(image, tile_size):
-    """tiles an image into image/tile_size tile_size x tile_size image tiles
-    image: torch.Tensor
-        [batch, channels, width, height]
-    tile_size: int
-    """
-    try:
-        assert(image.shape[-1] % tile_size == 0)
-    except AssertionError:
-        raise AssertionError(f"image width and height {image.shape[-1]} must be divisible by tile_size {tile_size}") 
+    tiler = torch.nn.Unfold(kernel_size = tile_size, stride = tile_size)
+    output = tiler(image)
+    output = rearrange(output, 'b n c -> b c n') 
+    return output 
 
-    p = tile_size 
-    # from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_pytorch.py
-    new_image = rearrange(image, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = p, p2 = p)            
-    return new_image 
+
+#def image_to_tiles(image, tile_size):
+#    """tiles an image into image/tile_size tile_size x tile_size image tiles
+#    image: torch.Tensor
+#        [batch, channels, width, height]
+#    tile_size: int
+#    """
+#    try:
+#        assert(image.shape[-1] % tile_size == 0)
+#    except AssertionError:
+#        raise AssertionError(f"image width and height {image.shape[-1]} must be divisible by tile_size {tile_size}") 
+#
+#    p = tile_size 
+#    # from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/vit_pytorch.py
+#    new_image = rearrange(image, 'b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = p, p2 = p)            
+#    return new_image 
 
 def upsample_tiles(tiled_output, tile_size):
     """
@@ -276,13 +283,17 @@ class TransformerEncoder(torch.nn.Module):
                  output_type: str = "per-pixel",
                  positional_encoding_type: str = "learned",
                  device: torch.device = "cpu",
-                 log_weights: bool = False):
+                 log_weights: bool = False,
+                 do_regression: bool = False,
+                 do_reconstruction: bool = False):
         super(TransformerEncoder, self).__init__() 
 
         self.compute_block_dist = False 
         self.output_type = output_type 
         self.init_scale = init_scale
         self.positional_encoding_type = positional_encoding_type
+        self.do_regression = do_regression
+        self.do_reconstruction = do_reconstruction
 
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
@@ -315,6 +326,7 @@ class TransformerEncoder(torch.nn.Module):
         else:
             output_dim = n_classes 
 
+
         self.next_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, output_dim)
@@ -323,6 +335,23 @@ class TransformerEncoder(torch.nn.Module):
             nn.LayerNorm(hidden_dim),
             nn.Linear(hidden_dim, output_dim) 
         )
+        if self.do_regression:
+            self.regression_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, 3)
+            )
+
+        if self.do_reconstruction:
+            # TODO (elias) maybe share these 
+            self.prev_patch_class_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, 21)
+            )
+            self.next_patch_class_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, 21)
+            )
+
 
     def get_lang_mask(self, lang): 
         bsz = len(lang)
@@ -404,8 +433,34 @@ class TransformerEncoder(torch.nn.Module):
     def forward(self, batch_instance): 
         language = batch_instance['command']
         image = batch_instance['prev_pos_input']
-        language_mask = self.get_lang_mask(language) 
+        # TODO (elias): remove
+        if False:
+            pdb.set_trace() 
+            import cv2 
+            input = batch_instance['prev_pos_input'][0]
+            #input = input[0:3,:,:]
+            output = batch_instance["prev_pos_for_pred"][0]
+            output = output.reshape((1, 224, 224)).repeat((3, 1, 1))
+            output[output!=0]=255
+            image_to_write = input + output 
+            image_to_write = image_to_write.permute(1,2,0)
+            path = "/home/estengel/scratch/fixed.png"
+            cv2.imwrite(path, image_to_write.detach().cpu().numpy())
+            img_alone = input.permute(1,2,0)
+            path = "/home/estengel/scratch/fixed_img.png"
+            cv2.imwrite(path, img_alone.detach().cpu().numpy())
 
+            #input = batch_instance['prev_pos_input'][1]
+            #depth_input = input[3:,:,:]
+            #output = batch_instance["prev_pos_for_acc"][1]
+            #output = output.reshape((1, 64, 64)).repeat((3, 1, 1))
+            #output[output!=0]=255
+            #depth_image = depth_input + output 
+            #depth_image = depth_image.permute(1,2,0)
+            #path = "/home/estengel/scratch/fixed_depth.png"
+            #cv2.imwrite(path, depth_image.detach().cpu().numpy())
+
+        language_mask = self.get_lang_mask(language) 
         tfmr_input, mask, n_patches = self._prepare_input(image, language, language_mask) 
 
         tfmr_output, __ = self.start_transformer(tfmr_input, mask) 
@@ -419,6 +474,18 @@ class TransformerEncoder(torch.nn.Module):
         # run final MLP 
         prev_classes = self.prev_mlp_head(prev_just_image_output) 
         next_classes = self.next_mlp_head(next_just_image_output) 
+        if self.do_regression: 
+            # go off sep token
+            next_pos_xyz = self.regression_head(next_output[:, n_patches, :]) 
+        else:
+            next_pos_xyz = None
+
+        if self.do_reconstruction: 
+            next_patch_class = self.next_patch_class_head(next_output[:,0:n_patches,:])
+            prev_patch_class = self.prev_patch_class_head(prev_output[:,0:n_patches,:])
+        else:
+            next_patch_class, prev_patch_class = None, None
+
 
         # convert back to image 
         prev_image_output = tiles_to_image(prev_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
@@ -426,6 +493,9 @@ class TransformerEncoder(torch.nn.Module):
 
         return {"prev_position": prev_image_output,
                 "next_position": next_image_output,
+                "next_per_patch_class": next_patch_class,
+                "prev_per_patch_class": prev_patch_class,
+                "next_pos_xyz": next_pos_xyz, 
                 "prev_attn_weights": prev_attn_out,
                 "next_attn_weights": next_attn_out}
 

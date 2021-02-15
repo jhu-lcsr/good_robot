@@ -13,7 +13,7 @@
 
 source activate blocks 
 
-#CHECKPOINT_DIR="models/unet_attn_dropout_${DROPOUT}_weighted_${WEIGHT}_lr_${LR}"
+#CHECKPOINT_DIR="models/language_pretrain"
 
 mkdir -p ${CHECKPOINT_DIR}/code
 # copy all code 
@@ -23,6 +23,9 @@ echo "RUNNING ON VERSION: " > ${CHECKPOINT_DIR}/stdout.log
 git branch >> ${CHECKPOINT_DIR}/stdout.log
 git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 
-python -u train_unet.py \
-        --cfg ${CONFIG} \
-        --checkpoint-dir ${CHECKPOINT_DIR} #| tee ${CHECKPOINT_DIR}/stdout.log
+python -u train_transformer_gr_data.py  \
+    --cfg ${CONFIG} \
+    --overfit \
+    --checkpoint-dir ${CHECKPOINT_DIR} \
+    --cuda -1
+

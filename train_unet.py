@@ -1,12 +1,15 @@
 import json 
-import argparse
+from jsonargparse import ArgumentParser, ActionConfigFile 
+import yaml 
 from typing import List, Dict
 import glob
 import os 
 import pathlib
 import pdb 
 import subprocess 
+import copy
 from io import StringIO
+from collections import defaultdict
 
 import torch
 from spacy.tokenizer import Tokenizer
@@ -23,6 +26,7 @@ from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from unet_shared import SharedUNet
+from metrics import UNetTeleportationMetric
 from mlp import MLP 
 from losses import ScheduledWeightedCrossEntropyLoss
 
@@ -47,19 +51,19 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                  depth: int = 7,
                  best_epoch: int = -1,
                  zero_weight: float = 0.05):
-        super(UNetLanguageTrainer, self).__init__(train_data,
-                                                  val_data,
-                                                  encoder,
-                                                  optimizer,
-                                                  num_epochs,
-                                                  num_blocks,
-                                                  device,
-                                                  checkpoint_dir,
-                                                  num_models_to_keep,
-                                                  generate_after_n,
-                                                  resolution, 
-                                                  depth, 
-                                                  best_epoch)
+        super(UNetLanguageTrainer, self).__init__(train_data = train_data,
+                                                  val_data = val_data,
+                                                  encoder = encoder,
+                                                  optimizer = optimizer,
+                                                  num_epochs = num_epochs,
+                                                  num_blocks = num_blocks,
+                                                  device = device,
+                                                  checkpoint_dir = checkpoint_dir,
+                                                  num_models_to_keep = num_models_to_keep,
+                                                  generate_after_n = generate_after_n,
+                                                  resolution = resolution, 
+                                                  depth = depth, 
+                                                  best_epoch = best_epoch)
 
         weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
         total_steps = num_epochs * len(train_data) 
@@ -74,6 +78,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         #self.weighted_xent_loss_fxn = BootstrappedCE()
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss()
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
+
+        self.teleportation_metric = UNetTeleportationMetric(block_size = 4, image_size = self.resolution) 
 
 
     def train_and_validate_one_epoch(self, epoch): 
@@ -98,19 +104,23 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         total_prev_acc, total_next_acc = 0.0, 0.0
         total = 0 
         total_block_acc = 0.0 
+        total_tele_score = 0.0
 
         self.encoder.eval() 
         for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
-            next_pixel_acc, prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
-            total_prev_acc += prev_pixel_acc
-            total_next_acc += next_pixel_acc
-            total_block_acc += block_acc
+            score_dict = self.validate(dev_batch_instance, epoch, b, 0) 
+            total_prev_acc += score_dict['prev_f1']
+            total_next_acc += score_dict['next_f1']
+            total_block_acc += score_dict['block_acc']
+            total_tele_score += score_dict['tele_score']
+
             total += 1
 
         mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
-        print(f"Epoch {epoch} has next pixel acc {mean_next_acc * 100} prev acc {mean_prev_acc * 100}, block acc {mean_block_acc * 100}") 
+        mean_tele_score = total_tele_score / total 
+        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}") 
         return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
 
     def compute_loss(self, inputs, next_outputs, prev_outputs):
@@ -189,7 +199,33 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
             block_accuracy = -1.0
-            
+
+        all_tele_dicts = []    
+        all_tele_scores = []
+        all_oracle_tele_scores = []
+        block_accs = []
+        pred_centers, true_centers = [], [] 
+        prev_position = prev_outputs['next_position']
+        next_position = next_outputs['next_position']
+
+        for batch_idx in range(prev_position.shape[0]):
+            tele_dict = self.teleportation_metric.get_metric(batch_instance["next_pos_for_acc"][batch_idx].clone(),
+                                                             batch_instance["prev_pos_for_acc"][batch_idx].clone(),
+                                                             prev_position[batch_idx].clone(),
+                                                             next_outputs["next_position"][batch_idx].clone(),
+                                                             batch_instance["block_to_move"][batch_idx].clone())
+            all_tele_dicts.append(tele_dict)
+            all_tele_scores.append(tele_dict['distance']) 
+            all_oracle_tele_scores.append(tele_dict['oracle_distance']) 
+            block_accs.append(tele_dict['block_acc']) 
+            pred_centers.append(tele_dict['pred_center'])
+            true_centers.append(tele_dict['true_center']) 
+
+        total_tele_score = np.mean(all_tele_scores) 
+        total_oracle_tele_score = np.mean(all_oracle_tele_scores) 
+        block_accuracy = np.mean(block_accs) 
+
+        bin_dict = defaultdict(list) 
         if epoch_num > self.generate_after_n: 
             for i in range(next_outputs["next_position"].shape[0]):
                 output_path = self.checkpoint_dir.joinpath(f"batch_{batch_num}").joinpath(f"instance_{i}")
@@ -211,7 +247,15 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
                                               output_path.joinpath("prev"),
                                               caption = command) 
 
-        return next_f1, prev_f1, block_accuracy
+                bin_distance = int(all_tele_dicts[i]["distance"])
+                bin_dict[bin_distance].append(str(output_path) )
+
+        return {"next_f1": next_f1, 
+            "prev_f1": prev_f1, 
+            "block_acc": block_accuracy, 
+            "tele_score": total_tele_score,
+            "oracle_tele_score": total_oracle_tele_score,
+            "bin_dict": bin_dict} 
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
@@ -286,7 +330,7 @@ def main(args):
     # load the data 
     dataset_reader = DatasetReader(args.train_path,
                                    args.val_path,
-                                   None,
+                                   args.test_path,
                                    batch_by_line = args.traj_type != "flat",
                                    traj_type = args.traj_type,
                                    batch_size = args.batch_size,
@@ -313,6 +357,12 @@ def main(args):
         
     print(f"Reading data from {args.val_path}")
     dev_vocab = dataset_reader.read_data("dev") 
+
+    if args.test_path is not None:
+        test_vocab = dataset_reader.read_data("test")
+    # no test then delete
+    else:
+        del(dataset_reader.data['test'])
 
     print(f"got data")  
     # construct the vocab and tokenizer 
@@ -393,9 +443,15 @@ def main(args):
             best_epoch = best_checkpoint_data["epoch"]
 
         # save arg config to checkpoint_dir
-        with open(pathlib.Path(args.checkpoint_dir).joinpath("config.json"), "w") as f1:
-            json.dump(args.__dict__, f1) 
-
+        with open(pathlib.Path(args.checkpoint_dir).joinpath("config.yaml"), "w") as f1:
+            dump_args = copy.deepcopy(args) 
+            # drop stuff we can't serialize 
+            del(dump_args.__dict__["cfg"]) 
+            del(dump_args.__dict__["__cwd__"]) 
+            del(dump_args.__dict__["__path__"]) 
+            to_dump = dump_args.__dict__
+            # dump 
+            yaml.safe_dump(to_dump, f1, encoding='utf-8', allow_unicode=True) 
 
         # construct trainer 
         trainer = UNetLanguageTrainer(train_data = dataset_reader.data["train"], 
@@ -420,8 +476,16 @@ def main(args):
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
         encoder.load_state_dict(state_dict, strict=True)  
 
+        if "test" in dataset_reader.data.keys():
+            eval_data = dataset_reader.data['test']
+            pdb.set_trace() 
+            out_path = "test_metrics.json"
+        else:
+            eval_data = dataset_reader.data['dev']
+            out_path = "val_metrics.json"
+
         eval_trainer = UNetLanguageTrainer(train_data = dataset_reader.data["train"], 
-                                   val_data = dataset_reader.data["dev"], 
+                                   val_data = eval_data,
                                    encoder = encoder,
                                    optimizer = None, 
                                    num_epochs = 0, 
@@ -430,18 +494,23 @@ def main(args):
                                    resolution = args.resolution, 
                                    checkpoint_dir = args.checkpoint_dir,
                                    num_models_to_keep = 0, 
-                                   generate_after_n = 0) 
+                                   generate_after_n = args.generate_after_n) 
         print(f"evaluating") 
-        eval_trainer.evaluate()
+        eval_trainer.evaluate(out_path)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
+    # config file 
+    parser.add_argument("--cfg", action = ActionConfigFile) 
+
     # training 
     parser.add_argument("--test", action="store_true", help="load model and test")
     parser.add_argument("--resume", action="store_true", help="resume training a model")
     # data 
     parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
+    parser.add_argument("--test-path", default = None, help = "path to test data" )
+
     parser.add_argument("--num-blocks", type=int, default=20) 
     parser.add_argument("--binarize-blocks", action="store_true", help="flag to treat block prediction as binary task instead of num-blocks-way classification") 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
