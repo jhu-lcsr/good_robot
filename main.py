@@ -530,7 +530,8 @@ def main(args):
                     toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height'] + 1
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
-              str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset))
+                str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset), + ' Does the code think the stack toppled: ' +
+                str(toppled))
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
