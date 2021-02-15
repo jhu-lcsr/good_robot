@@ -849,6 +849,7 @@ if __name__ == "__main__":
     parser.add_argument("--generate-after-n", type=int, default=10) 
     parser.add_argument("--score-type", type=str, default="acc", choices = ["acc", "block_acc", "tele_score"])
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
+    parser.add_argument("--init-scale", type=int, default = 4, help = "initalization scale for transformer weights")
     parser.add_argument("--seed", type=int, default=12) 
     parser.add_argument("--do-regression", action="store_true", help="add a regression task to learning") 
     parser.add_argument("--do-reconstruction", action="store_true", help="add a reconstruction task to learning") 

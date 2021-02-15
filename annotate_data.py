@@ -78,6 +78,55 @@ class Pair:
         next_image = cv2.imread(place_path)
         return cls(prev_image, prev_location, next_image, next_location)
 
+    def combine_json_data(self, json_data): 
+        def euclid_dist(p1, p2): 
+            total = 0
+            for i in range(len(p1)):
+                total += (p1[i] - p2[i])**2
+            return np.sqrt(total)
+
+        # find block closest to grasp index 
+        grasp_dists = [euclid_dist(self.prev_location, x[1]) for x in json_data.items()]
+        min_grasp_color = sorted(grasp_dists, key = lambda x:x[1])[0]
+        # find block closest to place index 
+        place_dists = [euclid_dist(self.next_location, x[1]) for x in json_data.items()]
+        min_place_color = sorted(place_dists, key = lambda x:x[1])[0]
+        # get relation between place location and place block 
+        place_landmark_pos = json_data[min_place_color]
+        place_pos = self.next_location 
+
+
+
+    @staticmethod
+    def read_json(json_path):
+        with open(json_path) as f1:
+            data = json.load(f1)
+        num_blocks = data['num_objs']
+        colors = data['color_names'][0:num_blocks]
+        coords = data['positions']
+        assert(len(coords) == num_blocks)
+        assert(len(coors[0]) == 3)
+        to_ret = {}
+        for color, coord in zip(colors, coords):
+            to_ret[color] = coord
+        return to_ret 
+
+
+    @classmethod
+    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
+        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
+        # annotate based on sim data 
+        # rules for row-making
+            # take the block being moved, and get the color 
+            # take the block being moved to by finding the block closest to the place idx 
+
+        # TODO (elias) rules for stacking
+            # 
+            
+
+
+
+
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"
         if self.source_location == "none":

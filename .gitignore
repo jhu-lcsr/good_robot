@@ -51,3 +51,6 @@ data/*
 
 .vscode
 .vscode/*
+
+tune_files
+tune_files/*
