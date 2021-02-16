@@ -93,9 +93,9 @@ class Pair:
         for color, coord in zip(colors, coords):
             # normalize location to resolution 
             coord = np.array(coord)
-            coord += 1
-            coord /= 2
-            coord *= self.resolution 
+            # coord += 1
+            # coord /= 2
+            # coord *= self.resolution 
             to_ret[color] = coord 
         return to_ret 
 
@@ -128,10 +128,23 @@ class Pair:
                 total += (p1[i] - p2[i])**2
             return np.sqrt(total)
 
-        pdb.set_trace() 
         # find block closest to grasp index 
         # min_grasp_color = self.get_moved_block(prev_json_data, next_json_data) 
-        grasp_dists = [(x[0], euclid_dist(self.prev_location, x[1])) for x in json_data.items()]
+        def convert_loc(loc):
+            loc = ((loc / 224) * 2) - 1
+            offset = [0.15, 0.0]
+            grid_dim = 14
+            side_len = 0.035
+            x_offset = 0.58
+            grid_len = grid_dim*side_len
+            for i in range(len(loc)):
+                loc[i] = (loc[i] + offset[i]) * grid_len/2
+            loc[0] -= x_offset 
+            return loc
+
+        prev_loc = convert_loc(self.prev_location)
+        next_loc = convert_loc(self.next_location) 
+        grasp_dists = [(x[0], euclid_dist(prev_loc, x[1])) for x in json_data.items()]
         min_grasp_color = list(sorted(grasp_dists, key = lambda x:x[1]))[0][0]
 
         other_blocks = [x for x in json_data.items() if x[0] != min_grasp_color]
@@ -148,7 +161,7 @@ class Pair:
             remaining_blocks = other_blocks
 
         # find block closest to place index 
-        place_dists = [(x[0], euclid_dist(self.next_location, x[1])) for x in remaining_blocks]
+        place_dists = [(x[0], euclid_dist(next_loc, x[1])) for x in remaining_blocks]
         min_place_color = list(sorted(place_dists, key = lambda x:x[1]))[0][0]
         # get relation between place location and place block 
         #place_landmark_pos = json_data[min_place_color]
