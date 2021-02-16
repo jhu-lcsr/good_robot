@@ -571,7 +571,7 @@ def main(args):
                                    optimizer = None, 
                                    scheduler = None, 
                                    num_epochs = 0, 
-                                   num_blocks = num_blocks,
+                                   num_blocks = args.num_blocks,
                                    device = device,
                                    resolution = args.resolution, 
                                    output_type = args.output_type, 

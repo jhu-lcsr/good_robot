@@ -30,7 +30,7 @@ import copy
 import shutil
 import matplotlib
 import matplotlib.pyplot as plt
-from data import DatasetReader
+from data import DatasetReader, GoodRobotDatasetReader
 from generate_logoblocks_images import BlockSetter
 
 def run_title(args):
@@ -159,6 +159,7 @@ def main(args):
     random_actions = args.random_actions
     # TODO(zhe) Added static language mask option
     static_language_mask = args.static_language_mask
+    is_bisk = args.is_bisk 
     randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
     obj_scale = 0.00018 if static_language_mask else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
@@ -1277,16 +1278,32 @@ def main(args):
     language_data = None
     blockMover = None
     language_model = None
-    if static_language_mask:
-        # TODO IF grasp_color_task don't load dataset reader else ...
-        dataset_reader = DatasetReader(args.train_language_inputs,
-                                       None,
-                                       None,
-                                       batch_by_line=True,
-                                       batch_size = 1)
-        print(f"Reading data from {args.train_language_inputs}, this may take a few minutes.")
-        language_data = dataset_reader.data['train']
-        # END IF
+    if static_language_mask: 
+        if is_sim and not is_bisk:
+            # define a dataset reader closure so that we can pass individual objects at a time 
+            # TODO(elias) turn these into command-line args 
+            dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x, 
+                                                    split_type="none",
+                                                    task_type="rows",
+                                                    augment_by_flipping=False,
+                                                    augument_language = False,
+                                                    leave_out_color=None,
+                                                    batch_size=1,
+                                                    max_seq_length=40,
+                                                    resolution = 64,
+                                                    is_bert = True,
+                                                    overfit=False) 
+                                                    
+        # if dealing with Bisk data, do as before 
+        if is_sim and is_bisk:
+            dataset_reader = DatasetReader(args.train_language_inputs,
+                                        None,
+                                        None,
+                                        batch_by_line=True,
+                                        batch_size = 1)
+            print(f"Reading data from {args.train_language_inputs}, this may take a few minutes.")
+            language_data = dataset_reader.data['train']
+            # END IF
         
         if is_sim:
             blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot, side_len=0.027)
@@ -1314,20 +1331,18 @@ def main(args):
             dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_0.json')
         
         # If using the language map, get the command sentence and set up the scene
-        language_data_instance = None
         nonlocal_variables['intended_position'] = None
         if static_language_mask:
-            if is_sim:
-                # OBTAIN A DATASAMPLE randomly from the training set
-                # TODO(zhe) Change to a randomized indices list instead to ensure all training examples are used.
-                # TODO(zhe) We should probably take an image of the scene instead of using a saved image from the dataset.
-                if is_testing:
-                    # language_data_instance = 
-                    pass
-                else:
-                    randIndex = random.randrange(0, len(language_data))
-                    language_data_instance = language_data[randIndex]
+            # TODO(elias) ensure prev_primitive_action is thread-safe 
+            # TODO(elias) what about unsuccessful grasp actions that move the block 
+            if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
+                json_data = sim_object_state_to_json(robot) 
+                pair = Pair.from_main_idxs(color_heightmap, json_data) 
+                # batchify a single example 
+                language_data_instance = dataset_reader_fxn(pair)['train'][0]
 
+            # only set up the scene if working with Bisk (2018) data 
+            elif is_sim and is_bisk: 
                 # Update nonlocal variables with bisk goal here
                 nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
 
@@ -1337,18 +1352,13 @@ def main(args):
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
             else:
-                # TODO(zhe) Implement training on the real robot. How are we going to reset? How do we recognize a reset case?
-                raise NotImplementedError('training the language model on the real robot has not yet been implemented')
+                pass 
+        else:
+            language_data_instance = None
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
             robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
-
-        # Generate the language mask using the language model.
-        language_output = None # 4 ndarrays with shape (batch_size, 2, 64, 64) where each pixel has two options (block is present, block is not present)
-        if static_language_mask:
-            with torch.no_grad():
-                language_output = language_model.forward(language_data_instance)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -1556,6 +1566,11 @@ def main(args):
                 # DONE(zhe) Need to ensure that "predictions" also have language mask
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
                 # TODO(elias) add check for if we're using language instruction 
+                # Generate the language mask using the language model.
+                language_output = None # 4 ndarrays with shape (batch_size, 2, 64, 64) where each pixel has two options (block is present, block is not present)
+                if static_language_mask and language_data_instance is not None:
+                    with torch.no_grad():
+                        language_output = language_model.forward(language_data_instance)
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
@@ -1913,15 +1928,23 @@ def main(args):
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
 
-def dump_sim_object_state_to_json(robot, logger, filename):
+def sim_object_state_to_json(robot):
     # Dump scene state information to a file.
     sim_positions, sim_orientations = robot.get_obj_positions_and_orientations()
+    to_ret = {'positions': sim_positions, 
+              'orientations': sim_orientations, 
+              'color_names': robot.color_names, 
+              'num_obj': robot.num_obj}
+    return to_ret 
+
+def dump_sim_object_state_to_json(robot, logger, filename):
+    # Dump scene state information to a file.
+    to_dump = sim_object_state_to_json(robot)
     save_location = os.path.join(logger.base_directory, 'data', 'variables')
     if not os.path.exists(save_location):
         os.mkdir(save_location)
     with open(os.path.join(save_location, filename), 'w') as f:
-            json.dump({'positions': sim_positions, 'orientations': sim_orientations, 'color_names': robot.color_names, 'num_obj': robot.num_obj}, f, cls=utils.NumpyEncoder, sort_keys=True)
-
+            json.dump(to_dump, f, cls=utils.NumpyEncoder, sort_keys=True)
 
 def parse_resume_and_snapshot_file_args(args):
     if args.resume == 'last':
@@ -2385,6 +2408,7 @@ if __name__ == '__main__':
     parser.add_argument('--task_type', dest='task_type', type=str, default=None)
 
     # Language Mask Options
+    parser.add_argument('--is_bisk', dest = 'is_bisk', action='store_true', default = False,                                help='running on bisk (2018) AAAI dataset')
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
     parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json',                   help='specify the language data file to use during reinforcement learning')
     parser.add_argument('--language_model_config', dest='language_model_config', type=str, default='blocks_data/config.yaml', help='relative path to the yaml file containing the model hyperparameters')

@@ -46,7 +46,7 @@ class Pair:
     def resize(self):
         self.prev_image = cv2.resize(self.prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
         self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
-        self.raio = self.resolution / 224 
+        self.ratio = self.resolution / 224 
 
         # normalize location and width 
         self.w *= self.ratio 
@@ -81,6 +81,28 @@ class Pair:
         next_image = cv2.cvtColor(next_image, cv2.COLOR_BGR2RGB)
         return cls(prev_image, prev_location, next_image, next_location)
 
+    @classmethod
+    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
+        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
+        # annotate based on sim data 
+        # rules for row-making
+        grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
+        place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
+
+        json_data = pair.read_json(grasp_json_path)
+        src_color, tgt_color = pair.combine_json_data(json_data)
+
+        # TODO (elias) rules for stacking
+        return pair 
+
+    @classmethod
+    def from_main_idxs(cls, prev_image, prev_json):
+        # TODO(elias) infer which block to move from interpolation here 
+        pair = cls(None, None, None, None) 
+        json_data = pair.read_json(prev_json)
+        src_color, tgt_color = pair.infer_from_json_data(json_data) 
+        return pair 
+
     def read_json(self, json_path):
         with open(json_path) as f1:
             data = json.load(f1)
@@ -104,20 +126,6 @@ class Pair:
         diff = [(k, np.sum(x)) for k, x in diff.items()]
         # get block with greatest diff in location 
         return list(sorted(diff, key = lambda x: x[1]))[-1]
-
-    @classmethod
-    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
-        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
-        # annotate based on sim data 
-        # rules for row-making
-        grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
-        place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
-
-        json_data = pair.read_json(grasp_json_path)
-        src_color, tgt_color = pair.combine_json_data(json_data)
-
-        # TODO (elias) rules for stacking
-        return pair 
 
     def combine_json_data(self, json_data, next_to=True, filter_left=False): 
         # first pass: all prompts say "next to" and reference the closest block to the left of the target location
@@ -174,7 +182,9 @@ class Pair:
 
         return min_grasp_color, min_place_color  
 
-
+    def infer_from_json_data(json_data):
+        # TODO(elias)
+        pass 
 
     
 

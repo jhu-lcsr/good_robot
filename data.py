@@ -531,7 +531,7 @@ class DatasetReader:
 
 class GoodRobotDatasetReader: 
     def __init__(self, 
-                path: str,
+                path_or_obj: str,
                 split_type: str = 'random',
                 task_type: str = "rows-and-stacks",
                 augment_by_flipping: bool = True, 
@@ -542,18 +542,22 @@ class GoodRobotDatasetReader:
                 resolution: int = 64,
                 is_bert: bool = True,
                 overfit: bool = False):
-        
+        # TODO(elias) add depth heightmaps 
         self.batch_size = batch_size
         self.is_bert = is_bert 
         self.resolution = resolution 
         self.max_seq_length = max_seq_length
-        self.path = pathlib.Path(path)
-        self.pkl_files = self.path.glob("*/*.pkl")
-        self.all_data = []
-        for pkl_file in self.pkl_files:
-            with open(pkl_file, "rb") as f1:
-                data = pkl.load(f1)
-                self.all_data.extend(data) 
+
+        if type(path_or_obj) == "str":
+            self.path = pathlib.Path(path_or_obj)
+            self.pkl_files = self.path.glob("*/*.pkl")
+            self.all_data = []
+            for pkl_file in self.pkl_files:
+                with open(pkl_file, "rb") as f1:
+                    data = pkl.load(f1)
+                    self.all_data.extend(data) 
+        else:
+            self.all_data = [path_or_obj]
 
         # augment by flipping across 4 axes 
         if augment_by_flipping:
@@ -576,6 +580,10 @@ class GoodRobotDatasetReader:
             train_data = self.all_data[0:train_len]
             dev_data = self.all_data[train_len: train_len + devtest_len]
             test_data = self.all_data[train_len + devtest_len: ]
+        elif split_type == "none": 
+            train_data = self.all_data
+            dev_data = self.all_data
+            test_data = self.all_data 
         elif split_type == "leave-out-color":
             pass
         elif split_type == "train-stack-test-row":
@@ -625,7 +633,6 @@ class GoodRobotDatasetReader:
             if not rows and pair.source_location is None:
                 filtered_data.append(pair)
         return filtered_data 
-
 
     def shuffle_and_batch_trajectories(self, split=None): 
         """
@@ -696,11 +703,13 @@ class GoodRobotDatasetReader:
             commands.append(command + [PAD for i in range(max_length - len(command))])
 
             prev_pos_input.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
-            prev_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.prev_location).copy()).unsqueeze(0))
-            prev_pos_for_acc.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
+            if pair.prev_location is not None: 
+                prev_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.prev_location).copy()).unsqueeze(0))
+                prev_pos_for_acc.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
 
-            next_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.next_location).copy()).unsqueeze(0))
-            next_pos_for_acc.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
+            if pair.next_location is not None:
+                next_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.next_location).copy()).unsqueeze(0))
+                next_pos_for_acc.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
             pairs.append(pair)
             block_to_move.append(None) 
 
