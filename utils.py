@@ -933,6 +933,11 @@ def compute_demo_dist(preds, example_actions):
 
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
+        # check if policy was supplied (entry will be None if it wasn't)
+        if example_actions[i] is None:
+            continue
+
+        # get actions and expand dims
         actions = list(example_actions[i])
 
         for j in actions:
@@ -955,6 +960,10 @@ def compute_demo_dist(preds, example_actions):
     # calculate l2 distance between example action embedding and preds for each policy and demo
     l2_dists = []
     for ind, actions in enumerate(example_actions):
+        # check if policy was supplied (entry will be None if it wasn't)
+        if actions is None:
+            continue
+
         for action in actions:
             dist = np.sum(np.square(action - preds[ind]), axis=1)
 
