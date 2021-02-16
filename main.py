@@ -490,8 +490,20 @@ def main(args):
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
 
+            elif task_type == 'stack':
+                # TODO(adit98) make sure we have path for real robot here
+                stack_matches_goal, nonlocal_variables['stack_height'] = \
+                        robot.check_stack(current_stack_goal, check_z_height=check_z_height,
+                                top_idx=top_idx)
+
+            elif task_type == 'row':
+                # TODO(adit98) make sure we have path for real robot here
+                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                        num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                        prev_z_height=nonlocal_variables['prev_stack_height'])
+
             else:
-                raise NotImplementedError
+                raise NotImplementedError(task_type)
 
         elif check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
@@ -977,9 +989,10 @@ def main(args):
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
-                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '2')
-                    needed_to_reset = check_stack_update_goal(place_check=True,
-                            depth_img=valid_depth_heightmap_place, task_type=task_type, use_imitation=use_demo)
+                    valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
+                            heightmap_resolution, logger, trainer, '2')
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
+                            task_type=task_type, use_imitation=use_demo)
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
