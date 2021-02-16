@@ -46,17 +46,16 @@ class Pair:
     def resize(self):
         self.prev_image = cv2.resize(self.prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
         self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
-        ratio = self.resolution / 224 
+        self.raio = self.resolution / 224 
 
         # normalize location and width 
-        self.w *= ratio 
+        self.w *= self.ratio 
         self.w = int(self.w)
 
-        self.prev_location = self.prev_location.astype(float).copy() * ratio
+        self.prev_location = self.prev_location.astype(float).copy() * self.ratio
         self.prev_location = self.prev_location.astype(int)
-        self.next_location = self.next_location.astype(float).copy() * ratio
+        self.next_location = self.next_location.astype(float).copy() * self.ratio
         self.next_location = self.next_location.astype(int)
-
 
     def get_mask(self, location):
         w, h, __ = self.prev_image.shape
@@ -74,58 +73,97 @@ class Pair:
         place_prefix = str(1000000 + place_idx)[1:]
         grasp_path = str(image_home.joinpath(f"{grasp_prefix}.0.color.png"))
         place_path = str(image_home.joinpath(f"{place_prefix}.2.color.png"))
+
+        # TODO(elias) swap BG channels here 
         prev_image = cv2.imread(grasp_path)
+        prev_image = cv2.cvtColor(prev_image, cv2.COLOR_BGR2RGB)
         next_image = cv2.imread(place_path)
+        next_image = cv2.cvtColor(next_image, cv2.COLOR_BGR2RGB)
         return cls(prev_image, prev_location, next_image, next_location)
 
-    def combine_json_data(self, json_data): 
-        def euclid_dist(p1, p2): 
-            total = 0
-            for i in range(len(p1)):
-                total += (p1[i] - p2[i])**2
-            return np.sqrt(total)
-
-        # find block closest to grasp index 
-        grasp_dists = [euclid_dist(self.prev_location, x[1]) for x in json_data.items()]
-        min_grasp_color = sorted(grasp_dists, key = lambda x:x[1])[0]
-        # find block closest to place index 
-        place_dists = [euclid_dist(self.next_location, x[1]) for x in json_data.items()]
-        min_place_color = sorted(place_dists, key = lambda x:x[1])[0]
-        # get relation between place location and place block 
-        place_landmark_pos = json_data[min_place_color]
-        place_pos = self.next_location 
-
-
-
-    @staticmethod
-    def read_json(json_path):
+    def read_json(self, json_path):
         with open(json_path) as f1:
             data = json.load(f1)
-        num_blocks = data['num_objs']
+        num_blocks = data['num_obj']
         colors = data['color_names'][0:num_blocks]
         coords = data['positions']
         assert(len(coords) == num_blocks)
-        assert(len(coors[0]) == 3)
+        assert(len(coords[0]) == 3)
         to_ret = {}
         for color, coord in zip(colors, coords):
-            to_ret[color] = coord
+            # normalize location to resolution 
+            coord = np.array(coord)
+            coord += 1
+            coord /= 2
+            coord *= self.resolution 
+            to_ret[color] = coord 
         return to_ret 
 
+    def get_moved_block(self, prev_coords, next_coords):
+        diff = {k: prev_coords[k][0:2] - next_coords[k][0:2] for k in prev_coords.keys()}
+        diff = [(k, np.sum(x)) for k, x in diff.items()]
+        # get block with greatest diff in location 
+        return list(sorted(diff, key = lambda x: x[1]))[-1]
 
     @classmethod
     def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
         pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
         # annotate based on sim data 
         # rules for row-making
-            # take the block being moved, and get the color 
-            # take the block being moved to by finding the block closest to the place idx 
+        grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
+        place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
+
+        json_data = pair.read_json(grasp_json_path)
+        src_color, tgt_color = pair.combine_json_data(json_data)
 
         # TODO (elias) rules for stacking
-            # 
-            
+        return pair 
+
+    def combine_json_data(self, json_data, next_to=True, filter_left=False): 
+        # first pass: all prompts say "next to" and reference the closest block to the left of the target location
+        # if no such block exists, skip for now 
+        def euclid_dist(p1, p2): 
+            total = 0
+            for i in range(len(p1)):
+                total += (p1[i] - p2[i])**2
+            return np.sqrt(total)
+
+        pdb.set_trace() 
+        # find block closest to grasp index 
+        # min_grasp_color = self.get_moved_block(prev_json_data, next_json_data) 
+        grasp_dists = [(x[0], euclid_dist(self.prev_location, x[1])) for x in json_data.items()]
+        min_grasp_color = list(sorted(grasp_dists, key = lambda x:x[1]))[0][0]
+
+        other_blocks = [x for x in json_data.items() if x[0] != min_grasp_color]
+
+        # filter down to blocks that are to the left of place index 
+        # x must be < 
+        if filter_left: 
+            left_of = [x for x in other_blocks if x[1][0] < self.next_location[0]]
+            if len(left_of) == 0:
+                print(f"no left of")
+                return None
+            remaining_blocks = left_of
+        else:
+            remaining_blocks = other_blocks
+
+        # find block closest to place index 
+        place_dists = [(x[0], euclid_dist(self.next_location, x[1])) for x in remaining_blocks]
+        min_place_color = list(sorted(place_dists, key = lambda x:x[1]))[0][0]
+        # get relation between place location and place block 
+        #place_landmark_pos = json_data[min_place_color]
+        #place_pos = self.next_locationA
+        # 
+        self.source_code = min_grasp_color[0]
+        self.target_code = min_place_color[0]
+
+        self.relation_code = "next_to"
+
+        return min_grasp_color, min_place_color  
 
 
 
+    
 
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"
@@ -163,7 +201,8 @@ class Pair:
         location_lookup_dict = {"w": "top", "d": "right", "a": "left", "s": "bottom", "n":""} 
 
         location_lookup_fxn = lambda x: " ".join([location_lookup_dict[y] for y in list(x)])
-        relation_lookup_dict = {"on": "on top of", 
+        relation_lookup_dict = {"on": "on top of",
+                                "next_to": "next to",
                                 "w": "over",
                                 "s": "under",
                                 "a": "to the left of",
@@ -173,7 +212,8 @@ class Pair:
                                 "wd": "up and to the right of",
                                 "sd": "down and to the right of"}
 
-        color_lookup_dict = {"r": "red", "b": "blue", "g": "green", "y": "yellow"}
+        color_lookup_dict = {"r": "red", "b": "blue", "g": "green", "y": "yellow", 
+                            "green":"green", "blue":"blue", "yellow":"yellow","red":"red"}
 
         stack_template = "stack the {source_location} {source_color} block {relation} the {target_location} {target_color} block"
         row_template = "move the {source_color} block {relation} the {target_color} block"
@@ -264,8 +304,10 @@ def flip_pair(pair, axis):
     return new_pair 
 
 
-def get_pairs(data_home):
+def get_pairs(data_home, is_sim = False):
     image_home = data_home.joinpath("data/color-heightmaps")
+    if is_sim: 
+        json_home = data_home.joinpath("data/variables")
     executed_action_path = data_home.joinpath("transitions/executed-action.log.txt")
     place_successes_path = data_home.joinpath("transitions/place-success.log.txt")
     grasp_successes_path = data_home.joinpath("transitions/grasp-success.log.txt")
@@ -314,7 +356,10 @@ def get_pairs(data_home):
         if not grasp and was_success:
             prev_act = "place"
             # now you can create a pair with the previous action's grasp and current place 
-            pair = Pair.from_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home)
+            if is_sim:
+                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home)
+            else:
+                pair = Pair.from_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home)
             pick_place_pairs.append(pair)
             prev_grasp_idx = None 
 

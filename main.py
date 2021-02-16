@@ -1555,6 +1555,7 @@ def main(args):
             else:
                 # DONE(zhe) Need to ensure that "predictions" also have language mask
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
+                # TODO(elias) add check for if we're using language instruction 
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
@@ -1849,6 +1850,7 @@ def main(args):
             robot.shutdown()
             break
 
+
         # If we don't have any successes reinitialize model
         # Save information for next training step
         prev_color_img = color_img.copy()
@@ -1879,6 +1881,12 @@ def main(args):
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
         else:
             prev_color_success = None
+
+        # TODO(elias) this is where we check for trial completion nonlocal_variables['train_complete]
+        #if nonlocal_variables['trial_complete']: 
+            # load next image of the task 
+            # use trial number variable as the index to pick out the image 
+            # use that also to get/save the string 
 
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
