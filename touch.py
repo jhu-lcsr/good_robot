@@ -74,6 +74,9 @@ class HumanControlOfRobot(object):
         else:
             self.robot = robot
 
+        # reset objects so we have correct progress
+        self.reset_sim()
+
         # Slow down robot
         # robot.joint_acc = 1.4
         # robot.joint_vel = 1.05
@@ -224,6 +227,11 @@ class HumanControlOfRobot(object):
         if self.task_type == 'vertical_square':
             print(self.robot.vertical_square_partial_success(np.ones(4), check_z_height=False, stack_dist_thresh=0.04))
             print(state_str)
+        elif self.task_type == 'row':
+            print(self.robot.check_row(np.ones(4), check_z_height=False))
+            print(state_str)
+        else:
+            print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
         if camera_color_img is None:
@@ -318,7 +326,8 @@ class HumanControlOfRobot(object):
 
             # NOTE(adit98) figure out how to show next img before action selection
             # finish trial and move to next trial
-            self.robot.reposition_objects()
+            # keep repositioning objects until we start from 1st step
+            self.reset_sim()
 
         elif key == ord('c'):
             # we stopped the program, write actions (only the successful ones)
@@ -376,6 +385,21 @@ class HumanControlOfRobot(object):
 
     def __del__(self):
         cv2.destroyAllWindows()
+
+    def reset_sim(self):
+        while True:
+            self.robot.reposition_objects()
+            if self.task_type == 'vertical_square':
+                _, progress = self.robot.vertical_square_partial_success(np.ones(4), check_z_height=False, stack_dist_thresh=0.04)
+            elif self.task_type == 'row':
+                _, progress = self.robot.check_row(np.ones(4), check_z_height=False)
+            elif self.task_type == 'stack':
+                _, progress = self.robot.check_stack(np.ones(4), check_z_height=False)
+            else:
+                progress = 1
+
+            if progress == 1:
+                break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
