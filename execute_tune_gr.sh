@@ -20,8 +20,8 @@ do
     
     #export CONFIG=configs/patch_transformer/tune_fixed.yaml;
     #export CONFIG=configs/image_transformer/bert.yaml
-    export CONFIG=configs/gr_transformer/base.yaml
-    dir="/srv/local1/estengel/models/transformer_tune_gr/${dr}_${w}_${n_sh}_${n_sp}_${nh}_${warm}";
+    export CONFIG=configs/gr_transformer/sim.yaml
+    dir="/srv/local1/estengel/models/transformer_tune_gr/${dr}_${w}_${n_sh}_${n_sp}_${nh}_${warm}_${init_scale}";
     export CHECKPOINT_DIR=${dir};
     export ZERO_WEIGHT=${w};
     export SHARED_LAYERS=${n_sh};
