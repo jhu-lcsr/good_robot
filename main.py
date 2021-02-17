@@ -985,7 +985,7 @@ def main(args):
                         over_block = not check_row
 
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=not check_row)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
