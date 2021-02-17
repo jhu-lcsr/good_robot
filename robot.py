@@ -2048,7 +2048,9 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
-    def check_stack(self, object_color_sequence, crop_stack_sequence=True, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
+    def check_stack(self, object_color_sequence, crop_stack_sequence=True,
+            horiz_distance_threshold=0.06, vert_distance_threshold=0.06, top_idx=-1,
+            pos=None, return_inds=False):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -2057,7 +2059,8 @@ class Robot(object):
         # Arguments
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        horiz_distance_threshold: The max distance cutoff between blocks(horizontal) in meters for the stack to be considered complete.
+        vert_distance_threshold: The max distance cutoff between blocks(vertical) in meters for the stack to be considered complete.
 
 
         # Returns
@@ -2100,7 +2103,7 @@ class Robot(object):
             # filter objects closest to the highest block in x, y based on the threshold
             # ordered from low to high, boolean mask array
             nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1) < \
-                    (distance_threshold/2)
+                    (horiz_distance_threshold/2)
             # print('nearby:', nearby_obj)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
@@ -2131,7 +2134,7 @@ class Robot(object):
             # print('bottom_pos:', bottom_pos)
             # print('top_pos:', top_pos)
             # print('distance_threshold: ', distance_threshold)
-            if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
+            if top_pos[2] < (bottom_pos[2] + vert_distance_threshold / 2.0):
                 print('check_stack(): not high enough for idx: ' + str(idx))
                 if return_inds:
                     return False, idx + 1, object_color_sequence
@@ -2141,7 +2144,7 @@ class Robot(object):
             # Check that the blocks are near each other
             dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
             # print('distance: ', dist)
-            if dist > distance_threshold:
+            if dist > vert_distance_threshold:
                 print('check_stack(): too far apart')
                 if return_inds:
                     return False, idx + 1, object_color_sequence
@@ -2196,7 +2199,7 @@ class Robot(object):
         # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
         # top_idx is set to the index of low2high_idx we want to check the stack at
         _, stack_height, first_stack_inds = self.check_stack(np.ones(2), crop_stack_sequence=False,
-                top_idx=top_idx, distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
+                top_idx=top_idx, horiz_distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
         second_stack_inds = None
 
         if stack_height > 1:
@@ -2212,7 +2215,8 @@ class Robot(object):
                 # check for 2nd stack (use index of block_ind in low2high_idx)
                 top_idx = len(low2high_idx) - 1 - i
                 _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
-                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True)
+                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True,
+                        horiz_distance_threshold=stack_dist_thresh)
 
                 if stack_height > 1:
                     num_stacks += 1
@@ -2296,7 +2300,7 @@ class Robot(object):
             top_idx = -2
 
         # run check stack to get height of stack
-        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx)
+        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
         # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
         structure_progress = 5 - stack_height

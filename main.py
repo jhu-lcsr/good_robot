@@ -482,9 +482,10 @@ def main(args):
         if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if task_type == 'vertical_square':
+                # NOTE(adit98) explicitly set a lower distance threshold for vertical square
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.vertical_square_partial_success(current_stack_goal,
-                                check_z_height=check_z_height)
+                                check_z_height=check_z_height, stack_dist_thresh=0.04)
             elif task_type == 'unstacking':
                 # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
                 stack_matches_goal, nonlocal_variables['stack_height'] = \

@@ -41,7 +41,7 @@ class HumanControlOfRobot(object):
         self.stop: if True shut down your program, pressing 'c' on the keyboard sets this variable to True.
     """
     def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True,
-            logger=None):
+            logger=None, task_type=None):
         self.stop = False
         self.print_state_count = 0
         self.tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
@@ -59,6 +59,8 @@ class HumanControlOfRobot(object):
         # go home automatically during push, grasp place actions
         self.go_home = True
         self.calib = None
+        self.task_type = task_type
+
         if robot is None:
 
             # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -219,8 +221,9 @@ class HumanControlOfRobot(object):
         state_str = 'Current action: ' + str(self.action) + '. '
         state_str += 'Grasp, HOLD, PLACE object task, ' if self.robot.place_task else 'Grasp then drop in box task, '
         state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
-        print(self.robot.vertical_square_partial_success(np.ones(4), False))
-        print(state_str)
+        if self.task_type == 'vertical_square':
+            print(self.robot.vertical_square_partial_success(np.ones(4), check_z_height=False, stack_dist_thresh=0.04))
+            print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
         if camera_color_img is None:
@@ -408,5 +411,5 @@ if __name__ == '__main__':
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
-    hcr = HumanControlOfRobot(robot, action=action, logger=logger)
+    hcr = HumanControlOfRobot(robot, action=action, logger=logger, task_type=args.task_type)
     hcr.run()
