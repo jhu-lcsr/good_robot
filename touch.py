@@ -312,6 +312,11 @@ class HumanControlOfRobot(object):
             self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
             self.trial += 1
 
+            # clear logs
+            self.all_action_log = []
+            self.successful_action_log = []
+
+            # NOTE(adit98) figure out how to show next img before action selection
             # finish trial and move to next trial
             self.robot.reposition_objects()
 
