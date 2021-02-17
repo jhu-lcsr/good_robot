@@ -1340,6 +1340,8 @@ def main(args):
                 pair = Pair.from_main_idxs(color_heightmap, json_data) 
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair)['train'][0]
+            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 
+            #if is
 
             # only set up the scene if working with Bisk (2018) data 
             elif is_sim and is_bisk: 

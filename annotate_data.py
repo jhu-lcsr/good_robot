@@ -21,7 +21,7 @@ class Pair:
         self.prev_location = prev_location
         self.next_image = next_image
         self.next_location = next_location 
-        self.w = 30
+        self.w = 40
         self.source_code = None 
         self.source_location = None
         self.target_code = None

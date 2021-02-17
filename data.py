@@ -548,7 +548,7 @@ class GoodRobotDatasetReader:
         self.resolution = resolution 
         self.max_seq_length = max_seq_length
 
-        if type(path_or_obj) == "str":
+        if type(path_or_obj) == str:
             self.path = pathlib.Path(path_or_obj)
             self.pkl_files = self.path.glob("*/*.pkl")
             self.all_data = []
@@ -605,9 +605,9 @@ class GoodRobotDatasetReader:
             else:
                 print("EXITING...")
                 sys.exit() 
-            self.data = {"train": dev_data,
-                         "dev": dev_data,
-                         "test": dev_data} 
+            self.data = {"train": dev_data[0:3],
+                         "dev": dev_data[0:3],
+                         "test": dev_data[0:3]} 
 
         self.vocab = set()
         for pair in self.data['train']:
