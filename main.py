@@ -316,7 +316,8 @@ def main(args):
                           'trial_complete': False,
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1,
-                          'save_state_this_iteration': False}
+                          'save_state_this_iteration': False,
+                          'example_actions_dict': None}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -715,10 +716,28 @@ def main(args):
                     # TODO(adit98) create an action_dict in nonlocal_variables to store each embedding
                     # TODO(adit98) check action_dict before running demo.get_action, populate action_dict if it doesn't have embedding for time step
                     # TODO(adit98) create trainers list with all the trainers, pass that to demo.get_action
-                    demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
-                            demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
-                                    nonlocal_variables['stack_height'], stack_trainer, row_trainer,
-                                    unstack_trainer, vertical_square_trainer)
+
+                    # first check if nonlocal_variables['example_actions_dict'] is none
+                    if nonlocal_variables['example_actions_dict'] is None:
+                        nonlocal_variables['example_action_dict'] = {}
+
+                    # check if embeddings for demo for progress n and primitive action p_a already exists
+                    task_progress = nonlocal_variables['stack_height']
+                    action = nonlocal_variables['primitive_action']
+                    if task_progress not in nonlocal_variables['example_actions_dict']:
+                        nonlocal_variables['example_actions_dict'][task_progress] = {}
+                    if action not in nonlocal_variables['example_actions_dict'][task_progress]:
+                        nonlocal_variables['example_actions_dict'][task_progress][action] = {}
+
+                    for ind, d in enumerate(example_demos):
+                        # get action embeddings from example demo
+                        if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
+
+                            demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
+                                    d.get_action(workspace_limits, action, task_progress, stack_trainer,
+                                            row_trainer, unstack_trainer, vertical_square_trainer)
+                            nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
+                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
@@ -787,11 +806,31 @@ def main(args):
 
                 else:
                     if use_demo:
+                        # rearrange example actions dictionary into (P, 2) array where P is number of policies
+                        example_actions = np.array([*nonlocal_variables['example_actions_dict'].values()],
+                                dtype=object).T
+
+                        # construct preds and example_actions based on task type ("Leave One Out")
+                        if task_type == 'row':
+                            preds = preds[1:]
+                            example_actions = example_actions[1:].tolist()
+                        elif task_type == 'stack':
+                            preds = preds[0, 2, 3]
+                            example_actions = example_actions[[0, 2, 3]].tolist()
+                        elif task_type == 'unstack':
+                            preds = preds[0, 1, 3]
+                            example_actions = example_actions[[0, 1, 3]].tolist()
+                        elif task_type == 'vertical_square':
+                            preds = preds[:-1]
+                            example_actions = example_actions[:3].tolist()
+                        else:
+                            raise NotImplementedError(task_type + ' is not implemented.')
+
                         # select preds based on primitive action selected in demo (theta, y, x)
                         correspondences, nonlocal_variables['best_pix_ind'] = \
-                                compute_demo_dist(preds, [demo_row_action, demo_stack_action,
-                                    demo_unstack_action, demo_vertical_square_action])
+                                compute_demo_dist(preds, example_actions)
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
+
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                         nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
@@ -1151,8 +1190,7 @@ def main(args):
         return
 
     if use_demo:
-        # TODO(adit98) set demo number to be cmd line arg, 0 right now
-        demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height,
+        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
                 task_type=args.task_type)
 
     num_trials = trainer.num_trials()
@@ -1236,6 +1274,11 @@ def main(args):
                             stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
                         if 'row' in multi_task_snapshot_files:
                             row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
+                        if 'unstack' in multi_task_snapshot_files:
+                            unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
+                        if 'vertical_square' in multi_task_snapshot_files:
+                            vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
+
                     else:
                         trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
@@ -1287,6 +1330,11 @@ def main(args):
                         stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
                     if 'row' in multi_task_snapshot_files:
                         row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
+                    if 'unstack' in multi_task_snapshot_files:
+                        unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
+                    if 'vertical_square' in multi_task_snapshot_files:
+                        vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
+
                 else:
                     trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1721,6 +1769,10 @@ def main(args):
                 stack_trainer.iteration += 1
             if row_trainer is not None:
                 row_trainer.iteration += 1
+            if unstack_trainer is not None:
+                unstack_trainer.iteration += 1
+            if vertical_square_trainer is not None:
+                vertical_square_trainer.iteration += 1
 
         else:
             trainer.iteration += 1
