@@ -103,15 +103,19 @@ if __name__ == '__main__':
     action_keys = sorted(example_demos[0].action_dict.keys())
     example_actions_dict = {}
     for k in action_keys:
+        if k in example_actions_dict: continue
+        example_actions_dict[k] = {}
         for action in ['grasp', 'place']:
+            if action in example_actions_dict[k]: continue
+            example_actions_dict[k] = {}
             for ind, d in enumerate(example_demos):
                 # get action embeddings from example demo
-                if ind not in example_actions_dict:
+                if ind not in example_actions_dict[k][action]:
                     example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _ = \
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
                                     use_hist=args.depth_channels_history, demo_mask=demo_mask)
-                    example_actions_dict[ind] = [example_action_row, example_action_stack,
+                    example_actions_dict[k][action] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square]
 
             if action == 'grasp':
@@ -214,7 +218,6 @@ if __name__ == '__main__':
             else:
                 raise NotImplementedError(args.task_type + ' is not implemented.')
 
-            # TODO(adit98) modify compute_demo_dist in utils to work with multiple demo embeddings per policy
             # evaluate l2 distance based action mask - leave one out is above
             im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions)
 
