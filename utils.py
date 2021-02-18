@@ -919,6 +919,7 @@ def compute_demo_dist(preds, example_actions):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     """
+
     # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
     def cos_sim(pix_preds, best_pred):
         """
@@ -934,14 +935,11 @@ def compute_demo_dist(preds, example_actions):
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
         # check if policy was supplied (entry will be None if it wasn't)
-        if example_actions[i] is None:
+        if example_actions[i][0] is None:
             continue
 
         # get actions and expand dims
-        actions = list(example_actions[i])
-
-        for j in actions:
-            actions[j] = np.expand_dims(actions[j], (0, 2, 3))
+        actions = np.expand_dims(np.stack(example_actions[i]), (1, 3, 4))
 
         # reshape and update list
         example_actions[i] = actions
@@ -950,7 +948,7 @@ def compute_demo_dist(preds, example_actions):
     mask = None
     for pred in preds:
         if pred is not None:
-            mask = (preds == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
             break
 
     # ensure that at least one of the preds is not None
@@ -960,11 +958,14 @@ def compute_demo_dist(preds, example_actions):
     # calculate l2 distance between example action embedding and preds for each policy and demo
     l2_dists = []
     for ind, actions in enumerate(example_actions):
-        # check if policy was supplied (entry will be None if it wasn't)
-        if actions is None:
+        # check if policy was supplied (entry will be [None, None] if it wasn't)
+        if actions[0] is None:
+            # if policy not supplied, insert pixel-wise array of inf distance
+            l2_dists.append(np.ones_like(mask) * np.inf)
             continue
 
         for action in actions:
+            # calculate pixel-wise l2 distance (16x224x224)
             dist = np.sum(np.square(action - preds[ind]), axis=1)
 
             # set all masked spaces to have max l2 distance
@@ -973,7 +974,7 @@ def compute_demo_dist(preds, example_actions):
             # append to l2_dists list
             l2_dists.append(dist)
 
-    # select best action as min b/w all dists in l2_dists
+    # stack pixel-wise distance array per policy (4x16x224x224)
     l2_dists = np.stack(l2_dists)
 
     # find overall minimum distance across all policies and get index
