@@ -41,7 +41,7 @@ class HumanControlOfRobot(object):
         self.stop: if True shut down your program, pressing 'c' on the keyboard sets this variable to True.
     """
     def __init__(self, robot=None, action='touch', human_control=True, mutex=None, move_robot=True,
-            logger=None, task_type=None):
+            logger=None, task_type=None, save_img=False):
         self.stop = False
         self.print_state_count = 0
         self.tool_orientation = [0.0, np.pi, 0.0] # Real Good Robot
@@ -52,6 +52,7 @@ class HumanControlOfRobot(object):
         self.all_action_log = []
         self.successful_action_log = []
         self.heightmap_pairs = []
+        self.img_pairs = []
         self.trial = 0
         self.click_count = 0
         self.click_position = None
@@ -60,6 +61,7 @@ class HumanControlOfRobot(object):
         self.go_home = True
         self.calib = None
         self.task_type = task_type
+        self.save_img = save_img
 
         if robot is None:
 
@@ -73,6 +75,9 @@ class HumanControlOfRobot(object):
             robot.open_gripper()
         else:
             self.robot = robot
+
+        # reset objects so we have correct progress
+        self.reset_sim()
 
         # Slow down robot
         # robot.joint_acc = 1.4
@@ -127,9 +132,10 @@ class HumanControlOfRobot(object):
 
     def execute_action(self, target_position, heightmap_rotation_angle):
         # log env state (demo/trial num is the poststring for saved heightmaps)
-        depth_heightmap, color_heightmap, _, _, _ = get_and_save_images(self.click_count,
+        depth_heightmap, color_heightmap, _, color_img, depth_img = get_and_save_images(self.click_count,
                 self.robot, self.logger, self.action, save_image=False)
         self.heightmap_pairs.append((depth_heightmap, color_heightmap))
+        self.img_pairs.append((depth_img, color_img))
 
         self.target_position = target_position
         self.click_count += 1
@@ -157,11 +163,20 @@ class HumanControlOfRobot(object):
                     depth_grasp, color_grasp = heightmap_pairs[0]
                     depth_place, color_place = heightmap_pairs[1]
 
-                    # save images
+                    # save heightmaps (and images)
                     self.logger.save_heightmaps(self.click_count, color_grasp,
                             depth_grasp, 'grasp', poststring=self.trial)
                     self.logger.save_heightmaps(self.click_count, color_place,
                             depth_place, 'place', poststring=self.trial)
+                    if self.save_img:
+                        img_pairs = self.img_pairs[-2:]
+                        depth_grasp_img, color_grasp_img = img_pairs[0]
+                        depth_place_img, color_place_img = img_pairs[1]
+                        self.logger.save_images(self.click_count, color_grasp_img,
+                                depth_grasp_img, 'grasp')
+                        self.logger.save_images(self.click_count, color_place_img,
+                                depth_place_img, 'place')
+
 
         if self.action == 'touch':
             # Move the gripper up a bit to protect the gripper (Real Good Robot)
@@ -223,6 +238,11 @@ class HumanControlOfRobot(object):
         state_str += 'robot WILL go home after push/grasp/place' if self.go_home else 'robot will NOT go home after push/grasp/place'
         if self.task_type == 'vertical_square':
             print(self.robot.vertical_square_partial_success(np.ones(4), check_z_height=False, stack_dist_thresh=0.04))
+            print(state_str)
+        elif self.task_type == 'row':
+            print(self.robot.check_row(np.ones(4), check_z_height=False))
+            print(state_str)
+        else:
             print(state_str)
 
     def run_one(self, camera_color_img=None, camera_depth_img=None):
@@ -312,8 +332,14 @@ class HumanControlOfRobot(object):
             self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
             self.trial += 1
 
+            # clear logs
+            self.all_action_log = []
+            self.successful_action_log = []
+
+            # NOTE(adit98) figure out how to show next img before action selection
             # finish trial and move to next trial
-            self.robot.reposition_objects()
+            # keep repositioning objects until we start from 1st step
+            self.reset_sim()
 
         elif key == ord('c'):
             # we stopped the program, write actions (only the successful ones)
@@ -372,9 +398,25 @@ class HumanControlOfRobot(object):
     def __del__(self):
         cv2.destroyAllWindows()
 
+    def reset_sim(self):
+        while True:
+            self.robot.reposition_objects()
+            if self.task_type == 'vertical_square':
+                _, progress = self.robot.vertical_square_partial_success(np.ones(4), check_z_height=False, stack_dist_thresh=0.04)
+            elif self.task_type == 'row':
+                _, progress = self.robot.check_row(np.ones(4), check_z_height=False)
+            elif self.task_type == 'stack':
+                _, progress = self.robot.check_stack(np.ones(4))
+            else:
+                progress = 1
+
+            if progress == 1:
+                break
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--task_type', default='stack', type=str)
+    parser.add_argument('-s', '--save_img', action='store_true', default=False)
     args = parser.parse_args()
 
     # User options (change me)
@@ -411,5 +453,5 @@ if __name__ == '__main__':
     logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
     logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
 
-    hcr = HumanControlOfRobot(robot, action=action, logger=logger, task_type=args.task_type)
+    hcr = HumanControlOfRobot(robot, action=action, logger=logger, task_type=args.task_type, save_img=args.save_img)
     hcr.run()
