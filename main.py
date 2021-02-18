@@ -198,14 +198,7 @@ def main(args):
         print('--unstack is automatically enabled')
 
     # ------ Pre-loading and logging options ------
-    stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory = \
-            parse_resume_and_snapshot_file_args(args)
-
-    if not use_demo:
-        if check_row:
-            snapshot_file = row_snapshot_file
-        else:
-            snapshot_file = stack_snapshot_file
+    snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
 
     save_visualizations = args.save_visualizations  # Save visualizations of FCN predictions? Takes 0.6s per training step if set to True
     plot_window = args.plot_window
@@ -243,9 +236,9 @@ def main(args):
     # Initialize trainer(s)
     if use_demo:
         stack_trainer, row_trainer = None, None
-        if stack_snapshot_file != '':
+        if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, stack_snapshot_file, force_cpu,
+                              is_testing, multi_task_snapshot_files['stack'], force_cpu,
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
@@ -253,9 +246,9 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
-        if row_snapshot_file != '':
+        if 'row' in multi_task_snapshot_files:
             row_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, row_snapshot_file, force_cpu,
+                              is_testing, multi_task_snapshot_files['row'], force_cpu,
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
@@ -263,9 +256,9 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
-        if unstack_snapshot_file != '':
+        if 'unstack' in multi_task_snapshot_files:
             unstack_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, unstack_snapshot_file, force_cpu,
+                              is_testing, multi_task_snapshot_files['unstack'], force_cpu,
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
@@ -273,9 +266,9 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
-        if vertical_square_snapshot_file != '':
+        if 'vertical_square' in multi_task_snapshot_files:
             vertical_square_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, vertical_square_snapshot_file, force_cpu,
+                              is_testing, multi_task_snapshot_files['vertical_square'], force_cpu,
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
@@ -1114,10 +1107,10 @@ def main(args):
             # Do special testing mode update steps
             # If at end of test run, re-load original weights (before test run)
             if use_demo:
-                if stack_snapshot_file != '':
-                    stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                if row_snapshot_file != '':
-                    row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                if 'stack' in multi_task_snapshot_files:
+                    stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
+                if 'row' in multi_task_snapshot_files:
+                    row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
             else:
                 trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1239,10 +1232,10 @@ def main(args):
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
                     if use_demo:
-                        if stack_snapshot_file != '':
-                            stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                        if row_snapshot_file != '':
-                            row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                        if 'stack' in multi_task_snapshot_files:
+                            stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
+                        if 'row' in multi_task_snapshot_files:
+                            row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
                     else:
                         trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
@@ -1290,10 +1283,10 @@ def main(args):
                 # Do special testing mode update steps
                 # If at end of test run, re-load original weights (before test run)
                 if use_demo:
-                    if stack_snapshot_file != '':
-                        stack_trainer.model.load_state_dict(torch.load(stack_snapshot_file))
-                    if row_snapshot_file != '':
-                        row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
+                    if 'stack' in multi_task_snapshot_files:
+                        stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
+                    if 'row' in multi_task_snapshot_files:
+                        row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
                 else:
                     trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1768,11 +1761,13 @@ def parse_resume_and_snapshot_file_args(args):
         continue_logging = False
         logging_directory = os.path.abspath('logs')
 
+    snapshot_file = os.path.abspath(args.snapshot_file) if args.snapshot_file else ''
+    multi_task_snapshot_files = {}
     # load all snapshots
-    stack_snapshot_file = os.path.abspath(args.stack_snapshot_file) if args.stack_snapshot_file else ''
-    row_snapshot_file = os.path.abspath(args.row_snapshot_file) if args.row_snapshot_file else ''
-    unstack_snapshot_file = os.path.abspath(args.unstack_snapshot_file) if args.unstack_snapshot_file else ''
-    vertical_square_snapshot_file = os.path.abspath(args.vertical_square_snapshot_file) if args.vertical_square_snapshot_file else ''
+    if args.stack_snapshot_file: multi_task_snapshot_files['stack'] = os.path.abspath(args.stack_snapshot_file)
+    if args.row_snapshot_file: multi_task_snapshot_files['row'] = os.path.abspath(args.row_snapshot_file)
+    if args.unstack_snapshot_file: multi_task_snapshot_files['unstack'] = os.path.abspath(args.unstack_snapshot_file)
+    if args.vertical_square_snapshot_file: multi_task_snapshot_files['vertical'] = os.path.abspath(args.vertical_square_snapshot_file)
 
     # if neither snapshot file is provided
     if continue_logging:
@@ -1788,12 +1783,7 @@ def parse_resume_and_snapshot_file_args(args):
                         log directory for errors')
                 exit(1)
 
-            if args.check_row:
-                row_snapshot_file = snapshot_file
-            else:
-                stack_snapshot_file = snapshot_file
-
-    return stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory
+    return snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory
 
 def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, title, place, prev_best_dict, preset_files=None, task_type=None):
     if preset_files is not None:
@@ -2025,8 +2015,7 @@ def choose_testing_snapshot(training_base_directory, best_dict, prioritize_actio
 def check_training_complete(args):
     ''' Function for use at program startup to check if we should run training some more or move on to testing mode.
     '''
-    stack_snapshot_file, row_snapshot_file, unstack_snapshot_file, vertical_square_snapshot_file, continue_logging, logging_directory = \
-            parse_resume_and_snapshot_file_args(args)
+    snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
 
     training_complete = False
     iteration = 0
@@ -2231,10 +2220,11 @@ if __name__ == '__main__':
     parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
 
     # ------ Pre-loading and logging options ------
-    parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                  help='stacking snapshot file to load for the model')
-    parser.add_argument('--row_snapshot_file', dest='row_snapshot_file', action='store', default='',                      help='row making snapshot file to load for the model')
-    parser.add_argument('--vertical_square_snapshot_file', dest='vertical_square_snapshot_file', action='store', default='', help='vertical_square making snapshot file to load for the model')
-    parser.add_argument('--unstack_snapshot_file', dest='unstack_snapshot_file', action='store', default='',              help='unstack making snapshot file to load for the model')
+    parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
+    parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                  help='multi model stacking snapshot file to load for the model (use --snapshot_file if you are training one model)')
+    parser.add_argument('--row_snapshot_file', dest='row_snapshot_file', action='store', default='',                      help='multi model row making snapshot file to load for the model (use --snapshot_file if you are training one model)')
+    parser.add_argument('--vertical_square_snapshot_file', dest='vertical_square_snapshot_file', action='store', default='', help='multi model vertical_square making snapshot file to load for the model (use --snapshot_file if you are training one model)')
+    parser.add_argument('--unstack_snapshot_file', dest='unstack_snapshot_file', action='store', default='',              help='multi model unstack making snapshot file to load for the model (use --snapshot_file if you are training one model)')
     parser.add_argument('--nn', dest='nn', action='store', default='densenet',                                            help='Neural network architecture choice, options are efficientnet, densenet')
     parser.add_argument('--num_dilation', dest='num_dilation', type=int, action='store', default=0,                       help='Number of dilations to apply to efficientnet, each increment doubles output resolution and increases computational expense.')
     parser.add_argument('--resume', dest='resume', nargs='?', default=None, const='last',                                 help='resume a previous run. If no run specified, resumes the most recent')
