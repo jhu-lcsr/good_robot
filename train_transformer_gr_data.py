@@ -17,8 +17,9 @@ from spacy.lang.en import English
 from einops import rearrange 
 import logging 
 from tqdm import tqdm 
-from matplotlib import pyplot as plt
 import matplotlib
+from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 from matplotlib import gridspec
 import numpy as np
 import torch.autograd.profiler as profiler
@@ -267,7 +268,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         return total_loss
 
-    def generate_debugging_image(self, true_img, pred_data, out_path, caption):
+    def generate_debugging_image(self, true_img, true_loc, pred_data, out_path, caption):
         caption = self.wrap_caption(caption)
         c = pred_data.shape[0]
 
@@ -289,8 +290,12 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             verticalalignment='top', bbox=props)
         # img_ax = plt.subplot(gs[2])
         img_ax = ax[1,0]
+        w = int(40 * (self.resolution / 224))
         true_img = true_img.detach().cpu().numpy().astype(int)
         img_ax.imshow(true_img)
+        location = true_loc - int(w/2)
+        rect = patches.Rectangle(location, w, w ,linewidth=3,edgecolor='w',facecolor='none')
+        img_ax.add_patch(rect)
 
         # pred_ax = plt.subplot(gs[0], figsize=(6,6))
         pred_ax = ax[0,0]
@@ -304,15 +309,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         pred_ax.set_ylim(0, self.resolution)
         pred_ax.set_xlim(0, self.resolution)
         plt.grid() 
-        to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
         to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
         for x_pos in xs:
             for z_pos in zs:
-                to_plot_xs_lab.append(x_pos)
-                to_plot_zs_lab.append(z_pos)
-
                 prob = pred_data[x_pos, z_pos].item()
-                to_plot_xs_prob.append(x_pos)
+                to_plot_xs_prob.append(self.resolution - x_pos)
                 to_plot_zs_prob.append(z_pos)
                 to_plot_probs.append(prob)
 
@@ -339,7 +340,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
 
 
-        if True: 
+        if False: 
             print(batch_instance["prev_pos_for_pred"][0,0,40:60,10:30,0].long()) 
             print(torch.argmax(prev_position[0,:,40:60,10:30], dim = 0))
 
@@ -360,11 +361,13 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
                  
                 self.generate_debugging_image(next_pos,
+                                             batch_instance['pairs'][i].next_location,
                                              next_position[i], 
                                              output_path.joinpath("next"),
                                              caption = command) 
 
                 self.generate_debugging_image(prev_pos, 
+                                              batch_instance['pairs'][i].prev_location,
                                               prev_position[i], 
                                               output_path.joinpath("prev"),
                                               caption = command) 
@@ -418,10 +421,11 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
-    dataset_reader = GoodRobotDatasetReader(path=args.path,
+    dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
                                             task_type=args.task_type,
                                             augment_by_flipping = args.augment_by_flipping,
+                                            augment_by_rotating = args.augment_by_rotating, 
                                             augment_language = args.augment_language,
                                             leave_out_color = args.leave_out_color,
                                             batch_size=args.batch_size,
@@ -571,7 +575,7 @@ def main(args):
                                    optimizer = None, 
                                    scheduler = None, 
                                    num_epochs = 0, 
-                                   num_blocks = args.num_blocks,
+                                   num_blocks = 1, 
                                    device = device,
                                    resolution = args.resolution, 
                                    output_type = args.output_type, 
@@ -615,6 +619,7 @@ if __name__ == "__main__":
                         default="rows-and-stacks") 
     parser.add_argument("--leave-out-color", type=str, default=None) 
     parser.add_argument("--augment-by-flipping", action="store_true")
+    parser.add_argument("--augment-by-rotating", action="store_true")
     parser.add_argument("--augment-language", action="store_true")
     parser.add_argument("--overfit", action = "store_true")
     # language embedder 
