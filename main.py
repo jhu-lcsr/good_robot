@@ -1468,7 +1468,11 @@ def main(args):
 
             # Adjust exploration probability
             if not is_testing:
-                explore_prob = max(0.5 * np.power(0.9996, trainer.iteration), 0.01) if explore_rate_decay else 0.5
+                explore_decay_rate = 0.9996
+                if (max_train_actions is not None and max_train_actions > 20000) or (max_train_actions is None and (max_iter == -1 or max_iter > 20000)):
+                    # do more exploration on longer runs
+                    explore_decay_rate = 0.9999
+                explore_prob = max(0.5 * np.power(explore_decay_rate, trainer.iteration), 0.01) if explore_rate_decay else 0.5
 
             # Do sampling for experience replay
             if experience_replay_enabled and prev_primitive_action is not None and not is_testing:
