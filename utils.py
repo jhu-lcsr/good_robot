@@ -13,14 +13,14 @@ from scipy.special import softmax
 import pathlib
 
 # Import necessary packages
-try:
-    from spacy.lang.en import English
-    from spacy.tokenizer import Tokenizer
-    from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-    from transformer import TransformerEncoder
-    from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
-except ImportError:
-    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
+#try:
+from spacy.lang.en import English
+from spacy.tokenizer import Tokenizer
+from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
+from transformer import TransformerEncoder
+from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
+#except ImportError:
+#    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -309,7 +309,7 @@ def load_language_model_from_config(configYamlPath, weightsPath):
     
     # Move model to available gpu
     device = "cpu"
-    if config["cuda is not None"]:
+    if config["cuda"] is not None and config["cuda"] >= 0:
         free_gpu_id = get_free_gpu()
         if free_gpu_id > -1:
             device = f"cuda:{free_gpu_id}"
@@ -350,7 +350,7 @@ def load_language_model_from_config(configYamlPath, weightsPath):
                                  channels = config["channels"], 
                                  n_heads = config["n_heads"],
                                  hidden_dim = config["hidden_dim"],
-                                 ff_dim = config["f_dim"],
+                                 ff_dim = config["ff_dim"],
                                  dropout = config["dropout"],
                                  embed_dropout = config["embed_dropout"],
                                  output_type = config["output_type"], 
@@ -360,7 +360,7 @@ def load_language_model_from_config(configYamlPath, weightsPath):
 
     # Load weights
     print(f'loading model weights from {config["checkpoint_dir"]}') 
-    state_dict = torch.load(pathlib.Path(config["checkpoint_dir"]).joinpath("best.th"))
+    state_dict = torch.load(pathlib.Path(config["checkpoint_dir"]).joinpath("best.th"), map_location = device)
     encoder.load_state_dict(state_dict, strict=True)
 
     return encoder

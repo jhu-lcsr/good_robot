@@ -45,17 +45,20 @@ class Pair:
 
     def resize(self):
         self.prev_image = cv2.resize(self.prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
-        self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+        if self.next_image is not None: 
+            self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
         self.ratio = self.resolution / 224 
 
         # normalize location and width 
         self.w *= self.ratio 
         self.w = int(self.w)
-
-        self.prev_location = self.prev_location.astype(float).copy() * self.ratio
-        self.prev_location = self.prev_location.astype(int)
-        self.next_location = self.next_location.astype(float).copy() * self.ratio
-        self.next_location = self.next_location.astype(int)
+        
+        if self.prev_location is not None: 
+            self.prev_location = self.prev_location.astype(float).copy() * self.ratio
+            self.prev_location = self.prev_location.astype(int)
+        if self.next_location is not None: 
+            self.next_location = self.next_location.astype(float).copy() * self.ratio
+            self.next_location = self.next_location.astype(int)
 
     def get_mask(self, location):
         w, h, __ = self.prev_image.shape
@@ -98,14 +101,17 @@ class Pair:
     @classmethod
     def from_main_idxs(cls, prev_image, prev_json):
         # TODO(elias) infer which block to move from interpolation here 
-        pair = cls(None, None, None, None) 
+        pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
         src_color, tgt_color = pair.infer_from_json_data(json_data) 
         return pair 
 
     def read_json(self, json_path):
-        with open(json_path) as f1:
-            data = json.load(f1)
+        if type(json_path) == dict:
+            data = json_path
+        else:
+            with open(json_path) as f1:
+                data = json.load(f1)
         num_blocks = data['num_obj']
         colors = data['color_names'][0:num_blocks]
         coords = data['positions']
@@ -182,11 +188,13 @@ class Pair:
 
         return min_grasp_color, min_place_color  
 
-    def infer_from_json_data(json_data):
+    def infer_from_json_data(self, json_data):
         # TODO(elias)
-        pass 
-
-    
+        # hardcode for now 
+        self.source_code = "r"
+        self.target_code = 'b'
+        self.relation_code = "next_to"
+        return "red", "blue"
 
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"
