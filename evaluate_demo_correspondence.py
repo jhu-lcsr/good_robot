@@ -103,11 +103,13 @@ if __name__ == '__main__':
     action_keys = sorted(example_demos[0].action_dict.keys())
     example_actions_dict = {}
     for k in action_keys:
-        if k in example_actions_dict: continue
-        example_actions_dict[k] = {}
-        for action in ['grasp', 'place']:
-            if action in example_actions_dict[k]: continue
+        if k not in example_actions_dict:
             example_actions_dict[k] = {}
+
+        for action in ['grasp', 'place']:
+            if action not in example_actions_dict[k]:
+                example_actions_dict[k][action] = {}
+
             for ind, d in enumerate(example_demos):
                 # get action embeddings from example demo
                 if ind not in example_actions_dict[k][action]:
@@ -115,7 +117,7 @@ if __name__ == '__main__':
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
                                     use_hist=args.depth_channels_history, demo_mask=demo_mask)
-                    example_actions_dict[k][action] = [example_action_row, example_action_stack,
+                    example_actions_dict[k][action][ind] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square]
 
             if action == 'grasp':
@@ -198,8 +200,8 @@ if __name__ == '__main__':
 
             print("Evaluating l2 distance for stack height:", k, "| Action:", action)
 
-            # rearrange example actions dictionary into (P, 2) array where P is number of policies
-            example_actions = np.array([*example_actions_dict.values()], dtype=object).T
+            # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
+            example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
 
             # store preds we want to use (after leave one out) in preds, and get relevant example actions
             # order of example actions is row, stack, unstack, vertical square

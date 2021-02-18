@@ -806,8 +806,12 @@ def main(args):
 
                 else:
                     if use_demo:
-                        # rearrange example actions dictionary into (P, 2) array where P is number of policies
-                        example_actions = np.array([*nonlocal_variables['example_actions_dict'].values()],
+                        # get parameters of current action to do dict lookup
+                        task_progress = nonlocal_variables['stack_height']
+                        action = nonlocal_variables['primitive_action']
+
+                        # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
+                        example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
                                 dtype=object).T
 
                         # construct preds and example_actions based on task type ("Leave One Out")
