@@ -32,6 +32,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from data import DatasetReader, GoodRobotDatasetReader
 from generate_logoblocks_images import BlockSetter
+from annotate_data import Pair 
 
 def run_title(args):
     """
@@ -1286,7 +1287,7 @@ def main(args):
                                                     split_type="none",
                                                     task_type="rows",
                                                     augment_by_flipping=False,
-                                                    augument_language = False,
+                                                    augment_language = False,
                                                     leave_out_color=None,
                                                     batch_size=1,
                                                     max_seq_length=40,
@@ -1305,7 +1306,7 @@ def main(args):
             language_data = dataset_reader.data['train']
             # END IF
         
-        if is_sim:
+        if is_sim and is_bisk:
             blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot, side_len=0.027)
         
         language_model = utils.load_language_model_from_config(configYamlPath=language_model_config, weightsPath=language_model_weights)
@@ -1324,6 +1325,10 @@ def main(args):
         # Record the current trial number
         trainer.trial_log.append([trainer.num_trials()])
 
+        # Get latest RGB-D image
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
+            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
+
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
@@ -1339,7 +1344,7 @@ def main(args):
                 json_data = sim_object_state_to_json(robot) 
                 pair = Pair.from_main_idxs(color_heightmap, json_data) 
                 # batchify a single example 
-                language_data_instance = dataset_reader_fxn(pair)['train'][0]
+                language_data_instance = dataset_reader_fxn(pair).data['train'][0]
             # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 
             #if is
 
@@ -1357,10 +1362,6 @@ def main(args):
                 pass 
         else:
             language_data_instance = None
-
-        # Get latest RGB-D image
-        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -1416,7 +1417,11 @@ def main(args):
                         if row_snapshot_file != '':
                             row_trainer.model.load_state_dict(torch.load(row_snapshot_file))
                     else:
-                        trainer.model.load_state_dict(torch.load(snapshot_file))
+                        try:
+                            trainer.model.load_state_dict(torch.load(snapshot_file))
+                        except FileNotFoundError:
+                            # TODO(elias) make sure this is OK 
+                            pass 
                 if place:
                     set_nonlocal_success_variables_false()
                     nonlocal_variables['stack'].reset_sequence()

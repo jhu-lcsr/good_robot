@@ -723,17 +723,20 @@ class GoodRobotDatasetReader:
             block_to_move.append(None) 
 
         prev_pos_input = torch.cat(prev_pos_input, 0)
-        prev_pos_for_pred = torch.cat(prev_pos_for_pred, 0)
-        prev_pos_for_acc  = torch.cat(prev_pos_for_acc, 0)
-        next_pos_for_pred  = torch.cat(next_pos_for_pred, 0) 
-        next_pos_for_acc = torch.cat(next_pos_for_acc, 0) 
+        if len(prev_pos_for_pred) > 0:
+            prev_pos_for_pred = torch.cat(prev_pos_for_pred, 0)
+            prev_pos_for_pred = prev_pos_for_pred.float().unsqueeze(-1)
+        if len(prev_pos_for_acc) > 0:
+            prev_pos_for_acc  = torch.cat(prev_pos_for_acc, 0)
+            prev_pos_for_acc  = prev_pos_for_acc.float() 
+        if len(next_pos_for_pred) > 0:
+            next_pos_for_pred  = torch.cat(next_pos_for_pred, 0) 
+            next_pos_for_pred = next_pos_for_pred.float().unsqueeze(-1)
+        if len(next_pos_for_acc) > 0:
+            next_pos_for_acc = torch.cat(next_pos_for_acc, 0) 
+            next_pos_for_acc = next_pos_for_acc.float() 
 
         prev_pos_input = prev_pos_input.permute(0, 3, 1, 2).float() 
-
-        prev_pos_for_pred = prev_pos_for_pred.float().unsqueeze(-1)
-        next_pos_for_pred = next_pos_for_pred.float().unsqueeze(-1)
-        prev_pos_for_acc  = prev_pos_for_acc.float() 
-        next_pos_for_acc = next_pos_for_acc.float() 
 
         return {"command": commands,
                 "prev_pos_input": prev_pos_input,
