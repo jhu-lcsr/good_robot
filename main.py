@@ -23,7 +23,7 @@ from utils import StackSequence
 from utils import compute_demo_dist
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
-from demo import Demonstration
+from demo import Demonstration, load_all_demos
 import plot
 import json
 import copy
@@ -43,7 +43,7 @@ def run_title(args):
     if args.task_type is not None:
         if args.task_type == 'vertical_square':
             title += 'Vertical Square, '
-        elif args.task_type == 'unstacking':
+        elif args.task_type == 'unstack':
             title += 'Unstacking, '
         elif args.task_type == 'stack':
             title += 'Stack, '
@@ -148,7 +148,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and ((args.task_type is None) or (args.task_type != 'unstacking'))
+    place_common_sense = args.common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -235,7 +235,7 @@ def main(args):
 
     # Initialize trainer(s)
     if use_demo:
-        stack_trainer, row_trainer = None, None
+        stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
         if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['stack'], force_cpu,
@@ -480,7 +480,7 @@ def main(args):
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.vertical_square_partial_success(current_stack_goal,
                                 check_z_height=check_z_height, stack_dist_thresh=0.04)
-            elif task_type == 'unstacking':
+            elif task_type == 'unstack':
                 # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
@@ -498,6 +498,7 @@ def main(args):
                         prev_z_height=nonlocal_variables['prev_stack_height'])
 
             else:
+                # TODO(adit98) trigger graceful exit here
                 raise NotImplementedError(task_type)
 
         elif check_row:
@@ -527,7 +528,7 @@ def main(args):
 
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
-            if task_type is not None and task_type == 'unstacking':
+            if task_type is not None and task_type == 'unstack':
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
@@ -719,7 +720,7 @@ def main(args):
 
                     # first check if nonlocal_variables['example_actions_dict'] is none
                     if nonlocal_variables['example_actions_dict'] is None:
-                        nonlocal_variables['example_action_dict'] = {}
+                        nonlocal_variables['example_actions_dict'] = {}
 
                     # check if embeddings for demo for progress n and primitive action p_a already exists
                     task_progress = nonlocal_variables['stack_height']
@@ -828,6 +829,7 @@ def main(args):
                             preds = preds[:-1]
                             example_actions = example_actions[:3].tolist()
                         else:
+                            # TODO(adit98) trigger graceful exit here
                             raise NotImplementedError(task_type + ' is not implemented.')
 
                         # select preds based on primitive action selected in demo (theta, y, x)
@@ -1016,7 +1018,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block for vertical square and stacking
-                    if task_type is not None and ((task_type == 'unstacking') or (task_type == 'row')):
+                    if task_type is not None and ((task_type == 'unstack') or (task_type == 'row')):
                         over_block = False
                     else:
                         over_block = not check_row
@@ -1154,6 +1156,10 @@ def main(args):
                     stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
                 if 'row' in multi_task_snapshot_files:
                     row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
+                if 'unstack' in multi_task_snapshot_files:
+                    unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
+                if 'vertical_square' in multi_task_snapshot_files:
+                    vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
             else:
                 trainer.model.load_state_dict(torch.load(snapshot_file))
 
