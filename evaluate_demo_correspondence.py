@@ -18,19 +18,22 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--stack_snapshot_file', default=None, help='snapshot file to load for the stacking model')
     parser.add_argument('-r', '--row_snapshot_file', default=None, help='snapshot file to load for row model')
     parser.add_argument('-u', '--unstack_snapshot_file', default=None, help='snapshot file to load for unstacking model')
-    parser.add_argument('-r', '--vertical_square_snapshot_file', default=None, help='snapshot file to load for vertical_square model')
+    parser.add_argument('-v', '--vertical_square_snapshot_file', default=None, help='snapshot file to load for vertical_square model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
     parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
     parser.add_argument('--depth_channels_history', default=False, action='store_true', help='use depth channel history when passing frames to model?')
     parser.add_argument('--viz', dest='save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
+
+    args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
     # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
     workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]])
 
     # create viz directory in imitation_demo folder
-    if not os.path.exists(os.path.join(args.imitation_demo, 'correspondences')):
-        os.makedirs(os.path.join(args.imitation_demo, 'correspondences'))
+    if args.save_visualizations:
+        if not os.path.exists(os.path.join(args.imitation_demo, 'correspondences')):
+            os.makedirs(os.path.join(args.imitation_demo, 'correspondences'))
 
     # create both demo classes
     example_demos = load_all_demos(demo_path=args.example_demo, check_z_height=False,
@@ -42,8 +45,10 @@ if __name__ == '__main__':
     # TODO(adit98) make this a cmd line argument and think about whether it should ever be set
     if args.task_type == 'unstack':
         place_common_sense = False
+        demo_mask = True
     else:
-        place_common_sense = False
+        place_common_sense = True
+        demo_mask = True
 
     # Initialize trainer(s)
     stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
@@ -96,35 +101,25 @@ if __name__ == '__main__':
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
     action_keys = sorted(example_demos[0].action_dict.keys())
-    example_actions = {}
+    example_actions_dict = {}
     for k in action_keys:
         for action in ['grasp', 'place']:
             for ind, d in enumerate(example_demos):
                 # get action embeddings from example demo
-                if ind not in example_actions:
+                if ind not in example_actions_dict:
                     example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _ = \
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
-                                    use_hist=args.depth_channels_history)
-                    example_actions[ind] = [example_action_row, example_action_stack,
+                                    use_hist=args.depth_channels_history, demo_mask=demo_mask)
+                    example_actions_dict[ind] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square]
 
-            # get imitation heightmaps
-            if args.task_type == 'unstack':
-                if action == 'grasp':
-                    im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['demo_ind'], use_hist=args.depth_channels_history)
-                else:
-                    im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['demo_ind'] + 1, use_hist=args.depth_channels_history)
-
+            if action == 'grasp':
+                im_color, im_depth = imitation_demo.get_heightmaps(action,
+                        imitation_demo.action_dict[k]['grasp_image_ind'], use_hist=args.depth_channels_history)
             else:
-                if action == 'grasp':
-                    im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['grasp_image_ind'], use_hist=args.depth_channels_history)
-                else:
-                    im_color, im_depth = imitation_demo.get_heightmaps(action,
-                            imitation_demo.action_dict[k]['place_image_ind'], use_hist=args.depth_channels_history)
+                im_color, im_depth = imitation_demo.get_heightmaps(action,
+                        imitation_demo.action_dict[k]['place_image_ind'], use_hist=args.depth_channels_history)
 
             # create filenames to be saved
             depth_filename = os.path.join(args.imitation_demo, 'correspondences',
@@ -133,11 +128,11 @@ if __name__ == '__main__':
                     str(k) + '.' + action + '.color.png')
 
             # run forward pass for imitation_demo
-            stack_preds, row_preds, unstack_preds, vertical_square_preds = None, None
+            stack_preds, row_preds, unstack_preds, vertical_square_preds = None, None, None, None
 
             # get stack features if stack_trainer is provided
             if stack_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color,
                         im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
 
@@ -147,7 +142,7 @@ if __name__ == '__main__':
 
             # get row features if row_trainer is provided
             if row_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 row_push, row_grasp, row_place = row_trainer.forward(im_color,
                         im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
 
@@ -157,7 +152,7 @@ if __name__ == '__main__':
 
             # get unstack features if unstack_trainer is provided
             if unstack_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 unstack_push, unstack_grasp, unstack_place = unstack_trainer.forward(im_color,
                         im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
 
@@ -167,7 +162,7 @@ if __name__ == '__main__':
 
             # get vertical_square features if vertical_square_trainer is provided
             if vertical_square_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with get_action_feat
+                # to get vector of 64 vals, run trainer.forward with keep_action_feat
                 vertical_square_push, vertical_square_grasp, vertical_square_place = \
                         vertical_square_trainer.forward(im_color, im_depth,
                                 is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
@@ -197,24 +192,27 @@ if __name__ == '__main__':
                 if vertical_square_trainer is not None:
                     vertical_square_preds = vertical_square_place
 
-            print("Evaluating l2 distance for stack height:", k)
+            print("Evaluating l2 distance for stack height:", k, "| Action:", action)
+
+            # rearrange example actions dictionary into (P, 2) array where P is number of policies
+            example_actions = np.array([*example_actions_dict.values()], dtype=object).T
 
             # store preds we want to use (after leave one out) in preds, and get relevant example actions
             # order of example actions is row, stack, unstack, vertical square
-            if task_type == 'row':
+            if args.task_type == 'row':
                 preds = [stack_preds, unstack_preds, vertical_square_preds]
-                example_actions = list(zip(*list(example_actions.values())))[1:]
-            elif task_type == 'stack':
+                example_actions = example_actions[1:].tolist()
+            elif args.task_type == 'stack':
                 preds = [row_preds, unstack_preds, vertical_square_preds]
-                example_actions = list(zip(*list(example_actions.values())))[0, 2, 3]
-            elif task_type == 'unstack':
+                example_actions = example_actions[[0, 2, 3]].tolist()
+            elif args.task_type == 'unstack':
                 preds = [row_preds, stack_preds, vertical_square_preds]
-                example_actions = list(zip(*list(example_actions.values())))[0, 1, 3]
-            elif task_type == 'vertical_square':
+                example_actions = example_actions[[0, 1, 3]].tolist()
+            elif args.task_type == 'vertical_square':
                 preds = [row_preds, stack_preds, unstack_preds]
-                example_actions = list(zip(*list(example_actions.values())))[:3]
+                example_actions = example_actions[:3].tolist()
             else:
-                raise NotImplementedError(task_type + ' is not implemented.')
+                raise NotImplementedError(args.task_type + ' is not implemented.')
 
             # TODO(adit98) modify compute_demo_dist in utils to work with multiple demo embeddings per policy
             # evaluate l2 distance based action mask - leave one out is above
