@@ -148,7 +148,8 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
+    place_common_sense = common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
+    print('main.py using common sense:', common_sense, 'using place common sense:', place_common_sense)
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -235,10 +236,12 @@ def main(args):
     else:
         place_dilation = 0.00
 
+    print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
+
     # Initialize trainer(s)
     if use_demo:
-        assert task_type is not None, raise ValueError("Must provide task_type if using demo")
-        assert is_testing, raise ValueError("Must run in testing mode if using demo")
+        assert task_type is not None, ("Must provide task_type if using demo")
+        assert is_testing, ("Must run in testing mode if using demo")
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
         if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -642,22 +645,22 @@ def main(args):
                         # get grasp predictions (since next action is grasp)
                         # fill the masked arrays and add to preds
                         if row_trainer is not None:
-                            preds.append(grasp_feat_row.filled(0.0))
+                            preds.append(grasp_feat_row)
                         else:
                             preds.append(None)
 
                         if stack_trainer is not None:
-                            preds.append(grasp_feat_stack.filled(0.0))
+                            preds.append(grasp_feat_stack)
                         else:
                             preds.append(None)
 
                         if unstack_trainer is not None:
-                            preds.append(grasp_feat_unstack.filled(0.0))
+                            preds.append(grasp_feat_unstack)
                         else:
                             preds.append(None)
 
                         if vertical_square_trainer is not None:
-                            preds.append(grasp_feat_vertical_square.filled(0.0))
+                            preds.append(grasp_feat_vertical_square)
                         else:
                             preds.append(None)
 
@@ -669,22 +672,22 @@ def main(args):
                             # get place predictions (since next action is place)
                             # fill the masked arrays and add to preds
                             if row_trainer is not None:
-                                preds.append(place_feat_row.filled(0.0))
+                                preds.append(place_feat_row)
                             else:
                                 preds.append(None)
 
                             if stack_trainer is not None:
-                                preds.append(place_feat_stack.filled(0.0))
+                                preds.append(place_feat_stack)
                             else:
                                 preds.append(None)
 
                             if unstack_trainer is not None:
-                                preds.append(place_feat_unstack.filled(0.0))
+                                preds.append(place_feat_unstack)
                             else:
                                 preds.append(None)
 
                             if vertical_square_trainer is not None:
-                                preds.append(place_feat_vertical_square.filled(0.0))
+                                preds.append(place_feat_vertical_square)
                             else:
                                 preds.append(None)
 
@@ -695,32 +698,28 @@ def main(args):
                             # get grasp predictions (since next action is grasp)
                             # fill the masked arrays and add to preds
                             if row_trainer is not None:
-                                preds.append(grasp_feat_row.filled(0.0))
+                                preds.append(grasp_feat_row)
                             else:
                                 preds.append(None)
 
                             if stack_trainer is not None:
-                                preds.append(grasp_feat_stack.filled(0.0))
+                                preds.append(grasp_feat_stack)
                             else:
                                 preds.append(None)
 
                             if unstack_trainer is not None:
-                                preds.append(grasp_feat_unstack.filled(0.0))
+                                preds.append(grasp_feat_unstack)
                             else:
                                 preds.append(None)
 
                             if vertical_square_trainer is not None:
-                                preds.append(grasp_feat_vertical_square.filled(0.0))
+                                preds.append(grasp_feat_vertical_square)
                             else:
                                 preds.append(None)
 
                     print("main.py: running demo.get_action for stack height",
                             nonlocal_variables['stack_height'], "and primitive action",
                             nonlocal_variables['primitive_action'])
-
-                    # TODO(adit98) create an action_dict in nonlocal_variables to store each embedding
-                    # TODO(adit98) check action_dict before running demo.get_action, populate action_dict if it doesn't have embedding for time step
-                    # TODO(adit98) create trainers list with all the trainers, pass that to demo.get_action
 
                     # first check if nonlocal_variables['example_actions_dict'] is none
                     if nonlocal_variables['example_actions_dict'] is None:
@@ -830,7 +829,7 @@ def main(args):
                             preds = preds[0, 1, 3]
                             example_actions = example_actions[[0, 1, 3]].tolist()
                         elif task_type == 'vertical_square':
-                            preds = preds[:-1]
+                            preds = preds[:3]
                             example_actions = example_actions[:3].tolist()
                         else:
                             # TODO(adit98) trigger graceful exit here
@@ -1389,17 +1388,19 @@ def main(args):
                 goal_condition = None
 
             # here, we run forward pass on imitation video
-            # TODO(adit98) refactor demo.get_action to get the saved embedding
             if args.use_demo:
                 # run forward pass, keep action features and get softmax predictions
-
                 # stack features
                 if stack_trainer is not None:
                     push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
                             grasp_predictions_stack, place_predictions_stack, _, _ = \
-                            stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            stack_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got stack features")
+
+                    # fill masked arrays of features
+                    push_feat_stack, grasp_feat_stack, place_feat_stack = \
+                            push_feat_stack.filled(0.0), grasp_feat_stack.filled(0.0), place_feat_stack.filled(0.0)
 
                     # TODO(adit98) may need to refactor, for now just store stack predictions
                     push_predictions, grasp_predictions, place_predictions = \
@@ -1409,9 +1410,13 @@ def main(args):
                     # row features
                     push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
                             grasp_predictions_row, place_predictions_row, _, _ = \
-                            row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            row_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got row features")
+
+                    # fill masked arrays of features
+                    push_feat_row, grasp_feat_row, place_feat_row = \
+                            push_feat_row.filled(0.0), grasp_feat_row.filled(0.0), place_feat_row.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to row predictions if stack trainer not specified
@@ -1423,9 +1428,13 @@ def main(args):
                     # unstack features
                     push_feat_unstack, grasp_feat_unstack, place_feat_unstack, push_predictions_unstack, \
                             grasp_predictions_unstack, place_predictions_unstack, _, _ = \
-                            unstack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            unstack_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got unstack features")
+
+                    # fill masked arrays of features
+                    push_feat_unstack, grasp_feat_unstack, place_feat_unstack = \
+                            push_feat_unstack.filled(0.0), grasp_feat_unstack.filled(0.0), place_feat_unstack.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to unstack predictions if stack trainer not specified
@@ -1437,9 +1446,13 @@ def main(args):
                     # vertical_square features
                     push_feat_vertical_square, grasp_feat_vertical_square, place_feat_vertical_square, push_predictions_vertical_square, \
                             grasp_predictions_vertical_square, place_predictions_vertical_square, _, _ = \
-                            vertical_square_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            vertical_square_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got vertical_square features")
+
+                    # fill masked arrays of features
+                    push_feat_vertical_square, grasp_feat_vertical_square, place_feat_vertical_square = \
+                            push_feat_vertical_square.filled(0.0), grasp_feat_vertical_square.filled(0.0), place_feat_vertical_square.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to vertical_square predictions if stack trainer not specified
