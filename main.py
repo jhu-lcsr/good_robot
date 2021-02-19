@@ -123,6 +123,10 @@ def main(args):
     flops = args.flops
     show_heightmap = args.show_heightmap
     max_train_actions = args.max_train_actions
+    if is_testing:
+        max_trial_actions = args.max_trial_actions_test
+    else:
+        max_trial_actions = args.max_trial_actions_train
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -547,6 +551,14 @@ def main(args):
                     # caused decrease of more than 1 block during push/grasp
                     toppled = nonlocal_variables['stack_height'] > (nonlocal_variables['prev_stack_height'] + 1)
 
+        insufficient_objs_in_scene = False
+        # add check for num_obj in scene
+        if is_sim and task_type in ['row', 'unstack', 'vertical_square']:
+            objs = robot.get_objects_in_scene()
+            if len(objs) < nonlocal_variables['stack'].num_obj:
+                needed_to_reset = True
+                insufficient_objs_in_scene = True
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
@@ -555,9 +567,11 @@ def main(args):
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            if insufficient_objs_in_scene:
+                mismatch_str += ', INSUFFICIENT OBJECTS IN SCENE'
             if toppled is not None and toppled:
                 mismatch_str += ', TOPPLED stack'
-            if not disable_situation_removal:
+            if not disable_situation_removal or insufficient_objs_in_scene or (toppled is not None and toppled):
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
@@ -1274,8 +1288,11 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
+        # calculate number of actions/iterations in this trial
+        actions_in_trial = trainer.get_final_trial_action_count()
+
         # NOTE(zhe) This is for the stacking task (BUG But it runs for place/grasp as well?), error is thrown when not enough objects are in the workspace or no change in workspace
-        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10) or (actions_in_trial >= max_trial_actions):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -1322,6 +1339,7 @@ def main(args):
                 do_continue = True
                 # continue
 
+        # TODO(adit98) figure out if we need to disable experience replay for boundary situations e.g. successful action & trial reset for trial action limit, successful action & objects leaving scene
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
@@ -2265,6 +2283,8 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='INTEGRATED TRAIN VAL TEST - maximum number of actions before training exits automatically at the end of that trial. Note this is slightly different from max_iter.')
+    parser.add_argument('--max_trial_actions_train', dest='max_trial_actions_train', type=int, action='store', default=100, help='Number of actions after which to reset environment if trial is not completed')
+    parser.add_argument('--max_trial_actions_test', dest='max_trial_actions_test', type=int, action='store', default=30, help='Number of actions after which to reset environment if trial is not completed')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
