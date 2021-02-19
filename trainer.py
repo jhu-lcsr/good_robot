@@ -1112,6 +1112,6 @@ class Trainer(object):
         Get the number of actions taken in the running trial.
         """
         if len(self.clearance_log) > 0:
-            return self.iteration - self.clearance_log[-1]
+            return self.iteration - np.array(self.clearance_log).flatten()[-1]
         else:
             return self.iteration + 1
