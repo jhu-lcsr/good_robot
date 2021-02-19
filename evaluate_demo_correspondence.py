@@ -60,7 +60,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.10,
+                          show_heightmap=False, place_dilation=0.00,
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 

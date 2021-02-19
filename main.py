@@ -229,12 +229,16 @@ def main(args):
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
+        # TODO(adit98) think about how we set different place dilations
+        stack_place_dilation = 0.00
         place_dilation = 0.10
     else:
         place_dilation = 0.00
 
     # Initialize trainer(s)
     if use_demo:
+        assert task_type is not None, raise ValueError("Must provide task_type if using demo")
+        assert is_testing, raise ValueError("Must run in testing mode if using demo")
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
         if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -242,7 +246,7 @@ def main(args):
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
