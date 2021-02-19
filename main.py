@@ -123,10 +123,6 @@ def main(args):
     flops = args.flops
     show_heightmap = args.show_heightmap
     max_train_actions = args.max_train_actions
-    if is_testing:
-        max_trial_actions = args.max_trial_actions_test
-    else:
-        max_trial_actions = args.max_trial_actions_train
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -174,6 +170,13 @@ def main(args):
         print('Testing mode detected, automatically disabling situation removal.')
         disable_situation_removal = True
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
+
+    # set max trial actions
+    if is_testing:
+        max_trial_actions = args.max_trial_actions_test
+    else:
+        max_trial_actions = args.max_trial_actions_train
+
     test_preset_cases = args.test_preset_cases
     trials_per_case = 1
     show_preset_cases_then_exit = args.show_preset_cases_then_exit

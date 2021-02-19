@@ -1111,4 +1111,7 @@ class Trainer(object):
         """
         Get the number of actions taken in the running trial.
         """
-        return self.iteration - self.clearance_log[-1]
+        if len(self.clearance_log) > 0:
+            return self.iteration - self.clearance_log[-1]
+        else:
+            return self.iteration + 1
