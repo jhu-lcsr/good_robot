@@ -950,8 +950,9 @@ def compute_demo_dist(preds, example_actions):
     exit = True
     for pred in preds:
         if pred is not None:
-            masks.append((pred == np.zeros([1, 64, 1, 1])).all(axis=1))
-            mask_shape = pred.shape
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask_shape = mask.shape
+            masks.append(mask)
             exit = False
 
         else:
