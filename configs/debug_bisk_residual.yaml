@@ -1,19 +1,23 @@
 # DATA 
-path: /srv/local1/estengel/gr_data_sim/
+train_path: "blocks_data/singleset.json"
+val_path: "blocks_data/singleset.json"
+num_blocks: 1
+binarize_blocks: True
+traj_type: "flat"
 batch_size: 32
 max_seq_length: 40
+do_filter: True
+do_one_hot: True
+top_only: True
 resolution: 64
-split_type: "random"
-task_type: "rows" 
-overfit: true
-augment_by_flipping: False
-augment_language: False 
+zero_weight: 0.01
 
 # LANGUAGE EMBEDDER
 embedder: random
 embedding_dim: 15
 
 # TRANSFORMER
+encoder_type: ResidualTransformerEncoder
 patch_size: 4
 n_shared_layers: 2
 n_split_layers: 2
@@ -25,12 +29,13 @@ dropout: 0.00
 embed_dropout: 0.00
 output_type: "per-patch" 
 pos_encoding_type: fixed-2d-separate
+do_residual: false
 
 # MISC
 cuda: 0
 learn_rate: 0.00
-warmup: 400
+warmup: 400 
 checkpoint_dir: "" #"models/language_pretrain"
-num_epochs: 1000
-generate_after_n: 999
-score_type: "acc"
+num_epochs: 100
+generate_after_n: 98
+score_type: "tele_score"

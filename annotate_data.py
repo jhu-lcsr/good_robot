@@ -44,9 +44,18 @@ class Pair:
         plt.show()
 
     def resize(self):
-        self.prev_image = cv2.resize(self.prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
-        if self.next_image is not None: 
-            self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+
+        prev_image, prev_depth = self.prev_image[:,:,0:3], self.prev_image[:,:,3:]
+        prev_image = cv2.resize(prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+        prev_depth = cv2.resize(prev_depth, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+        self.prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
+
+        if self.next_image is not None:
+            next_image, next_depth = self.next_image[:,:,0:3], self.next_image[:,:,3:]
+            next_image = cv2.resize(next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+            next_depth = cv2.resize(next_depth, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+            self.next_image = np.concatenate([next_image, next_depth], axis=-1)
+
         self.ratio = self.resolution / 224 
 
         # normalize location and width 
@@ -111,6 +120,7 @@ class Pair:
     @classmethod
     def from_main_idxs(cls, prev_image, prev_heightmap, prev_json):
         # TODO(elias) infer which block to move from interpolation here 
+        prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
         src_color, tgt_color = pair.infer_from_json_data(json_data) 

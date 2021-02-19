@@ -320,20 +320,20 @@ class TransformerEncoder(torch.nn.Module):
         self.dropout = torch.nn.Dropout(embed_dropout) 
         
         if output_type == "per-pixel":
-            output_dim = self.patch_size**2 * n_classes
+            self.output_dim = self.patch_size**2 * n_classes
         elif output_type == "patch-softmax":
-            output_dim = 1
+            self.output_dim = 1
         else:
-            output_dim = n_classes 
+            self.output_dim = n_classes 
 
 
         self.next_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, output_dim)
+            nn.Linear(hidden_dim, self.output_dim)
         )
         self.prev_mlp_head = nn.Sequential(
             nn.LayerNorm(hidden_dim),
-            nn.Linear(hidden_dim, output_dim) 
+            nn.Linear(hidden_dim, self.output_dim) 
         )
         if self.do_regression:
             self.regression_head = nn.Sequential(
@@ -466,6 +466,112 @@ class TransformerEncoder(torch.nn.Module):
         tfmr_output, __ = self.start_transformer(tfmr_input, mask) 
         prev_output, prev_attn_out = self.prev_transformer(tfmr_output, mask) 
         next_output, next_attn_out = self.next_transformer(tfmr_output, mask) 
+
+        # trim off language 
+        prev_just_image_output = prev_output[:, 0:n_patches, :]
+        next_just_image_output = next_output[:, 0:n_patches, :]
+
+        # run final MLP 
+        prev_classes = self.prev_mlp_head(prev_just_image_output) 
+        next_classes = self.next_mlp_head(next_just_image_output) 
+        if self.do_regression: 
+            # go off sep token
+            next_pos_xyz = self.regression_head(next_output[:, n_patches, :]) 
+        else:
+            next_pos_xyz = None
+
+        if self.do_reconstruction: 
+            next_patch_class = self.next_patch_class_head(next_output[:,0:n_patches,:])
+            prev_patch_class = self.prev_patch_class_head(prev_output[:,0:n_patches,:])
+        else:
+            next_patch_class, prev_patch_class = None, None
+
+
+        # convert back to image 
+        prev_image_output = tiles_to_image(prev_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
+        next_image_output = tiles_to_image(next_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
+
+        return {"prev_position": prev_image_output,
+                "next_position": next_image_output,
+                "next_per_patch_class": next_patch_class,
+                "prev_per_patch_class": prev_patch_class,
+                "next_pos_xyz": next_pos_xyz, 
+                "prev_attn_weights": prev_attn_out,
+                "next_attn_weights": next_attn_out}
+
+class ResidualTransformerEncoder(TransformerEncoder):
+    def __init__(self,
+                 image_size: int, 
+                 patch_size: int, 
+                 language_embedder: torch.nn.Module, 
+                 n_layers_shared: int,
+                 n_layers_split: int,
+                 n_classes: int = 2, 
+                 channels: int = 21, 
+                 n_heads: int = 8,
+                 hidden_dim: int = 512,
+                 ff_dim: int = 1024,
+                 init_scale: int = 4,
+                 dropout: float = 0.33,
+                 embed_dropout: float = 0.33,
+                 output_type: str = "per-pixel",
+                 positional_encoding_type: str = "learned",
+                 device: torch.device = "cpu",
+                 log_weights: bool = False,
+                 do_regression: bool = False,
+                 do_reconstruction: bool = False,
+                 do_residual: bool = False):
+        super(ResidualTransformerEncoder, self).__init__(image_size = image_size,
+                                                         patch_size = patch_size,
+                                                         language_embedder=language_embedder,
+                                                         n_layers_shared=n_layers_shared,
+                                                         n_layers_split = n_layers_split,
+                                                         n_classes = n_classes,
+                                                         channels = channels,
+                                                         n_heads = n_heads,
+                                                         hidden_dim = hidden_dim,
+                                                         ff_dim = ff_dim,
+                                                         init_scale = init_scale,
+                                                         dropout = dropout, 
+                                                         embed_dropout = embed_dropout,
+                                                         output_type = output_type,
+                                                         positional_encoding_type=positional_encoding_type,
+                                                         device=device,
+                                                         log_weights=log_weights,
+                                                         do_regression=do_regression,
+                                                         do_reconstruction=do_reconstruction)
+        self.do_residual = do_residual
+        if self.do_residual:
+            self.next_transformer = Transformer(2*hidden_dim, n_layers_split, n_heads, ff_dim, dropout, init_scale, log_weights) 
+            self.next_mlp_head = nn.Sequential(
+                nn.LayerNorm(2*hidden_dim),
+                nn.Linear(2*hidden_dim, self.output_dim)
+            )
+        else:
+            self.next_transformer = Transformer(hidden_dim, n_layers_split, n_heads, ff_dim, dropout, init_scale, log_weights) 
+            self.next_mlp_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, self.output_dim)
+            )
+
+    def forward(self, batch_instance): 
+        language = batch_instance['command']
+        image = batch_instance['prev_pos_input']
+
+        language_mask = self.get_lang_mask(language) 
+        tfmr_input, mask, n_patches = self._prepare_input(image, language, language_mask) 
+
+        tfmr_output, __ = self.start_transformer(tfmr_input, mask) 
+        prev_output, prev_attn_out = self.prev_transformer(tfmr_output, mask) 
+
+        if self.do_residual:
+            # residually connect shared output with prev output 
+            next_input = torch.cat([prev_output, tfmr_output], dim = -1)
+        else:
+            # only stream through prev_output 
+            next_input = prev_output 
+        # CHANGE FROM TransformerEncoder: connect from prev_output to next
+        next_output, next_attn_out = self.next_transformer(next_input, mask) 
 
         # trim off language 
         prev_just_image_output = prev_output[:, 0:n_patches, :]

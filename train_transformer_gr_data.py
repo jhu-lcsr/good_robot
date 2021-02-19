@@ -29,7 +29,7 @@ from allennlp.training.scheduler import Scheduler
 from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
-from transformer import TransformerEncoder, image_to_tiles, tiles_to_image
+from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
 from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
@@ -291,7 +291,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         # img_ax = plt.subplot(gs[2])
         img_ax = ax[1,0]
         w = int(40 * (self.resolution / 224))
-        true_img = true_img.detach().cpu().numpy().astype(int)
+        true_img = true_img.detach().cpu().numpy().astype(int)[:,:,0:3]
         img_ax.imshow(true_img)
         location = true_loc - int(w/2)
         rect = patches.Rectangle(location, w, w ,linewidth=3,edgecolor='w',facecolor='none')
@@ -313,8 +313,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         for x_pos in xs:
             for z_pos in zs:
                 prob = pred_data[x_pos, z_pos].item()
-                to_plot_xs_prob.append(self.resolution - x_pos)
-                to_plot_zs_prob.append(z_pos)
+                to_plot_zs_prob.append(self.resolution - x_pos)
+                to_plot_xs_prob.append(z_pos)
                 to_plot_probs.append(prob)
 
         squares = []
@@ -460,25 +460,31 @@ def main(args):
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
     depth = 1
-    encoder = TransformerEncoder(image_size = args.resolution,
-                                 patch_size = args.patch_size, 
-                                 language_embedder = embedder, 
-                                 n_layers_shared = args.n_shared_layers,
-                                 n_layers_split  = args.n_split_layers,
-                                 n_classes = 2,
-                                 channels = 3,
-                                 n_heads = args.n_heads,
-                                 hidden_dim = args.hidden_dim,
-                                 ff_dim = args.ff_dim,
-                                 dropout = args.dropout,
-                                 embed_dropout = args.embed_dropout,
-                                 output_type = args.output_type, 
-                                 positional_encoding_type = args.pos_encoding_type,
-                                 device = device,
-                                 log_weights = args.test,
-                                 init_scale = args.init_scale, 
-                                 do_regression = False,
-                                 do_reconstruction = False) 
+    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else "TransformerEncoder"
+    encoder_kwargs = dict(image_size = args.resolution,
+                          patch_size = args.patch_size, 
+                          language_embedder = embedder, 
+                          n_layers_shared = args.n_shared_layers,
+                          n_layers_split  = args.n_split_layers,
+                          n_classes = 2,
+                          channels = args.channels,
+                          n_heads = args.n_heads,
+                          hidden_dim = args.hidden_dim,
+                          ff_dim = args.ff_dim,
+                          dropout = args.dropout,
+                          embed_dropout = args.embed_dropout,
+                          output_type = args.output_type, 
+                          positional_encoding_type = args.pos_encoding_type,
+                          device = device,
+                          log_weights = args.test,
+                          init_scale = args.init_scale, 
+                          do_regression = False,
+                          do_reconstruction = False) 
+    if args.encoder_type == "ResidualTransformerEncoder":
+        encoder_kwargs["do_residual"] = args.do_residual 
+    # Initialize encoder 
+    encoder = encoder_cls(**encoder_kwargs)
+
     if args.cuda is not None:
         encoder = encoder.cuda(device) 
     print(encoder) 
@@ -611,6 +617,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     parser.add_argument("--next-weight", type=float, default=1)
     parser.add_argument("--prev-weight", type=float, default=1) 
+    parser.add_argument("--channels", type=int, default=6)
     parser.add_argument("--split-type", type=str, choices= ["random", "leave-out-color",
                                                              "train-stack-test-row",
                                                              "train-row-test-stack"],
@@ -627,6 +634,7 @@ if __name__ == "__main__":
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # transformer parameters 
+    parser.add_argument("--encoder-type", type=str, default="TransformerEncoder", choices = ["TransformerEncoder", "ResidualTransformerEncoder"], help = "choice of dual-stream transformer encoder or one that bases next prediction on previous transformer representation")
     parser.add_argument("--pos-encoding-type", type = str, default="learned") 
     parser.add_argument("--patch-size", type=int, default = 8)  
     parser.add_argument("--n-shared-layers", type=int, default = 6) 
@@ -638,6 +646,7 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch", "patch-softmax"], default='per-pixel')
+    parser.add_argument("--do-residual", action = "store_true", help = "set to residually connect unshared and next prediction in ResidualTransformerEncoder")
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 

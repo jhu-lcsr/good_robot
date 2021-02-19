@@ -14,6 +14,7 @@ embedder: random
 embedding_dim: 15
 
 # TRANSFORMER
+encoder_type: ResidualTransformerEncoder
 patch_size: 4
 n_shared_layers: 2
 n_split_layers: 2
@@ -25,6 +26,7 @@ dropout: 0.00
 embed_dropout: 0.00
 output_type: "per-patch" 
 pos_encoding_type: fixed-2d-separate
+do_residual: True
 
 # MISC
 cuda: 0
