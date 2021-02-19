@@ -578,19 +578,35 @@ class Robot(object):
             # check sim, but we are already in the restart loop so don't recurse
             sim_ok = sim_started == vrep.simx_return_ok and self.check_sim(restart_if_not_ok=False)
 
+    def check_obj_in_scene(self, obj_handle, workspace_limits=None, buffer_meters=0.1):
+        """
+        Check if object/gripper specified by CoppeliaSim handle is in scene
+        Arguments:
+            obj_handle: CoppeliaSim object handle
+            workspace_limits: Workspace limit coordinates, defaults to self.workspace_limits
+            buffer_meters: Amount of buffer to allow, defaults to 0.1
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # get object position
+        sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, -1, vrep.simx_opmode_blocking)
+        sim_ok = pos[0] > workspace_limits[0][0] - buffer_meters and pos[0] < workspace_limits[0][1] + buffer_meters and pos[1] > workspace_limits[1][0] - buffer_meters and pos[1] < workspace_limits[1][1] + buffer_meters and pos[2] > workspace_limits[2][0] and pos[2] < workspace_limits[2][1]
+
+        return sim_ok
 
     def check_sim(self, restart_if_not_ok=True):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, -1, vrep.simx_opmode_blocking)
-        sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
+        sim_ok = self.check_obj_in_scene(self.UR5_tip_handle)
+
         if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim(connect=True)
             self.add_objects()
         return sim_ok
-
 
     def get_task_score(self):
 
@@ -645,6 +661,19 @@ class Robot(object):
             obj_positions.append(object_position)
 
         return obj_positions
+
+    def get_objects_in_scene(self, workspace_limits=None):
+        """
+        Function to iterate through all object positions and return number of objects within workspace_limits
+        Returns:
+            objs: list of CoppeliaSim object handles in scene
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # iterate through self.object_handles and check if in scene
+        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj)]
 
     def get_obj_positions_and_orientations(self):
         if not self.is_sim:
@@ -1434,7 +1463,7 @@ class Robot(object):
         return grasped_object_ind, grasped_object_handle
 
 
-    def reposition_objects_near_gripper(self, distance_threshold=0.07, put_inside_workspace=True):
+    def reposition_objects_near_gripper(self, distance_threshold=0.1, put_inside_workspace=True):
         """ Simulation only function to detect objects near the gripper.
 
             put_inside_workspace: True will select a random position inside workspace, false will select a specific position outside the workspace
@@ -2070,7 +2099,9 @@ class Robot(object):
             row_size = max(len(block_indices), row_size)
         return success, row_size, successful_block_indices
 
-    def check_stack(self, object_color_sequence, crop_stack_sequence=True, distance_threshold=0.06, top_idx=-1, pos=None, return_inds=False):
+    def check_stack(self, object_color_sequence, crop_stack_sequence=True,
+            horiz_distance_threshold=0.06, vert_distance_threshold=0.06, top_idx=-1,
+            pos=None, return_inds=False):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -2079,7 +2110,8 @@ class Robot(object):
         # Arguments
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        horiz_distance_threshold: The max distance cutoff between blocks(horizontal) in meters for the stack to be considered complete.
+        vert_distance_threshold: The max distance cutoff between blocks(vertical) in meters for the stack to be considered complete.
 
 
         # Returns
@@ -2122,7 +2154,7 @@ class Robot(object):
             # filter objects closest to the highest block in x, y based on the threshold
             # ordered from low to high, boolean mask array
             nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1) < \
-                    (distance_threshold/2)
+                    (horiz_distance_threshold/2)
             # print('nearby:', nearby_obj)
             # take num_obj that are close enough from bottom to top
             # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
@@ -2167,7 +2199,7 @@ class Robot(object):
                 # print('bottom_pos:', bottom_pos)
                 # print('top_pos:', top_pos)
                 # print('distance_threshold: ', distance_threshold)
-                if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
+            if top_pos[2] < (bottom_pos[2] + vert_distance_threshold / 2.0):
                     if not self.grasp_color_task:
                         print('check_stack(): not high enough for idx: ' + str(idx))
                     working_seq_found=False
@@ -2176,7 +2208,7 @@ class Robot(object):
                 # Check that the blocks are near each other
                 dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
                 # print('distance: ', dist)
-                if dist > distance_threshold:
+            if dist > vert_distance_threshold:
                     if not self.grasp_color_task:
                         print('check_stack(): too far apart')
                     working_seq_found=False
@@ -2215,52 +2247,6 @@ class Robot(object):
             self.generate_possible_color_stack_sequences(object_color_sequence, index+1, new_used_indicies, output)
         
         return
-
-    def check_vert_square(self, stack_dist_thresh=0.06, row_dist_thresh=0.02,
-                          separation_threshold=0.1, num_directions=64):
-        # get object positions (array with each object position)
-        pos = np.asarray(self.get_obj_positions())
-
-        # sort indices of blocks by z value
-        low2high_idx = np.array(pos[:, 2]).argsort()
-
-        # First see if there is one stack of height 2
-
-        # filter objects closest to the highest block in x, y based on the threshold
-        high_idx = low2high_idx[-1]
-        nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2], axis=1) < \
-                (stack_dist_thresh / 2))
-
-        # if the highest stack has height not equal to 2, task is not completed
-        # NOTE this could lead to false negatives if we are running with 8 objects in scene \
-        # and there are pre-existing stacks besides the main vertical square structures
-        if len(nearby_obj) != 2:
-            return False
-
-        # store the index of the bottom block of first 2-block stack
-        # first block in nearby_obj since the blocks are ordered low to high in the low2high_idx array
-        first_stack_ind = nearby_obj[0].item()
-
-        # check blocks in descending order, stop before block in nearby_obj since that has height 1
-        for i in range(2, len(pos) - first_stack_ind - 1):
-            high_idx = low2high_idx[-1 * i]
-            nearby_obj = np.argwhere(np.linalg.norm(pos[:, :2] - pos[high_idx][:2],
-                    axis=1) < (stack_dist_thresh / 2))
-
-            if len(nearby_obj) != 2:
-                continue
-
-            # put both bottom block indicies in array
-            block_indices = np.array([nearby_obj[0].item(), first_stack_ind])
-
-            # we have another stack of height 2, now check if bottom blocks of each stack make row
-            row_success, _, _ = self.check_specific_blocks_for_row(pos, block_indices,
-                    row_dist_thresh, separation_threshold, None, 1, False)
-
-            if row_success:
-                return True
-
-        return False
 
     def vertical_square_partial_success(self, current_stack_goal, check_z_height,
             row_dist_thresh=0.02, separation_threshold=0.1, stack_dist_thresh=0.06):
@@ -2302,7 +2288,7 @@ class Robot(object):
         # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
         # top_idx is set to the index of low2high_idx we want to check the stack at
         _, stack_height, first_stack_inds = self.check_stack(np.ones(2), crop_stack_sequence=False,
-                top_idx=top_idx, distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
+                top_idx=top_idx, horiz_distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
         second_stack_inds = None
 
         if stack_height > 1:
@@ -2318,7 +2304,8 @@ class Robot(object):
                 # check for 2nd stack (use index of block_ind in low2high_idx)
                 top_idx = len(low2high_idx) - 1 - i
                 _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
-                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True)
+                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True,
+                        horiz_distance_threshold=stack_dist_thresh)
 
                 if stack_height > 1:
                     num_stacks += 1
@@ -2402,7 +2389,7 @@ class Robot(object):
             top_idx = -2
 
         # run check stack to get height of stack
-        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx)
+        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
         # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
         structure_progress = 5 - stack_height

@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+from utils import ACTION_TO_ID
 
 class Demonstration():
     def __init__(self, path, demo_num, check_z_height, task_type='stack'):
@@ -18,7 +19,7 @@ class Demonstration():
         self.task_type = task_type
 
         # image_names should contain all heightmaps that have demo_num as their poststring
-        self.image_names = sorted([i for i in os.listdir(self.rgb_dir) if i.split('.')[-2] == demo_num])
+        self.image_names = sorted([i for i in os.listdir(self.rgb_dir) if int(i.split('.')[-3]) == demo_num])
 
         # get number of actions in demo
         self.num_actions = len(self.action_log)
@@ -46,9 +47,9 @@ class Demonstration():
             action_str = str(stack_height) + action_str
 
         rgb_filename = os.path.join(self.rgb_dir,
-                '%06d.%s.color.png' % (stack_height, action_str))
+                '%06d.%s.%d.color.png' % (stack_height, action_str, self.demo_num))
         depth_filename = os.path.join(self.depth_dir,
-                '%06d.%s.depth.png' % (stack_height, action_str))
+                '%06d.%s.%d.depth.png' % (stack_height, action_str, self.demo_num))
 
         # read rgb and depth heightmap
         rgb_heightmap = cv2.cvtColor(cv2.imread(rgb_filename), cv2.COLOR_BGR2RGB)
@@ -75,67 +76,27 @@ class Demonstration():
         return rgb_heightmap, np.stack([depth_heightmap] * 3, axis=-1)
 
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
-            row_trainer=None, unstack_trainer=False, vertical_square_trainer=False, use_hist=False):
+            row_trainer=None, unstack_trainer=None, vertical_square_trainer=None, use_hist=False,
+            demo_mask=True):
         # ensure one of stack trainer or row trainer is provided
         if stack_trainer is None and row_trainer is None and unstack_trainer is None and vertical_square_trainer is None:
             raise ValueError("Must provide at least one trainer")
 
-        # TODO(adit98) clean up the way demo heightmaps are saved to reduce confusion
-        # set action_str based on primitive action
-        # heightmap_height is the height we use to get the demo heightmaps
-        if self.task_type == 'stack':
-            if not self.check_z_height:
-                # if we completed a stack, prev_stack_height will be 4, but we want the imitation actions for stack height 1
-                stack_height = (stack_height - 1) if stack_height < 4 else 0
-            else:
-                stack_height = np.round(stack_height).astype(int)
-                stack_height = (stack_height - 1) if stack_height < 4 else 0
+        if primitive_action == 'grasp':
+            color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
+                    self.action_dict[stack_height]['grasp_image_ind'], use_hist=use_hist)
 
-            # TODO(adit98) deal with push
-            if primitive_action == 'push':
-                return -1
-
-            if stack_height == 0 and primitive_action == 'grasp':
-                action_str = 'orig'
-            elif primitive_action == 'grasp':
-                # if primitive action is grasp, we need the previous place heightmap and grasp action
-                action_str = 'place'
-                heightmap_height -= 1
-            else:
-                # if primitive action is place, get the previous grasp heightmap
-                action_str = 'grasp'
-
-            color_heightmap, valid_depth_heightmap = self.get_heightmaps(action_str,
-                    stack_height, use_hist=use_hist)
-            action_str = primitive_action
-
-        elif self.task_type == 'unstack':
-            if primitive_action == 'grasp':
-                # offset is 2 for stack height 4, 4 for stack height 3, ...
-                #offset = 10 - 2 * stack_height
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['demo_ind'], use_hist=use_hist)
-
-            elif primitive_action == 'place':
-                # offset is grasp_offset - 1 because place is always 1 action after grasp
-                #offset = 9 - 2 * stack_height
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['demo_ind'] + 1, use_hist=use_hist)
-        else:
-            if primitive_action == 'grasp':
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['grasp_image_ind'], use_hist=use_hist)
-
-            elif primitive_action == 'place':
-                color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
-                        self.action_dict[stack_height]['place_image_ind'], use_hist=use_hist)
+        elif primitive_action == 'place':
+            color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
+                    self.action_dict[stack_height]['place_image_ind'], use_hist=use_hist)
 
         # get stack features if stack_trainer is provided
         # TODO(adit98) can add specific rotation to these forward calls for speedup
         if stack_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             stack_push, stack_grasp, stack_place = stack_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True,
+                    demo_mask=demo_mask)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             stack_push, stack_grasp, stack_place = stack_push.filled(0.0), \
@@ -145,7 +106,8 @@ class Demonstration():
         if row_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             row_push, row_grasp, row_place = row_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True,
+                    demo_mask=demo_mask)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             row_push, row_grasp, row_place = row_push.filled(0.0), \
@@ -155,7 +117,8 @@ class Demonstration():
         if unstack_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             unstack_push, unstack_grasp, unstack_place = unstack_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True,
+                    demo_mask=demo_mask)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             unstack_push, unstack_grasp, unstack_place = unstack_push.filled(0.0), \
@@ -165,7 +128,8 @@ class Demonstration():
         if vertical_square_trainer is not None:
             # to get vector of 64 vals, run trainer.forward with get_action_feat
             vertical_square_push, vertical_square_grasp, vertical_square_place = vertical_square_trainer.forward(color_heightmap,
-                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True)[:3]
+                    valid_depth_heightmap, is_volatile=True, keep_action_feat=True,
+                    demo_mask=demo_mask)[:3]
 
             # fill all masked arrays (convert to regular np arrays)
             vertical_square_push, vertical_square_grasp, vertical_square_place = vertical_square_push.filled(0.0), \
