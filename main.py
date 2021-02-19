@@ -162,7 +162,7 @@ def main(args):
     static_language_mask = args.static_language_mask
     is_bisk = args.is_bisk 
     randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
-    obj_scale = 0.00018 if static_language_mask else 1 # Hard coded value based on logoblock mesh size.
+    obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
     language_model_weights = args.language_model_weights
 
@@ -1574,13 +1574,17 @@ def main(args):
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
                 # TODO(elias) add check for if we're using language instruction 
                 # Generate the language mask using the language model.
-                language_output = None # 4 ndarrays with shape (batch_size, 2, 64, 64) where each pixel has two options (block is present, block is not present)
+                language_output = None # 4 ndarrays with shape (batch_size, 256, 2, 1) where each pixel has two options (block is present, block is not present)
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
-                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
-                        trainer.forward(color_heightmap, valid_depth_heightmap,
+                        push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                                trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
+                else:
+                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                            trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, goal_condition=goal_condition, language_output=language_output)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1757,7 +1761,7 @@ def main(args):
             # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop and not is_testing:
                 print('Running two step backprop()')
                 #if use_demo:
                 #    demo_color_heightmap, demo_depth_heightmap = \

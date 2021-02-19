@@ -250,50 +250,59 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
-    
+def process_prediction_language_masking(language_data, predictions):
+    """
+    Adds a language mask to the predictions array.
+
+    language_data: an array with shape [1, 256, 2, 1] which will be processed into a mask
+    predictions: masked array or ndarray with prediction values for a specific action
+    """
+
     # Convert inputs to np.ma.masked_array objects if they are inputted as np.ndarrays
-    if not np.ma.is_masked(grasp_predictions):
-        if isinstance(grasp_predictions, np.ndarray):
-            grasp_predictions = np.ma.masked_array(grasp_predictions)
+    if not np.ma.is_masked(predictions):
+        if isinstance(predictions, np.ndarray):
+            predictions = np.ma.masked_array(predictions, mask=False)
         else:
-            raise TypeError("grasp_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
-    
-    if not np.ma.is_masked(place_predictions):
-        if isinstance(place_predictions, np.ndarray):
-            place_predictions = np.ma.masked_array(place_predictions)
-        else:
-            raise TypeError("place_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
+            raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
     
     # Extract current masks
-    graspMask = np.ma.get_mask(grasp_predictions)
-    placeMask = np.ma.get_mask(place_predictions)
-    
-    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
-    # NOTE(zhe) Should we erode part of the mask away? The current mask lets the whole block pass. We may want to mask the edges of the block.
-    
+    currMask = np.ma.getmask(predictions)
+
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
-    languageGraspMask = softmax(language_output['prev_position'][0], axis=0)
-    languageGraspMask = languageGraspMask[1] > 0.5      # using mask index 1 here to use the negative mask.
-    languagePlaceMask = softmax(language_output['next_position'][0], axis=0)
-    languagePlaceMask = languagePlaceMask[1] > 0.5      # using mask index 1 here to use the negative mask.
-    
+    # language_data should have shape torch([1, 256, 2, 1])
+    languageMask = softmax(language_data[0,:,:,0], axis=1)
+    languageMask = np.float32(languageMask[:,1] > 0.5).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+
+    # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
+
     # Scale language masks to match the prediction array sizes
-    languageGraspMask = cv2.resize(languageGraspMask, graspMask.shape, interpolation=cv2.INTER_NEAREST)
-    languagePlaceMask = cv2.resize(languagePlaceMask, placeMask.shape, interpolation=cv2.INTER_NEAREST)
+    languageMask = cv2.resize(languageMask, currMask.shape[1:3], interpolation=cv2.INTER_NEAREST)
+    languageMask = np.broadcast_to(languageMask, predictions.shape, subok=True)
+
+    # Catching errors
+    assert languageMask.shape == currMask.shape and languageMask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
 
     # Combine language mask with existing masks if necessary
-    if graspMask is np.ma.nomask:
-        grasp_predictions.mask = languageGraspMask
+    if currMask is np.ma.nomask:
+        predictions.mask = languageMask
     else:
-        grasp_predictions.mask = 1 - np.logical_and(1 - graspMask,  1 - languageGraspMask)
-    
-    if placeMask is np.ma.nomask:
-        place_predictions.mask = languageGraspMask
-    else:
-        place_predictions.mask = 1 - np.logical_and(1 - placeMask,  1 - languagePlaceMask)
+        predictions.mask = 1 - np.logical_and(1 - currMask,  1 - languageMask)
+
+    return predictions
+
+
+
+# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
+    """ 
+    Processes the language output into a mask and combine it with existing masks in prediction arrays
+    """
+
+    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
+    push_predictions = push_predictions
+    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions)
 
     return push_predictions, grasp_predictions, place_predictions
 
