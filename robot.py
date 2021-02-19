@@ -1416,7 +1416,7 @@ class Robot(object):
         return grasped_object_ind, grasped_object_handle
 
 
-    def reposition_objects_near_gripper(self, distance_threshold=0.07, put_inside_workspace=True):
+    def reposition_objects_near_gripper(self, distance_threshold=0.1, put_inside_workspace=True):
         """ Simulation only function to detect objects near the gripper.
 
             put_inside_workspace: True will select a random position inside workspace, false will select a specific position outside the workspace
