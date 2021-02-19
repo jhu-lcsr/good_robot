@@ -1325,40 +1325,9 @@ def main(args):
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
-            no_change_count = [0, 0]
-            num_trials = trainer.end_trial()
-            if nonlocal_variables['stack'] is not None:
-                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
-                nonlocal_variables['stack'].trial = num_trials
-            logger.write_to_log('clearance', trainer.clearance_log)
-            # we've recorded the data to mark this trial as complete
-            nonlocal_variables['trial_complete'] = False
-            # we're still not totally done, we still need to finalize the log for the trial
-            nonlocal_variables['finalize_prev_trial_log'] = True
-            if is_testing:
-                # Do special testing mode update steps
-                # If at end of test run, re-load original weights (before test run)
-                if use_demo:
-                    if 'stack' in multi_task_snapshot_files:
-                        stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
-                    if 'row' in multi_task_snapshot_files:
-                        row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
-                    if 'unstack' in multi_task_snapshot_files:
-                        unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
-                    if 'vertical_square' in multi_task_snapshot_files:
-                        vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
+            no_change_count = end_trial()
+            num_trials = trainer.num_trials()
 
-                else:
-                    trainer.model.load_state_dict(torch.load(snapshot_file))
-
-                if test_preset_cases:
-                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
-                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
-                    # load the current preset case, incrementing as trials are cleared
-                    print('loading case file: ' + str(case_file))
-                    robot.load_preset_case(case_file)
-                if not place and num_trials >= max_test_trials:
-                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
