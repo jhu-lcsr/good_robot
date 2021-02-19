@@ -1106,3 +1106,12 @@ class Trainer(object):
 
         best_pix_ind = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
         return best_pix_ind
+
+    def get_final_trial_action_count(self):
+        """
+        Get the number of actions taken in the running trial.
+        """
+        if len(self.clearance_log) > 0:
+            return self.iteration - np.array(self.clearance_log).flatten()[-1]
+        else:
+            return self.iteration + 1

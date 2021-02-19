@@ -567,19 +567,35 @@ class Robot(object):
             # check sim, but we are already in the restart loop so don't recurse
             sim_ok = sim_started == vrep.simx_return_ok and self.check_sim(restart_if_not_ok=False)
 
+    def check_obj_in_scene(self, obj_handle, workspace_limits=None, buffer_meters=0.1):
+        """
+        Check if object/gripper specified by CoppeliaSim handle is in scene
+        Arguments:
+            obj_handle: CoppeliaSim object handle
+            workspace_limits: Workspace limit coordinates, defaults to self.workspace_limits
+            buffer_meters: Amount of buffer to allow, defaults to 0.1
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # get object position
+        sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, -1, vrep.simx_opmode_blocking)
+        sim_ok = pos[0] > workspace_limits[0][0] - buffer_meters and pos[0] < workspace_limits[0][1] + buffer_meters and pos[1] > workspace_limits[1][0] - buffer_meters and pos[1] < workspace_limits[1][1] + buffer_meters and pos[2] > workspace_limits[2][0] and pos[2] < workspace_limits[2][1]
+
+        return sim_ok
 
     def check_sim(self, restart_if_not_ok=True):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, -1, vrep.simx_opmode_blocking)
-        sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
+        sim_ok = self.check_obj_in_scene(self.UR5_tip_handle)
+
         if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim(connect=True)
             self.add_objects()
         return sim_ok
-
 
     def get_task_score(self):
 
@@ -634,6 +650,19 @@ class Robot(object):
             obj_positions.append(object_position)
 
         return obj_positions
+
+    def get_objects_in_scene(self, workspace_limits=None):
+        """
+        Function to iterate through all object positions and return number of objects within workspace_limits
+        Returns:
+            objs: list of CoppeliaSim object handles in scene
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # iterate through self.object_handles and check if in scene
+        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj)]
 
     def get_obj_positions_and_orientations(self):
         if not self.is_sim:

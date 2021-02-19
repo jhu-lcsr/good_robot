@@ -23,7 +23,7 @@ from utils import StackSequence
 from utils import compute_demo_dist
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
-from demo import Demonstration
+from demo import Demonstration, load_all_demos
 import plot
 import json
 import copy
@@ -43,7 +43,7 @@ def run_title(args):
     if args.task_type is not None:
         if args.task_type == 'vertical_square':
             title += 'Vertical Square, '
-        elif args.task_type == 'unstacking':
+        elif args.task_type == 'unstack':
             title += 'Unstacking, '
         elif args.task_type == 'stack':
             title += 'Stack, '
@@ -148,7 +148,8 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = args.common_sense and ((args.task_type is None) or (args.task_type != 'unstacking'))
+    place_common_sense = common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
+    print('main.py using common sense:', common_sense, 'using place common sense:', place_common_sense)
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
     random_trunk_weights_max = args.random_trunk_weights_max
@@ -169,6 +170,13 @@ def main(args):
         print('Testing mode detected, automatically disabling situation removal.')
         disable_situation_removal = True
     max_test_trials = args.max_test_trials # Maximum number of test runs per case/scenario
+
+    # set max trial actions
+    if is_testing:
+        max_trial_actions = args.max_trial_actions_test
+    else:
+        max_trial_actions = args.max_trial_actions_train
+
     test_preset_cases = args.test_preset_cases
     trials_per_case = 1
     show_preset_cases_then_exit = args.show_preset_cases_then_exit
@@ -229,20 +237,26 @@ def main(args):
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
-        place_dilation = 0.10
+        # TODO(adit98) think about how we set different place dilations
+        stack_place_dilation = 0.00
+        place_dilation = 0.05
     else:
         place_dilation = 0.00
 
+    print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
+
     # Initialize trainer(s)
     if use_demo:
-        stack_trainer, row_trainer = None, None
+        assert task_type is not None, ("Must provide task_type if using demo")
+        assert is_testing, ("Must run in testing mode if using demo")
+        stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
         if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['stack'], force_cpu,
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
@@ -316,7 +330,8 @@ def main(args):
                           'trial_complete': False,
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1,
-                          'save_state_this_iteration': False}
+                          'save_state_this_iteration': False,
+                          'example_actions_dict': None}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -479,7 +494,7 @@ def main(args):
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.vertical_square_partial_success(current_stack_goal,
                                 check_z_height=check_z_height, stack_dist_thresh=0.04)
-            elif task_type == 'unstacking':
+            elif task_type == 'unstack':
                 # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
                         robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
@@ -497,6 +512,7 @@ def main(args):
                         prev_z_height=nonlocal_variables['prev_stack_height'])
 
             else:
+                # TODO(adit98) trigger graceful exit here
                 raise NotImplementedError(task_type)
 
         elif check_row:
@@ -526,7 +542,7 @@ def main(args):
 
             # Has that stack gotten shorter than it was before? If so we need to reset
             needed_to_reset = nonlocal_variables['stack_height'] < max_workspace_height or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height']
-            if task_type is not None and task_type == 'unstacking':
+            if task_type is not None and task_type == 'unstack':
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
@@ -538,6 +554,14 @@ def main(args):
                     # caused decrease of more than 1 block during push/grasp
                     toppled = nonlocal_variables['stack_height'] > (nonlocal_variables['prev_stack_height'] + 1)
 
+        insufficient_objs_in_scene = False
+        # add check for num_obj in scene
+        if is_sim and task_type in ['row', 'unstack', 'vertical_square']:
+            objs = robot.get_objects_in_scene()
+            if len(objs) < nonlocal_variables['stack'].num_obj:
+                needed_to_reset = True
+                insufficient_objs_in_scene = True
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
@@ -546,9 +570,11 @@ def main(args):
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
             # we are two blocks off the goal, reset the scene.
             mismatch_str = 'main.py check_stack() DETECTED PROGRESS REVERSAL, mismatch between the goal height: ' + str(max_workspace_height) + ' and current workspace stack height: ' + str(nonlocal_variables['stack_height'])
+            if insufficient_objs_in_scene:
+                mismatch_str += ', INSUFFICIENT OBJECTS IN SCENE'
             if toppled is not None and toppled:
                 mismatch_str += ', TOPPLED stack'
-            if not disable_situation_removal:
+            if not disable_situation_removal or insufficient_objs_in_scene or (toppled is not None and toppled):
                 mismatch_str += ', RESETTING the objects, goals, and action success to FALSE...'
                 print(mismatch_str)
                 # this reset is appropriate for stacking, but not checking rows
@@ -636,22 +662,22 @@ def main(args):
                         # get grasp predictions (since next action is grasp)
                         # fill the masked arrays and add to preds
                         if row_trainer is not None:
-                            preds.append(grasp_feat_row.filled(0.0))
+                            preds.append(grasp_feat_row)
                         else:
                             preds.append(None)
 
                         if stack_trainer is not None:
-                            preds.append(grasp_feat_stack.filled(0.0))
+                            preds.append(grasp_feat_stack)
                         else:
                             preds.append(None)
 
                         if unstack_trainer is not None:
-                            preds.append(grasp_feat_unstack.filled(0.0))
+                            preds.append(grasp_feat_unstack)
                         else:
                             preds.append(None)
 
                         if vertical_square_trainer is not None:
-                            preds.append(grasp_feat_vertical_square.filled(0.0))
+                            preds.append(grasp_feat_vertical_square)
                         else:
                             preds.append(None)
 
@@ -663,22 +689,22 @@ def main(args):
                             # get place predictions (since next action is place)
                             # fill the masked arrays and add to preds
                             if row_trainer is not None:
-                                preds.append(place_feat_row.filled(0.0))
+                                preds.append(place_feat_row)
                             else:
                                 preds.append(None)
 
                             if stack_trainer is not None:
-                                preds.append(place_feat_stack.filled(0.0))
+                                preds.append(place_feat_stack)
                             else:
                                 preds.append(None)
 
                             if unstack_trainer is not None:
-                                preds.append(place_feat_unstack.filled(0.0))
+                                preds.append(place_feat_unstack)
                             else:
                                 preds.append(None)
 
                             if vertical_square_trainer is not None:
-                                preds.append(place_feat_vertical_square.filled(0.0))
+                                preds.append(place_feat_vertical_square)
                             else:
                                 preds.append(None)
 
@@ -689,22 +715,22 @@ def main(args):
                             # get grasp predictions (since next action is grasp)
                             # fill the masked arrays and add to preds
                             if row_trainer is not None:
-                                preds.append(grasp_feat_row.filled(0.0))
+                                preds.append(grasp_feat_row)
                             else:
                                 preds.append(None)
 
                             if stack_trainer is not None:
-                                preds.append(grasp_feat_stack.filled(0.0))
+                                preds.append(grasp_feat_stack)
                             else:
                                 preds.append(None)
 
                             if unstack_trainer is not None:
-                                preds.append(grasp_feat_unstack.filled(0.0))
+                                preds.append(grasp_feat_unstack)
                             else:
                                 preds.append(None)
 
                             if vertical_square_trainer is not None:
-                                preds.append(grasp_feat_vertical_square.filled(0.0))
+                                preds.append(grasp_feat_vertical_square)
                             else:
                                 preds.append(None)
 
@@ -712,13 +738,27 @@ def main(args):
                             nonlocal_variables['stack_height'], "and primitive action",
                             nonlocal_variables['primitive_action'])
 
-                    # TODO(adit98) create an action_dict in nonlocal_variables to store each embedding
-                    # TODO(adit98) check action_dict before running demo.get_action, populate action_dict if it doesn't have embedding for time step
-                    # TODO(adit98) create trainers list with all the trainers, pass that to demo.get_action
-                    demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
-                            demo.get_action(workspace_limits, nonlocal_variables['primitive_action'],
-                                    nonlocal_variables['stack_height'], stack_trainer, row_trainer,
-                                    unstack_trainer, vertical_square_trainer)
+                    # first check if nonlocal_variables['example_actions_dict'] is none
+                    if nonlocal_variables['example_actions_dict'] is None:
+                        nonlocal_variables['example_actions_dict'] = {}
+
+                    # check if embeddings for demo for progress n and primitive action p_a already exists
+                    task_progress = nonlocal_variables['stack_height']
+                    action = nonlocal_variables['primitive_action']
+                    if task_progress not in nonlocal_variables['example_actions_dict']:
+                        nonlocal_variables['example_actions_dict'][task_progress] = {}
+                    if action not in nonlocal_variables['example_actions_dict'][task_progress]:
+                        nonlocal_variables['example_actions_dict'][task_progress][action] = {}
+
+                    for ind, d in enumerate(example_demos):
+                        # get action embeddings from example demo
+                        if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
+
+                            demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
+                                    d.get_action(workspace_limits, action, task_progress, stack_trainer,
+                                            row_trainer, unstack_trainer, vertical_square_trainer)
+                            nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
+                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
@@ -787,11 +827,36 @@ def main(args):
 
                 else:
                     if use_demo:
+                        # get parameters of current action to do dict lookup
+                        task_progress = nonlocal_variables['stack_height']
+                        action = nonlocal_variables['primitive_action']
+
+                        # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
+                        example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
+                                dtype=object).T
+
+                        # construct preds and example_actions based on task type ("Leave One Out")
+                        if task_type == 'row':
+                            preds = preds[1:]
+                            example_actions = example_actions[1:].tolist()
+                        elif task_type == 'stack':
+                            preds = preds[0, 2, 3]
+                            example_actions = example_actions[[0, 2, 3]].tolist()
+                        elif task_type == 'unstack':
+                            preds = preds[0, 1, 3]
+                            example_actions = example_actions[[0, 1, 3]].tolist()
+                        elif task_type == 'vertical_square':
+                            preds = preds[:3]
+                            example_actions = example_actions[:3].tolist()
+                        else:
+                            # TODO(adit98) trigger graceful exit here
+                            raise NotImplementedError(task_type + ' is not implemented.')
+
                         # select preds based on primitive action selected in demo (theta, y, x)
                         correspondences, nonlocal_variables['best_pix_ind'] = \
-                                compute_demo_dist(preds, [demo_row_action, demo_stack_action,
-                                    demo_unstack_action, demo_vertical_square_action])
+                                compute_demo_dist(preds, example_actions)
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
+
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
                         nonlocal_variables['best_pix_ind'], each_action_max_coordinate, \
@@ -973,7 +1038,7 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'place':
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block for vertical square and stacking
-                    if task_type is not None and ((task_type == 'unstacking') or (task_type == 'row')):
+                    if task_type is not None and ((task_type == 'unstack') or (task_type == 'row')):
                         over_block = False
                     else:
                         over_block = not check_row
@@ -1111,6 +1176,10 @@ def main(args):
                     stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
                 if 'row' in multi_task_snapshot_files:
                     row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
+                if 'unstack' in multi_task_snapshot_files:
+                    unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
+                if 'vertical_square' in multi_task_snapshot_files:
+                    vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
             else:
                 trainer.model.load_state_dict(torch.load(snapshot_file))
 
@@ -1151,8 +1220,7 @@ def main(args):
         return
 
     if use_demo:
-        # TODO(adit98) set demo number to be cmd line arg, 0 right now
-        demo = Demonstration(path=args.demo_path, demo_num=0, check_z_height=check_z_height,
+        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
                 task_type=args.task_type)
 
     num_trials = trainer.num_trials()
@@ -1223,8 +1291,11 @@ def main(args):
             trainer.trial_success_log.append([int(pg_trial_success_count + 1)])
             nonlocal_variables['trial_complete'] = True
 
+        # calculate number of actions/iterations in this trial
+        actions_in_trial = trainer.get_final_trial_action_count()
+
         # NOTE(zhe) This is for the stacking task (BUG But it runs for place/grasp as well?), error is thrown when not enough objects are in the workspace or no change in workspace
-        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10):
+        if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10) or (actions_in_trial >= max_trial_actions):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
                       ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
@@ -1236,6 +1307,11 @@ def main(args):
                             stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
                         if 'row' in multi_task_snapshot_files:
                             row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
+                        if 'unstack' in multi_task_snapshot_files:
+                            unstack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['unstack']))
+                        if 'vertical_square' in multi_task_snapshot_files:
+                            vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
+
                     else:
                         trainer.model.load_state_dict(torch.load(snapshot_file))
                 if place:
@@ -1266,38 +1342,13 @@ def main(args):
                 do_continue = True
                 # continue
 
+        # TODO(adit98) figure out if we need to disable experience replay for boundary situations e.g. successful action & trial reset for trial action limit, successful action & objects leaving scene
         # end trial if scene is empty or no changes
         if nonlocal_variables['trial_complete']:
             # Check if the other thread ended the trial and reset the important values
-            no_change_count = [0, 0]
-            num_trials = trainer.end_trial()
-            if nonlocal_variables['stack'] is not None:
-                # TODO(ahundt) HACK to work around BUG where the stack sequence class currently over-counts the trials due to double resets at the end of one trial.
-                nonlocal_variables['stack'].trial = num_trials
-            logger.write_to_log('clearance', trainer.clearance_log)
-            # we've recorded the data to mark this trial as complete
-            nonlocal_variables['trial_complete'] = False
-            # we're still not totally done, we still need to finalize the log for the trial
-            nonlocal_variables['finalize_prev_trial_log'] = True
-            if is_testing:
-                # Do special testing mode update steps
-                # If at end of test run, re-load original weights (before test run)
-                if use_demo:
-                    if 'stack' in multi_task_snapshot_files:
-                        stack_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['stack']))
-                    if 'row' in multi_task_snapshot_files:
-                        row_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['row']))
-                else:
-                    trainer.model.load_state_dict(torch.load(snapshot_file))
+            no_change_count = end_trial()
+            num_trials = trainer.num_trials()
 
-                if test_preset_cases:
-                    case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
-                    # case_file = preset_files[min(len(preset_files)-1, int(float(num_trials-1)/float(trials_per_case)))]
-                    # load the current preset case, incrementing as trials are cleared
-                    print('loading case file: ' + str(case_file))
-                    robot.load_preset_case(case_file)
-                if not place and num_trials >= max_test_trials:
-                    nonlocal_pause['exit_called'] = True  # Exit after training thread (backprop and saving labels)
             if do_continue:
                 do_continue = False
                 continue
@@ -1327,17 +1378,19 @@ def main(args):
                 goal_condition = None
 
             # here, we run forward pass on imitation video
-            # TODO(adit98) refactor demo.get_action to get the saved embedding
             if args.use_demo:
                 # run forward pass, keep action features and get softmax predictions
-
                 # stack features
                 if stack_trainer is not None:
                     push_feat_stack, grasp_feat_stack, place_feat_stack, push_predictions_stack, \
                             grasp_predictions_stack, place_predictions_stack, _, _ = \
-                            stack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            stack_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got stack features")
+
+                    # fill masked arrays of features
+                    push_feat_stack, grasp_feat_stack, place_feat_stack = \
+                            push_feat_stack.filled(0.0), grasp_feat_stack.filled(0.0), place_feat_stack.filled(0.0)
 
                     # TODO(adit98) may need to refactor, for now just store stack predictions
                     push_predictions, grasp_predictions, place_predictions = \
@@ -1347,9 +1400,13 @@ def main(args):
                     # row features
                     push_feat_row, grasp_feat_row, place_feat_row, push_predictions_row, \
                             grasp_predictions_row, place_predictions_row, _, _ = \
-                            row_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            row_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got row features")
+
+                    # fill masked arrays of features
+                    push_feat_row, grasp_feat_row, place_feat_row = \
+                            push_feat_row.filled(0.0), grasp_feat_row.filled(0.0), place_feat_row.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to row predictions if stack trainer not specified
@@ -1361,9 +1418,13 @@ def main(args):
                     # unstack features
                     push_feat_unstack, grasp_feat_unstack, place_feat_unstack, push_predictions_unstack, \
                             grasp_predictions_unstack, place_predictions_unstack, _, _ = \
-                            unstack_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            unstack_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got unstack features")
+
+                    # fill masked arrays of features
+                    push_feat_unstack, grasp_feat_unstack, place_feat_unstack = \
+                            push_feat_unstack.filled(0.0), grasp_feat_unstack.filled(0.0), place_feat_unstack.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to unstack predictions if stack trainer not specified
@@ -1375,9 +1436,13 @@ def main(args):
                     # vertical_square features
                     push_feat_vertical_square, grasp_feat_vertical_square, place_feat_vertical_square, push_predictions_vertical_square, \
                             grasp_predictions_vertical_square, place_predictions_vertical_square, _, _ = \
-                            vertical_square_trainer.forward(color_heightmap, valid_depth_heightmap, is_volatile=True,
-                                goal_condition=goal_condition, keep_action_feat=True, demo_mask=args.common_sense)
+                            vertical_square_trainer.forward(color_heightmap, valid_depth_heightmap,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)
                     print("main.py nonlocal_pause['exit_called'] got vertical_square features")
+
+                    # fill masked arrays of features
+                    push_feat_vertical_square, grasp_feat_vertical_square, place_feat_vertical_square = \
+                            push_feat_vertical_square.filled(0.0), grasp_feat_vertical_square.filled(0.0), place_feat_vertical_square.filled(0.0)
 
                     # NOTE(adit98) what gets logged in these variables is unlikely to be relevant
                     # set predictions variables to vertical_square predictions if stack trainer not specified
@@ -1721,6 +1786,10 @@ def main(args):
                 stack_trainer.iteration += 1
             if row_trainer is not None:
                 row_trainer.iteration += 1
+            if unstack_trainer is not None:
+                unstack_trainer.iteration += 1
+            if vertical_square_trainer is not None:
+                vertical_square_trainer.iteration += 1
 
         else:
             trainer.iteration += 1
@@ -2217,6 +2286,8 @@ if __name__ == '__main__':
     parser.add_argument('--evaluate_random_objects', dest='evaluate_random_objects', action='store_true', default=False,                help='Evaluate trials with random block positions, for example testing frequency of random rows.')
     parser.add_argument('--max_test_trials', dest='max_test_trials', type=int, action='store', default=100,                help='maximum number of test runs per case/scenario')
     parser.add_argument('--max_train_actions', dest='max_train_actions', type=int, action='store', default=None,                help='INTEGRATED TRAIN VAL TEST - maximum number of actions before training exits automatically at the end of that trial. Note this is slightly different from max_iter.')
+    parser.add_argument('--max_trial_actions_train', dest='max_trial_actions_train', type=int, action='store', default=100, help='Number of actions after which to reset environment if trial is not completed')
+    parser.add_argument('--max_trial_actions_test', dest='max_trial_actions_test', type=int, action='store', default=30, help='Number of actions after which to reset environment if trial is not completed')
     parser.add_argument('--test_preset_cases', dest='test_preset_cases', action='store_true', default=False)
     parser.add_argument('--test_preset_file', dest='test_preset_file', action='store', default='')
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
