@@ -236,7 +236,7 @@ def main(args):
     elif task_type is not None:
         # TODO(adit98) think about how we set different place dilations
         stack_place_dilation = 0.00
-        place_dilation = 0.10
+        place_dilation = 0.05
     else:
         place_dilation = 0.00
 
