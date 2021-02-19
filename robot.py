@@ -651,7 +651,7 @@ class Robot(object):
 
         return obj_positions
 
-    def get_objs_in_scene(self, workspace_limits=None):
+    def get_objects_in_scene(self, workspace_limits=None):
         """
         Function to iterate through all object positions and return number of objects within workspace_limits
         Returns:
