@@ -2363,7 +2363,7 @@ def ablation(args):
 
 if __name__ == '__main__':
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
-    matplotlib.use('Agg')
+    # matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')

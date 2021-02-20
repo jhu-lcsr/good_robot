@@ -647,7 +647,7 @@ class Trainer(object):
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions, color_heightmap=color_heightmap)
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
