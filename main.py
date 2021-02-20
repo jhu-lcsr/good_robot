@@ -243,8 +243,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
-    # (elias) added this to prevent an error in the print statement 
-    stack_place_dilation = None
+    stack_place_dilation = 0.00
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
@@ -1307,7 +1306,6 @@ def main(args):
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot) 
                 # TODO(elias) add depthmap 
-                pdb.set_trace() 
                 pair = Pair.from_main_idxs(color_heightmap, valid_depth_heightmap, json_data) 
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
@@ -2332,7 +2330,7 @@ def ablation(args):
 
 if __name__ == '__main__':
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
-    matplotlib.use('Agg')
+    # matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')

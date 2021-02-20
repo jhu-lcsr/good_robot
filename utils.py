@@ -11,6 +11,7 @@ import yaml
 import torch
 from scipy.special import softmax
 import pathlib
+import matplotlib.pyplot as plt
 
 # Import necessary packages
 #try:
@@ -250,7 +251,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None):
     """
     Adds a language mask to the predictions array.
 
@@ -289,20 +290,43 @@ def process_prediction_language_masking(language_data, predictions):
     else:
         predictions.mask = 1 - np.logical_and(1 - currMask,  1 - languageMask)
 
+    
+    if show_heightmap:
+        # visualize the common sense function results
+        # show the heightmap
+        f = plt.figure()
+        # f.suptitle(str(trainer.iteration))
+        f.add_subplot(1,2, 1)
+        #if predictions is not None:
+        plt.imshow(predictions.mask[0,:,:])
+        f.add_subplot(1,2, 2)
+        if color_heightmap is not None:
+            plt.imshow(color_heightmap)
+        # f.add_subplot(1,4, 2)
+        # if push_predictions is not None:
+        #     plt.imshow(push_contactable_regions)
+        # f.add_subplot(1,4, 3)
+        # plt.imshow(depth_heightmap)
+        # f.add_subplot(1,4, 4)
+        # if color_heightmap is not None:
+        #     plt.imshow(color_heightmap)
+        plt.show(block=True)
+
     return predictions
 
 
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):
     """ 
     Processes the language output into a mask and combine it with existing masks in prediction arrays
     """
 
     # language masks are currently for grasp and place only. The push predictions will not be operated upon.
     push_predictions = push_predictions
-    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions)
-    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions)
+    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap)
+
 
     return push_predictions, grasp_predictions, place_predictions
 
