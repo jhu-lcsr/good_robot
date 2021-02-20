@@ -1195,7 +1195,7 @@ def main(args):
 
         return no_change_count
 
-    def sim_problem_end_trial():
+    def sim_problem_end_trial(num_problems_detected=0):
         ''' Call when trials must be ended due to an exceptional situation from the main training loop.
         Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner, 
         which often means the simulator entered a physically impossible state.
@@ -1228,6 +1228,7 @@ def main(args):
             # Try more drastic recovery methods the second time around
             robot.restart_sim(connect=True)
             robot.add_objects()
+        return num_problems_detected
 
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
@@ -1663,7 +1664,7 @@ def main(args):
                     # Trial decline needs to be worse for an actual reset
                     if is_bad_decline_string('trial') or bad_action_decline:
                         print('ERROR: PROBLEM DETECTED IN SCENE, STEEP TRIAL, GRASP, OR PLACE PERFORMANCE DECLINE, RESETTING THE OBJECTS TO RECOVER... sometimes performance declines because the simulator is in a physically impossible state, so move on to the next trial to be safe.')
-                        sim_problem_end_trial()
+                        num_problems_detected = sim_problem_end_trial(num_problems_detected)
 
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000:
@@ -1759,7 +1760,7 @@ def main(args):
             elif is_sim and int(time_elapsed) > timeout:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
-                sim_problem_end_trial(robot, workspace_limits, heightmap_resolution, logger, trainer, check_z_height)
+                num_problems_detected = sim_problem_end_trial(num_problems_detected)
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
