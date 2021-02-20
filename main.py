@@ -840,11 +840,13 @@ def main(args):
                             preds = preds[1:]
                             example_actions = example_actions[1:].tolist()
                         elif task_type == 'stack':
-                            preds = preds[0, 2, 3]
-                            example_actions = example_actions[[0, 2, 3]].tolist()
+                            inds = [0, 2, 3]
+                            preds = [preds[i] for i in inds]
+                            example_actions = example_actions[inds].tolist()
                         elif task_type == 'unstack':
-                            preds = preds[0, 1, 3]
-                            example_actions = example_actions[[0, 1, 3]].tolist()
+                            inds = [0, 1, 3]
+                            preds = [preds[i] for i in inds]
+                            example_actions = example_actions[inds].tolist()
                         elif task_type == 'vertical_square':
                             preds = preds[:3]
                             example_actions = example_actions[:3].tolist()
@@ -1890,7 +1892,8 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         prev_best_dict = copy.deepcopy(best_dict)
         if is_testing:
             # when testing the plot data should be averaged across the whole run
-            plot_window = trainer.iteration - 3
+            # if less than 3 iterations have passed, set plot_window to 1
+            plot_window = max(1, trainer.iteration - 3)
         best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place,
                 window=plot_window, num_preset_arrangements=preset_files, task_type=task_type)
     return best_dict, prev_best_dict, current_dict
