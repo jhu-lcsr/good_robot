@@ -244,10 +244,9 @@ def main(args):
     else:
         place_dilation = 0.00
 
-    print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
-
     # Initialize trainer(s)
     if use_demo:
+        print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
         assert task_type is not None, ("Must provide task_type if using demo")
         assert is_testing, ("Must run in testing mode if using demo")
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
