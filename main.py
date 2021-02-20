@@ -1342,7 +1342,8 @@ def main(args):
             # TODO(elias) what about unsuccessful grasp actions that move the block 
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot) 
-                pair = Pair.from_main_idxs(color_heightmap, json_data) 
+                # TODO(elias) add depthmap 
+                pair = Pair.from_main_idxs(color_heightmap, depth_heightmap, json_data) 
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
             # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 
@@ -1352,7 +1353,6 @@ def main(args):
             elif is_sim and is_bisk: 
                 # Update nonlocal variables with bisk goal here
                 nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
-
                 # RESET THE SCENE to match the "previous" state if we are in the simulator
                 # NOTE(zhe) This currently requires the dynamics to be turned off. TODO(zhe) Allow dynamics in future.
                 pos = language_data_instance.previous_positions[0]
