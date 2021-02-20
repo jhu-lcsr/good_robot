@@ -632,25 +632,30 @@ class Trainer(object):
         # return components depending on flags
         if keep_action_feat and not use_demo:
             if self.place_common_sense:
-                return push_feat, grasp_feat, masked_place_feat, push_predictions, \
-                        grasp_predictions, masked_place_predictions, state_feat, output_prob
+                try:
+                    return push_feat, grasp_feat, masked_place_feat, push_predictions, \
+                            grasp_predictions, masked_place_predictions, state_feat, output_prob
+                except UnboundLocalError:
+                    raise ValueError("Need to run with demo_mask set to True if place_common_sense is set")
             else:
                 return push_feat, grasp_feat, place_feat, push_predictions, \
                         grasp_predictions, place_predictions, state_feat, output_prob
 
         elif use_demo:
             if self.place_common_sense:
-                return push_predictions, grasp_predictions, masked_place_predictions
+                try:
+                    return push_predictions, grasp_predictions, masked_place_predictions
+                except UnboundLocalError:
+                    raise ValueError("Need to run with demo_mask set to True if place_common_sense is set")
             else:
                 return push_predictions, grasp_predictions, place_predictions
 
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
-            # language_output = None # Fill this in
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions)
-        elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
-            raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
+        # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
+            # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
         # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
         if self.place_common_sense and not self.static_language_mask:
@@ -1104,3 +1109,12 @@ class Trainer(object):
 
         best_pix_ind = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
         return best_pix_ind
+
+    def get_final_trial_action_count(self):
+        """
+        Get the number of actions taken in the running trial.
+        """
+        if len(self.clearance_log) > 0:
+            return self.iteration - np.array(self.clearance_log).flatten()[-1]
+        else:
+            return self.iteration + 1

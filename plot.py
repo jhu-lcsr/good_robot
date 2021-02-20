@@ -225,7 +225,7 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
         # window_size = min(i, window)
         window_size = np.array(min(i+1, window), np.float64)
         num_trials = success[start:i+1].sum()
-        efficiency[i] = num_trials * ideal_actions_per_trial / window
+        efficiency[i] = num_trials * ideal_actions_per_trial / window_size
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
         upper[i] = efficiency[i] - 3*var

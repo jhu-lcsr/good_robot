@@ -49,6 +49,8 @@ models/*
 data/
 data/*
 
+figures/
+
 .vscode
 .vscode/*
 

@@ -250,50 +250,59 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
-    
+def process_prediction_language_masking(language_data, predictions):
+    """
+    Adds a language mask to the predictions array.
+
+    language_data: an array with shape [1, 256, 2, 1] which will be processed into a mask
+    predictions: masked array or ndarray with prediction values for a specific action
+    """
+
     # Convert inputs to np.ma.masked_array objects if they are inputted as np.ndarrays
-    if not np.ma.is_masked(grasp_predictions):
-        if isinstance(grasp_predictions, np.ndarray):
-            grasp_predictions = np.ma.masked_array(grasp_predictions)
+    if not np.ma.is_masked(predictions):
+        if isinstance(predictions, np.ndarray):
+            predictions = np.ma.masked_array(predictions, mask=False)
         else:
-            raise TypeError("grasp_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
-    
-    if not np.ma.is_masked(place_predictions):
-        if isinstance(place_predictions, np.ndarray):
-            place_predictions = np.ma.masked_array(place_predictions)
-        else:
-            raise TypeError("place_predictions passed into the common_sense_language_model_mask function should be np.ma.masked_array or np.ndarray objects.")
+            raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
     
     # Extract current masks
-    graspMask = np.ma.get_mask(grasp_predictions)
-    placeMask = np.ma.get_mask(place_predictions)
-    
-    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
-    # NOTE(zhe) Should we erode part of the mask away? The current mask lets the whole block pass. We may want to mask the edges of the block.
-    
+    currMask = np.ma.getmask(predictions)
+
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
-    languageGraspMask = softmax(language_output['prev_position'][0], axis=0)
-    languageGraspMask = languageGraspMask[1] > 0.5      # using mask index 1 here to use the negative mask.
-    languagePlaceMask = softmax(language_output['next_position'][0], axis=0)
-    languagePlaceMask = languagePlaceMask[1] > 0.5      # using mask index 1 here to use the negative mask.
-    
+    # language_data should have shape torch([1, 256, 2, 1])
+    languageMask = softmax(language_data[0,:,:,0], axis=1)
+    languageMask = np.float32(languageMask[:,1] > 0.5).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+
+    # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
+
     # Scale language masks to match the prediction array sizes
-    languageGraspMask = cv2.resize(languageGraspMask, graspMask.shape, interpolation=cv2.INTER_NEAREST)
-    languagePlaceMask = cv2.resize(languagePlaceMask, placeMask.shape, interpolation=cv2.INTER_NEAREST)
+    languageMask = cv2.resize(languageMask, currMask.shape[1:3], interpolation=cv2.INTER_NEAREST)
+    languageMask = np.broadcast_to(languageMask, predictions.shape, subok=True)
+
+    # Catching errors
+    assert languageMask.shape == currMask.shape and languageMask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
 
     # Combine language mask with existing masks if necessary
-    if graspMask is np.ma.nomask:
-        grasp_predictions.mask = languageGraspMask
+    if currMask is np.ma.nomask:
+        predictions.mask = languageMask
     else:
-        grasp_predictions.mask = 1 - np.logical_and(1 - graspMask,  1 - languageGraspMask)
-    
-    if placeMask is np.ma.nomask:
-        place_predictions.mask = languageGraspMask
-    else:
-        place_predictions.mask = 1 - np.logical_and(1 - placeMask,  1 - languagePlaceMask)
+        predictions.mask = 1 - np.logical_and(1 - currMask,  1 - languageMask)
+
+    return predictions
+
+
+
+# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None):
+    """ 
+    Processes the language output into a mask and combine it with existing masks in prediction arrays
+    """
+
+    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
+    push_predictions = push_predictions
+    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions)
 
     return push_predictions, grasp_predictions, place_predictions
 
@@ -1069,6 +1078,7 @@ def compute_demo_dist(preds, example_actions):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     """
+
     # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
     def cos_sim(pix_preds, best_pred):
         """
@@ -1083,38 +1093,56 @@ def compute_demo_dist(preds, example_actions):
 
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
-        actions = list(example_actions[i])
+        # check if policy was supplied (entry will be None if it wasn't)
+        if example_actions[i][0] is None:
+            continue
 
-        for j in actions:
-            actions[j] = np.expand_dims(actions[j], (0, 2, 3))
+        # get actions and expand dims
+        actions = np.expand_dims(np.stack(example_actions[i]), (1, 3, 4))
 
         # reshape and update list
         example_actions[i] = actions
 
     # get mask from first available model (NOTE(adit98) see if we need a different strategy for this)
-    mask = None
+    masks = []
+    mask_shape = None
+    exit = True
     for pred in preds:
         if pred is not None:
-            mask = (preds == np.zeros([1, 64, 1, 1])).all(axis=1)
-            break
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask_shape = mask.shape
+            masks.append(mask)
+            exit = False
 
-    # ensure that at least one of the preds is not None
-    if mask is None:
-        raise ValueError("Must provide at least one non-null pixel-wise embedding array")
+        else:
+            masks.append(None)
+
+    # exit if no policies were provided
+    if exit:
+        raise ValueError("Must provide at least one model")
 
     # calculate l2 distance between example action embedding and preds for each policy and demo
     l2_dists = []
     for ind, actions in enumerate(example_actions):
+        # check if policy was supplied (entry will be [None, None] if it wasn't)
+        if actions[0] is None:
+            # if policy not supplied, insert pixel-wise array of inf distance
+            # apply 
+            l2_dists.append(np.ones(mask_shape) * np.inf)
+            continue
+
         for action in actions:
+            # calculate pixel-wise l2 distance (16x224x224)
             dist = np.sum(np.square(action - preds[ind]), axis=1)
 
             # set all masked spaces to have max l2 distance
-            dist[mask] = np.max(dist) * 1.1
+            # select appropriate mask from list of masks
+            dist[masks[ind]] = np.max(dist) * 1.1
 
             # append to l2_dists list
             l2_dists.append(dist)
 
-    # select best action as min b/w all dists in l2_dists
+    # stack pixel-wise distance array per policy (4x16x224x224)
     l2_dists = np.stack(l2_dists)
 
     # find overall minimum distance across all policies and get index
