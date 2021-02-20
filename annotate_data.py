@@ -31,22 +31,31 @@ class Pair:
 
     def show(self):
         fig,ax = plt.subplots(1)
-        ax.imshow(self.prev_image)
+        ax.imshow(self.prev_image[:,:,0:3])
         prev_location = self.prev_location - int(self.w/2)
         next_location = self.next_location - int(self.w/2)
         rect = patches.Rectangle(prev_location, self.w, self.w ,linewidth=3,edgecolor='w',facecolor='none')
         ax.add_patch(rect)
         plt.show()
         fig,ax = plt.subplots(1)
-        ax.imshow(self.next_image)
+        ax.imshow(self.next_image[:,:,0:3])
         rect = patches.Rectangle(next_location, self.w, self.w,linewidth=3,edgecolor='w',facecolor='none')
         ax.add_patch(rect)
         plt.show()
 
     def resize(self):
-        self.prev_image = cv2.resize(self.prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
-        if self.next_image is not None: 
-            self.next_image = cv2.resize(self.next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+
+        prev_image, prev_depth = self.prev_image[:,:,0:3], self.prev_image[:,:,3:]
+        prev_image = cv2.resize(prev_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+        prev_depth = cv2.resize(prev_depth, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+        self.prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
+
+        if self.next_image is not None:
+            next_image, next_depth = self.next_image[:,:,0:3], self.next_image[:,:,3:]
+            next_image = cv2.resize(next_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+            next_depth = cv2.resize(next_depth, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
+            self.next_image = np.concatenate([next_image, next_depth], axis=-1)
+
         self.ratio = self.resolution / 224 
 
         # normalize location and width 
@@ -74,14 +83,24 @@ class Pair:
         next_location = data[place_idx][2:][::-1]
         grasp_prefix = str(1000000 + grasp_idx)[1:]
         place_prefix = str(1000000 + place_idx)[1:]
-        grasp_path = str(image_home.joinpath(f"{grasp_prefix}.0.color.png"))
-        place_path = str(image_home.joinpath(f"{place_prefix}.2.color.png"))
+        depth_home = image_home.parent.joinpath("depth-heightmaps")
+        grasp_color_path = str(image_home.joinpath(f"{grasp_prefix}.0.color.png"))
+        place_color_path = str(image_home.joinpath(f"{place_prefix}.2.color.png"))
+        grasp_depth_path = str(depth_home.joinpath(f"{grasp_prefix}.0.depth.png"))
+        place_depth_path = str(depth_home.joinpath(f"{place_prefix}.2.depth.png"))
 
-        # TODO(elias) swap BG channels here 
-        prev_image = cv2.imread(grasp_path)
+        prev_image = cv2.imread(grasp_color_path)
         prev_image = cv2.cvtColor(prev_image, cv2.COLOR_BGR2RGB)
-        next_image = cv2.imread(place_path)
+        prev_depth = cv2.imread(grasp_depth_path)
+        prev_depth = cv2.cvtColor(prev_depth, cv2.COLOR_BGR2RGB)
+        next_image = cv2.imread(place_color_path)
         next_image = cv2.cvtColor(next_image, cv2.COLOR_BGR2RGB)
+        next_depth = cv2.imread(place_depth_path)
+        next_depth = cv2.cvtColor(next_depth, cv2.COLOR_BGR2RGB)
+
+        prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
+        next_image = np.concatenate([next_image, next_depth], axis=-1)
+
         return cls(prev_image, prev_location, next_image, next_location)
 
     @classmethod
@@ -99,8 +118,9 @@ class Pair:
         return pair 
 
     @classmethod
-    def from_main_idxs(cls, prev_image, prev_json):
+    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json):
         # TODO(elias) infer which block to move from interpolation here 
+        prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
         src_color, tgt_color = pair.infer_from_json_data(json_data) 
@@ -265,6 +285,34 @@ class Pair:
                                     relation = relation_lookup_dict[self.relation_code])
         except KeyError:
             return "bad"
+
+
+def rotate_pair(pair, deg): 
+    pair.clean()
+    assert(deg in [1,2,3])
+
+
+    new_pair = copy.deepcopy(pair)
+
+    def rotate_image(img):
+        for i in range(deg):
+            img = cv2.rotate(img, cv2.cv2.ROTATE_90_CLOCKWISE)
+        return img 
+
+    def rotate_coords(coords):
+        # put back into unit square
+        coords = ((coords/new_pair.resolution) * 2)-1
+        x, y = coords
+        x, y = -y, x
+        coords = np.array([x,y])
+        coords = (coords + 1)/2 * new_pair.resolution
+        return coords
+
+    new_pair.prev_image = rotate_image(new_pair.prev_image)
+    new_pair.next_image = rotate_image(new_pair.next_image)
+    new_pair.prev_location = rotate_coords(new_pair.prev_location)
+    new_pair.next_location = rotate_coords(new_pair.next_location)
+    return new_pair
 
 def flip_pair(pair, axis):
     pair.clean() 

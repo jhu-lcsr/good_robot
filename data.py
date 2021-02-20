@@ -14,7 +14,7 @@ import copy
 import pathlib 
 import pickle as pkl
 
-from annotate_data import Pair, flip_pair
+from annotate_data import Pair, flip_pair, rotate_pair 
 np.random.seed(12) 
 torch.manual_seed(12) 
 
@@ -404,9 +404,9 @@ class DatasetReader:
                         trajectory = self.trajectory_class(line_id,
                                                     command, 
                                                     [previous_positions[timestep]],
-                                                    [previous_rotations[timestep]],
+                                                    [None],
                                                     [next_positions[timestep]],
-                                                    [next_rotations[timestep]],
+                                                    [None],
                                                     images=[images[timestep],images[timestep+1]],
                                                     lengths = [None],
                                                     tokenizer=self.tokenizer,
@@ -535,6 +535,7 @@ class GoodRobotDatasetReader:
                 split_type: str = 'random',
                 task_type: str = "rows-and-stacks",
                 augment_by_flipping: bool = True, 
+                augment_by_rotating: bool = True, 
                 augment_language: bool = True, 
                 leave_out_color: str = None, 
                 batch_size: int = 32,
@@ -567,6 +568,14 @@ class GoodRobotDatasetReader:
                     new_pair = flip_pair(pair, axis) 
                     new_data.append(new_pair) 
             self.all_data += new_data 
+
+        if augment_by_rotating:
+            new_data = []
+            for pair in self.all_data:
+                for rot in range(1, 4):
+                    new_pair = rotate_pair(pair, rot)
+                    new_data.append(new_pair)
+            self.all_data += new_data
 
         if task_type == "rows":
             all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 

@@ -632,15 +632,21 @@ class Trainer(object):
         # return components depending on flags
         if keep_action_feat and not use_demo:
             if self.place_common_sense:
-                return push_feat, grasp_feat, masked_place_feat, push_predictions, \
-                        grasp_predictions, masked_place_predictions, state_feat, output_prob
+                try:
+                    return push_feat, grasp_feat, masked_place_feat, push_predictions, \
+                            grasp_predictions, masked_place_predictions, state_feat, output_prob
+                except UnboundLocalError:
+                    raise ValueError("Need to run with demo_mask set to True if place_common_sense is set")
             else:
                 return push_feat, grasp_feat, place_feat, push_predictions, \
                         grasp_predictions, place_predictions, state_feat, output_prob
 
         elif use_demo:
             if self.place_common_sense:
-                return push_predictions, grasp_predictions, masked_place_predictions
+                try:
+                    return push_predictions, grasp_predictions, masked_place_predictions
+                except UnboundLocalError:
+                    raise ValueError("Need to run with demo_mask set to True if place_common_sense is set")
             else:
                 return push_predictions, grasp_predictions, place_predictions
 
@@ -1103,3 +1109,12 @@ class Trainer(object):
 
         best_pix_ind = np.unravel_index(np.argmax(place_predictions), place_predictions.shape)
         return best_pix_ind
+
+    def get_final_trial_action_count(self):
+        """
+        Get the number of actions taken in the running trial.
+        """
+        if len(self.clearance_log) > 0:
+            return self.iteration - np.array(self.clearance_log).flatten()[-1]
+        else:
+            return self.iteration + 1

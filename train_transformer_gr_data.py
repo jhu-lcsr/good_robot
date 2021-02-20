@@ -17,8 +17,9 @@ from spacy.lang.en import English
 from einops import rearrange 
 import logging 
 from tqdm import tqdm 
-from matplotlib import pyplot as plt
 import matplotlib
+from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 from matplotlib import gridspec
 import numpy as np
 import torch.autograd.profiler as profiler
@@ -28,7 +29,7 @@ from allennlp.training.scheduler import Scheduler
 from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
-from transformer import TransformerEncoder, image_to_tiles, tiles_to_image
+from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
 from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
@@ -267,7 +268,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         return total_loss
 
-    def generate_debugging_image(self, true_img, pred_data, out_path, caption):
+    def generate_debugging_image(self, true_img, true_loc, pred_data, out_path, caption):
         caption = self.wrap_caption(caption)
         c = pred_data.shape[0]
 
@@ -289,8 +290,12 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             verticalalignment='top', bbox=props)
         # img_ax = plt.subplot(gs[2])
         img_ax = ax[1,0]
-        true_img = true_img.detach().cpu().numpy().astype(int)
+        w = int(40 * (self.resolution / 224))
+        true_img = true_img.detach().cpu().numpy().astype(int)[:,:,0:3]
         img_ax.imshow(true_img)
+        location = true_loc - int(w/2)
+        rect = patches.Rectangle(location, w, w ,linewidth=3,edgecolor='w',facecolor='none')
+        img_ax.add_patch(rect)
 
         # pred_ax = plt.subplot(gs[0], figsize=(6,6))
         pred_ax = ax[0,0]
@@ -304,16 +309,12 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         pred_ax.set_ylim(0, self.resolution)
         pred_ax.set_xlim(0, self.resolution)
         plt.grid() 
-        to_plot_xs_lab, to_plot_zs_lab, to_plot_labels = [], [], []
         to_plot_xs_prob, to_plot_zs_prob, to_plot_probs = [], [], []
         for x_pos in xs:
             for z_pos in zs:
-                to_plot_xs_lab.append(x_pos)
-                to_plot_zs_lab.append(z_pos)
-
                 prob = pred_data[x_pos, z_pos].item()
-                to_plot_xs_prob.append(x_pos)
-                to_plot_zs_prob.append(z_pos)
+                to_plot_zs_prob.append(self.resolution - x_pos)
+                to_plot_xs_prob.append(z_pos)
                 to_plot_probs.append(prob)
 
         squares = []
@@ -339,7 +340,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
 
 
-        if True: 
+        if False: 
             print(batch_instance["prev_pos_for_pred"][0,0,40:60,10:30,0].long()) 
             print(torch.argmax(prev_position[0,:,40:60,10:30], dim = 0))
 
@@ -360,11 +361,13 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
                  
                 self.generate_debugging_image(next_pos,
+                                             batch_instance['pairs'][i].next_location,
                                              next_position[i], 
                                              output_path.joinpath("next"),
                                              caption = command) 
 
                 self.generate_debugging_image(prev_pos, 
+                                              batch_instance['pairs'][i].prev_location,
                                               prev_position[i], 
                                               output_path.joinpath("prev"),
                                               caption = command) 
@@ -418,10 +421,11 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
-    dataset_reader = GoodRobotDatasetReader(path=args.path,
+    dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
                                             task_type=args.task_type,
                                             augment_by_flipping = args.augment_by_flipping,
+                                            augment_by_rotating = args.augment_by_rotating, 
                                             augment_language = args.augment_language,
                                             leave_out_color = args.leave_out_color,
                                             batch_size=args.batch_size,
@@ -456,25 +460,31 @@ def main(args):
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
     depth = 1
-    encoder = TransformerEncoder(image_size = args.resolution,
-                                 patch_size = args.patch_size, 
-                                 language_embedder = embedder, 
-                                 n_layers_shared = args.n_shared_layers,
-                                 n_layers_split  = args.n_split_layers,
-                                 n_classes = 2,
-                                 channels = 3,
-                                 n_heads = args.n_heads,
-                                 hidden_dim = args.hidden_dim,
-                                 ff_dim = args.ff_dim,
-                                 dropout = args.dropout,
-                                 embed_dropout = args.embed_dropout,
-                                 output_type = args.output_type, 
-                                 positional_encoding_type = args.pos_encoding_type,
-                                 device = device,
-                                 log_weights = args.test,
-                                 init_scale = args.init_scale, 
-                                 do_regression = False,
-                                 do_reconstruction = False) 
+    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else "TransformerEncoder"
+    encoder_kwargs = dict(image_size = args.resolution,
+                          patch_size = args.patch_size, 
+                          language_embedder = embedder, 
+                          n_layers_shared = args.n_shared_layers,
+                          n_layers_split  = args.n_split_layers,
+                          n_classes = 2,
+                          channels = args.channels,
+                          n_heads = args.n_heads,
+                          hidden_dim = args.hidden_dim,
+                          ff_dim = args.ff_dim,
+                          dropout = args.dropout,
+                          embed_dropout = args.embed_dropout,
+                          output_type = args.output_type, 
+                          positional_encoding_type = args.pos_encoding_type,
+                          device = device,
+                          log_weights = args.test,
+                          init_scale = args.init_scale, 
+                          do_regression = False,
+                          do_reconstruction = False) 
+    if args.encoder_type == "ResidualTransformerEncoder":
+        encoder_kwargs["do_residual"] = args.do_residual 
+    # Initialize encoder 
+    encoder = encoder_cls(**encoder_kwargs)
+
     if args.cuda is not None:
         encoder = encoder.cuda(device) 
     print(encoder) 
@@ -571,7 +581,7 @@ def main(args):
                                    optimizer = None, 
                                    scheduler = None, 
                                    num_epochs = 0, 
-                                   num_blocks = args.num_blocks,
+                                   num_blocks = 1, 
                                    device = device,
                                    resolution = args.resolution, 
                                    output_type = args.output_type, 
@@ -607,6 +617,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     parser.add_argument("--next-weight", type=float, default=1)
     parser.add_argument("--prev-weight", type=float, default=1) 
+    parser.add_argument("--channels", type=int, default=6)
     parser.add_argument("--split-type", type=str, choices= ["random", "leave-out-color",
                                                              "train-stack-test-row",
                                                              "train-row-test-stack"],
@@ -615,6 +626,7 @@ if __name__ == "__main__":
                         default="rows-and-stacks") 
     parser.add_argument("--leave-out-color", type=str, default=None) 
     parser.add_argument("--augment-by-flipping", action="store_true")
+    parser.add_argument("--augment-by-rotating", action="store_true")
     parser.add_argument("--augment-language", action="store_true")
     parser.add_argument("--overfit", action = "store_true")
     # language embedder 
@@ -622,6 +634,7 @@ if __name__ == "__main__":
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
     parser.add_argument("--embedding-dim", type=int, default=300) 
     # transformer parameters 
+    parser.add_argument("--encoder-type", type=str, default="TransformerEncoder", choices = ["TransformerEncoder", "ResidualTransformerEncoder"], help = "choice of dual-stream transformer encoder or one that bases next prediction on previous transformer representation")
     parser.add_argument("--pos-encoding-type", type = str, default="learned") 
     parser.add_argument("--patch-size", type=int, default = 8)  
     parser.add_argument("--n-shared-layers", type=int, default = 6) 
@@ -633,6 +646,7 @@ if __name__ == "__main__":
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch", "patch-softmax"], default='per-pixel')
+    parser.add_argument("--do-residual", action = "store_true", help = "set to residually connect unshared and next prediction in ResidualTransformerEncoder")
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
