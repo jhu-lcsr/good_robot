@@ -338,17 +338,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
-
-
-        if False: 
-            print(batch_instance["prev_pos_for_pred"][0,0,40:60,10:30,0].long()) 
-            print(torch.argmax(prev_position[0,:,40:60,10:30], dim = 0))
-
+        # f1 metric 
         prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
         next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
-
-        print(prev_p, prev_r, prev_f1)
-        print(next_p, next_r, next_f1)
+        # block accuracy metric 
+        prev_block_acc = self.compute_block_accuracy(batch_instance["pairs"], prev_position)
 
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -405,6 +399,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         recall = true_pos / (true_pos + false_neg + eps) 
         f1 = 2 * (precision * recall) / (precision + recall + eps) 
         return precision, recall, f1
+
+    def compute_teleportation_metric(self, pairs, pred_pos, next_pos):
+        true_centers = [p.prev_location for p in pairs]
+        
+
 
 
 def main(args):

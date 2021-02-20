@@ -28,6 +28,8 @@ class Pair:
         self.target_location = None 
         self.relation_code = None
         self.resolution = resolution 
+        self.prev_state_image = None 
+        self.next_state_image = None 
 
     def show(self):
         fig,ax = plt.subplots(1)
@@ -107,14 +109,10 @@ class Pair:
     def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
         pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
         # annotate based on sim data 
-        # rules for row-making
         grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
-
         json_data = pair.read_json(grasp_json_path)
         src_color, tgt_color = pair.combine_json_data(json_data)
-
-        # TODO (elias) rules for stacking
         return pair 
 
     @classmethod
@@ -141,9 +139,6 @@ class Pair:
         for color, coord in zip(colors, coords):
             # normalize location to resolution 
             coord = np.array(coord)
-            # coord += 1
-            # coord /= 2
-            # coord *= self.resolution 
             to_ret[color] = coord 
         return to_ret 
 
@@ -152,6 +147,30 @@ class Pair:
         diff = [(k, np.sum(x)) for k, x in diff.items()]
         # get block with greatest diff in location 
         return list(sorted(diff, key = lambda x: x[1]))[-1]
+
+    def make_image(self, json_data):
+        state = np.zeros((224, 224, 1))
+
+        def convert_to_loc(state):
+            offset = [0.15, 0.0, 0.0]
+            grid_dim = 14
+            side_len = 0.035
+            x_offset = 0.58
+            state[0] += x_offset 
+            for i in range(len(state)):
+                state[i] = (state[i] * 2) / grid_len - offset[i]
+
+            state = (state + 1)/2 * 224
+            return state 
+
+        color_to_idx = {"red":1, "blue": 2, "yellow": 3, "green": 4}
+        for color, location in json_data.items():
+            idx = color_to_idx[color]
+            loc = convert_to_loc(location)
+            state[loc[0], loc[1], :] = idx 
+    
+        return state 
+
 
     def combine_json_data(self, json_data, next_to=True, filter_left=False): 
         # first pass: all prompts say "next to" and reference the closest block to the left of the target location
@@ -175,6 +194,8 @@ class Pair:
                 loc[i] = (loc[i] + offset[i]) * grid_len/2
             loc[0] -= x_offset 
             return loc
+
+        self.prev_state_image = self.make_image(json_data)
 
         prev_loc = convert_loc(self.prev_location)
         next_loc = convert_loc(self.next_location) 
