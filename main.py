@@ -1640,18 +1640,29 @@ def main(args):
                 # reload the best model if trial performance has declined by more than 10%
                 if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and
                    trainer_iteration_of_most_recent_model_reload + 60 < trainer.iteration):
-                    allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
-                    if allowed_decline > current_dict['trial_success_rate_current_value']:
+                    # TODO(ahundt) check if the default scale requrement for a bad decline should be even smaller like 0.5 or 0.4
+                    def is_bad_decline(best, current, subtract=0.1, scale=0.6):
+                        return (best - subtract) * scale > current
+                    def is_bad_decline_string(name, scale=0.6):
+                        current_success = current_dict[name + '_success_rate_current_value']
+                        best_success = best_dict[name + '_success_rate_best_value']
+                        is_bad = is_bad_decline(best_success, current_success, scale=scale)
+                        if is_bad:
+                            print('WARNING: ' + name + ' success declined from the best ' + str(best_success) + ' to below the allowed limit of ' + str(current_success))
+                        return is_bad
+
+                    # check if grasp success or place success dropped a lot
+                    bad_action_decline = is_bad_decline_string('grasp') or (place and is_bad_decline_string('place'))
+                    if is_bad_decline_string('trial', scale=0.9) or bad_action_decline:
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
                         logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
-                        print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
-                            ' is below the allowed decline of ' + str(allowed_decline) +
-                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) +
-                            ', reloading the best model ' + str(snapshot_file))
-                        # sometimes performance declines because the simulator is in a physically impossible state, so move on to the next trial to be safe.
+                        print('WARNING: reloading the best model ' + str(snapshot_file))
+                    # Trial decline needs to be worse for an actual reset
+                    if is_bad_decline_string('trial') or bad_action_decline:
+                        print('ERROR: PROBLEM DETECTED IN SCENE, STEEP TRIAL, GRASP, OR PLACE PERFORMANCE DECLINE, RESETTING THE OBJECTS TO RECOVER... sometimes performance declines because the simulator is in a physically impossible state, so move on to the next trial to be safe.')
                         sim_problem_end_trial()
 
                 # Save model if we are at a new best stack rate
