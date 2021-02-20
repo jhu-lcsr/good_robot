@@ -86,6 +86,7 @@ def run_title(args):
 def main(args):
     # TODO(ahundt) move main and process_actions() to a class?
 
+    num_problems_detected = 0
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
@@ -1194,6 +1195,40 @@ def main(args):
 
         return no_change_count
 
+    def sim_problem_end_trial():
+        ''' Call when trials must be ended due to an exceptional situation from the main training loop.
+        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner, 
+        which often means the simulator entered a physically impossible state.
+        The existing code should already call the regular end_trial() function when the next iteration starts.
+        '''
+        get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+        robot.check_sim()
+        if not robot.reposition_objects():
+            # This can happen if objects are in impossible positions (NaN),
+            # so set the variable to immediately and completely restart
+            # the simulation below.
+            num_problems_detected += 3
+        nonlocal_variables['trial_complete'] = True
+
+        if place:
+            nonlocal_variables['stack'].reset_sequence()
+            nonlocal_variables['stack'].next()
+        if check_z_height:
+            # Zero out the height because the trial is done.
+            # Note these lines must normally be after the
+            # logging of these variables is complete,
+            # but this is a special (hopefully rare) recovery scenario.
+            nonlocal_variables['stack_height'] = 0.0
+            nonlocal_variables['prev_stack_height'] = 0.0
+        else:
+            nonlocal_variables['stack_height'] = 1.0
+            nonlocal_variables['prev_stack_height'] = 1.0
+        num_problems_detected += 1
+        if num_problems_detected > 2:
+            # Try more drastic recovery methods the second time around
+            robot.restart_sim(connect=True)
+            robot.add_objects()
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -1616,6 +1651,8 @@ def main(args):
                             ' is below the allowed decline of ' + str(allowed_decline) +
                             ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) +
                             ', reloading the best model ' + str(snapshot_file))
+                        # sometimes performance declines because the simulator is in a physically impossible state, so move on to the next trial to be safe.
+                        sim_problem_end_trial()
 
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000:
@@ -1711,33 +1748,7 @@ def main(args):
             elif is_sim and int(time_elapsed) > timeout:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
-                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.check_sim()
-                if not robot.reposition_objects():
-                    # This can happen if objects are in impossible positions (NaN),
-                    # so set the variable to immediately and completely restart
-                    # the simulation below.
-                    num_problems_detected += 3
-                nonlocal_variables['trial_complete'] = True
-
-                if place:
-                    nonlocal_variables['stack'].reset_sequence()
-                    nonlocal_variables['stack'].next()
-                if check_z_height:
-                    # Zero out the height because the trial is done.
-                    # Note these lines must normally be after the
-                    # logging of these variables is complete,
-                    # but this is a special (hopefully rare) recovery scenario.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
-                else:
-                    nonlocal_variables['stack_height'] = 1.0
-                    nonlocal_variables['prev_stack_height'] = 1.0
-                num_problems_detected += 1
-                if num_problems_detected > 2:
-                    # Try more drastic recovery methods the second time around
-                    robot.restart_sim(connect=True)
-                    robot.add_objects()
+                sim_problem_end_trial(robot, workspace_limits, heightmap_resolution, logger, trainer, check_z_height)
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
