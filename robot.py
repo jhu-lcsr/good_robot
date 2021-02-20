@@ -651,7 +651,7 @@ class Robot(object):
 
         return obj_positions
 
-    def get_objects_in_scene(self, workspace_limits=None):
+    def get_objects_in_scene(self, workspace_limits=None, buffer_meters=0.0):
         """
         Function to iterate through all object positions and return number of objects within workspace_limits
         Returns:
@@ -662,7 +662,7 @@ class Robot(object):
             workspace_limits = self.workspace_limits
 
         # iterate through self.object_handles and check if in scene
-        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj)]
+        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj, workspace_limits=workspace_limits, buffer_meters=buffer_meters)]
 
     def get_obj_positions_and_orientations(self):
         if not self.is_sim:
