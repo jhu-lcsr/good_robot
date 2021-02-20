@@ -2,6 +2,7 @@
 
 import time
 import os
+import pdb 
 import signal
 import sys
 import random
@@ -242,6 +243,8 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
+    # (elias) added this to prevent an error in the print statement 
+    stack_place_dilation = None
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
@@ -1250,6 +1253,7 @@ def main(args):
                                                     task_type="rows",
                                                     augment_by_flipping=False,
                                                     augment_language = False,
+                                                    augment_by_rotating=False, 
                                                     leave_out_color=None,
                                                     batch_size=1,
                                                     max_seq_length=40,
@@ -1303,7 +1307,8 @@ def main(args):
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot) 
                 # TODO(elias) add depthmap 
-                pair = Pair.from_main_idxs(color_heightmap, depth_heightmap, json_data) 
+                pdb.set_trace() 
+                pair = Pair.from_main_idxs(color_heightmap, valid_depth_heightmap, json_data) 
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
             # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 
