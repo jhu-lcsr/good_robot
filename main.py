@@ -1298,7 +1298,8 @@ def main(args):
         if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10) or (actions_in_trial >= max_trial_actions):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
-                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
+                      ', the trial took ' + str(actions_in_trial) + ' vs a limit of ' + str(max_trial_actions) + ' actions, ' +
+                      'or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
