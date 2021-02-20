@@ -242,6 +242,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
+    stack_place_dilation = 0.00
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
