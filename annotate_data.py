@@ -30,6 +30,7 @@ class Pair:
         self.resolution = resolution 
         self.prev_state_image = None 
         self.next_state_image = None 
+        self.json_data = None 
 
     def show(self):
         fig,ax = plt.subplots(1)
@@ -59,6 +60,10 @@ class Pair:
             self.next_image = np.concatenate([next_image, next_depth], axis=-1)
 
         self.ratio = self.resolution / 224 
+
+        self.prev_state_image = np.tile(self.prev_state_image, (1,1,3))
+        self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA) 
+        self.prev_state_image = self.prev_state_image[:,:,0]
 
         # normalize location and width 
         self.w *= self.ratio 
@@ -113,6 +118,7 @@ class Pair:
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
         json_data = pair.read_json(grasp_json_path)
         src_color, tgt_color = pair.combine_json_data(json_data)
+        pair.json_data = json_data
         return pair 
 
     @classmethod
@@ -121,6 +127,7 @@ class Pair:
         prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
+        pair.json_data = json_data
         src_color, tgt_color = pair.infer_from_json_data(json_data) 
         return pair 
 
@@ -149,25 +156,31 @@ class Pair:
         return list(sorted(diff, key = lambda x: x[1]))[-1]
 
     def make_image(self, json_data):
-        state = np.zeros((224, 224, 1))
+        state = np.zeros((self.resolution, self.resolution, 1))
 
         def convert_to_loc(state):
             offset = [0.15, 0.0, 0.0]
             grid_dim = 14
             side_len = 0.035
             x_offset = 0.58
+            grid_len = grid_dim*side_len
             state[0] += x_offset 
             for i in range(len(state)):
                 state[i] = (state[i] * 2) / grid_len - offset[i]
-
-            state = (state + 1)/2 * 224
-            return state 
+            state = (state + 1)/2 * self.resolution
+            return state.astype(int)
 
         color_to_idx = {"red":1, "blue": 2, "yellow": 3, "green": 4}
         for color, location in json_data.items():
             idx = color_to_idx[color]
             loc = convert_to_loc(location)
-            state[loc[0], loc[1], :] = idx 
+            block_width = 15
+            for i in range(loc[0]-block_width, loc[0] + block_width):
+                for j in range(loc[1] - block_width, loc[1] + block_width):
+                    try:
+                        state[j, i, :] = idx 
+                    except IndexError:
+                        continue 
     
         return state 
 
@@ -404,7 +417,7 @@ def flip_pair(pair, axis):
     return new_pair 
 
 
-def get_pairs(data_home, is_sim = False):
+def get_pairs(data_home, resolution = 224, is_sim = False):
     image_home = data_home.joinpath("data/color-heightmaps")
     if is_sim: 
         json_home = data_home.joinpath("data/variables")
