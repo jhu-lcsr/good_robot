@@ -561,7 +561,7 @@ def main(args):
 
         insufficient_objs_in_scene = False
         # add check for num_obj in scene
-        if is_sim and task_type in ['row', 'unstack', 'vertical_square']:
+        if is_sim and task_type in ['row', 'vertical_square']:
             objs = robot.get_objects_in_scene()
             if len(objs) < nonlocal_variables['stack'].num_obj:
                 needed_to_reset = True
