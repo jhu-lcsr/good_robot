@@ -424,7 +424,7 @@ class Robot(object):
         """ Reposition the object to a specified position and orientation """
         object_handle = self.object_handles[index]
         # TODO(adit98) figure out significance of plane_handle, set to -1 for now
-        if self.task_type is not None and self.task_type == 'unstacking':
+        if self.task_type is not None and self.task_type == 'unstack':
             plane_handle=-1
         else:
             success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
@@ -526,7 +526,7 @@ class Robot(object):
         self.obj_positions = []
 
         # now reposition objects if we are unstacking
-        if self.task_type == 'unstacking':
+        if self.task_type == 'unstack':
             self.reposition_objects()
 
     def restart_sim(self, connect=False):
@@ -795,7 +795,7 @@ class Robot(object):
                 # time.sleep(1)
 
                 # if not unstacking, place all objects randomly
-                if self.task_type is None or self.task_type != 'unstacking':
+                if self.task_type is None or self.task_type != 'unstack':
                     for object_handle in self.object_handles:
                         # Drop object at random x,y location and random orientation in robot workspace
                         self.reposition_object_randomly(object_handle)

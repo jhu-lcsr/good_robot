@@ -149,7 +149,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
+    place_common_sense = common_sense and ((args.task_type is None) or ('unstack' not in args.task_type))
     print('main.py using common sense:', common_sense, 'using place common sense:', place_common_sense)
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
@@ -164,6 +164,11 @@ def main(args):
     use_demo = args.use_demo
     demo_path = args.demo_path
     task_type = args.task_type
+
+    # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
+    if 'unstack' in args.task_type:
+        args.task_type = 'unstack'
+        task_type = 'unstack'
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
