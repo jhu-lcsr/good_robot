@@ -1017,7 +1017,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     return im_mask, match_ind
 
 # TODO(adit98) implement this
-def compute_cc_dist(preds, example_actions):
+def compute_cc_dist(test_preds, demo_preds):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     """

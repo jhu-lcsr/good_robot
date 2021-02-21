@@ -763,10 +763,10 @@ def main(args):
                     for ind, d in enumerate(example_demos):
                         # get action embeddings from example demo
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
-
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
-                                    d.get_action(workspace_limits, action, task_progress, stack_trainer,
-                                            row_trainer, unstack_trainer, vertical_square_trainer)
+                                d.get_action(workspace_limits, action, task_progress, stack_trainer,
+                                        row_trainer, unstack_trainer, vertical_square_trainer, use_hist=args.depth_channels_history,
+                                        cycle_consistency=args.cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
                                     demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
@@ -845,6 +845,9 @@ def main(args):
                         if task_type == 'unstack':
                             task_progress = min(3, task_progress)
 
+                        # TODO(adit98) implement
+                        if args.cycle_consistency:
+                            raise NotImplementedError("Need to test if below line works with different array shape!!!")
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
                                 dtype=object).T
@@ -869,8 +872,13 @@ def main(args):
                             raise NotImplementedError(task_type + ' is not implemented.')
 
                         # select preds based on primitive action selected in demo (theta, y, x)
-                        correspondences, nonlocal_variables['best_pix_ind'] = \
-                                compute_demo_dist(preds, example_actions)
+                        if args.cycle_consistency:
+                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                                    compute_cc_dist(preds, example_actions)
+                        else:
+                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                                    compute_demo_dist(preds, example_actions)
+
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
 
                     else:
@@ -2316,6 +2324,8 @@ if __name__ == '__main__':
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
     parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
     parser.add_argument('--task_type', dest='task_type', type=str, default=None)
+    # TODO(adit98) clarify argument name?
+    parser.add_argument('--cycle_consistency', dest='cycle_consistency', action='store_true', default=False, help='Use cycle consistency for action matching')
 
     # TODO(zhe) Added command line argument to use the static language mask
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
