@@ -561,11 +561,14 @@ def main(args):
 
         insufficient_objs_in_scene = False
         # add check for num_obj in scene
-        if is_sim and task_type in ['row', 'vertical_square']:
-            objs = robot.get_objects_in_scene()
-            if len(objs) < nonlocal_variables['stack'].num_obj:
-                needed_to_reset = True
-                insufficient_objs_in_scene = True
+        if is_sim and task_type in ['row', 'vertical_square', 'unstack']:
+            if task_type == 'unstack' and is_testing:
+                pass
+            else:
+                objs = robot.get_objects_in_scene()
+                if len(objs) < nonlocal_variables['stack'].num_obj:
+                    needed_to_reset = True
+                    insufficient_objs_in_scene = True
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +

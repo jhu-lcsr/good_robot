@@ -921,14 +921,14 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     """
 
     # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
-    def cos_sim(pix_preds, best_pred):
+    def cos_sim(test_feat, demo_action_embed):
         """
         Helper function to compute cosine similarity.
         Arguments:
             test_feat: pixel-wise embeddings output by NN for test env
             demo_action_embed: embedding of demo action
         """
-        cos_sim = np.multiply(test_feat, demo_action_embed)
+        cos_sim = np.sum(np.multiply(test_feat, demo_action_embed), axis=1)
         norm_factor = np.linalg.norm(test_feat, axis=1) * np.linalg.norm(demo_action_embed)
         return (cos_sim / norm_factor)
 
