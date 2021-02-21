@@ -30,7 +30,7 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
-from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
+from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -88,6 +88,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                                                  prev_weight=prev_weight,
                                                  do_reconstruction=do_reconstruction,
                                                  do_regression=do_regression)
+
+        self.teleportation_metric = GoodRobotTransformerTeleportationMetric(block_size=block_size,
+                                                                            image_size = resolution,
+                                                                            patch_size = patch_size)
+
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -299,7 +304,6 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         # pred_ax = plt.subplot(gs[0], figsize=(6,6))
         pred_ax = ax[0,0]
-        pdb.set_trace() 
         xs = np.arange(0, self.resolution, 1)
         zs = np.arange(0, self.resolution, 1)
 
@@ -342,7 +346,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
         next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
         # block accuracy metric 
-        prev_block_acc = self.compute_block_accuracy(batch_instance["pairs"], prev_position)
+        tele_metric_data  = self.compute_teleportation_metric(batch_instance["pairs"], prev_position, next_position)
 
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -401,8 +405,9 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         return precision, recall, f1
 
     def compute_teleportation_metric(self, pairs, pred_pos, next_pos):
-        true_centers = [p.prev_location for p in pairs]
-        
+        for pair, ppos, npos in zip(pairs, pred_pos, next_pos): 
+            to_ret = self.teleportation_metric.get_metric(pair, ppos, npos)
+        return to_ret 
 
 
 
@@ -459,7 +464,7 @@ def main(args):
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
     depth = 1
-    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else "TransformerEncoder"
+    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else TransformerEncoder
     encoder_kwargs = dict(image_size = args.resolution,
                           patch_size = args.patch_size, 
                           language_embedder = embedder, 
