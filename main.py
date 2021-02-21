@@ -752,8 +752,7 @@ def main(args):
 
                     # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
                     if task_type == 'unstack':
-                        if task_progress > 3:
-                            task_progress = 3
+                        task_progress = min(3, task_progress)
 
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
@@ -841,6 +840,10 @@ def main(args):
                         # get parameters of current action to do dict lookup
                         task_progress = nonlocal_variables['stack_height']
                         action = nonlocal_variables['primitive_action']
+
+                        # clamp task_progress at 3 if task_type is unstack
+                        if task_type == 'unstack':
+                            task_progress = min(3, task_progress)
 
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
