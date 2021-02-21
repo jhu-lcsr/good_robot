@@ -749,6 +749,12 @@ def main(args):
 
                     # check if embeddings for demo for progress n and primitive action p_a already exists
                     task_progress = nonlocal_variables['stack_height']
+
+                    # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
+                    if task_type == 'unstack':
+                        if task_progress > 3:
+                            task_progress = 3
+
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
                         nonlocal_variables['example_actions_dict'][task_progress] = {}

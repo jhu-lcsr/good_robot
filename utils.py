@@ -968,7 +968,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
         # check if policy was supplied (entry will be [None, None] if it wasn't)
         if actions[0] is None:
             # if policy not supplied, insert pixel-wise array of inf distance
-            l2_dists.append(np.ones(mask_shape) * np.inf)
+            dists.append(np.ones(mask_shape) * np.inf)
             continue
 
         for action in actions:
