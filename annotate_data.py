@@ -61,9 +61,13 @@ class Pair:
 
         self.ratio = self.resolution / 224 
 
-        self.prev_state_image = np.tile(self.prev_state_image, (1,1,3))
-        self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA) 
-        self.prev_state_image = self.prev_state_image[:,:,0]
+        # causes all zeros 
+        if self.prev_state_image.shape[0] != self.resolution: 
+            self.prev_state_image = (np.tile(self.prev_state_image, (1,1,3))/4) * 255
+            self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_NEAREST) 
+            self.prev_state_image = (self.prev_state_image / 255) * 4
+            self.prev_state_image = self.prev_state_image[:,:,0].astype(int)
+            assert(np.sum(self.prev_state_image) > 0)
 
         # normalize location and width 
         self.w *= self.ratio 
@@ -122,14 +126,21 @@ class Pair:
         return pair 
 
     @classmethod
-    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json):
+    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json, stack_sequence):
         # TODO(elias) infer which block to move from interpolation here 
         prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
         pair.json_data = json_data
-        src_color, tgt_color = pair.infer_from_json_data(json_data) 
+        src_color, tgt_color = pair.infer_from_stacksequence(stack_sequence)  
         return pair 
+
+    def infer_from_stacksequence(self, stack_sequence):
+        src_color = stack_sequence.color_names[(stack_sequence.object_color_index) % stack_sequence.color_len)]
+        tgt_color = stack_sequence.color_names[stack_sequence.object_color_sequence[stack_sequence.object_color_index-1] % stack_sequence.color_len]
+        self.source_code = src_color[0]
+        self.target_code = tgt_color[0]
+        return src_color, tgt_color 
 
     def read_json(self, json_path):
         if type(json_path) == dict:
@@ -157,7 +168,6 @@ class Pair:
 
     def make_image(self, json_data):
         state = np.zeros((self.resolution, self.resolution, 1))
-
         def convert_to_loc(state):
             offset = [0.15, 0.0, 0.0]
             grid_dim = 14
@@ -181,7 +191,7 @@ class Pair:
                         state[j, i, :] = idx 
                     except IndexError:
                         continue 
-    
+
         return state 
 
 
@@ -241,14 +251,6 @@ class Pair:
         self.relation_code = "next_to"
 
         return min_grasp_color, min_place_color  
-
-    def infer_from_json_data(self, json_data):
-        # TODO(elias)
-        # hardcode for now 
-        self.source_code = "r"
-        self.target_code = 'b'
-        self.relation_code = "next_to"
-        return "red", "blue"
 
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"

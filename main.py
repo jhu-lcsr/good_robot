@@ -1303,7 +1303,11 @@ def main(args):
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot) 
                 # TODO(elias) add depthmap 
-                pair = Pair.from_main_idxs(color_heightmap, valid_depth_heightmap, json_data) 
+                pair = Pair.from_main_idxs(color_heightmap, 
+                                           valid_depth_heightmap, 
+                                           json_data, 
+                                           nonlocal_variables['stack']) 
+
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
             # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 

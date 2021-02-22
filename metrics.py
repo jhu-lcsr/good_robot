@@ -3,6 +3,7 @@ from torch.nn import functional as F
 import numpy as np 
 import math
 import pdb 
+import copy 
 
 np.random.seed(12) 
 torch.manual_seed(12) 
@@ -271,29 +272,34 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         row_values, row_indices = torch.max(pred_prev_image, dim=0)
         col_values, col_idx = torch.max(row_values, dim=0)
         row_idx = row_indices[col_idx]
-
         true_prev_image = pair.prev_state_image 
         pred_block_id = true_prev_image[row_idx, col_idx].item()  
         # might be no regions predicted 
         if pred_block_id == 0:
+            print(f"selecting block 1")
             pred_block_id = 1
         return pred_block_id, (row_idx, col_idx), pred_prev_image[row_idx, col_idx]
 
     def execute_move(self, pred_corner, pred_idx, json_data):
         # if pred_idx != true_idx, then true block doesn't move from previous location 
         pred_color = self.idx_to_color[int(pred_idx)]
+        json_data = copy.deepcopy(json_data) 
         json_data[pred_color] = pred_corner 
         return json_data 
 
-    def compute_distance(self, pred_block_loc, prev_block_id, pair):
+    def compute_distance(self, pred_block_loc, prev_block_id, pair, block_size):
         # execute the move on the previous state 
         pred_data = self.execute_move(pred_block_loc, prev_block_id, pair.json_data) 
         true_block_name = self.expand_names[pair.target_code]
         true_block_loc = self.convert_to_loc(pair.json_data[true_block_name]) 
         # get centers          
-        distance_pix = self.euclid.get_euclidean_distance(pred_block_loc, true_block_loc) 
+        true_block_loc = np.array(true_block_loc).astype(float) * self.image_size / 224
+        true_block_loc = true_block_loc.astype(int)
+        distance_pix = self.euclid.get_euclidean_distance(pred_block_loc, true_block_loc[0:2]) 
         # convert to distance in block_lengths 
-        distance_normalized = distance_pix / self.block_size
+
+        distance_normalized = distance_pix / block_size
+        print(f"pred_block_loc {pred_block_loc} true_block_loc {true_block_loc} distance {distance_normalized}")
         return distance_normalized, pred_block_loc, true_block_loc
 
     def convert_to_loc(self, state):
@@ -302,6 +308,7 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         side_len = 0.035
         x_offset = 0.58
         grid_len = grid_dim*side_len
+        state = np.array(state)
         state[0] += x_offset 
         for i in range(len(state)):
             state[i] = (state[i] * 2) / grid_len - offset[i]
@@ -318,9 +325,9 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         patch_center = (row_idx, col_idx)
         patch_lc  = (row_idx - int(self.block_size/2), col_idx - int(self.block_size/2))
         return patch_center, patch_lc 
-        
 
     def get_metric(self, pair, pred_prev_image, pred_next_patches): 
+        pair = copy.deepcopy(pair)
         pair.resolution = self.image_size
         pair.resize()
         pred_prev_image = pred_prev_image.detach().cpu() 
@@ -329,10 +336,15 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         prev_block_id, pred_idx, pred_value = self.select_prev_block(pair, pred_prev_image)
         # get the center of the most likely next location, to move the block to 
         pred_block_center, pred_block_corner = self.select_next_location(pred_next_patches) 
-        distance_normalized, pred_block_center, true_block_center = self.compute_distance(pred_block_corner, prev_block_id, pair)
+        # move to 224 space 
+        block_size = self.block_size 
+        distance_normalized, pred_block_center, true_block_center = self.compute_distance(pred_block_corner, prev_block_id, pair, block_size)
+        block_to_move = self.color_to_idx[self.expand_names[pair.target_code]]
+
+        print(f"pred_block {prev_block_id} block_id {block_to_move}")
         block_acc = 1 if block_to_move == prev_block_id else 0
         to_ret = {"distance": distance_normalized,
-                  "oracle_distance": distance_oracle_source,
+                  #"oracle_distance": distance_oracle_source,
                   "block_acc": block_acc, 
                   "pred_center": pred_block_center,
                   "true_center": true_block_center} 
