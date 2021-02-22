@@ -136,7 +136,7 @@ class Pair:
         return pair 
 
     def infer_from_stacksequence(self, stack_sequence):
-        src_color = stack_sequence.color_names[(stack_sequence.object_color_index) % stack_sequence.color_len)]
+        src_color = stack_sequence.color_names[((stack_sequence.object_color_index) % stack_sequence.color_len)]
         tgt_color = stack_sequence.color_names[stack_sequence.object_color_sequence[stack_sequence.object_color_index-1] % stack_sequence.color_len]
         self.source_code = src_color[0]
         self.target_code = tgt_color[0]
