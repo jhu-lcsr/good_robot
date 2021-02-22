@@ -2,6 +2,7 @@
 
 import time
 import os
+import pdb 
 import signal
 import sys
 import random
@@ -242,6 +243,7 @@ def main(args):
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
+    stack_place_dilation = 0.00
     if check_row:
         place_dilation = 0.05
     elif task_type is not None:
@@ -1250,6 +1252,7 @@ def main(args):
                                                     task_type="rows",
                                                     augment_by_flipping=False,
                                                     augment_language = False,
+                                                    augment_by_rotating=False, 
                                                     leave_out_color=None,
                                                     batch_size=1,
                                                     max_seq_length=40,
@@ -2331,7 +2334,7 @@ def ablation(args):
 
 if __name__ == '__main__':
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
-    matplotlib.use('Agg')
+    # matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')
