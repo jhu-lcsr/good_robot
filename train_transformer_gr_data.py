@@ -30,7 +30,7 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
-from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
+from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -89,6 +89,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                                                  do_reconstruction=do_reconstruction,
                                                  do_regression=do_regression)
 
+        self.teleportation_metric = GoodRobotTransformerTeleportationMetric(block_size=block_size,
+                                                                            image_size = resolution,
+                                                                            patch_size = patch_size)
+
+
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
         self.encoder.train() 
@@ -129,11 +134,16 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             score_dict = self.validate(dev_batch_instance, epoch, b, 0) 
             total_prev_acc += score_dict['prev_f1']
             total_next_acc += score_dict['next_f1']
+            total_block_acc += score_dict['block_acc']
+            total_tele_score += score_dict['tele_dist']
             total += 1
 
         mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
-        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}")
+        mean_block_acc = total_block_acc / total
+        mean_tele_score = total_tele_score / total
+
+        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block_acc {mean_block_acc * 100}, tele score: {mean_tele_score}")
         if self.score_type == "acc":
             return (mean_next_acc + mean_prev_acc)/2, -1.0
         else:
@@ -268,7 +278,14 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         return total_loss
 
-    def generate_debugging_image(self, true_img, true_loc, pred_data, out_path, caption):
+    def generate_debugging_image(self, 
+                                 true_img, 
+                                 true_loc, 
+                                 pred_data, 
+                                 out_path, 
+                                 caption = None,
+                                 pred_center = None,
+                                 true_center = None):
         caption = self.wrap_caption(caption)
         c = pred_data.shape[0]
 
@@ -299,7 +316,6 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         # pred_ax = plt.subplot(gs[0], figsize=(6,6))
         pred_ax = ax[0,0]
-        pdb.set_trace() 
         xs = np.arange(0, self.resolution, 1)
         zs = np.arange(0, self.resolution, 1)
 
@@ -325,6 +341,11 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             sq = matplotlib.patches.Rectangle((x,z), width = 1, height = 1, color = rgba)
             pred_ax.add_patch(sq)
 
+        # plot centers if availalbe 
+        if pred_center is not None and true_center is not None:
+            pred_ax.plot(*pred_center, marker = "D", color='0000')
+            pred_ax.plot(*true_center, marker = "X", color='0000')
+
         file_path =  f"{out_path}.png"
         print(f"saving to {file_path}") 
         plt.savefig(file_path) 
@@ -338,17 +359,13 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
-
-
-        if False: 
-            print(batch_instance["prev_pos_for_pred"][0,0,40:60,10:30,0].long()) 
-            print(torch.argmax(prev_position[0,:,40:60,10:30], dim = 0))
-
+        # f1 metric 
         prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
         next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
-
-        print(prev_p, prev_r, prev_f1)
-        print(next_p, next_r, next_f1)
+        # block accuracy metric 
+        tele_metric_data  = self.compute_teleportation_metric(batch_instance["pairs"], prev_position, next_position)
+        block_acc = tele_metric_data['block_acc']
+        tele_dist = tele_metric_data['distance']
 
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -364,7 +381,9 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                                              batch_instance['pairs'][i].next_location,
                                              next_position[i], 
                                              output_path.joinpath("next"),
-                                             caption = command) 
+                                             caption = command,
+                                             pred_center=tele_metric_data["pred_center"][i],
+                                             true_center = tele_metric_data["true_center"][i]) 
 
                 self.generate_debugging_image(prev_pos, 
                                               batch_instance['pairs'][i].prev_location,
@@ -384,7 +403,9 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                     pass
 
         return {"next_f1": next_f1, 
-                "prev_f1": prev_f1} 
+                "prev_f1": prev_f1,
+                "block_acc": block_acc,
+                "tele_dist": tele_dist} 
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
@@ -405,6 +426,18 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         recall = true_pos / (true_pos + false_neg + eps) 
         f1 = 2 * (precision * recall) / (precision + recall + eps) 
         return precision, recall, f1
+
+    def compute_teleportation_metric(self, pairs, pred_pos, next_pos):
+        avg_to_ret = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}
+        for pair, ppos, npos in zip(pairs, pred_pos, next_pos): 
+            res = self.teleportation_metric.get_metric(pair, ppos, npos)
+            for k in avg_to_ret.keys():
+                avg_to_ret[k].append(res[k])
+
+        for k in ["distance", "block_acc"]:
+            avg_to_ret[k] = np.mean(avg_to_ret[k])
+        return avg_to_ret 
+
 
 
 def main(args):
@@ -460,7 +493,7 @@ def main(args):
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
     depth = 1
-    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else "TransformerEncoder"
+    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else TransformerEncoder
     encoder_kwargs = dict(image_size = args.resolution,
                           patch_size = args.patch_size, 
                           language_embedder = embedder, 

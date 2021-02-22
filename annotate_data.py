@@ -28,6 +28,9 @@ class Pair:
         self.target_location = None 
         self.relation_code = None
         self.resolution = resolution 
+        self.prev_state_image = None 
+        self.next_state_image = None 
+        self.json_data = None 
 
     def show(self):
         fig,ax = plt.subplots(1)
@@ -57,6 +60,14 @@ class Pair:
             self.next_image = np.concatenate([next_image, next_depth], axis=-1)
 
         self.ratio = self.resolution / 224 
+
+        # causes all zeros 
+        if self.prev_state_image is not None and self.prev_state_image.shape[0] != self.resolution: 
+            self.prev_state_image = (np.tile(self.prev_state_image, (1,1,3))/4) * 255
+            self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_NEAREST) 
+            self.prev_state_image = (self.prev_state_image / 255) * 4
+            self.prev_state_image = self.prev_state_image[:,:,0].astype(int)
+            assert(np.sum(self.prev_state_image) > 0)
 
         # normalize location and width 
         self.w *= self.ratio 
@@ -107,24 +118,29 @@ class Pair:
     def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
         pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
         # annotate based on sim data 
-        # rules for row-making
         grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
-
         json_data = pair.read_json(grasp_json_path)
         src_color, tgt_color = pair.combine_json_data(json_data)
-
-        # TODO (elias) rules for stacking
+        pair.json_data = json_data
         return pair 
 
     @classmethod
-    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json):
+    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json, stack_sequence):
         # TODO(elias) infer which block to move from interpolation here 
         prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None) 
         json_data = pair.read_json(prev_json)
-        src_color, tgt_color = pair.infer_from_json_data(json_data) 
+        pair.json_data = json_data
+        src_color, tgt_color = pair.infer_from_stacksequence(stack_sequence)  
         return pair 
+
+    def infer_from_stacksequence(self, stack_sequence):
+        src_color = stack_sequence.color_names[((stack_sequence.object_color_index) % stack_sequence.color_len)]
+        tgt_color = stack_sequence.color_names[stack_sequence.object_color_sequence[stack_sequence.object_color_index-1] % stack_sequence.color_len]
+        self.source_code = src_color[0]
+        self.target_code = tgt_color[0]
+        return src_color, tgt_color 
 
     def read_json(self, json_path):
         if type(json_path) == dict:
@@ -141,9 +157,6 @@ class Pair:
         for color, coord in zip(colors, coords):
             # normalize location to resolution 
             coord = np.array(coord)
-            # coord += 1
-            # coord /= 2
-            # coord *= self.resolution 
             to_ret[color] = coord 
         return to_ret 
 
@@ -152,6 +165,35 @@ class Pair:
         diff = [(k, np.sum(x)) for k, x in diff.items()]
         # get block with greatest diff in location 
         return list(sorted(diff, key = lambda x: x[1]))[-1]
+
+    def make_image(self, json_data):
+        state = np.zeros((self.resolution, self.resolution, 1))
+        def convert_to_loc(state):
+            offset = [0.15, 0.0, 0.0]
+            grid_dim = 14
+            side_len = 0.035
+            x_offset = 0.58
+            grid_len = grid_dim*side_len
+            state[0] += x_offset 
+            for i in range(len(state)):
+                state[i] = (state[i] * 2) / grid_len - offset[i]
+            state = (state + 1)/2 * self.resolution
+            return state.astype(int)
+
+        color_to_idx = {"red":1, "blue": 2, "yellow": 3, "green": 4}
+        for color, location in json_data.items():
+            idx = color_to_idx[color]
+            loc = convert_to_loc(location)
+            block_width = 15
+            for i in range(loc[0]-block_width, loc[0] + block_width):
+                for j in range(loc[1] - block_width, loc[1] + block_width):
+                    try:
+                        state[j, i, :] = idx 
+                    except IndexError:
+                        continue 
+
+        return state 
+
 
     def combine_json_data(self, json_data, next_to=True, filter_left=False): 
         # first pass: all prompts say "next to" and reference the closest block to the left of the target location
@@ -175,6 +217,8 @@ class Pair:
                 loc[i] = (loc[i] + offset[i]) * grid_len/2
             loc[0] -= x_offset 
             return loc
+
+        self.prev_state_image = self.make_image(json_data)
 
         prev_loc = convert_loc(self.prev_location)
         next_loc = convert_loc(self.next_location) 
@@ -207,14 +251,6 @@ class Pair:
         self.relation_code = "next_to"
 
         return min_grasp_color, min_place_color  
-
-    def infer_from_json_data(self, json_data):
-        # TODO(elias)
-        # hardcode for now 
-        self.source_code = "r"
-        self.target_code = 'b'
-        self.relation_code = "next_to"
-        return "red", "blue"
 
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"
@@ -383,7 +419,7 @@ def flip_pair(pair, axis):
     return new_pair 
 
 
-def get_pairs(data_home, is_sim = False):
+def get_pairs(data_home, resolution = 224, is_sim = False):
     image_home = data_home.joinpath("data/color-heightmaps")
     if is_sim: 
         json_home = data_home.joinpath("data/variables")
