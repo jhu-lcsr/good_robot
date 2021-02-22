@@ -62,7 +62,7 @@ class Pair:
         self.ratio = self.resolution / 224 
 
         # causes all zeros 
-        if self.prev_state_image.shape[0] != self.resolution: 
+        if self.prev_state_image is not None and self.prev_state_image.shape[0] != self.resolution: 
             self.prev_state_image = (np.tile(self.prev_state_image, (1,1,3))/4) * 255
             self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_NEAREST) 
             self.prev_state_image = (self.prev_state_image / 255) * 4
