@@ -928,9 +928,9 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
             test_feat: pixel-wise embeddings output by NN for test env
             demo_action_embed: embedding of demo action
         """
+        # no need to normalize since we are only concerned with relative values
         cos_sim = np.sum(np.multiply(test_feat, demo_action_embed), axis=1)
-        norm_factor = np.linalg.norm(test_feat, axis=1) * np.linalg.norm(demo_action_embed)
-        return (cos_sim / norm_factor)
+        return (cos_sim)
 
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
@@ -944,7 +944,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
         # reshape and update list
         example_actions[i] = actions
 
-    # get mask from first available model (NOTE(adit98) see if we need a different strategy for this)
+    # get mask for each model
     masks = []
     mask_shape = None
     exit = True
@@ -965,36 +965,56 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     # calculate distance between example action embedding and preds for each policy and demo
     dists = []
     for ind, actions in enumerate(example_actions):
-        # check if policy was supplied (entry will be [None, None] if it wasn't)
-        if actions[0] is None:
+        for i, action in enumerate(actions):
             # if policy not supplied, insert pixel-wise array of inf distance
-            dists.append(np.ones(mask_shape) * np.inf)
-            continue
-
-        for action in actions:
             if metric == 'l2':
+                if action is None:
+                    dists.append(np.ones(mask_shape) * np.inf)
+                    continue
+
                 # calculate pixel-wise l2 distance (16x224x224)
                 dist = np.sum(np.square(action - preds[ind]), axis=1)
                 invert = True
+
             elif metric == 'cos_sim':
+                if action is None:
+                    dists.append(np.ones(mask_shape) * np.NINF)
+                    continue
+
                 dist = cos_sim(preds[ind], action)
+                #print('Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
+                #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
                 invert = False
+
             # TODO(adit98) UMAP distance?
             else:
                 raise NotImplementedError
 
-            # set all masked spaces to have max l2 distance
-            # select appropriate mask from list of masks
-            dist[masks[ind]] = np.max(dist) * 1.1
+            if invert:
+                # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
+                dist[masks[ind]] = np.max(dist) * 1.1
 
-            # append to l2_dists list
+            else:
+                # set all masked spaces to have min similarity (select appropriate mask from list of masks)
+                dist[masks[ind]] = np.min(dist) * 0.9
+
+            #print('Post-Mask | Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
+            #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
+
+            # append to dists list
             dists.append(dist)
 
     # stack pixel-wise distance array per policy (4x16x224x224)
     dists = np.stack(dists)
 
-    # find overall minimum distance across all policies and get index
-    match_ind = np.unravel_index(np.argmin(dists), dists.shape)
+    if invert:
+        # find overall minimum distance across all policies and get index
+        match_ind = np.unravel_index(np.argmin(dists), dists.shape)
+    else:
+        # find overall maximum similarity across all policies and get index
+        match_ind = np.unravel_index(np.argmax(dists), dists.shape)
+
+    #print("Selected match_ind:", match_ind)
 
     # select distance array for policy which contained minimum distance index
     dist = dists[match_ind[0]]
