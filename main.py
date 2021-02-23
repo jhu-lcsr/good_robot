@@ -164,6 +164,9 @@ def main(args):
     use_demo = args.use_demo
     demo_path = args.demo_path
     task_type = args.task_type
+    primitive_distance_method = args.primitive_distance_method
+    cycle_consistency = args.cycle_consistency
+    depth_channels_history = args.depth_channels_history
 
     # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
     if 'unstack' in args.task_type:
@@ -768,8 +771,8 @@ def main(args):
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
                                 d.get_action(workspace_limits, action, task_progress, stack_trainer,
-                                        row_trainer, unstack_trainer, vertical_square_trainer, use_hist=args.depth_channels_history,
-                                        cycle_consistency=args.cycle_consistency)
+                                        row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
+                                        cycle_consistency=cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
                                     demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
@@ -849,7 +852,7 @@ def main(args):
                             task_progress = min(3, task_progress)
 
                         # TODO(adit98) implement
-                        if args.cycle_consistency:
+                        if cycle_consistency:
                             raise NotImplementedError("Need to test if below line works with different array shape!!!")
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
@@ -875,12 +878,12 @@ def main(args):
                             raise NotImplementedError(task_type + ' is not implemented.')
 
                         # select preds based on primitive action selected in demo (theta, y, x)
-                        if args.cycle_consistency:
+                        if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
-                                    compute_cc_dist(preds, example_actions)
+                                    compute_cc_dist(preds, example_actions, metric=primitive_distance_method)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
-                                    compute_demo_dist(preds, example_actions)
+                                    compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
 
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
 
@@ -1311,7 +1314,7 @@ def main(args):
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
+            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=depth_channels_history)
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -2034,7 +2037,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
          sample_change_detected, sample_push_predictions, sample_grasp_predictions,
          next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
          exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
-         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, depth_channels_history=args.depth_channels_history)
+         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, depth_channels_history=depth_channels_history)
 
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
@@ -2327,6 +2330,7 @@ if __name__ == '__main__':
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
     parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
     parser.add_argument('--task_type', dest='task_type', type=str, default=None)
+    parser.add_argument('--primitive_distance_method', dest='primitive_distance_method', type=str, default='l2')
     # TODO(adit98) clarify argument name?
     parser.add_argument('--cycle_consistency', dest='cycle_consistency', action='store_true', default=False, help='Use cycle consistency for action matching')
 

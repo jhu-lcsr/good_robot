@@ -930,7 +930,8 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
         """
         # no need to normalize since we are only concerned with relative values
         cos_sim = np.sum(np.multiply(test_feat, demo_action_embed), axis=1)
-        return (cos_sim)
+        norm_factor = np.linalg.norm(test_feat, axis=1) + 1e-4
+        return (cos_sim / norm_factor)
 
     # reshape each example_action to 1 x 64 x 1 x 1
     for i in range(len(example_actions)):
