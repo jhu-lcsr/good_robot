@@ -61,7 +61,7 @@ class Pair:
 
         self.ratio = self.resolution / 224 
 
-        # causes all zeros 
+        # don't double-resize 
         if self.prev_state_image is not None and self.prev_state_image.shape[0] != self.resolution: 
             self.prev_state_image = (np.tile(self.prev_state_image, (1,1,3))/4) * 255
             self.prev_state_image = cv2.resize(self.prev_state_image, (self.resolution,self.resolution), interpolation = cv2.INTER_NEAREST) 
@@ -69,16 +69,17 @@ class Pair:
             self.prev_state_image = self.prev_state_image[:,:,0].astype(int)
             assert(np.sum(self.prev_state_image) > 0)
 
+            if self.prev_location is not None: 
+                self.prev_location = self.prev_location.astype(float).copy() * self.ratio
+                self.prev_location = self.prev_location.astype(int)
+            if self.next_location is not None: 
+                self.next_location = self.next_location.astype(float).copy() * self.ratio
+                self.next_location = self.next_location.astype(int)
+
         # normalize location and width 
         self.w *= self.ratio 
         self.w = int(self.w)
         
-        if self.prev_location is not None: 
-            self.prev_location = self.prev_location.astype(float).copy() * self.ratio
-            self.prev_location = self.prev_location.astype(int)
-        if self.next_location is not None: 
-            self.next_location = self.next_location.astype(float).copy() * self.ratio
-            self.next_location = self.next_location.astype(int)
 
     def get_mask(self, location):
         w, h, __ = self.prev_image.shape
@@ -180,7 +181,7 @@ class Pair:
             state = (state + 1)/2 * self.resolution
             return state.astype(int)
 
-        color_to_idx = {"red":1, "blue": 2, "yellow": 3, "green": 4}
+        color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4} 
         for color, location in json_data.items():
             idx = color_to_idx[color]
             loc = convert_to_loc(location)
@@ -208,7 +209,7 @@ class Pair:
         # min_grasp_color = self.get_moved_block(prev_json_data, next_json_data) 
         def convert_loc(loc):
             loc = ((loc / 224) * 2) - 1
-            offset = [0.15, 0.0]
+            offset = [0.15, 0.0, 0.0]
             grid_dim = 14
             side_len = 0.035
             x_offset = 0.58
@@ -218,14 +219,31 @@ class Pair:
             loc[0] -= x_offset 
             return loc
 
+        def convert_to_loc(state):
+            offset = [0.15, 0.0, 0.0]
+            grid_dim = 14
+            side_len = 0.035
+            x_offset = 0.58
+            grid_len = grid_dim*side_len
+            state[0] += x_offset 
+            for i in range(len(state)):
+                state[i] = (state[i] * 2) / grid_len - offset[i]
+            state = (state + 1)/2 * 224
+            return state.astype(int)
+
+        assert(np.sum(convert_loc(convert_to_loc(np.array([-0.43000549,  0.08394134,  0.02593102]))) - np.array([-0.43000549,  0.08394134,  0.02593102])) < 0.01)
+        json_data_new = copy.deepcopy(json_data)
         self.prev_state_image = self.make_image(json_data)
 
-        prev_loc = convert_loc(self.prev_location)
-        next_loc = convert_loc(self.next_location) 
-        grasp_dists = [(x[0], euclid_dist(prev_loc, x[1])) for x in json_data.items()]
+        #prev_loc = convert_loc(self.prev_location)
+        #next_loc = convert_loc(self.next_location) 
+
+        json_data_new = {k:convert_to_loc(v)[0:2] for k, v in json_data_new.items() }
+
+        grasp_dists = [(x[0], euclid_dist(self.prev_location, x[1])) for x in json_data_new.items()]
         min_grasp_color = list(sorted(grasp_dists, key = lambda x:x[1]))[0][0]
 
-        other_blocks = [x for x in json_data.items() if x[0] != min_grasp_color]
+        other_blocks = [x for x in json_data_new.items() if x[0] != min_grasp_color]
 
         # filter down to blocks that are to the left of place index 
         # x must be < 
@@ -239,7 +257,7 @@ class Pair:
             remaining_blocks = other_blocks
 
         # find block closest to place index 
-        place_dists = [(x[0], euclid_dist(next_loc, x[1])) for x in remaining_blocks]
+        place_dists = [(x[0], euclid_dist(self.next_location, x[1])) for x in remaining_blocks]
         min_place_color = list(sorted(place_dists, key = lambda x:x[1]))[0][0]
         # get relation between place location and place block 
         #place_landmark_pos = json_data[min_place_color]
@@ -416,6 +434,7 @@ def flip_pair(pair, axis):
     new_pair.next_image = flip_image(new_pair.next_image)
     new_pair.prev_location = flip_coords(new_pair.prev_location)
     new_pair.next_location = flip_coords(new_pair.next_location)
+    new_pair.prev_state_image = flip_image(new_pair.prev_state_image).reshape(224, 224, 1)
     return new_pair 
 
 

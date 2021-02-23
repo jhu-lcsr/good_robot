@@ -343,8 +343,15 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         # plot centers if availalbe 
         if pred_center is not None and true_center is not None:
-            pred_ax.plot(*pred_center, marker = "D", color='0000')
-            pred_ax.plot(*true_center, marker = "X", color='0000')
+
+            true_center = true_center[0:2]
+            pred_x, pred_y = pred_center 
+            pred_x, pred_y = pred_y, self.resolution - pred_x 
+            true_x, true_y = true_center 
+            true_x, true_y = true_x, self.resolution - true_y 
+
+            pred_ax.plot(pred_x, pred_y, marker = "D", color='0000')
+            pred_ax.plot(true_x, true_y, marker = "X", color='0000')
 
         file_path =  f"{out_path}.png"
         print(f"saving to {file_path}") 
@@ -363,9 +370,18 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
         next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
         # block accuracy metric 
-        tele_metric_data  = self.compute_teleportation_metric(batch_instance["pairs"], prev_position, next_position)
-        block_acc = tele_metric_data['block_acc']
-        tele_dist = tele_metric_data['distance']
+        # looks like there's some shuffling going on here 
+        tele_metric_data = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}
+        
+        for i in range(outputs['next_position'].shape[0]):
+            single_tele_dict = self.compute_teleportation_metric(batch_instance["pairs"][i], prev_position[i].detach().clone(), next_position[i].detach().clone())
+            tele_metric_data['distance'].append(single_tele_dict['distance'])
+            tele_metric_data['block_acc'].append(single_tele_dict['block_acc'])
+            tele_metric_data['pred_center'].append(single_tele_dict['pred_center'])
+            tele_metric_data['true_center'].append(single_tele_dict['true_center'])
+
+        block_acc = np.mean(tele_metric_data['block_acc'])
+        tele_dist = np.mean(tele_metric_data['distance'])
 
         if epoch_num > self.generate_after_n: 
             for i in range(outputs["next_position"].shape[0]):
@@ -376,14 +392,13 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                 command = " ".join(command) 
                 next_pos = batch_instance["next_pos_for_acc"][i]
                 prev_pos = batch_instance["prev_pos_for_acc"][i]
-                 
                 self.generate_debugging_image(next_pos,
                                              batch_instance['pairs'][i].next_location,
                                              next_position[i], 
                                              output_path.joinpath("next"),
                                              caption = command,
                                              pred_center=tele_metric_data["pred_center"][i],
-                                             true_center = tele_metric_data["true_center"][i]) 
+                                             true_center = batch_instance['pairs'][i].next_location) 
 
                 self.generate_debugging_image(prev_pos, 
                                               batch_instance['pairs'][i].prev_location,
@@ -427,18 +442,9 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         f1 = 2 * (precision * recall) / (precision + recall + eps) 
         return precision, recall, f1
 
-    def compute_teleportation_metric(self, pairs, pred_pos, next_pos):
-        avg_to_ret = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}
-        for pair, ppos, npos in zip(pairs, pred_pos, next_pos): 
-            res = self.teleportation_metric.get_metric(pair, ppos, npos)
-            for k in avg_to_ret.keys():
-                avg_to_ret[k].append(res[k])
-
-        for k in ["distance", "block_acc"]:
-            avg_to_ret[k] = np.mean(avg_to_ret[k])
-        return avg_to_ret 
-
-
+    def compute_teleportation_metric(self, pairs,  pred_pos, next_pos):
+        res = self.teleportation_metric.get_metric(pairs, pred_pos, next_pos)
+        return res
 
 def main(args):
     device = "cpu"
