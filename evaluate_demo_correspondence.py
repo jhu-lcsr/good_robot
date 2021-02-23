@@ -200,6 +200,8 @@ if __name__ == '__main__':
 
             print("Evaluating l2 distance for stack height:", k, "| Action:", action)
 
+            breakpoint()
+
             # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
             example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
 

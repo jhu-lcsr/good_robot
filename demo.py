@@ -202,7 +202,8 @@ class Demonstration():
 
         # otherwise, return the entire 16x224x224 embedding space (only for selected primitive action)
         else:
-            return stack_feat, row_feat, unstack_feat, vertical_square_feat, ACTION_TO_ID[primitive_action]
+            action_ind = (best_rot_ind, best_action_xy[1], best_action_xy[0])
+            return (row_feat, action_ind), (stack_feat, action_ind), (unstack_feat, action_ind), (vertical_square_feat, action_ind), ACTION_TO_ID[primitive_action]
 
 def load_all_demos(demo_path, check_z_height, task_type):
     """
