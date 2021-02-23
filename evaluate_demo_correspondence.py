@@ -5,7 +5,7 @@ import argparse
 import cv2
 import torch
 from collections import OrderedDict
-from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis
+from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, compute_cc_dist
 from trainer import Trainer
 from demo import Demonstration, load_all_demos
 
@@ -117,7 +117,8 @@ if __name__ == '__main__':
                     example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _, demo_action_ind = \
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
-                                    use_hist=args.depth_channels_history, demo_mask=demo_mask, cycle_consistency=args.cycle_consistency)
+                                    use_hist=args.depth_channels_history, demo_mask=args.cycle_consistency,
+                                    cycle_consistency=args.cycle_consistency)
                     example_actions_dict[k][action][ind] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square, demo_action_ind]
 
@@ -205,7 +206,7 @@ if __name__ == '__main__':
             example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
 
             # extract demo action inds
-            demo_action_inds = example_actions[-1].to_list()
+            demo_action_inds = example_actions[-1].tolist()
 
             # store preds we want to use (after leave one out) in preds, and get relevant example actions
             # order of example actions is row, stack, unstack, vertical square

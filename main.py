@@ -20,7 +20,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
-from utils import compute_demo_dist
+from utils import compute_demo_dist, compute_cc_dist
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
 from demo import Demonstration, load_all_demos
@@ -772,7 +772,7 @@ def main(args):
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id, demo_action_ind = \
                                 d.get_action(workspace_limits, action, task_progress, stack_trainer,
                                         row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
-                                        cycle_consistency=cycle_consistency, demo_mask=False)
+                                        cycle_consistency=cycle_consistency, demo_mask=cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
                                     demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
@@ -851,17 +851,17 @@ def main(args):
                         if task_type == 'unstack':
                             task_progress = min(3, task_progress)
 
-                        # TODO(adit98) implement
-                        if cycle_consistency:
-                            raise NotImplementedError("Need to test if below line works with different array shape!!!")
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
                                 dtype=object).T
 
+                        # extract demo action inds
+                        demo_action_inds = example_actions[-1].tolist()
+
                         # construct preds and example_actions based on task type ("Leave One Out")
                         if task_type == 'row':
                             preds = preds[1:]
-                            example_actions = example_actions[1:].tolist()
+                            example_actions = example_actions[1:-1].tolist()
                         elif task_type == 'stack':
                             inds = [0, 2, 3]
                             preds = [preds[i] for i in inds]
@@ -880,7 +880,8 @@ def main(args):
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
-                                    compute_cc_dist(preds, example_actions, metric=primitive_distance_method)
+                                    compute_cc_dist(preds, example_actions, demo_action_inds=demo_action_inds,
+                                            metric=primitive_distance_method)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)

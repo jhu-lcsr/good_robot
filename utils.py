@@ -1037,7 +1037,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
 
     return im_mask, match_ind
 
-def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap, metric='l2'):
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2'):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     Arguments:
@@ -1073,7 +1073,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
     for ind, embeddings in enumerate(example_actions):
         for i, embedding in enumerate(embeddings):
             # get demo action (ind represents policy, i represents demo num)
-            demo_action = demo_action_inds[ind][i]
+            demo_action = np.array(demo_action_inds[i])
 
             # if policy not supplied, insert pixel-wise array of inf distance
             if metric == 'l2':
@@ -1083,22 +1083,25 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                     continue
 
                 # get embedding for best action
-                action_embedding = embedding[demo_action]
+                action_embedding = embedding[demo_action[0], :, demo_action[1], demo_action[2]]
 
                 # calculate pixel-wise l2 distance (16x224x224)
-                right_dist = np.sum(np.square(action_embedding - preds[ind]), axis=1)
+                right_dist = np.sum(np.square(np.expand_dims(action_embedding,
+                    (0, 2, 3)) - preds[ind]), axis=1)
 
                 # get embedding at best match (right_match)
-                right_match = preds[ind][np.unravel_index(np.argmin(right_dist), right_dist.shape)]
+                match_ind = np.unravel_index(np.argmin(right_dist), right_dist.shape)
+                right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
 
                 # now rematch this with entire demo_embedding array
-                left_dist = np.sum(np.square(embedding - right_match), axis=1)
+                left_dist = np.sum(np.square(embedding - np.expand_dims(right_match,
+                    (0, 2, 3))), axis=1)
                 rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
 
                 # TODO(adit98) dealing with rotation?
                 # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
                 # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
-                cc_dist = np.sum(np.square(match_ind[1:] - rematch_ind[1:]))
+                cc_dist = np.sum(np.square(np.array(match_ind[1:]) - np.array(rematch_ind[1:])))
                 match_map = right_dist
 
             elif metric == 'cos_sim':
@@ -1108,16 +1111,17 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                     continue
 
                 # get embedding for best action
-                action_embedding = embedding[demo_action]
+                action_embedding = embedding[demo_action[0], :, demo_action[1], demo_action[2]]
 
                 # calculate pixel-wise l2 distance (16x224x224)
-                right_sim = cos_sim(preds[ind], action_embedding)
+                right_sim = cos_sim(preds[ind], np.expand_dims(action_embedding, (0, 2, 3)))
 
                 # get embedding at best match (right_match)
-                right_match = preds[ind][np.unravel_index(np.argmax(right_sim), right_sim.shape)]
+                match_ind = np.unravel_index(np.argmin(right_sim), right_sim.shape)
+                right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
 
                 # now rematch this with entire demo_embedding array
-                left_sim = cos_sim(embedding, right_match)
+                left_sim = cos_sim(embedding, np.expand_dims(right_match, (0, 2, 3)))
                 rematch_ind = np.unravel_index(np.argmax(left_sim), left_sim.shape)
 
                 # TODO(adit98) dealing with rotation?
