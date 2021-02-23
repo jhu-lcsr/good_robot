@@ -2038,7 +2038,7 @@ def experience_replay(method, prev_primitive_action, prev_reward_value, trainer,
          sample_change_detected, sample_push_predictions, sample_grasp_predictions,
          next_sample_color_heightmap, next_sample_depth_heightmap, sample_color_success,
          exp_goal_condition, sample_place_predictions, sample_place_success, sample_color_heightmap,
-         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, depth_channels_history=depth_channels_history)
+         sample_depth_heightmap] = trainer.load_sample(sample_iteration, logger, depth_channels_history=args.depth_channels_history)
 
         sample_primitive_action = ID_TO_ACTION[sample_primitive_action_id]
         print('Experience replay %d: history timestep index %d, action: %s, surprise value: %f' % (nonlocal_variables['replay_iteration'], sample_iteration, str(sample_primitive_action), sample_surprise_values[sorted_surprise_ind[rand_sample_ind]]))
