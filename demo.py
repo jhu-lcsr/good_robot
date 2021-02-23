@@ -198,12 +198,12 @@ class Demonstration():
         # if we aren't using cycle consistency, return best action's embedding
         if not cycle_consistency:
             # return best action for each model, primitive_action
-            return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
+            return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action], None
 
         # otherwise, return the entire 16x224x224 embedding space (only for selected primitive action)
         else:
             action_ind = (best_rot_ind, best_action_xy[1], best_action_xy[0])
-            return (row_feat, action_ind), (stack_feat, action_ind), (unstack_feat, action_ind), (vertical_square_feat, action_ind), ACTION_TO_ID[primitive_action]
+            return row_feat, stack_feat, unstack_feat, vertical_square_feat, ACTION_TO_ID[primitive_action], action_ind
 
 def load_all_demos(demo_path, check_z_height, task_type):
     """

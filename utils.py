@@ -1037,12 +1037,15 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
 
     return im_mask, match_ind
 
-def compute_cc_dist(preds, example_actions, metric='l2'):
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap, metric='l2'):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     Arguments:
-        preds: 16x64x224x224 test env features
-        example_actions: tuple (16x64x224x224 demo features, demo action ind)
+        preds: 16x64x224x224 test env features for each policy
+        example_actions: list of 16x64x224x224 features for each policy and demo
+        demo_action_inds: indices of executed action in each demo D * (theta, y, x)
+        valid_depth_heightmap: heightmap of test scene
+        metric: primitive distance function to use for computing matches (defaults to l2 distance)
     """
     # get mask for each model
     masks = []
@@ -1066,79 +1069,100 @@ def compute_cc_dist(preds, example_actions, metric='l2'):
     # also compute rematch from test space to demo space, then find xyz distance between demo action and rematch
     # this value represents the cycle consistency distance, which we will append to the dists array in addition
     # to the distance between each test pixel embedding and the optimal demo embedding
-    dists = []
-    for ind, actions in enumerate(example_actions):
-        for i, action in enumerate(actions):
+    cc_dists = []
+    for ind, embeddings in enumerate(example_actions):
+        for i, embedding in enumerate(embeddings):
+            # get demo action (ind represents policy, i represents demo num)
+            demo_action = demo_action_inds[ind][i]
+
             # if policy not supplied, insert pixel-wise array of inf distance
             if metric == 'l2':
-                if action is None:
-                    dists.append((np.ones(mask_shape) * np.inf, np.inf))
+                invert = True
+                if embedding is None:
+                    cc_dists.append((np.ones(mask_shape) * np.inf, np.inf))
                     continue
+
+                # get embedding for best action
+                action_embedding = embedding[demo_action]
 
                 # calculate pixel-wise l2 distance (16x224x224)
-                dist = np.sum(np.square(action - preds[ind]), axis=1)
-                invert = True
+                right_dist = np.sum(np.square(action_embedding - preds[ind]), axis=1)
+
+                # get embedding at best match (right_match)
+                right_match = preds[ind][np.unravel_index(np.argmin(right_dist), right_dist.shape)]
+
+                # now rematch this with entire demo_embedding array
+                left_dist = np.sum(np.square(embedding - right_match), axis=1)
+                rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
+
+                # TODO(adit98) dealing with rotation?
+                # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
+                # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
+                cc_dist = np.sum(np.square(match_ind[1:] - rematch_ind[1:]))
+                match_map = right_dist
 
             elif metric == 'cos_sim':
-                if action is None:
-                    dists.append((np.ones(mask_shape) * np.NINF, np.NINF))
+                invert = False
+                if embedding is None:
+                    cc_dists.append((np.ones(mask_shape) * np.NINF, np.NINF))
                     continue
 
-                dist = cos_sim(preds[ind], action)
-                #print('Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
-                #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
-                invert = False
+                # get embedding for best action
+                action_embedding = embedding[demo_action]
+
+                # calculate pixel-wise l2 distance (16x224x224)
+                right_sim = cos_sim(preds[ind], action_embedding)
+
+                # get embedding at best match (right_match)
+                right_match = preds[ind][np.unravel_index(np.argmax(right_sim), right_sim.shape)]
+
+                # now rematch this with entire demo_embedding array
+                left_sim = cos_sim(embedding, right_match)
+                rematch_ind = np.unravel_index(np.argmax(left_sim), left_sim.shape)
+
+                # TODO(adit98) dealing with rotation?
+                # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
+                #primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
+                # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
+                cc_dist = np.sum(np.square(match_ind[1:] - rematch_ind[1:]))
+                match_map = right_sim
 
             # TODO(adit98) UMAP distance?
             else:
                 raise NotImplementedError
 
+            # mask invalid locations
             if invert:
                 # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
-                dist[masks[ind]] = np.max(dist) * 1.1
-
-                # isolate best match embedding
-                match_ind = np.unravel_index(np.argmin(dist), dist.shape)
-                test_match = preds[ind]
+                match_map[masks[ind]] = np.max(match_map) * 1.1
 
             else:
                 # set all masked spaces to have min similarity (select appropriate mask from list of masks)
-                dist[masks[ind]] = np.min(dist) * 0.9
+                match_map[masks[ind]] = np.min(match_map) * 0.9
 
-            #print('Post-Mask | Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
-            #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
+            # append (match_map, cycle consistency distance) pair to list of cc distances
+            cc_dists.append((match_map, cc_dist))
 
-            # append to dists list
-            dists.append(dist)
-
-    # stack pixel-wise distance array per policy (4x16x224x224)
-    dists = np.stack(dists)
+    # select match_map with minimum cycle consistency distance
+    best_match_map = cc_dists[np.argmin([x[1] for x in cc_dists])][0]
 
     if invert:
         # find overall minimum distance across all policies and get index
-        match_ind = np.unravel_index(np.argmin(dists), dists.shape)
+        match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
     else:
         # find overall maximum similarity across all policies and get index
-        match_ind = np.unravel_index(np.argmax(dists), dists.shape)
+        match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
 
-    #print("Selected match_ind:", match_ind)
+    # make best_match_map >=0 and max_normalize
+    best_match_map = best_match_map - np.min(best_match_map)
+    best_match_map = best_match_map / np.max(best_match_map)
 
-    # select distance array for policy which contained minimum distance index
-    dist = dists[match_ind[0]]
-
-    # discard first dimension of match_ind to get it in the form (theta, y, x)
-    match_ind = match_ind[1:]
-
-    # make dist >=0 and max_normalize
-    dist = dist - np.min(dist)
-    dist = dist / np.max(dist)
-
-    # if our distance metric returns high values for values that are far apart, we need to invert (for viz)
+    # if our best_match_mapance metric returns high values for values that are far apart, we need to invert (for viz)
     if invert:
-        # invert values of dist so that large values indicate correspondence
-        im_mask = 1 - dist
+        # invert values of best_match_map so that large values indicate correspondence
+        im_mask = 1 - best_match_map
 
     else:
-        im_mask = dist
+        im_mask = best_match_map
 
     return im_mask, match_ind

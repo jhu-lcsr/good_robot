@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--vertical_square_snapshot_file', default=None, help='snapshot file to load for vertical_square model')
     parser.add_argument('-c', '--cpu', action='store_true', default=False, help='force cpu')
     parser.add_argument('-b', '--blend_ratio', default=0.5, type=float, help='how much to weight background vs similarity heatmap')
+    parser.add_argument('--cycle_consistency', default=False, action='store_true', help='use cycle consistency to get matching action in demo')
     parser.add_argument('--depth_channels_history', default=False, action='store_true', help='use depth channel history when passing frames to model?')
     parser.add_argument('--viz', dest='save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
 
@@ -113,12 +114,12 @@ if __name__ == '__main__':
             for ind, d in enumerate(example_demos):
                 # get action embeddings from example demo
                 if ind not in example_actions_dict[k][action]:
-                    example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _ = \
+                    example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _, demo_action_ind = \
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
-                                    use_hist=args.depth_channels_history, demo_mask=demo_mask)
+                                    use_hist=args.depth_channels_history, demo_mask=demo_mask, cycle_consistency=args.cycle_consistency)
                     example_actions_dict[k][action][ind] = [example_action_row, example_action_stack,
-                            example_action_unstack, example_action_vertical_square]
+                            example_action_unstack, example_action_vertical_square, demo_action_ind]
 
             if action == 'grasp':
                 im_color, im_depth = imitation_demo.get_heightmaps(action,
@@ -198,18 +199,19 @@ if __name__ == '__main__':
                 if vertical_square_trainer is not None:
                     vertical_square_preds = vertical_square_place
 
-            print("Evaluating l2 distance for stack height:", k, "| Action:", action)
-
-            breakpoint()
+            print("Evaluating distance for stack height:", k, "| Action:", action)
 
             # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
             example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
+
+            # extract demo action inds
+            demo_action_inds = example_actions[-1].to_list()
 
             # store preds we want to use (after leave one out) in preds, and get relevant example actions
             # order of example actions is row, stack, unstack, vertical square
             if args.task_type == 'row':
                 preds = [stack_preds, unstack_preds, vertical_square_preds]
-                example_actions = example_actions[1:].tolist()
+                example_actions = example_actions[1:-1].tolist()
             elif args.task_type == 'stack':
                 preds = [row_preds, unstack_preds, vertical_square_preds]
                 example_actions = example_actions[[0, 2, 3]].tolist()
@@ -222,8 +224,13 @@ if __name__ == '__main__':
             else:
                 raise NotImplementedError(args.task_type + ' is not implemented.')
 
-            # evaluate l2 distance based action mask - leave one out is above
-            im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions, metric=args.metric)
+            if not args.cycle_consistency:
+                # evaluate distance based action mask - leave one out is above
+                im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions, metric=args.metric)
+            else:
+                # evaluate distance based action mask with cycle consistency
+                im_mask, match_ind = compute_cc_dist(preds=preds, example_actions=example_actions,
+                        demo_action_inds=demo_action_inds, metric=args.metric)
 
             if args.save_visualizations:
                 # fix dynamic range of im_depth
