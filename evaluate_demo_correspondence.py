@@ -117,7 +117,7 @@ if __name__ == '__main__':
                     example_action_row, example_action_stack, example_action_unstack, example_action_vertical_square, _, demo_action_ind = \
                             d.get_action(workspace_limits, action, k, stack_trainer=stack_trainer, row_trainer=row_trainer,
                                     unstack_trainer=unstack_trainer, vertical_square_trainer=vertical_square_trainer,
-                                    use_hist=args.depth_channels_history, demo_mask=args.cycle_consistency,
+                                    use_hist=args.depth_channels_history, demo_mask=True,
                                     cycle_consistency=args.cycle_consistency)
                     example_actions_dict[k][action][ind] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square, demo_action_ind]
