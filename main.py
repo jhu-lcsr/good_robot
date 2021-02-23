@@ -169,7 +169,7 @@ def main(args):
     depth_channels_history = args.depth_channels_history
 
     # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
-    if 'unstack' in args.task_type:
+    if task_type is not None and 'unstack' in args.task_type:
         args.task_type = 'unstack'
         task_type = 'unstack'
 
