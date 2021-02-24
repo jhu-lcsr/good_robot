@@ -1311,7 +1311,8 @@ def main(args):
                 pair = Pair.from_main_idxs(color_heightmap, 
                                            valid_depth_heightmap, 
                                            json_data, 
-                                           nonlocal_variables['stack']) 
+                                           nonlocal_variables['stack'],
+                                           is_row = check_row) 
 
                 # batchify a single example 
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]

@@ -128,10 +128,10 @@ class Pair:
         return pair 
 
     @classmethod
-    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json, stack_sequence):
+    def from_main_idxs(cls, prev_image, prev_heightmap, prev_json, stack_sequence, is_row = True):
         # TODO(elias) infer which block to move from interpolation here 
         prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
-        pair = cls(prev_image, None, None, None) 
+        pair = cls(prev_image, None, None, None, is_row = is_row) 
         json_data = pair.read_json(prev_json)
         pair.json_data = json_data
         src_color, tgt_color = pair.infer_from_stacksequence(stack_sequence)  
