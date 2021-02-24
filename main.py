@@ -90,6 +90,7 @@ def run_title(args):
 def main(args):
     # TODO(ahundt) move main and process_actions() to a class?
 
+    num_problems_detected = 0
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
@@ -152,7 +153,7 @@ def main(args):
     evaluate_random_objects = args.evaluate_random_objects
     skip_noncontact_actions = args.skip_noncontact_actions
     common_sense = args.common_sense
-    place_common_sense = common_sense and ((args.task_type is None) or (args.task_type != 'unstack'))
+    place_common_sense = common_sense and ((args.task_type is None) or ('unstack' not in args.task_type))
     print('main.py using common sense:', common_sense, 'using place common sense:', place_common_sense)
     common_sense_backprop = not args.no_common_sense_backprop
     disable_two_step_backprop = args.disable_two_step_backprop
@@ -172,6 +173,14 @@ def main(args):
     use_demo = args.use_demo
     demo_path = args.demo_path
     task_type = args.task_type
+    primitive_distance_method = args.primitive_distance_method
+    cycle_consistency = args.cycle_consistency
+    depth_channels_history = args.depth_channels_history
+
+    # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
+    if task_type is not None and 'unstack' in args.task_type:
+        args.task_type = 'unstack'
+        task_type = 'unstack'
 
     # -------------- Test grasping options --------------
     is_testing = args.is_testing
@@ -253,10 +262,9 @@ def main(args):
     else:
         place_dilation = 0.00
 
-    print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
-
     # Initialize trainer(s)
     if use_demo:
+        print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
         assert task_type is not None, ("Must provide task_type if using demo")
         assert is_testing, ("Must run in testing mode if using demo")
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
@@ -568,11 +576,14 @@ def main(args):
 
         insufficient_objs_in_scene = False
         # add check for num_obj in scene
-        if is_sim and task_type in ['row', 'unstack', 'vertical_square']:
-            objs = robot.get_objects_in_scene()
-            if len(objs) < nonlocal_variables['stack'].num_obj:
-                needed_to_reset = True
-                insufficient_objs_in_scene = True
+        if is_sim and task_type in ['row', 'vertical_square', 'unstack']:
+            if task_type == 'unstack' and is_testing:
+                pass
+            else:
+                objs = robot.get_objects_in_scene()
+                if len(objs) < nonlocal_variables['stack'].num_obj:
+                    needed_to_reset = True
+                    insufficient_objs_in_scene = True
 
         if not is_sim and grasp_color_task:
             # TODO(elias) add call to pygame to show relevant info for checking here
@@ -760,6 +771,11 @@ def main(args):
 
                     # check if embeddings for demo for progress n and primitive action p_a already exists
                     task_progress = nonlocal_variables['stack_height']
+
+                    # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
+                    if task_type == 'unstack':
+                        task_progress = min(3, task_progress)
+
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
                         nonlocal_variables['example_actions_dict'][task_progress] = {}
@@ -769,10 +785,10 @@ def main(args):
                     for ind, d in enumerate(example_demos):
                         # get action embeddings from example demo
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
-
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
-                                    d.get_action(workspace_limits, action, task_progress, stack_trainer,
-                                            row_trainer, unstack_trainer, vertical_square_trainer)
+                                d.get_action(workspace_limits, action, task_progress, stack_trainer,
+                                        row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
+                                        cycle_consistency=cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
                                     demo_stack_action, demo_unstack_action, demo_vertical_square_action]
 
@@ -828,8 +844,9 @@ def main(args):
                             # explore the choices of push actions vs place actions
                             push_frequency_one_in_n = 5
                             nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                    trainer.is_exploit_log.append([0 if explore_actions else 1])
-                    logger.write_to_log('is-exploit', trainer.is_exploit_log)
+
+                trainer.is_exploit_log.append([0 if explore_actions else 1])
+                logger.write_to_log('is-exploit', trainer.is_exploit_log)
                     # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
                     # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                     # logger.write_to_log('trial', trainer.trial_log)
@@ -847,6 +864,13 @@ def main(args):
                         task_progress = nonlocal_variables['stack_height']
                         action = nonlocal_variables['primitive_action']
 
+                        # clamp task_progress at 3 if task_type is unstack
+                        if task_type == 'unstack':
+                            task_progress = min(3, task_progress)
+
+                        # TODO(adit98) implement
+                        if cycle_consistency:
+                            raise NotImplementedError("Need to test if below line works with different array shape!!!")
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
                                 dtype=object).T
@@ -856,11 +880,13 @@ def main(args):
                             preds = preds[1:]
                             example_actions = example_actions[1:].tolist()
                         elif task_type == 'stack':
-                            preds = preds[0, 2, 3]
-                            example_actions = example_actions[[0, 2, 3]].tolist()
+                            inds = [0, 2, 3]
+                            preds = [preds[i] for i in inds]
+                            example_actions = example_actions[inds].tolist()
                         elif task_type == 'unstack':
-                            preds = preds[0, 1, 3]
-                            example_actions = example_actions[[0, 1, 3]].tolist()
+                            inds = [0, 1, 3]
+                            preds = [preds[i] for i in inds]
+                            example_actions = example_actions[inds].tolist()
                         elif task_type == 'vertical_square':
                             preds = preds[:3]
                             example_actions = example_actions[:3].tolist()
@@ -869,8 +895,13 @@ def main(args):
                             raise NotImplementedError(task_type + ' is not implemented.')
 
                         # select preds based on primitive action selected in demo (theta, y, x)
-                        correspondences, nonlocal_variables['best_pix_ind'] = \
-                                compute_demo_dist(preds, example_actions)
+                        if cycle_consistency:
+                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                                    compute_cc_dist(preds, example_actions, metric=primitive_distance_method)
+                        else:
+                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                                    compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
+
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
 
                     else:
@@ -1210,6 +1241,41 @@ def main(args):
 
         return no_change_count
 
+    def sim_problem_end_trial(num_problems_detected=0):
+        ''' Call when trials must be ended due to an exceptional situation from the main training loop.
+        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner, 
+        which often means the simulator entered a physically impossible state.
+        The existing code should already call the regular end_trial() function when the next iteration starts.
+        '''
+        get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+        robot.check_sim()
+        if not robot.reposition_objects():
+            # This can happen if objects are in impossible positions (NaN),
+            # so set the variable to immediately and completely restart
+            # the simulation below.
+            num_problems_detected += 3
+        nonlocal_variables['trial_complete'] = True
+
+        if place:
+            nonlocal_variables['stack'].reset_sequence()
+            nonlocal_variables['stack'].next()
+        if check_z_height:
+            # Zero out the height because the trial is done.
+            # Note these lines must normally be after the
+            # logging of these variables is complete,
+            # but this is a special (hopefully rare) recovery scenario.
+            nonlocal_variables['stack_height'] = 0.0
+            nonlocal_variables['prev_stack_height'] = 0.0
+        else:
+            nonlocal_variables['stack_height'] = 1.0
+            nonlocal_variables['prev_stack_height'] = 1.0
+        num_problems_detected += 1
+        if num_problems_detected > 2:
+            # Try more drastic recovery methods the second time around
+            robot.restart_sim(connect=True)
+            robot.add_objects()
+        return num_problems_detected
+
     action_thread = threading.Thread(target=process_actions)
     action_thread.daemon = True
     action_thread.start()
@@ -1298,7 +1364,7 @@ def main(args):
 
         # Get latest RGB-D image
         valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=args.depth_channels_history)
+            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=depth_channels_history)
 
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
@@ -1384,7 +1450,8 @@ def main(args):
         if stuff_sum < empty_threshold or ((is_testing or is_sim) and not prev_grasp_success and no_change_count[0] + no_change_count[1] > 10) or (actions_in_trial >= max_trial_actions):
             if is_sim:
                 print('There have not been changes to the objects for for a long time [push, grasp]: ' + str(no_change_count) +
-                      ', or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
+                      ', the trial took ' + str(actions_in_trial) + ' vs a limit of ' + str(max_trial_actions) + ' actions, ' +
+                      'or there are not enough objects in view (value: %d)! Repositioning objects.' % (stuff_sum))
                 robot.restart_sim()
                 robot.add_objects()
                 if is_testing:  # If at end of test run, re-load original weights (before test run)
@@ -1707,17 +1774,30 @@ def main(args):
                 # reload the best model if trial performance has declined by more than 10%
                 if(trainer.iteration >= 1000 and 'trial_success_rate_best_value' in best_dict and 'trial_success_rate_current_value' in current_dict and
                    trainer_iteration_of_most_recent_model_reload + 60 < trainer.iteration):
-                    allowed_decline = (best_dict['trial_success_rate_best_value'] - 0.1) * 0.9
-                    if allowed_decline > current_dict['trial_success_rate_current_value']:
+                    # TODO(ahundt) check if the default scale requrement for a bad decline should be even smaller like 0.5 or 0.4
+                    def is_bad_decline(best, current, subtract=0.1, scale=0.6):
+                        return (best - subtract) * scale > current
+                    def is_bad_decline_string(name, scale=0.6):
+                        current_success = current_dict[name + '_success_rate_current_value']
+                        best_success = best_dict[name + '_success_rate_best_value']
+                        is_bad = is_bad_decline(best_success, current_success, scale=scale)
+                        if is_bad:
+                            print('WARNING: ' + name + ' success declined from the best ' + str(best_success) + ' to below the allowed limit of ' + str(current_success))
+                        return is_bad
+
+                    # check if grasp success or place success dropped a lot
+                    bad_action_decline = is_bad_decline_string('grasp') or (place and is_bad_decline_string('place'))
+                    if is_bad_decline_string('trial', scale=0.9) or bad_action_decline:
                         # The model quality has declined too much from the peak, reload the previous best model.
                         snapshot_file = choose_testing_snapshot(logger.base_directory, best_dict)
                         trainer.load_snapshot_file(snapshot_file)
                         logger.write_to_log('load_snapshot_file_iteration', trainer.load_snapshot_file_iteration_log)
                         trainer_iteration_of_most_recent_model_reload = trainer.iteration
-                        print('WARNING: current trial performance ' + str(current_dict['trial_success_rate_current_value']) +
-                            ' is below the allowed decline of ' + str(allowed_decline) +
-                            ' compared to the previous best ' + str(best_dict['trial_success_rate_best_value']) +
-                            ', reloading the best model ' + str(snapshot_file))
+                        print('WARNING: reloading the best model ' + str(snapshot_file))
+                    # Trial decline needs to be worse for an actual reset
+                    if is_bad_decline_string('trial') or bad_action_decline:
+                        print('ERROR: PROBLEM DETECTED IN SCENE, STEEP TRIAL, GRASP, OR PLACE PERFORMANCE DECLINE, RESETTING THE OBJECTS TO RECOVER... sometimes performance declines because the simulator is in a physically impossible state, so move on to the next trial to be safe.')
+                        num_problems_detected = sim_problem_end_trial(num_problems_detected)
 
                 # Save model if we are at a new best stack rate
                 if place and trainer.iteration >= 1000:
@@ -1813,33 +1893,7 @@ def main(args):
             elif is_sim and int(time_elapsed) > timeout:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
                 print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
-                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                robot.check_sim()
-                if not robot.reposition_objects():
-                    # This can happen if objects are in impossible positions (NaN),
-                    # so set the variable to immediately and completely restart
-                    # the simulation below.
-                    num_problems_detected += 3
-                nonlocal_variables['trial_complete'] = True
-
-                if place:
-                    nonlocal_variables['stack'].reset_sequence()
-                    nonlocal_variables['stack'].next()
-                if check_z_height:
-                    # Zero out the height because the trial is done.
-                    # Note these lines must normally be after the
-                    # logging of these variables is complete,
-                    # but this is a special (hopefully rare) recovery scenario.
-                    nonlocal_variables['stack_height'] = 0.0
-                    nonlocal_variables['prev_stack_height'] = 0.0
-                else:
-                    nonlocal_variables['stack_height'] = 1.0
-                    nonlocal_variables['prev_stack_height'] = 1.0
-                num_problems_detected += 1
-                if num_problems_detected > 2:
-                    # Try more drastic recovery methods the second time around
-                    robot.restart_sim(connect=True)
-                    robot.add_objects()
+                num_problems_detected = sim_problem_end_trial(num_problems_detected)
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
                 # TODO(ahundt) Improve recovery: maybe set trial_complete = True here and call continue or set do_continue = True?
@@ -1985,7 +2039,8 @@ def save_plot(trainer, plot_window, is_testing, num_trials, best_dict, logger, t
         prev_best_dict = copy.deepcopy(best_dict)
         if is_testing:
             # when testing the plot data should be averaged across the whole run
-            plot_window = trainer.iteration - 3
+            # if less than 3 iterations have passed, set plot_window to 1
+            plot_window = max(1, trainer.iteration - 3)
         best_dict, current_dict = plot.plot_it(logger.base_directory, title, place=place,
                 window=plot_window, num_preset_arrangements=preset_files, task_type=task_type)
     return best_dict, prev_best_dict, current_dict
@@ -2394,6 +2449,9 @@ if __name__ == '__main__':
     parser.add_argument('--depth_channels_history', dest='depth_channels_history', action='store_true', default=False, help='Use 2 steps of history instead of replicating depth values 3 times during training/testing')
     parser.add_argument('--use_demo', dest='use_demo', action='store_true', default=False, help='Use demonstration to chose action')
     parser.add_argument('--task_type', dest='task_type', type=str, default=None)
+    parser.add_argument('--primitive_distance_method', dest='primitive_distance_method', type=str, default='l2')
+    # TODO(adit98) clarify argument name?
+    parser.add_argument('--cycle_consistency', dest='cycle_consistency', action='store_true', default=False, help='Use cycle consistency for action matching')
 
     # Language Mask Options
     parser.add_argument('--is_bisk', dest = 'is_bisk', action='store_true', default = False,                                help='running on bisk (2018) AAAI dataset')

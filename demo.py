@@ -77,7 +77,7 @@ class Demonstration():
 
     def get_action(self, workspace_limits, primitive_action, stack_height, stack_trainer=None,
             row_trainer=None, unstack_trainer=None, vertical_square_trainer=None, use_hist=False,
-            demo_mask=True):
+            demo_mask=True, cycle_consistency=False):
         # ensure one of stack trainer or row trainer is provided
         if stack_trainer is None and row_trainer is None and unstack_trainer is None and vertical_square_trainer is None:
             raise ValueError("Must provide at least one trainer")
@@ -148,6 +148,9 @@ class Demonstration():
         # initialize best actions for stacking and row making
         best_action_stack, best_action_row, best_action_unstack, best_action_vertical_square = None, None, None, None
 
+        # initialize embedding arrays for each policy (for selected primitive_action)
+        stack_feat, row_feat, unstack_feat, vertical_square_feat = None, None, None, None
+
         # index predictions to obtain best action
         if primitive_action == 'grasp':
             # NOTE that we swap the order that the best_action_xy coordinates are passed in since
@@ -155,10 +158,12 @@ class Demonstration():
             if stack_trainer is not None:
                 best_action_stack = stack_grasp[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
+                stack_feat = stack_grasp
 
             if row_trainer is not None:
                 best_action_row = row_grasp[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
+                row_feat = row_grasp
 
             if unstack_trainer is not None:
                 best_action_unstack = unstack_grasp[best_rot_ind, :, best_action_xy[1],
@@ -167,26 +172,37 @@ class Demonstration():
             if vertical_square_trainer is not None:
                 best_action_vertical_square = vertical_square_grasp[best_rot_ind, :,
                         best_action_xy[1], best_action_xy[0]]
+                vertical_square_feat = vertical_square_grasp
 
         elif primitive_action == 'place':
             if stack_trainer is not None:
                 best_action_stack = stack_place[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
+                stack_feat = stack_place
 
             if row_trainer is not None:
                 best_action_row = row_place[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
+                row_feat = row_place
 
             if unstack_trainer is not None:
                 best_action_unstack = unstack_place[best_rot_ind, :, best_action_xy[1],
                         best_action_xy[0]]
+                unstack_feat = unstack_place
 
             if vertical_square_trainer is not None:
                 best_action_vertical_square = vertical_square_place[best_rot_ind, :,
                         best_action_xy[1], best_action_xy[0]]
+                vertical_square_feat = vertical_square_place
 
-        # return best action for each model, primitive_action
-        return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
+        # if we aren't using cycle consistency, return best action's embedding
+        if not cycle_consistency:
+            # return best action for each model, primitive_action
+            return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
+
+        # otherwise, return the entire 16x224x224 embedding space (only for selected primitive action)
+        else:
+            return stack_feat, row_feat, unstack_feat, vertical_square_feat, ACTION_TO_ID[primitive_action]
 
 def load_all_demos(demo_path, check_z_height, task_type):
     """

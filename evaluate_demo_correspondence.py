@@ -221,7 +221,7 @@ if __name__ == '__main__':
                 raise NotImplementedError(args.task_type + ' is not implemented.')
 
             # evaluate l2 distance based action mask - leave one out is above
-            im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions)
+            im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions, metric=args.metric)
 
             if args.save_visualizations:
                 # fix dynamic range of im_depth
