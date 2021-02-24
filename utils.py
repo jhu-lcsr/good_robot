@@ -1094,15 +1094,20 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 match_ind = np.unravel_index(np.argmin(right_dist), right_dist.shape)
                 right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
 
-                # now rematch this with entire demo_embedding array
-                left_dist = np.sum(np.square(embedding - np.expand_dims(right_match,
-                    (0, 2, 3))), axis=1)
+                # now crop demo embedding to +/- 15 pixels around demo_action
+                cropped_embedding = embedding[demo_action[0], :,
+                        (demo_action[1] - 15):(demo_action[1]+16),
+                        (demo_action[2] - 15):(demo_action[2]+16)]
+                revised_match_ind = np.array([15, 15])
+
+                # now rematch this with cropped demo_embedding array
+                left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None]), axis=0)
                 rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
 
                 # TODO(adit98) dealing with rotation?
                 # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
                 # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
-                cc_dist = np.sum(np.square(np.array(match_ind[1:]) - np.array(rematch_ind[1:])))
+                cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
                 match_map = right_dist
 
             elif metric == 'cos_sim':
@@ -1121,8 +1126,14 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 match_ind = np.unravel_index(np.argmin(right_sim), right_sim.shape)
                 right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
 
-                # now rematch this with entire demo_embedding array
-                left_sim = cos_sim(embedding, np.expand_dims(right_match, (0, 2, 3)))
+                # now crop demo embedding to +/- 15 pixels around demo_action
+                cropped_embedding = embedding[demo_action[0], :,
+                        (demo_action[1] - 15):(demo_action[1]+16),
+                        (demo_action[2] - 15):(demo_action[2]+16)]
+                revised_match_ind = np.array([15, 15])
+
+                # now rematch this with cropped demo_embedding array NOTE(adit98) may need to modify cos_sim function
+                left_sim = cos_sim(cropped_embedding, right_match[:, None, None])
                 rematch_ind = np.unravel_index(np.argmax(left_sim), left_sim.shape)
 
                 # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
@@ -1133,7 +1144,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 #        rematch_ind[1], 'grasp', valid_depth_heightmap)
 
                 # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
-                cc_dist = np.sum(np.square(match_ind[1:] - rematch_ind[1:]))
+                cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
                 match_map = right_sim
 
             # TODO(adit98) UMAP distance?
@@ -1153,7 +1164,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
             cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind]))
 
     # select entry with min cycle consistency distance
-    best_match_map, best_embedding, best_preds, demo_action_ind, mask = cc_dists[np.argmin([x[1] for x in cc_dists])]
+    best_match_map, best_cc_dist, best_embedding, best_preds, demo_action_ind, mask = cc_dists[np.argmin([x[1] for x in cc_dists])]
 
     if cc_match:
         # now, find rematch_ind for each allowed_action in embedding

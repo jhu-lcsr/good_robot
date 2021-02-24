@@ -233,7 +233,8 @@ if __name__ == '__main__':
             else:
                 # evaluate distance based action mask with cycle consistency
                 im_mask, match_ind = compute_cc_dist(preds=preds, example_actions=example_actions,
-                        demo_action_inds=demo_action_inds, valid_depth_heightmap=im_depth, metric=args.metric)
+                        demo_action_inds=demo_action_inds, valid_depth_heightmap=im_depth,
+                        metric=args.metric, cc_match=False)
 
             if args.save_visualizations:
                 # fix dynamic range of im_depth
