@@ -168,7 +168,7 @@ def get_place_success_rate(stack_height, actions, include_push=False, window=200
     stack_height_increased = np.zeros_like(stack_height, np.bool)
     stack_height_increased[0] = False
 
-    if task_type is None or task_type != 'unstacking':
+    if task_type is None or task_type != 'unstack':
         # the stack height increased if the next stack height is higher than the previous
         stack_height_increased[1:] = stack_height[1:] > stack_height[:-1]
     else:
@@ -210,22 +210,23 @@ def get_action_efficiency(stack_height, window=200, ideal_actions_per_trial=6, m
     # success = np.rint(stack_height) == max_height
     # TODO(ahundt) it may be better to drop this function and modify get_trial_success_rate() to calculate: max(trial_successes)-min(trial_successes)/(window/ideal_actions_per_trial)
     success = stack_height >= max_height
-    if task_type is not None and task_type == 'unstacking':
+    if task_type is not None and task_type == 'unstack':
         if trial_success_log is None:
             raise ValueError("Must provide trial success log when evaluating unstacking action efficiency")
 
         # successes are when trial was logged as successful
-        success = trial_success_log
+        success[0] = trial_success_log[0]
+        success[1:] = trial_success_log[1:] - trial_success_log[:-1]
 
     efficiency = np.zeros_like(stack_height, np.float64)
     lower = np.zeros_like(efficiency)
     upper = np.zeros_like(efficiency)
     for i in range(1, efficiency.shape[0]):
         start = max(i - window, 1)
-        # window_size = min(i, window)
-        window_size = np.array(min(i+1, window), np.float64)
+        window_size = min(i, window)
         num_trials = success[start:i+1].sum()
-        efficiency[i] = num_trials * ideal_actions_per_trial / window_size
+        # assume historical actions are failures if we haven't completed window # actions
+        efficiency[i] = num_trials * ideal_actions_per_trial / window
         var = efficiency[i] / np.sqrt(window_size)
         lower[i] = efficiency[i] + 3*var
         upper[i] = efficiency[i] - 3*var

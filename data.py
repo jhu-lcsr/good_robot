@@ -614,9 +614,9 @@ class GoodRobotDatasetReader:
             else:
                 print("EXITING...")
                 sys.exit() 
-            self.data = {"train": dev_data[0:3],
-                         "dev": dev_data[0:3],
-                         "test": dev_data[0:3]} 
+            self.data = {"train": dev_data[3:6],
+                         "dev": dev_data[3:6],
+                         "test": dev_data[3:6]} 
 
         self.vocab = set()
         for pair in self.data['train']:
@@ -637,9 +637,9 @@ class GoodRobotDatasetReader:
         filtered_data = []
         for pair in data:
             # rows 
-            if rows and pair.source_location is not None:
+            if rows and pair.is_row:
                 filtered_data.append(pair)
-            if not rows and pair.source_location is None:
+            if not rows and not pair.is_row: 
                 filtered_data.append(pair)
         return filtered_data 
 

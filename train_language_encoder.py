@@ -476,16 +476,20 @@ class FlatLanguageTrainer(LanguageTrainer):
         bin_dict = defaultdict(list) 
         for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
             all_res_dicts.append(self.validate(dev_batch_instance, 1, b, 0))
-            batch_bin_dict = all_res_dicts[-1]['bin_dict']
-            for k,v in batch_bin_dict.items():
-                bin_dict[k] += v
+            try:
+                batch_bin_dict = all_res_dicts[-1]['bin_dict']
+                for k,v in batch_bin_dict.items():
+                    bin_dict[k] += v
+            except KeyError:
+                continue
 
-        with open(self.checkpoint_dir.joinpath("bin_dict.json"), "w") as f1: json.dump(bin_dict, f1) 
+        with open(self.checkpoint_dir.joinpath("bin_dict.json"), "w") as f1: 
+            json.dump(bin_dict, f1) 
         if len(all_res_dicts) == 0:
             return None
         mean_dict = {k: [] for k in all_res_dicts[0].keys()}
 
-        print(all_res_dicts) 
+        #print(all_res_dicts) 
         for res_d in all_res_dicts:
             for k, v in res_d.items():
                 if type(v) in [float, int, np.float64, np.int]:
