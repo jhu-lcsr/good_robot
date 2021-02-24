@@ -435,7 +435,7 @@ class Robot(object):
         """ Reposition the object to a specified position and orientation """
         object_handle = self.object_handles[index]
         # TODO(adit98) figure out significance of plane_handle, set to -1 for now
-        if self.task_type is not None and self.task_type == 'unstacking':
+        if self.task_type is not None and self.task_type == 'unstack':
             plane_handle=-1
         else:
             success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
@@ -537,7 +537,7 @@ class Robot(object):
         self.obj_positions = []
 
         # now reposition objects if we are unstacking
-        if self.task_type == 'unstacking':
+        if self.task_type == 'unstack':
             self.reposition_objects()
 
     def restart_sim(self, connect=False):
@@ -662,7 +662,7 @@ class Robot(object):
 
         return obj_positions
 
-    def get_objects_in_scene(self, workspace_limits=None):
+    def get_objects_in_scene(self, workspace_limits=None, buffer_meters=0.0):
         """
         Function to iterate through all object positions and return number of objects within workspace_limits
         Returns:
@@ -673,7 +673,7 @@ class Robot(object):
             workspace_limits = self.workspace_limits
 
         # iterate through self.object_handles and check if in scene
-        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj)]
+        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj, workspace_limits=workspace_limits, buffer_meters=buffer_meters)]
 
     def get_obj_positions_and_orientations(self):
         if not self.is_sim:
@@ -806,7 +806,7 @@ class Robot(object):
                 # time.sleep(1)
 
                 # if not unstacking, place all objects randomly
-                if self.task_type is None or self.task_type != 'unstacking':
+                if self.task_type is None or self.task_type != 'unstack':
                     for object_handle in self.object_handles:
                         # Drop object at random x,y location and random orientation in robot workspace
                         self.reposition_object_randomly(object_handle)
