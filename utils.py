@@ -1037,7 +1037,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
 
     return im_mask, match_ind
 
-def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2'):
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', cc_match=False):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     Arguments:
@@ -1046,6 +1046,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         demo_action_inds: indices of executed action in each demo D * (theta, y, x)
         valid_depth_heightmap: heightmap of test scene
         metric: primitive distance function to use for computing matches (defaults to l2 distance)
+        cc_match: use cycle consistency to find best action_ind for selected demo and policy
     """
     # get mask for each model
     masks = []
@@ -1124,9 +1125,13 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 left_sim = cos_sim(embedding, np.expand_dims(right_match, (0, 2, 3)))
                 rematch_ind = np.unravel_index(np.argmax(left_sim), left_sim.shape)
 
-                # TODO(adit98) dealing with rotation?
                 # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
-                #primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
+                # NOTE(adit98) hardcoding primitive action as grasp for now
+                #match_robot_ind, _ = robot.action_heightmap_coordinate_to_3d_robot_pose(match_ind[2],
+                #        match_ind[1], 'grasp', valid_depth_heightmap)
+                #rematch_robot_ind, _ = robot.action_heightmap_coordinate_to_3d_robot_pose(rematch_ind[2],
+                #        rematch_ind[1], 'grasp', valid_depth_heightmap)
+
                 # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
                 cc_dist = np.sum(np.square(match_ind[1:] - rematch_ind[1:]))
                 match_map = right_sim
@@ -1144,18 +1149,47 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 # set all masked spaces to have min similarity (select appropriate mask from list of masks)
                 match_map[masks[ind]] = np.min(match_map) * 0.9
 
-            # append (match_map, cycle consistency distance) pair to list of cc distances
-            cc_dists.append((match_map, cc_dist))
+            # append (match_map, cycle consistency distance, embedding, preds, and demo_action) to list of cc distances
+            cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind]))
 
-    # select match_map with minimum cycle consistency distance
-    best_match_map = cc_dists[np.argmin([x[1] for x in cc_dists])][0]
+    # select entry with min cycle consistency distance
+    best_match_map, best_embedding, best_preds, demo_action_ind, mask = cc_dists[np.argmin([x[1] for x in cc_dists])]
 
-    if invert:
-        # find overall minimum distance across all policies and get index
-        match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
+    if cc_match:
+        # now, find rematch_ind for each allowed_action in embedding
+        flat_embedding = np.expand_dims(best_embedding.reshape(-1, 64), (1, 3, 4)) # now this is N x 16 x 64 x 224 x 224
+
+        if metric == 'l2':
+            dists = np.sum(np.square(flat_embedding - best_preds[None, ...]), axis=2) # N x 16 x 224 x 224
+
+            # rematches contains N (theta, y, x) coordinates
+            rematches = np.vstack(np.unravel_index(np.argmin(dists, axis=0), best_embedding.shape)) # N x 3
+
+        elif metric == 'cos_sim':
+            # NOTE(adit98) this probably won't work
+            dists = cos_sim(flat_embedding, best_preds[None, ...])
+
+            # rematches contains N (theta, y, x) coordinates
+            rematches = np.vstack(np.unravel_index(np.argmax(dists, axis=0), best_embedding.shape)) # N x 3
+
+        # now compute (x, y) distance of rematches with original demo_action_ind
+        rematch_dists = np.sum(np.square(rematches[:, 1:] - demo_action_ind[None, 1:]), axis=1)
+
+        # mask invalid locs by setting to [0, 0, 0] (flatten mask to get indices) NOTE(adit98) check if flatten behaves properly here
+        print(mask.flatten().shape, rematches.shape)
+        rematch_dists[mask.flatten()] = np.inf
+
+        # finally get argmin and unravel_index
+        match_ind = np.unravel_index(np.argmin(rematch_dists), best_embedding.shape)
+
     else:
-        # find overall maximum similarity across all policies and get index
-        match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
+        if invert:
+            # find overall minimum distance across all policies and get index
+            match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
+
+        else:
+            # find overall maximum similarity across all policies and get index
+            match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
 
     # make best_match_map >=0 and max_normalize
     best_match_map = best_match_map - np.min(best_match_map)

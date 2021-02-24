@@ -61,7 +61,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.00,
+                          show_heightmap=False, place_dilation=0.05,
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 
@@ -227,11 +227,13 @@ if __name__ == '__main__':
 
             if not args.cycle_consistency:
                 # evaluate distance based action mask - leave one out is above
-                im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions, metric=args.metric)
+                im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions,
+                        metric=args.metric)
+
             else:
                 # evaluate distance based action mask with cycle consistency
                 im_mask, match_ind = compute_cc_dist(preds=preds, example_actions=example_actions,
-                        demo_action_inds=demo_action_inds, metric=args.metric)
+                        demo_action_inds=demo_action_inds, valid_depth_heightmap=im_depth, metric=args.metric)
 
             if args.save_visualizations:
                 # fix dynamic range of im_depth

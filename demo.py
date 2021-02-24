@@ -42,10 +42,6 @@ class Demonstration():
                     'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
     def get_heightmaps(self, action_str, stack_height, use_hist=False, history_len=3):
-        # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
-        if action_str != 'orig' and self.task_type == 'stack':
-            action_str = str(stack_height) + action_str
-
         rgb_filename = os.path.join(self.rgb_dir,
                 '%06d.%s.%d.color.png' % (stack_height, action_str, self.demo_num))
         depth_filename = os.path.join(self.depth_dir,

@@ -247,7 +247,7 @@ def main(args):
         place_dilation = 0.05
     elif task_type is not None:
         # TODO(adit98) think about how we set different place dilations
-        stack_place_dilation = 0.00
+        stack_place_dilation = 0.05
         place_dilation = 0.05
     else:
         place_dilation = 0.00
@@ -257,6 +257,7 @@ def main(args):
         print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
         assert task_type is not None, ("Must provide task_type if using demo")
         assert is_testing, ("Must run in testing mode if using demo")
+        trainer = None
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
         if 'stack' in multi_task_snapshot_files:
             stack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -268,6 +269,10 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
+            # set trainer if not already set
+            if trainer is None:
+                trainer = stack_trainer
+
         if 'row' in multi_task_snapshot_files:
             row_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['row'], force_cpu,
@@ -277,6 +282,10 @@ def main(args):
                               place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = row_trainer
 
         if 'unstack' in multi_task_snapshot_files:
             unstack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -288,6 +297,10 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
+            # set trainer if not already set
+            if trainer is None:
+                trainer = unstack_trainer
+
         if 'vertical_square' in multi_task_snapshot_files:
             vertical_square_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['vertical_square'], force_cpu,
@@ -298,8 +311,9 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
-        # set trainer reference to stack_trainer to get metadata (e.g. iteration)
-        trainer = stack_trainer
+            # set trainer if not already set
+            if trainer is None:
+                trainer = vertical_square_trainer
 
     else:
         trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -510,8 +524,7 @@ def main(args):
             elif task_type == 'stack':
                 # TODO(adit98) make sure we have path for real robot here
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.check_stack(current_stack_goal, check_z_height=check_z_height,
-                                top_idx=top_idx)
+                        robot.check_stack(current_stack_goal, top_idx=top_idx)
 
             elif task_type == 'row':
                 # TODO(adit98) make sure we have path for real robot here
@@ -772,9 +785,9 @@ def main(args):
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id, demo_action_ind = \
                                 d.get_action(workspace_limits, action, task_progress, stack_trainer,
                                         row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
-                                        cycle_consistency=cycle_consistency, demo_mask=cycle_consistency)
+                                        cycle_consistency=cycle_consistency, demo_mask=True)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
-                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action]
+                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action, demo_action_ind]
 
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
@@ -880,7 +893,7 @@ def main(args):
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
-                                    compute_cc_dist(preds, example_actions, demo_action_inds=demo_action_inds,
+                                    compute_cc_dist(preds, example_actions, demo_action_inds,
                                             metric=primitive_distance_method)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'] = \
@@ -1894,7 +1907,7 @@ def parse_resume_and_snapshot_file_args(args):
     if args.stack_snapshot_file: multi_task_snapshot_files['stack'] = os.path.abspath(args.stack_snapshot_file)
     if args.row_snapshot_file: multi_task_snapshot_files['row'] = os.path.abspath(args.row_snapshot_file)
     if args.unstack_snapshot_file: multi_task_snapshot_files['unstack'] = os.path.abspath(args.unstack_snapshot_file)
-    if args.vertical_square_snapshot_file: multi_task_snapshot_files['vertical'] = os.path.abspath(args.vertical_square_snapshot_file)
+    if args.vertical_square_snapshot_file: multi_task_snapshot_files['vertical_square'] = os.path.abspath(args.vertical_square_snapshot_file)
 
     # if neither snapshot file is provided
     if continue_logging:
