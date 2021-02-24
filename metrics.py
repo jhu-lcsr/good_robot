@@ -253,8 +253,8 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
                  image_size: int = 64,
                  patch_size: int = 4):
         super(GoodRobotTransformerTeleportationMetric, self).__init__(block_size, image_size, patch_size) 
-        self.color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4} 
-        self.expand_names = {"r":"red", "b":"blue","y":"yellow", "g": "green"}
+        #self.color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4} 
+        self.color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4, "brown": 5, "orange": 6, "gray": 7, "purple": 8, "cyan": 9, "pink": 10}
         self.idx_to_color = {v:k for k,v in self.color_to_idx.items()}
         self.block_ratio = 9/64
 
@@ -342,7 +342,7 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         block_size = int(self.block_ratio * self.image_size)
         distance_normalized = self.compute_distance(pred_block_center, prev_block_id, pair, block_size)
         true_block_center =  pair.next_location
-        block_to_move = self.color_to_idx[self.expand_names[pair.source_code]]
+        block_to_move = self.color_to_idx[pair.source_code]
         block_acc = 1 if block_to_move == prev_block_id else 0
 
         to_ret = {"distance": distance_normalized,

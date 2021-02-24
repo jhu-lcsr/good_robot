@@ -637,9 +637,9 @@ class GoodRobotDatasetReader:
         filtered_data = []
         for pair in data:
             # rows 
-            if rows and pair.source_location is not None:
+            if rows and pair.is_row:
                 filtered_data.append(pair)
-            if not rows and pair.source_location is None:
+            if not rows and not pair.is_row: 
                 filtered_data.append(pair)
         return filtered_data 
 

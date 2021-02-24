@@ -16,7 +16,7 @@ def check_success(data, idx):
     return data[idx][0] == 1    
 
 class Pair:
-    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224):
+    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224, is_row = True):
         self.prev_image = prev_image
         self.prev_location = prev_location
         self.next_image = next_image
@@ -31,6 +31,7 @@ class Pair:
         self.prev_state_image = None 
         self.next_state_image = None 
         self.json_data = None 
+        self.is_row = is_row
 
     def show(self):
         fig,ax = plt.subplots(1)
@@ -90,7 +91,7 @@ class Pair:
         return mask 
 
     @classmethod
-    def from_idxs(cls, grasp_idx, place_idx, data, image_home):
+    def from_idxs(cls, grasp_idx, place_idx, data, image_home, is_row = True):
         prev_location = data[grasp_idx][2:][::-1]
         next_location = data[place_idx][2:][::-1]
         grasp_prefix = str(1000000 + grasp_idx)[1:]
@@ -113,11 +114,11 @@ class Pair:
         prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
         next_image = np.concatenate([next_image, next_depth], axis=-1)
 
-        return cls(prev_image, prev_location, next_image, next_location)
+        return cls(prev_image, prev_location, next_image, next_location, is_row = is_row)
 
     @classmethod
-    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home): 
-        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home)
+    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home, is_row=True): 
+        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home, is_row = is_row)
         # annotate based on sim data 
         grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
@@ -139,8 +140,8 @@ class Pair:
     def infer_from_stacksequence(self, stack_sequence):
         src_color = stack_sequence.color_names[((stack_sequence.object_color_index) % stack_sequence.color_len)]
         tgt_color = stack_sequence.color_names[stack_sequence.object_color_sequence[stack_sequence.object_color_index-1] % stack_sequence.color_len]
-        self.source_code = src_color[0]
-        self.target_code = tgt_color[0]
+        self.source_code = src_color
+        self.target_code = tgt_color
         return src_color, tgt_color 
 
     def read_json(self, json_path):
@@ -181,7 +182,7 @@ class Pair:
             state = (state + 1)/2 * self.resolution
             return state.astype(int)
 
-        color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4} 
+        color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4, "brown": 5, "orange": 6, "gray": 7, "purple": 8, "cyan": 9, "pink": 10}
         for color, location in json_data.items():
             idx = color_to_idx[color]
             loc = convert_to_loc(location)
@@ -237,34 +238,41 @@ class Pair:
 
         #prev_loc = convert_loc(self.prev_location)
         #next_loc = convert_loc(self.next_location) 
-
-        json_data_new = {k:convert_to_loc(v)[0:2] for k, v in json_data_new.items() }
+        if self.is_row:
+            json_data_new = {k:convert_to_loc(v)[0:2] for k, v in json_data_new.items() }
+        else:
+            json_data_new = {k:convert_to_loc(v) for k, v in json_data_new.items() }
 
         grasp_dists = [(x[0], euclid_dist(self.prev_location, x[1])) for x in json_data_new.items()]
         min_grasp_color = list(sorted(grasp_dists, key = lambda x:x[1]))[0][0]
 
-        other_blocks = [x for x in json_data_new.items() if x[0] != min_grasp_color]
-
-        # filter down to blocks that are to the left of place index 
-        # x must be < 
-        if filter_left: 
-            left_of = [x for x in other_blocks if x[1][0] < self.next_location[0]]
-            if len(left_of) == 0:
-                print(f"no left of")
-                return None
-            remaining_blocks = left_of
-        else:
-            remaining_blocks = other_blocks
+        remaining_blocks = [x for x in json_data_new.items() if x[0] != min_grasp_color]
+        remaining_blocks_before = [x for x in remaining_blocks]
+        if not self.is_row:
+            # if we're building a stack, restrict to the highest blocks 
+            thresh = 10
+            heights = [x[1][-1] for x in remaining_blocks]
+            max_height = max(heights)
+            #place_height = self.next_location[-1]
+            # soft match blocks within a threshold of 10 pixels of the place location 
+            remaining_blocks = [x for x in remaining_blocks if np.abs(x[1][-1] - max_height) < thresh ]
 
         # find block closest to place index 
         place_dists = [(x[0], euclid_dist(self.next_location, x[1])) for x in remaining_blocks]
-        min_place_color = list(sorted(place_dists, key = lambda x:x[1]))[0][0]
+        sorted_place_dists = sorted(place_dists, key = lambda x:x[1])
+        match_thresh = 25
+        if not self.is_row:
+            # if the height restriction was too restrictive, back off to flat match 
+            if (len(sorted_place_dists) == 0 or sorted_place_dists[0][1] > match_thresh):
+                print(f"BACKING OFF to x-z only")
+                remaining_blocks = remaining_blocks_before
+                place_dists = [(x[0], euclid_dist(self.next_location, x[1])) for x in remaining_blocks]
+                sorted_place_dists = sorted(place_dists, key = lambda x:x[1]) 
+
+        min_place_color = list(sorted_place_dists)[0][0]
         # get relation between place location and place block 
-        #place_landmark_pos = json_data[min_place_color]
-        #place_pos = self.next_locationA
-        # 
-        self.source_code = min_grasp_color[0]
-        self.target_code = min_place_color[0]
+        self.source_code = min_grasp_color
+        self.target_code = min_place_color
 
         self.relation_code = "next_to"
 
@@ -317,26 +325,20 @@ class Pair:
                                 "wd": "up and to the right of",
                                 "sd": "down and to the right of"}
 
-        color_lookup_dict = {"r": "red", "b": "blue", "g": "green", "y": "yellow", 
-                            "green":"green", "blue":"blue", "yellow":"yellow","red":"red"}
-
-        stack_template = "stack the {source_location} {source_color} block {relation} the {target_location} {target_color} block"
+        #stack_template = "stack the {source_location} {source_color} block {relation} the {target_location} {target_color} block"
+        stack_template = "stack the {source_color} block {relation} the {target_color} block"
         row_template = "move the {source_color} block {relation} the {target_color} block"
 
         # is stacking task 
         try:
-            if self.source_location is not None:
-                return stack_template.format(source_location = location_lookup_fxn(self.source_location), 
-                                            source_color = color_lookup_dict[self.source_code],
-                                            target_location = location_lookup_fxn(self.target_location), 
-                                            target_color = color_lookup_dict[self.target_code],
-                                            relation = relation_lookup_dict[self.relation_code])
-        except KeyError:
-            return "bad"
-        try:
-            return row_template.format(source_color = color_lookup_dict[self.source_code],
-                                    target_color = color_lookup_dict[self.target_code],
-                                    relation = relation_lookup_dict[self.relation_code])
+            if self.is_row: 
+                return row_template.format(source_color = self.source_code,
+                                        target_color = self.target_code, 
+                                        relation = relation_lookup_dict[self.relation_code])
+            else:
+                return stack_template.format(source_color = self.source_code,
+                                            target_color = self.target_code,
+                                            relation = "on")
         except KeyError:
             return "bad"
 
@@ -438,7 +440,7 @@ def flip_pair(pair, axis):
     return new_pair 
 
 
-def get_pairs(data_home, resolution = 224, is_sim = False):
+def get_pairs(data_home, resolution = 224, is_sim = False, is_row = True):
     image_home = data_home.joinpath("data/color-heightmaps")
     if is_sim: 
         json_home = data_home.joinpath("data/variables")
@@ -491,7 +493,7 @@ def get_pairs(data_home, resolution = 224, is_sim = False):
             prev_act = "place"
             # now you can create a pair with the previous action's grasp and current place 
             if is_sim:
-                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home)
+                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row)
             else:
                 pair = Pair.from_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home)
             pick_place_pairs.append(pair)
