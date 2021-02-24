@@ -1545,13 +1545,14 @@ def main(args):
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
-                        push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
-                                trainer.forward(color_heightmap, valid_depth_heightmap,
+
+                # print(f"Command: {language_data_instance['command']}") 
+                # color_path = "/Users/Elias/Desktop/color_heightmap.png"
+                # plt.imsave(color_path, color_heightmap) 
+
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                        trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
-                else:
-                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
-                            trainer.forward(color_heightmap, valid_depth_heightmap,
-                                    is_volatile=True, goal_condition=goal_condition, language_output=language_output)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
