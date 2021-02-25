@@ -928,7 +928,6 @@ def cos_sim(test_feat, demo_action_embed):
     norm_factor = np.linalg.norm(test_feat, axis=1) + 1e-4
     return (cos_sim / norm_factor)
 
-
 def compute_demo_dist(preds, example_actions, metric='l2'):
     """
     Function to evaluate l2 distance and generate demo-signal mask
@@ -945,7 +944,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
         # reshape and update list
         example_actions[i] = actions
 
-    # get mask for each model
+    # get mask
     masks = []
     mask_shape = None
     exit = True
@@ -966,56 +965,36 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     # calculate distance between example action embedding and preds for each policy and demo
     dists = []
     for ind, actions in enumerate(example_actions):
-        for i, action in enumerate(actions):
+        # check if policy was supplied (entry will be [None, None] if it wasn't)
+        if actions[0] is None:
             # if policy not supplied, insert pixel-wise array of inf distance
-            if metric == 'l2':
-                if action is None:
-                    dists.append(np.ones(mask_shape) * np.inf)
-                    continue
+            dists.append(np.ones(mask_shape) * np.inf)
+            continue
 
+        for action in actions:
+            if metric == 'l2':
                 # calculate pixel-wise l2 distance (16x224x224)
                 dist = np.sum(np.square(action - preds[ind]), axis=1)
                 invert = True
-
             elif metric == 'cos_sim':
-                if action is None:
-                    dists.append(np.ones(mask_shape) * np.NINF)
-                    continue
-
                 dist = cos_sim(preds[ind], action)
-                #print('Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
-                #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
                 invert = False
-
             # TODO(adit98) UMAP distance?
             else:
                 raise NotImplementedError
 
-            if invert:
-                # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
-                dist[masks[ind]] = np.max(dist) * 1.1
+            # set all masked spaces to have max l2 distance
+            # select appropriate mask from list of masks
+            dist[masks[ind]] = np.max(dist) * 1.1
 
-            else:
-                # set all masked spaces to have min similarity (select appropriate mask from list of masks)
-                dist[masks[ind]] = np.min(dist) * 0.9
-
-            #print('Post-Mask | Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
-            #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
-
-            # append to dists list
+            # append to l2_dists list
             dists.append(dist)
 
     # stack pixel-wise distance array per policy (4x16x224x224)
     dists = np.stack(dists)
 
-    if invert:
-        # find overall minimum distance across all policies and get index
-        match_ind = np.unravel_index(np.argmin(dists), dists.shape)
-    else:
-        # find overall maximum similarity across all policies and get index
-        match_ind = np.unravel_index(np.argmax(dists), dists.shape)
-
-    #print("Selected match_ind:", match_ind)
+    # find overall minimum distance across all policies and get index
+    match_ind = np.unravel_index(np.argmin(dists), dists.shape)
 
     # select distance array for policy which contained minimum distance index
     dist = dists[match_ind[0]]
@@ -1033,6 +1012,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
         im_mask = dist
 
     return im_mask, match_ind[1:], match_ind[0]
+
 
 def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', cc_match=False):
     """

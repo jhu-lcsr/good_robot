@@ -798,10 +798,11 @@ def main(args):
                     for ind, d in enumerate(example_demos):
                         # get action embeddings from example demo
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
+                            print('depth_channels_history', depth_channels_history)
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id, demo_action_ind = \
                                 d.get_action(workspace_limits, action, task_progress, stack_trainer,
                                         row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
-                                        cycle_consistency=cycle_consistency, demo_mask=True)
+                                        cycle_consistency=cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
                                     demo_stack_action, demo_unstack_action, demo_vertical_square_action, demo_action_ind]
 
