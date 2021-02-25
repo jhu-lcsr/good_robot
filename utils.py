@@ -252,7 +252,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.5):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.8):
     """
     Adds a language mask to the predictions array.
 
@@ -299,15 +299,14 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     else:
         # TODO (elias) why not just multiply probs in with the mask 
         if threshold is not None:
-            predictions.mask = 1 - np.logical_and(1 - curr_mask,  1 - language_mask)
-
+            predictions.mask = 1 - np.logical_and(1 - curr_mask, 1 - language_mask)
+           
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
         f = plt.figure()
         # f.suptitle(str(trainer.iteration))
         f.add_subplot(1,2, 1)
-        #if predictions is not None:
         plt.imshow(predictions.mask[0,:,:])
         f.add_subplot(1,2, 2)
         if color_heightmap is not None:
@@ -883,6 +882,7 @@ class StackSequence(object):
         if self.is_goal_conditioned_task:
             # 3 is currently the red block
             # object_color_index = 3
+            # start with 1st object fixed, move 2nd object onto it 
             self.object_color_index = 0
 
             # Choose a random sequence to stack
