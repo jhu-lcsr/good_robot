@@ -76,8 +76,9 @@ class HumanControlOfRobot(object):
         else:
             self.robot = robot
 
-        # reset objects so we have correct progress
-        self.reset_sim()
+        if is_sim:
+            # reset objects so we have correct progress
+            self.reset_sim()
 
         # Slow down robot
         # robot.joint_acc = 1.4
@@ -341,7 +342,8 @@ class HumanControlOfRobot(object):
             # NOTE(adit98) figure out how to show next img before action selection
             # finish trial and move to next trial
             # keep repositioning objects until we start from 1st step
-            self.reset_sim()
+            if is_sim:
+                self.reset_sim()
 
         elif key == ord('c'):
             if self.logger is not None:
