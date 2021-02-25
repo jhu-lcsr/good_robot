@@ -750,7 +750,7 @@ class Trainer(object):
             print(reward_str)
             return expected_reward, current_reward
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, use_demo=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -869,10 +869,6 @@ class Trainer(object):
             self.optimizer.step()
 
         elif self.method == 'reinforcement':
-            # TODO(adit98) figure out backprop for use_demo
-            if use_demo:
-                raise NotImplementedError
-
             self.optimizer.zero_grad()
             # Compute labels
             label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))

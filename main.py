@@ -259,20 +259,9 @@ def main(args):
         assert is_testing, ("Must run in testing mode if using demo")
         trainer = None
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
-        if 'stack' in multi_task_snapshot_files:
-            stack_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, multi_task_snapshot_files['stack'], force_cpu,
-                              goal_condition_len, place, pretrained, flops,
-                              network=neural_network_name, common_sense=common_sense,
-                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
-                              trial_reward='discounted' if discounted_reward else 'spot',
-                              num_dilation=num_dilation)
 
-            # set trainer if not already set
-            if trainer is None:
-                trainer = stack_trainer
-
+        # store list of trainers
+        trainers = []
         if 'row' in multi_task_snapshot_files:
             row_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['row'], force_cpu,
@@ -283,9 +272,29 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
+            # add row trainer to list of trainers
+            trainers.append(row_trainer)
+
             # set trainer if not already set
             if trainer is None:
                 trainer = row_trainer
+
+        if 'stack' in multi_task_snapshot_files:
+            stack_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, multi_task_snapshot_files['stack'], force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
+
+            # add stack trainer to list of trainers
+            trainers.append(stack_trainer)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = stack_trainer
 
         if 'unstack' in multi_task_snapshot_files:
             unstack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -296,6 +305,9 @@ def main(args):
                               place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
+
+            # add unstack trainer to list of trainers
+            trainers.append(unstack_trainer)
 
             # set trainer if not already set
             if trainer is None:
@@ -310,6 +322,9 @@ def main(args):
                               place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
+
+            # add vertical_square trainer to list of trainers
+            trainers.append(vertical_square_trainer)
 
             # set trainer if not already set
             if trainer is None:
@@ -1727,15 +1742,14 @@ def main(args):
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
                 print('Running two step backprop()')
-                #if use_demo:
-                #    demo_color_heightmap, demo_depth_heightmap = \
-                #            demo.get_heightmaps(prev_primitive_action, prev_stack_height)
-                #    trainer.backprop(demo_color_heightmap, demo_depth_heightmap,
-                #            prev_primitive_action, prev_best_dict, label_value,
-                #            goal_condition=prev_goal_condition)
+                # NOTE(adit98) this is a WIP
+                if use_demo:
+                    backprop_trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
+                        prev_primitive_action, prev_best_pix_ind, label_value,
+                        goal_condition=prev_goal_condition)
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
                         prev_primitive_action, prev_best_pix_ind, label_value,
-                        goal_condition=prev_goal_condition, use_demo=use_demo)
+                        goal_condition=prev_goal_condition)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
