@@ -1020,9 +1020,6 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     # select distance array for policy which contained minimum distance index
     dist = dists[match_ind[0]]
 
-    # discard first dimension of match_ind to get it in the form (theta, y, x)
-    match_ind = match_ind[1:]
-
     # make dist >=0 and max_normalize
     dist = dist - np.min(dist)
     dist = dist / np.max(dist)
@@ -1035,7 +1032,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     else:
         im_mask = dist
 
-    return im_mask, match_ind
+    return im_mask, match_ind[1:], match_ind[0]
 
 def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', cc_match=False):
     """
@@ -1182,4 +1179,4 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
     # invert values of best_match_map so that large values indicate correspondence
     im_mask = 1 - best_match_map
 
-    return im_mask, match_ind
+    return im_mask, match_ind, best_ind

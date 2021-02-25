@@ -368,7 +368,8 @@ def main(args):
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False,
-                          'example_actions_dict': None}
+                          'example_actions_dict': None,
+                          'best_trainer_ind': 0}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -907,11 +908,11 @@ def main(args):
 
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
-                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                            correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_cc_dist(preds, example_actions, demo_action_inds,
                                             metric=primitive_distance_method)
                         else:
-                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                            correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
 
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
@@ -1744,6 +1745,7 @@ def main(args):
                 print('Running two step backprop()')
                 # NOTE(adit98) this is a WIP
                 if use_demo:
+                    backprop_trainer = trainers[nonlocal_variables['best_trainer_ind']]
                     backprop_trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
                         prev_primitive_action, prev_best_pix_ind, label_value,
                         goal_condition=prev_goal_condition)
