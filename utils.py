@@ -1078,7 +1078,6 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
             # if policy not supplied, insert pixel-wise array of inf distance
             if metric == 'l2':
-                invert = True
                 if embedding is None:
                     cc_dists.append((np.ones(mask_shape) * np.inf, np.inf))
                     continue
@@ -1110,55 +1109,11 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
                 match_map = right_dist
 
-            elif metric == 'cos_sim':
-                invert = False
-                if embedding is None:
-                    cc_dists.append((np.ones(mask_shape) * np.NINF, np.NINF))
-                    continue
-
-                # get embedding for best action
-                action_embedding = embedding[demo_action[0], :, demo_action[1], demo_action[2]]
-
-                # calculate pixel-wise l2 distance (16x224x224)
-                right_sim = cos_sim(preds[ind], np.expand_dims(action_embedding, (0, 2, 3)))
-
-                # get embedding at best match (right_match)
-                match_ind = np.unravel_index(np.argmin(right_sim), right_sim.shape)
-                right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
-
-                # now crop demo embedding to +/- 15 pixels around demo_action
-                cropped_embedding = embedding[demo_action[0], :,
-                        (demo_action[1] - 15):(demo_action[1]+16),
-                        (demo_action[2] - 15):(demo_action[2]+16)]
-                revised_match_ind = np.array([15, 15])
-
-                # now rematch this with cropped demo_embedding array NOTE(adit98) may need to modify cos_sim function
-                left_sim = cos_sim(cropped_embedding, right_match[:, None, None])
-                rematch_ind = np.unravel_index(np.argmax(left_sim), left_sim.shape)
-
-                # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
-                # NOTE(adit98) hardcoding primitive action as grasp for now
-                #match_robot_ind, _ = robot.action_heightmap_coordinate_to_3d_robot_pose(match_ind[2],
-                #        match_ind[1], 'grasp', valid_depth_heightmap)
-                #rematch_robot_ind, _ = robot.action_heightmap_coordinate_to_3d_robot_pose(rematch_ind[2],
-                #        rematch_ind[1], 'grasp', valid_depth_heightmap)
-
-                # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
-                cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
-                match_map = right_sim
-
-            # TODO(adit98) UMAP distance?
             else:
                 raise NotImplementedError
 
-            # mask invalid locations
-            if invert:
-                # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
-                match_map[masks[ind]] = np.max(match_map) * 1.1
-
-            else:
-                # set all masked spaces to have min similarity (select appropriate mask from list of masks)
-                match_map[masks[ind]] = np.min(match_map) * 0.9
+            # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
+            match_map[masks[ind]] = np.max(match_map) * 1.1
 
             # append (match_map, cycle consistency distance, embedding, preds, and demo_action) to list of cc distances
             cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind], ind, i))
@@ -1167,13 +1122,8 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
     best_match_map, best_cc_dist, best_embedding, best_preds, demo_action_ind, mask, best_ind, best_i = cc_dists[np.argmin([x[1] for x in cc_dists])]
     print("Selected Policy #:", best_ind, "demo number:", best_i)
 
-    if invert:
-        # find overall minimum distance across all policies and get index
-        initial_match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
-
-    else:
-        # find overall maximum similarity across all policies and get index
-        initial_match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
+    # find overall minimum distance across all policies and get index
+    initial_match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
 
     if cc_match:
         # if using cycle consistency to match actions in addition to domains, look at all match pairs in a neighborhood
@@ -1219,7 +1169,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         cropped_match_ind = np.unravel_index(np.argmin(pixel_cc_dist), cropped_preds.shape[-2:])
 
         # pad match_ind to get original index
-        offset = initial_match_ind[1:] - np.array([15, 15])
+        offset = np.array([initial_match_ind[1] - 15, initial_match_ind[2] - 15])
         match_ind = [initial_match_ind[0], cropped_match_ind[0] + offset[0], cropped_match_ind[1] + offset[1]]
 
     else:
@@ -1229,12 +1179,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
     best_match_map = best_match_map - np.min(best_match_map)
     best_match_map = best_match_map / np.max(best_match_map)
 
-    # if our best_match_mapance metric returns high values for values that are far apart, we need to invert (for viz)
-    if invert:
-        # invert values of best_match_map so that large values indicate correspondence
-        im_mask = 1 - best_match_map
-
-    else:
-        im_mask = best_match_map
+    # invert values of best_match_map so that large values indicate correspondence
+    im_mask = 1 - best_match_map
 
     return im_mask, match_ind
