@@ -268,7 +268,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
             raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
     
     # Extract current masks
-    curr_mask = np.ma.getmask(predictions)
+    curr_mask = np.ma.getmask(predictions).copy()
 
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
@@ -299,26 +299,20 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     else:
         # TODO (elias) why not just multiply probs in with the mask 
         if threshold is not None:
-            predictions.mask = 1 - np.logical_and(1 - curr_mask, 1 - language_mask)
-           
+            predictions.mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
+
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
         f = plt.figure()
-        # f.suptitle(str(trainer.iteration))
-        f.add_subplot(1,2, 1)
-        plt.imshow(predictions.mask[0,:,:])
-        f.add_subplot(1,2, 2)
+        fig, ax = plt.subplot(2,3)
+        ax[0,0].imshow(curr_mask[0,:,:])
+        ax[0,1].imshow(1 - language_mask[0,:,:])
+        ax[0,2].imshow(predictions.mask[0,:,:])
+        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
         if color_heightmap is not None:
-            plt.imshow(color_heightmap)
-        # f.add_subplot(1,4, 2)
-        # if push_predictions is not None:
-        #     plt.imshow(push_contactable_regions)
-        # f.add_subplot(1,4, 3)
-        # plt.imshow(depth_heightmap)
-        # f.add_subplot(1,4, 4)
-        # if color_heightmap is not None:
-        #     plt.imshow(color_heightmap)
+            ax[1,1].imshow(color_heightmap)
+       
         plt.show(block=True)
     return predictions
 
