@@ -587,9 +587,7 @@ def main(args):
                     needed_to_reset = True
                     insufficient_objs_in_scene = True
 
-        #if not is_sim and grasp_color_task:
-        if True:
-            # TODO(elias) add call to pygame to show relevant info for checking here
+        if not is_sim and grasp_color_task:
             if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
                 nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None: 
                 success_code, comment = annotate_success_manually(nonlocal_variables['language_metadata']['command'], 
