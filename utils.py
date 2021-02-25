@@ -304,8 +304,8 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
-        f = plt.figure()
-        fig, ax = plt.subplot(2,3)
+        plt.figure()
+        fig, ax = plt.subplots(2,3)
         ax[0,0].imshow(curr_mask[0,:,:])
         ax[0,1].imshow(1 - language_mask[0,:,:])
         ax[0,2].imshow(predictions.mask[0,:,:])
