@@ -584,6 +584,10 @@ def main(args):
                     needed_to_reset = True
                     insufficient_objs_in_scene = True
 
+        if not is_sim and grasp_color_task:
+            # TODO(elias) add call to pygame to show relevant info for checking here
+            pass 
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
@@ -1611,13 +1615,12 @@ def main(args):
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
-                        push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
-                                trainer.forward(color_heightmap, valid_depth_heightmap,
+                command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
+                print(f"Command: {' '.join(command)}") 
+
+                push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
+                        trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
-                else:
-                    push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
-                            trainer.forward(color_heightmap, valid_depth_heightmap,
-                                    is_volatile=True, goal_condition=goal_condition, language_output=language_output)
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread

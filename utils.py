@@ -12,13 +12,14 @@ import torch
 from scipy.special import softmax
 import pathlib
 import matplotlib.pyplot as plt
+import pdb 
 
 # Import necessary packages
 #try:
 from spacy.lang.en import English
 from spacy.tokenizer import Tokenizer
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-from transformer import TransformerEncoder
+from transformer import TransformerEncoder, tiles_to_image
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 #except ImportError:
 #    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
@@ -251,7 +252,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.5):
     """
     Adds a language mask to the predictions array.
 
@@ -267,30 +268,39 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
             raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
     
     # Extract current masks
-    currMask = np.ma.getmask(predictions)
+    curr_mask = np.ma.getmask(predictions)
 
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
     # language_data should have shape torch([1, 256, 2, 1])
-    languageMask = softmax(language_data[0,:,:,0], axis=1)
-    languageMask = np.float32(languageMask[:,1] > 0.5).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+    language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
+    language_data = softmax(language_data, axis = 1)
+    # take prob yes 
+    language_mask = language_data[:,1,:,:]
+    language_mask = np.float32(language_mask).reshape(64,64, 1)
+    #language_mask = softmax(language_data[0,:,:,0], axis=1)
+    #language_mask = np.float32(language_mask[:,1] > 0.8).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+    if threshold is not None:
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
 
     # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
-
     # Scale language masks to match the prediction array sizes
-    languageMask = cv2.resize(languageMask, currMask.shape[1:3], interpolation=cv2.INTER_NEAREST)
-    languageMask = np.broadcast_to(languageMask, predictions.shape, subok=True)
+    new_w = curr_mask.shape[1]
+    language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+    language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
 
     # Catching errors
-    assert languageMask.shape == currMask.shape and languageMask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
+    assert language_mask.shape == curr_mask.shape and language_mask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
 
     # Combine language mask with existing masks if necessary
-    if currMask is np.ma.nomask:
-        predictions.mask = languageMask
+    if curr_mask is np.ma.nomask:
+        predictions.mask = language_mask
     else:
-        predictions.mask = 1 - np.logical_and(1 - currMask,  1 - languageMask)
+        # TODO (elias) why not just multiply probs in with the mask 
+        if threshold is not None:
+            predictions.mask = 1 - np.logical_and(1 - curr_mask,  1 - language_mask)
 
-    
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
@@ -311,10 +321,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         # if color_heightmap is not None:
         #     plt.imshow(color_heightmap)
         plt.show(block=True)
-
     return predictions
-
-
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
 def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):

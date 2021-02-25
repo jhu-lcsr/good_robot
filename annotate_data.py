@@ -334,7 +334,8 @@ class Pair:
             if self.is_row: 
                 return row_template.format(source_color = self.source_code,
                                         target_color = self.target_code, 
-                                        relation = relation_lookup_dict[self.relation_code])
+                                        relation = "next to")
+                                        # relation = relation_lookup_dict[self.relation_code])
             else:
                 return stack_template.format(source_color = self.source_code,
                                             target_color = self.target_code,
