@@ -47,9 +47,15 @@ if __name__ == '__main__':
     if args.task_type == 'unstack':
         place_common_sense = False
         demo_mask = True
+        place_dilation = 0.05
+    elif args.task_type == 'stack':
+        demo_mask = True
+        place_common_sense = True
+        place_dilation = 0.00
     else:
         place_common_sense = True
         demo_mask = True
+        place_dilation = 0.05
 
     # Initialize trainer(s)
     stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
@@ -61,7 +67,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.05,
+                          show_heightmap=False, place_dilation=0.00,
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 
@@ -72,7 +78,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.05,
+                          show_heightmap=False, place_dilation=place_dilation,
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 
@@ -83,7 +89,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.05,
+                          show_heightmap=False, place_dilation=place_dilation,
                           common_sense_backprop=True, trial_reward='spot',
                           num_dilation=0)
 
@@ -94,7 +100,7 @@ if __name__ == '__main__':
                           force_cpu=args.cpu, goal_condition_len=0, place=True,
                           pretrained=True, flops=False, network='densenet',
                           common_sense=True, place_common_sense=place_common_sense,
-                          show_heightmap=False, place_dilation=0.05,
+                          show_heightmap=False, place_dilation=place_dilation,
                           common_sense_backprop=True, trial_reward='spot', num_dilation=0)
 
     if stack_trainer is None and row_trainer is None and unstack_trainer is None and vertical_square_trainer is None:

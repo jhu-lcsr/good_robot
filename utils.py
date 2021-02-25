@@ -1161,46 +1161,69 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 match_map[masks[ind]] = np.min(match_map) * 0.9
 
             # append (match_map, cycle consistency distance, embedding, preds, and demo_action) to list of cc distances
-            cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind]))
+            cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind], ind, i))
 
     # select entry with min cycle consistency distance
-    best_match_map, best_cc_dist, best_embedding, best_preds, demo_action_ind, mask = cc_dists[np.argmin([x[1] for x in cc_dists])]
+    best_match_map, best_cc_dist, best_embedding, best_preds, demo_action_ind, mask, best_ind, best_i = cc_dists[np.argmin([x[1] for x in cc_dists])]
+    print("Selected Policy #:", best_ind, "demo number:", best_i)
 
-    if cc_match:
-        # now, find rematch_ind for each allowed_action in embedding
-        flat_embedding = np.expand_dims(best_embedding.reshape(-1, 64), (1, 3, 4)) # now this is N x 16 x 64 x 224 x 224
-
-        if metric == 'l2':
-            dists = np.sum(np.square(flat_embedding - best_preds[None, ...]), axis=2) # N x 16 x 224 x 224
-
-            # rematches contains N (theta, y, x) coordinates
-            rematches = np.vstack(np.unravel_index(np.argmin(dists, axis=0), best_embedding.shape)) # N x 3
-
-        elif metric == 'cos_sim':
-            # NOTE(adit98) this probably won't work
-            dists = cos_sim(flat_embedding, best_preds[None, ...])
-
-            # rematches contains N (theta, y, x) coordinates
-            rematches = np.vstack(np.unravel_index(np.argmax(dists, axis=0), best_embedding.shape)) # N x 3
-
-        # now compute (x, y) distance of rematches with original demo_action_ind
-        rematch_dists = np.sum(np.square(rematches[:, 1:] - demo_action_ind[None, 1:]), axis=1)
-
-        # mask invalid locs by setting to [0, 0, 0] (flatten mask to get indices) NOTE(adit98) check if flatten behaves properly here
-        print(mask.flatten().shape, rematches.shape)
-        rematch_dists[mask.flatten()] = np.inf
-
-        # finally get argmin and unravel_index
-        match_ind = np.unravel_index(np.argmin(rematch_dists), best_embedding.shape)
+    if invert:
+        # find overall minimum distance across all policies and get index
+        initial_match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
 
     else:
-        if invert:
-            # find overall minimum distance across all policies and get index
-            match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
+        # find overall maximum similarity across all policies and get index
+        initial_match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
 
-        else:
-            # find overall maximum similarity across all policies and get index
-            match_ind = np.unravel_index(np.argmax(best_match_map), best_match_map.shape)
+    if cc_match:
+        # if using cycle consistency to match actions in addition to domains, look at all match pairs in a neighborhood
+        # then select most consistent pair (min x,y dist)
+
+        # first crop preds around initial best match
+        cropped_preds = best_preds[initial_match_ind[0], :,
+                (initial_match_ind[1] - 15):(initial_match_ind[1]+16),
+                (initial_match_ind[2] - 15):(initial_match_ind[2]+16)]
+
+        # also crop mask
+        cropped_mask = mask[initial_match_ind[0], (initial_match_ind[1] - 15):(initial_match_ind[1]+16),
+                (initial_match_ind[2] - 15):(initial_match_ind[2]+16)]
+
+        # then crop embedding around demo action (choose a very conservative neighborhood here)
+        cropped_embedding = best_embedding[demo_action[0], :, (demo_action[1] - 2):(demo_action[1]+3),
+                (demo_action[2] - 2):(demo_action[2]+3)]
+
+        # now, flatten cropped preds, get match embeddings, then find rematch_inds, and unravel index
+        flat_preds = cropped_preds.reshape(-1, 64)[None, ...] # now this is 1 x N x 64
+        flat_embeds = cropped_embedding.reshape(-1, 64)[:, None, :] # now this is n x 1 x 64
+
+        # now find match inds
+        match_inds = np.argmin(np.sum(np.square(flat_preds - flat_embeds), axis=-1), axis=0)
+
+        # index with match_inds to get matched embeds
+        matched_embeds = flat_embeds[match_inds] # N x 1 x 64
+
+        # rematch into preds
+        rematch_inds = np.argmin(np.sum(np.square(flat_preds - matched_embeds), axis=-1), axis=1)
+
+        # convert rematch_inds and np.arange(N) to unraveled indices
+        orig_inds = np.vstack(np.unravel_index(np.arange(rematch_inds.shape[0]), cropped_preds.shape[-2:])) # N x 2
+        rematch_inds = np.vstack(np.unravel_index(rematch_inds, cropped_preds.shape[-2:])) # N x 2
+
+        # compute pixel-wise cc distance in test space
+        pixel_cc_dist = np.sum(np.square(orig_inds - rematch_inds), axis=0).astype(np.float32)
+
+        # mask cc_dist
+        pixel_cc_dist[cropped_mask.flatten()] = np.inf
+
+        # compute cc dist for each ind and pick min as best match
+        cropped_match_ind = np.unravel_index(np.argmin(pixel_cc_dist), cropped_preds.shape[-2:])
+
+        # pad match_ind to get original index
+        offset = initial_match_ind[1:] - np.array([15, 15])
+        match_ind = [initial_match_ind[0], cropped_match_ind[0] + offset[0], cropped_match_ind[1] + offset[1]]
+
+    else:
+        match_ind = initial_match_ind
 
     # make best_match_map >=0 and max_normalize
     best_match_map = best_match_map - np.min(best_match_map)
