@@ -12,6 +12,7 @@ import torch
 from scipy.special import softmax
 import pathlib
 import matplotlib.pyplot as plt
+import pygame
 import pdb 
 
 # Import necessary packages
@@ -1310,3 +1311,54 @@ def compute_cc_dist(test_preds, demo_preds):
     im_mask = 1 - l2_dist
 
     return im_mask, match_ind
+
+def annotate_success_manually(command, prev_image, next_image):
+    """
+    # Returns
+
+      description, comment.
+    """
+    print(
+        "\nPress a key to label the file: 1. success, 2. failure, 3. skip \n"
+        "What to look for:\n"
+        " - A successful stack is 3 blocks tall or 4 blocks tall with the gripper completely removed from the field of view.\n"
+        " - If the tower is 3 blocks tall and blocks will clearly slide off if not for the wall press 2 for 'failure',\n"
+        "   if it is merely in contact with a wall, press 1 for 'success'."
+        " - When the robot doesn't move but there is already a visible successful stack, that's an error.failure.falsely_appears_correct, so press 1 for 'success'!\n"
+        " - If you can see the gripper, the example is a failure even if the stack is tall enough!\n")
+    # , 3: error.failure
+    flag = 0
+    comment = 'none'
+    mark_previous_unconfirmed = None
+    pygame.init()
+    font = pygame.font.Font('freesansbold.ttf', 32)
+    textsurface = font.render(command, True, "black", "white")
+    text_rect = textsurface.get_rect()
+    text_rect.center = (350, 16)
+    screen = pygame.display.set_mode((700, 500))
+    screen.blit(textsurface, text_rect)
+    screen.blit(prev_image, (200,33))
+    w = prev_image.get_size()[0]
+    screen.blit(next_image, (200, 33 + w+1))
+    pygame.display.update()
+    while flag == 0:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    print("label set to success")
+                    flag = 1
+                    pygame.quit()
+                    return "success", comment
+                elif event.key == pygame.K_2:
+                    print("label set to failure")
+                    flag = 1
+                    pygame.quit()
+                    return "failure", comment 
+                elif event.key == pygame.K_3:
+                    flag = 1
+                    pygame.quit()
+                    return 'skip', comment 
+      
