@@ -163,19 +163,20 @@ class HumanControlOfRobot(object):
                     depth_grasp, color_grasp = heightmap_pairs[0]
                     depth_place, color_place = heightmap_pairs[1]
 
-                    # save heightmaps (and images)
-                    self.logger.save_heightmaps(self.click_count, color_grasp,
-                            depth_grasp, 'grasp', poststring=self.trial)
-                    self.logger.save_heightmaps(self.click_count, color_place,
-                            depth_place, 'place', poststring=self.trial)
-                    if self.save_img:
-                        img_pairs = self.img_pairs[-2:]
-                        depth_grasp_img, color_grasp_img = img_pairs[0]
-                        depth_place_img, color_place_img = img_pairs[1]
-                        self.logger.save_images(self.click_count, color_grasp_img,
-                                depth_grasp_img, 'grasp')
-                        self.logger.save_images(self.click_count, color_place_img,
-                                depth_place_img, 'place')
+                    if self.logger is not None:
+                        # save heightmaps (and images)
+                        self.logger.save_heightmaps(self.click_count, color_grasp,
+                                depth_grasp, 'grasp', poststring=self.trial)
+                        self.logger.save_heightmaps(self.click_count, color_place,
+                                depth_place, 'place', poststring=self.trial)
+                        if self.save_img:
+                            img_pairs = self.img_pairs[-2:]
+                            depth_grasp_img, color_grasp_img = img_pairs[0]
+                            depth_place_img, color_place_img = img_pairs[1]
+                            self.logger.save_images(self.click_count, color_grasp_img,
+                                    depth_grasp_img, 'grasp')
+                            self.logger.save_images(self.click_count, color_place_img,
+                                    depth_place_img, 'place')
 
 
         if self.action == 'touch':
@@ -326,10 +327,11 @@ class HumanControlOfRobot(object):
                 robot_state += ' joint pos: ' + str(joint_position) + ' homogeneous cart_pose: ' + str(actual_tool_pose)
                 print(str(self.print_state_count) + ' ' + robot_state)
         elif key == ord('f'):
-            # finish trial, write actions (only the successful ones), and move to next trial
-            self.logger.write_to_log('executed-actions-' + str(self.trial),
-                    self.successful_action_log)
-            self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
+            if self.logger is not None:
+                # finish trial, write actions (only the successful ones), and move to next trial
+                self.logger.write_to_log('executed-actions-' + str(self.trial),
+                        self.successful_action_log)
+                self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
             self.trial += 1
 
             # clear logs
@@ -342,10 +344,11 @@ class HumanControlOfRobot(object):
             self.reset_sim()
 
         elif key == ord('c'):
-            # we stopped the program, write actions (only the successful ones)
-            self.logger.write_to_log('executed-actions-' + str(self.trial),
-                    self.successful_action_log)
-            self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
+            if self.logger is not None:
+                # we stopped the program, write actions (only the successful ones)
+                self.logger.write_to_log('executed-actions-' + str(self.trial),
+                        self.successful_action_log)
+                self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
             self.stop = True
         elif key == ord('h'):
             with self.mutex:
@@ -417,6 +420,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--task_type', default='stack', type=str)
     parser.add_argument('-s', '--save_img', action='store_true', default=False)
+    parser.add_argument('--save', action='store_true', default=False)
     args = parser.parse_args()
 
     # User options (change me)
@@ -448,10 +452,13 @@ if __name__ == '__main__':
                 tcp_host_ip, tcp_port, rtc_host_ip, rtc_port, False, None, None,
                 place=True, calibrate=calibrate, unstack=False, task_type=args.task_type)
 
-    # initialize logger
-    logger = Logger(continue_logging=False, logging_directory='demos')
-    logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
-    logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
+    if args.save:
+        # initialize logger
+        logger = Logger(continue_logging=False, logging_directory='demos')
+        logger.save_camera_info(robot.cam_intrinsics, robot.cam_pose, robot.cam_depth_scale) # Save camera intrinsics and pose
+        logger.save_heightmap_info(workspace_limits, heightmap_resolution) # Save heightmap parameters
+    else:
+        logger = None
 
     hcr = HumanControlOfRobot(robot, action=action, logger=logger, task_type=args.task_type, save_img=args.save_img)
     hcr.run()
