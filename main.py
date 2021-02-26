@@ -22,6 +22,7 @@ from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils import compute_demo_dist
+from utils import annotate_success_manually
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
 from demo import Demonstration, load_all_demos
@@ -348,7 +349,9 @@ def main(args):
                           'finalize_prev_trial_log': False,
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False,
-                          'example_actions_dict': None}
+                          'example_actions_dict': None,
+                          'language_metadata': {},
+                          'color_partial_stack_success': None}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -585,8 +588,14 @@ def main(args):
                     insufficient_objs_in_scene = True
 
         if not is_sim and grasp_color_task:
-            # TODO(elias) add call to pygame to show relevant info for checking here
-            pass 
+            if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
+                nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None: 
+                success_code, comment = annotate_success_manually(nonlocal_variables['language_metadata']['command'], 
+                                                                nonlocal_variables['language_metadata']['prev_color_heightmap'],
+                                                                nonlocal_variables['language_metadata']['next_color_heightmap']) 
+
+                nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
+
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
@@ -981,6 +990,10 @@ def main(args):
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
+                        # add for annotation process if we're not in the sim 
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
+
                         needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
@@ -1026,6 +1039,9 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
+                        # add for annotation process if we're not in the sim 
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
 
@@ -1057,6 +1073,7 @@ def main(args):
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print('running check_stack_update_goal for grasp action')
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
                                 depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo)
 
@@ -1096,6 +1113,12 @@ def main(args):
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
                             heightmap_resolution, logger, trainer, '2')
+
+                    # TODO(elias) confirm this doesn't break anything 
+                    # add for annotation process if we're not in the sim 
+                    nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                    nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
+
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
                             task_type=task_type, use_imitation=use_demo)
 
@@ -1615,12 +1638,22 @@ def main(args):
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
+
                 command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
+                nonlocal_variables['language_metadata']['command'] = command
                 print(f"Command: {' '.join(command)}") 
 
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
+
+                # min of 5 active pixels or we kill the sim 
+                if np.sum(1-grasp_predictions.mask) < 5: 
+                    print(f"Grasp action '{command}' cannot be executed because of missing blocks, exiting!")
+                    no_change_count = end_trial()
+                if np.sum(1-place_predictions.mask) < 5: 
+                    print(f"Place action '{command}' cannot be executed because of missing blocks, exiting!")
+                    no_change_count = end_trial()
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
