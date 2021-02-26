@@ -245,16 +245,15 @@ def main(args):
     # which defines where place actions are permitted. Units are in meters.
     if check_row:
         place_dilation = 0.05
+    elif task_type == 'stack':
+        place_dilation = 0.00
     elif task_type is not None:
-        # TODO(adit98) think about how we set different place dilations
-        stack_place_dilation = 0.05
         place_dilation = 0.05
     else:
         place_dilation = 0.00
 
     # Initialize trainer(s)
     if use_demo:
-        print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
         assert task_type is not None, ("Must provide task_type if using demo")
         assert is_testing, ("Must run in testing mode if using demo")
         trainer = None
@@ -285,7 +284,7 @@ def main(args):
                               goal_condition_len, place, pretrained, flops,
                               network=neural_network_name, common_sense=common_sense,
                               place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
@@ -798,7 +797,6 @@ def main(args):
                     for ind, d in enumerate(example_demos):
                         # get action embeddings from example demo
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
-                            print('depth_channels_history', depth_channels_history)
                             demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id, demo_action_ind = \
                                 d.get_action(workspace_limits, action, task_progress, stack_trainer,
                                         row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
@@ -911,7 +909,7 @@ def main(args):
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_cc_dist(preds, example_actions, demo_action_inds,
-                                            metric=primitive_distance_method)
+                                            metric=primitive_distance_method, cc_match=False)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)

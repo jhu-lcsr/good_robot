@@ -1066,6 +1066,10 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 right_dist = np.sum(np.square(np.expand_dims(action_embedding,
                     (0, 2, 3)) - preds[ind]), axis=1)
 
+                # smooth distance array and mask
+                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(0, 3, 3))
+                right_dist[masks[ind]] = np.max(right_dist) * 1.1
+
                 # get embedding at best match (right_match)
                 match_ind = np.unravel_index(np.argmin(right_dist), right_dist.shape)
                 right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
@@ -1078,6 +1082,9 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
                 # now rematch this with cropped demo_embedding array
                 left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None]), axis=0)
+
+                # smooth left_dist
+                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(3, 3))
                 rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
 
                 # TODO(adit98) dealing with rotation?
@@ -1088,9 +1095,6 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
             else:
                 raise NotImplementedError
-
-            # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
-            match_map[masks[ind]] = np.max(match_map) * 1.1
 
             # append (match_map, cycle consistency distance, embedding, preds, and demo_action) to list of cc distances
             cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind], ind, i))
@@ -1108,12 +1112,12 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
         # first crop preds around initial best match
         cropped_preds = best_preds[initial_match_ind[0], :,
-                (initial_match_ind[1] - 15):(initial_match_ind[1]+16),
-                (initial_match_ind[2] - 15):(initial_match_ind[2]+16)]
+                (initial_match_ind[1] - 10):(initial_match_ind[1]+11),
+                (initial_match_ind[2] - 10):(initial_match_ind[2]+11)]
 
         # also crop mask
-        cropped_mask = mask[initial_match_ind[0], (initial_match_ind[1] - 15):(initial_match_ind[1]+16),
-                (initial_match_ind[2] - 15):(initial_match_ind[2]+16)]
+        cropped_mask = mask[initial_match_ind[0], (initial_match_ind[1] - 10):(initial_match_ind[1]+11),
+                (initial_match_ind[2] - 10):(initial_match_ind[2]+11)]
 
         # then crop embedding around demo action (choose a very conservative neighborhood here)
         cropped_embedding = best_embedding[demo_action[0], :, (demo_action[1] - 2):(demo_action[1]+3),
@@ -1123,14 +1127,22 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         flat_preds = cropped_preds.reshape(-1, 64)[None, ...] # now this is 1 x N x 64
         flat_embeds = cropped_embedding.reshape(-1, 64)[:, None, :] # now this is n x 1 x 64
 
-        # now find match inds
-        match_inds = np.argmin(np.sum(np.square(flat_preds - flat_embeds), axis=-1), axis=0)
+        # now find match dist and mask
+        match_dist = np.sum(np.square(flat_preds - flat_embeds), axis=-1) # n x N
+        match_dist[:, cropped_mask.flatten()] = np.max(match_dist) * 1.1
+
+        # get match inds
+        match_inds = np.argmin(match_dist, axis=0) # N
 
         # index with match_inds to get matched embeds
         matched_embeds = flat_embeds[match_inds] # N x 1 x 64
 
-        # rematch into preds
-        rematch_inds = np.argmin(np.sum(np.square(flat_preds - matched_embeds), axis=-1), axis=1)
+        # calculate rematch dist and mask
+        rematch_dist = np.sum(np.square(flat_preds - matched_embeds), axis=-1) # N x N
+        rematch_dist[:, cropped_mask.flatten()] = np.max(rematch_dist) * 1.1
+
+        # get rematch inds
+        rematch_inds = np.argmin(rematch_dist, axis=1) # N
 
         # convert rematch_inds and np.arange(N) to unraveled indices
         orig_inds = np.vstack(np.unravel_index(np.arange(rematch_inds.shape[0]), cropped_preds.shape[-2:])) # N x 2
@@ -1146,8 +1158,8 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         cropped_match_ind = np.unravel_index(np.argmin(pixel_cc_dist), cropped_preds.shape[-2:])
 
         # pad match_ind to get original index
-        offset = np.array([initial_match_ind[1] - 15, initial_match_ind[2] - 15])
-        match_ind = [initial_match_ind[0], cropped_match_ind[0] + offset[0], cropped_match_ind[1] + offset[1]]
+        offset = np.array([initial_match_ind[1] - 10, initial_match_ind[2] - 10])
+        match_ind = (initial_match_ind[0], cropped_match_ind[0] + offset[0], cropped_match_ind[1] + offset[1])
 
     else:
         match_ind = initial_match_ind
