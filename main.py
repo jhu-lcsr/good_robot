@@ -547,6 +547,10 @@ def main(args):
                         num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
                         prev_z_height=nonlocal_variables['prev_stack_height'])
 
+                # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
+                if not check_z_height:
+                    stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+
             else:
                 # TODO(adit98) trigger graceful exit here
                 raise NotImplementedError(task_type)
