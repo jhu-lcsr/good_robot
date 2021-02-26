@@ -1014,7 +1014,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     return im_mask, match_ind[1:], match_ind[0]
 
 
-def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', cc_match=False):
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=True, cc_match=False):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     Arguments:
@@ -1074,11 +1074,15 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 match_ind = np.unravel_index(np.argmin(right_dist), right_dist.shape)
                 right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
 
-                # now crop demo embedding to +/- 15 pixels around demo_action
-                cropped_embedding = embedding[demo_action[0], :,
-                        (demo_action[1] - 15):(demo_action[1]+16),
-                        (demo_action[2] - 15):(demo_action[2]+16)]
-                revised_match_ind = np.array([15, 15])
+                if neighborhood_match:
+                    # now crop demo embedding to +/- 15 pixels around demo_action
+                    cropped_embedding = embedding[demo_action[0], :,
+                            (demo_action[1] - 15):(demo_action[1]+16),
+                            (demo_action[2] - 15):(demo_action[2]+16)]
+                    revised_match_ind = np.array([15, 15])
+                else:
+                    cropped_embedding = embedding
+                    revised_match_ind = match_ind[1:]
 
                 # now rematch this with cropped demo_embedding array
                 left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None]), axis=0)
@@ -1107,6 +1111,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
     initial_match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
 
     if cc_match:
+        # when using cc_match, we already use the most cycle-consistent policy-demo pair, so we always operate in a cropped neighborhood
         # if using cycle consistency to match actions in addition to domains, look at all match pairs in a neighborhood
         # then select most consistent pair (min x,y dist)
 
@@ -1127,8 +1132,14 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         flat_preds = cropped_preds.reshape(-1, 64)[None, ...] # now this is 1 x N x 64
         flat_embeds = cropped_embedding.reshape(-1, 64)[:, None, :] # now this is n x 1 x 64
 
-        # now find match dist and mask
+        # now find match dist
         match_dist = np.sum(np.square(flat_preds - flat_embeds), axis=-1) # n x N
+
+        # reshape and smooth, and re-flatten
+        match_dist = match_dist.reshape((match_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
+        match_dist = ndimage.filters.gaussian_filter(match_dist, sigma=(0, 3, 3)).flatten()
+
+        # mask
         match_dist[:, cropped_mask.flatten()] = np.max(match_dist) * 1.1
 
         # get match inds
@@ -1137,8 +1148,14 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
         # index with match_inds to get matched embeds
         matched_embeds = flat_embeds[match_inds] # N x 1 x 64
 
-        # calculate rematch dist and mask
+        # calculate rematch dist
         rematch_dist = np.sum(np.square(flat_preds - matched_embeds), axis=-1) # N x N
+
+        # reshape and smooth, and re-flatten
+        rematch_dist = rematch_dist.reshape((rematch_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
+        rematch_dist = ndimage.filters.gaussian_filter(rematch_dist, sigma=(0, 3, 3)).flatten()
+
+        # mask
         rematch_dist[:, cropped_mask.flatten()] = np.max(rematch_dist) * 1.1
 
         # get rematch inds
