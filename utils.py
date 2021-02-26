@@ -762,6 +762,12 @@ class StackSequence(object):
             if not self.object_color_index < self.num_obj:
                 self.reset_sequence()
 
+    # NOTE(adit98) adding this function to modify goal if we see progress reversal in test mode
+    def set_progress(self, current_height):
+        # set object_color_index to current height
+        # if current height is 2, goal will be self.object_color_sequence[:3] which is 3 blocks
+        self.object_color_index = current_height
+
 
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
     """ Return if the current arrangement of blocks in the heightmap is a valid row 
@@ -1137,7 +1143,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
         # reshape and smooth, and re-flatten
         match_dist = match_dist.reshape((match_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
-        match_dist = ndimage.filters.gaussian_filter(match_dist, sigma=(0, 3, 3)).flatten()
+        match_dist = ndimage.filters.gaussian_filter(match_dist, sigma=(0, 3, 3)).reshape(match_dist.shape[0], -1)
 
         # mask
         match_dist[:, cropped_mask.flatten()] = np.max(match_dist) * 1.1
@@ -1153,7 +1159,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
         # reshape and smooth, and re-flatten
         rematch_dist = rematch_dist.reshape((rematch_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
-        rematch_dist = ndimage.filters.gaussian_filter(rematch_dist, sigma=(0, 3, 3)).flatten()
+        rematch_dist = ndimage.filters.gaussian_filter(rematch_dist, sigma=(0, 3, 3)).reshape(rematch_dist.shape[0], -1) # n x N
 
         # mask
         rematch_dist[:, cropped_mask.flatten()] = np.max(rematch_dist) * 1.1

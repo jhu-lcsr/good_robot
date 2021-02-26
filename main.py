@@ -630,6 +630,8 @@ def main(args):
                     _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
             else:
+                # not resetting, so set stack goal to proper value
+                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
                 print(mismatch_str)
 
         return needed_to_reset
@@ -909,7 +911,7 @@ def main(args):
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_cc_dist(preds, example_actions, demo_action_inds,
-                                            metric=primitive_distance_method, cc_match=False)
+                                            metric=primitive_distance_method, cc_match=True)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
@@ -1744,7 +1746,7 @@ def main(args):
                 print('Running two step backprop()')
                 # NOTE(adit98) this is a WIP
                 if use_demo:
-                    backprop_trainer = trainers[nonlocal_variables['best_trainer_ind']]
+                    backprop_trainer = trainers[prev_best_trainer_ind]
                     backprop_trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
                         prev_primitive_action, prev_best_pix_ind, label_value,
                         goal_condition=prev_goal_condition)
@@ -1856,8 +1858,11 @@ def main(args):
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
+
         else:
             prev_color_success = None
+
+        prev_best_trainer_ind = nonlocal_variables['best_trainer_ind']
 
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
