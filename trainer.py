@@ -231,7 +231,11 @@ class Trainer(object):
         self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), **kwargs)
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
         self.use_heuristic_log = self.use_heuristic_log.tolist()
-        self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), **kwargs)
+        try:
+            self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), **kwargs)
+        except IOError as identifier:
+            print('WARNING: HACK TO WORKAROUND MISSING is-exploit log')
+            self.is_exploit_log = np.array([[0]]*self.iteration, dtype=int)
         self.is_exploit_log = self.is_exploit_log[0:self.iteration]
         self.is_exploit_log = self.is_exploit_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
