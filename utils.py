@@ -767,6 +767,8 @@ class StackSequence(object):
         # set object_color_index to current height
         # if current height is 2, goal will be self.object_color_sequence[:3] which is 3 blocks
         self.object_color_index = current_height
+        if not self.object_color_index < self.num_obj:
+            self.reset_sequence()
 
 
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
@@ -1020,7 +1022,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     return im_mask, match_ind[1:], match_ind[0]
 
 
-def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=True, cc_match=False):
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=False, cc_match=False):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     Arguments:
@@ -1073,7 +1075,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                     (0, 2, 3)) - preds[ind]), axis=1)
 
                 # smooth distance array and mask
-                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(0, 3, 3))
+                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(3, 3, 3), mode='wrap')
                 right_dist[masks[ind]] = np.max(right_dist) * 1.1
 
                 # get embedding at best match (right_match)
@@ -1082,25 +1084,25 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
                 if neighborhood_match:
                     # now crop demo embedding to +/- 15 pixels around demo_action
-                    cropped_embedding = embedding[demo_action[0], :,
+                    cropped_embedding = embedding[:, :,
                             (demo_action[1] - 15):(demo_action[1]+16),
                             (demo_action[2] - 15):(demo_action[2]+16)]
-                    revised_match_ind = np.array([15, 15])
+                    revised_match_ind = np.array([demo_action[0], 15, 15])
                 else:
                     cropped_embedding = embedding
-                    revised_match_ind = match_ind[1:]
+                    revised_match_ind = match_ind
 
                 # now rematch this with cropped demo_embedding array
-                left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None]), axis=0)
+                left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None][None, ...]), axis=0)
 
                 # smooth left_dist
-                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(3, 3))
+                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(3, 3, 3), mode='wrap')
                 rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
 
                 # TODO(adit98) dealing with rotation?
                 # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
                 # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
-                cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
+                cc_dist = np.sum(np.square(revised_match_ind[1:] - np.array(rematch_ind)[1:]))
                 match_map = right_dist
 
             else:

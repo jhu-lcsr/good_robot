@@ -368,7 +368,7 @@ def main(args):
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
-                          'best_trainer_ind': 0}
+                          'best_trainer_log': []}
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -572,7 +572,6 @@ def main(args):
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
 
-        print(current_stack_goal, nonlocal_variables['stack_height'], stack_matches_goal)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
 
         if not check_z_height:
@@ -914,13 +913,16 @@ def main(args):
                             # TODO(adit98) trigger graceful exit here
                             raise NotImplementedError(task_type + ' is not implemented.')
 
+                        # best trainer ind is latest value in best_trainer_log
+                        best_trainer_ind = nonlocal_variables['best_trainer_log'][-1]
+
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
-                            correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
+                            correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
                                     compute_cc_dist(preds, example_actions, demo_action_inds,
                                             metric=primitive_distance_method, cc_match=False)
                         else:
-                            correspondences, nonlocal_variables['best_pix_ind'], nonlocal_variables['best_trainer_ind'] = \
+                            correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
 
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
@@ -954,6 +956,19 @@ def main(args):
                 # Save predicted confidence value
                 trainer.predicted_value_log.append([predicted_value])
                 logger.write_to_log('predicted-value', trainer.predicted_value_log)
+
+                # Save selected policy NOTE(adit98) this is not a great method of doing this...
+                if task_type == 'row':
+                    policy_names = {0: 'stack', 1: 'unstack', 2: 'vertical_square'}
+                elif task_type == 'stack':
+                    policy_names = {0: 'row', 1: 'unstack', 2: 'vertical_square'}
+                elif task_type == 'unstack':
+                    policy_names = {0: 'row', 1: 'stack', 2: 'vertical_square'}
+                elif task_type == 'vertical_square':
+                    policy_names = {0: 'row', 1: 'stack', 2: 'unstack'}
+
+                selected_policy_log = [policy_names[i] for i in nonlocal_variables['best_trainer_log']]
+                logger.write_to_log('selected-policy', selected_policy_log)
 
                 # NOTE(zhe) compute the best (rotAng, x, y)
                 # Compute 3D position of pixel
@@ -1875,7 +1890,7 @@ def main(args):
         else:
             prev_color_success = None
 
-        prev_best_trainer_ind = nonlocal_variables['best_trainer_ind']
+        prev_best_trainer_ind = nonlocal_variables['best_trainer_log'][-2]
 
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
