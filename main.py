@@ -550,6 +550,7 @@ def main(args):
                 # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
                 if not check_z_height:
                     stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+                    # set current_stack_goal according to length of stack sequence
 
             else:
                 # TODO(adit98) trigger graceful exit here
@@ -571,6 +572,7 @@ def main(args):
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
 
+        print(current_stack_goal, nonlocal_variables['stack_height'], stack_matches_goal)
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
 
         if not check_z_height:
@@ -1005,14 +1007,20 @@ def main(args):
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                                nonlocal_variables['stack'].next()
+                                # instead of calling next, set progress
+                                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
+
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                                 print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+
                             elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
-                                nonlocal_variables['stack'].next()
+                                # instead of calling next, set progress
+                                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
+
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
+
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
