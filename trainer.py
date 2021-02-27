@@ -900,17 +900,9 @@ class Trainer(object):
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
-
-                # TODO(adit98) figure out common sense backprop for use_demo
-                if use_demo:
-                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
-                            demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
-                                    grasp_predictions, place_predictions)
-                    raise NotImplementedError
-                else:
-                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
-                            action_space_argmax(primitive_action, push_predictions,
-                                    grasp_predictions, place_predictions)
+                new_best_pix_ind, each_action_max_coordinate, predicted_value = \
+                        action_space_argmax(primitive_action, push_predictions,
+                                grasp_predictions, place_predictions)
 
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:
