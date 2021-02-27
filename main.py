@@ -811,6 +811,10 @@ def main(args):
                         # NOTE(adit98) check if we should round or cut off float -> int
                         task_progress = int(np.rint(task_progress))
 
+                        # NOTE(adit98) HACK, make sure task_progress starts at 1 when stack_height is initialized to 0.0
+                        if task_progress == 0:
+                            task_progress = 1
+
                     # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
                     if task_type == 'unstack':
                         task_progress = min(3, task_progress)
