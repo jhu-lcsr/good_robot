@@ -1075,7 +1075,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                     (0, 2, 3)) - preds[ind]), axis=1)
 
                 # smooth distance array and mask
-                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(3, 3, 3), mode='wrap')
+                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(0, 3, 3))
                 right_dist[masks[ind]] = np.max(right_dist) * 1.1
 
                 # get embedding at best match (right_match)
@@ -1096,7 +1096,7 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
                 left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None][None, ...]), axis=0)
 
                 # smooth left_dist
-                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(3, 3, 3), mode='wrap')
+                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(0, 3, 3), mode='wrap')
                 rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
 
                 # TODO(adit98) dealing with rotation?
