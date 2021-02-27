@@ -2342,6 +2342,28 @@ class Robot(object):
 
         return goal_success, structure_progress
 
+    def manual_progress_check(self, prev_structure_progress, task_type):
+        while True:
+            try:
+                progress = float(input("For task", task_type.upper(),
+                    "input current structure size:"))
+                break
+            except ValueError:
+                print("ENTER AN INTEGER!!!!")
+                continue
+
+        if progress < prev_structure_progress:
+            needed_to_reset = True
+        else:
+            needed_to_reset = False
+
+        if progress > prev_structure_progress:
+            stack_matches_goal = True
+        else:
+            stack_matches_goal = False
+
+        return stack_matches_goal, progress, needed_to_reset
+
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
         goal, max_z, decrease_threshold = self.check_z_height(input_img)

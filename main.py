@@ -494,7 +494,7 @@ def main(args):
         nonlocal_variables['place_color_success'] = False
         nonlocal_variables['partial_stack_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None):
+    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None, check_z_height=False):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -527,30 +527,45 @@ def main(args):
         if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if task_type == 'vertical_square':
-                # NOTE(adit98) explicitly set a lower distance threshold for vertical square
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.vertical_square_partial_success(current_stack_goal,
-                                check_z_height=check_z_height, stack_dist_thresh=0.04)
+                if check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+                else:
+                    # NOTE(adit98) explicitly set a lower distance threshold for vertical square
+                    stack_matches_goal, nonlocal_variables['stack_height'] = \
+                            robot.vertical_square_partial_success(current_stack_goal,
+                                    check_z_height=check_z_height, stack_dist_thresh=0.04)
             elif task_type == 'unstack':
-                # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
+                if check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+                else:
+                    # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
+                    stack_matches_goal, nonlocal_variables['stack_height'] = \
+                            robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
 
             elif task_type == 'stack':
-                # TODO(adit98) make sure we have path for real robot here
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.check_stack(current_stack_goal, top_idx=top_idx)
+                if check_z_height:
+                    # decrease_threshold = None  # None means decrease_threshold will be disabled
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
+                    max_workspace_height = ' (see max_workspace_height printout above) '
+                    # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
+                    # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
+
+                else:
+                    # TODO(adit98) make sure we have path for real robot here
+                    stack_matches_goal, nonlocal_variables['stack_height'] = \
+                            robot.check_stack(current_stack_goal, top_idx=top_idx)
 
             elif task_type == 'row':
-                # TODO(adit98) make sure we have path for real robot here
-                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                        num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
-                        prev_z_height=nonlocal_variables['prev_stack_height'])
+                if check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+                else:
+                    # TODO(adit98) make sure we have path for real robot here
+                    stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                            num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                            prev_z_height=nonlocal_variables['prev_stack_height'])
 
-                # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
-                if not check_z_height:
+                    # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
                     stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
-                    # set current_stack_goal according to length of stack sequence
 
             else:
                 # TODO(adit98) trigger graceful exit here
@@ -563,12 +578,14 @@ def main(args):
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             if not check_z_height:
                 stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
             max_workspace_height = ' (see max_workspace_height printout above) '
             # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
+
         else:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
 
@@ -1020,7 +1037,7 @@ def main(args):
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
-                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type)
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
@@ -1072,7 +1089,7 @@ def main(args):
                         # place operations expect increased height,
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
-                                use_imitation=use_demo, task_type=task_type)
+                                use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
 
 
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -1103,7 +1120,8 @@ def main(args):
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print('running check_stack_update_goal for grasp action')
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
-                                depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo)
+                                depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo,
+                                check_z_height=check_z_height)
 
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
@@ -1142,7 +1160,7 @@ def main(args):
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
                             heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
-                            task_type=task_type, use_imitation=use_demo)
+                            task_type=task_type, use_imitation=use_demo, check_z_height=check_z_height)
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
