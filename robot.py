@@ -152,6 +152,7 @@ class Robot(object):
 
         # task type (defaults to None)
         self.task_type = task_type
+        self.capture_logoblock_dataset = capture_logoblock_dataset
 
         # If in simulation...
         if self.is_sim:
@@ -241,7 +242,6 @@ class Robot(object):
             # Scaling used when importing objects
             self.obj_scale = obj_scale
             self.textured = textured
-            self.capture_logoblock_dataset = capture_logoblock_dataset
 
             # If testing, read object meshes and poses from test case file
             print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}")

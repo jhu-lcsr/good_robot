@@ -284,6 +284,10 @@ In a separate tab run our small test script:
 python test_ros_images.py
 ```
 
+Running a simple image viewer to look at the real robot images:
+```
+rosrun image_view image_view image:=/camera/rgb/image_rect_color
+```
 Running RVIZ to look at the images:
 
 ```
@@ -349,11 +353,8 @@ You will need to generate and load a calibration yaml file which goes in a locat
 4. Roslaunch the camera with, for example:
 ```shell
 taskset 0x00000FFF roslaunch openni2_launch openni2.launch depth_registration:=true
-
-We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
-
 ```
-
+We use the [linux taskset command](https://linux.die.net/man/1/taskset) ([examples](https://www.howtoforge.com/linux-taskset-command/)) to limit ROS to utilizing 8 cores or fewer, so other cores are available for training.
 5. The script is subscribed to the rostopic `/fiducial_transform` to get the pose of the tag in the camera frame. Roslaunch aruco_detect:
 ```shell
 taskset 0x00000FFF roslaunch aruco_detect aruco_detect.launch
