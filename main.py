@@ -913,9 +913,6 @@ def main(args):
                             # TODO(adit98) trigger graceful exit here
                             raise NotImplementedError(task_type + ' is not implemented.')
 
-                        # best trainer ind is latest value in best_trainer_log
-                        best_trainer_ind = nonlocal_variables['best_trainer_log'][-1]
-
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
@@ -926,6 +923,9 @@ def main(args):
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
 
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
+
+                        # append best_trainer_ind to nonlocal_variables['best_trainer_log']
+                        nonlocal_variables['best_trainer_log'].append(best_trainer_ind)
 
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
