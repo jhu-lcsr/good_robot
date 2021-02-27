@@ -169,7 +169,7 @@ def main(args):
     depth_channels_history = args.depth_channels_history
 
     # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
-    if 'unstack' in args.task_type:
+    if task_type is not None and 'unstack' in args.task_type:
         args.task_type = 'unstack'
         task_type = 'unstack'
 
@@ -862,8 +862,9 @@ def main(args):
                             # explore the choices of push actions vs place actions
                             push_frequency_one_in_n = 5
                             nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
-                    trainer.is_exploit_log.append([0 if explore_actions else 1])
-                    logger.write_to_log('is-exploit', trainer.is_exploit_log)
+
+                trainer.is_exploit_log.append([0 if explore_actions else 1])
+                logger.write_to_log('is-exploit', trainer.is_exploit_log)
                     # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
                     # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                     # logger.write_to_log('trial', trainer.trial_log)
