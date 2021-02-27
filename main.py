@@ -957,18 +957,20 @@ def main(args):
                 trainer.predicted_value_log.append([predicted_value])
                 logger.write_to_log('predicted-value', trainer.predicted_value_log)
 
-                # Save selected policy NOTE(adit98) this is not a great method of doing this...
-                if task_type == 'row':
-                    policy_names = {0: 'stack', 1: 'unstack', 2: 'vertical_square'}
-                elif task_type == 'stack':
-                    policy_names = {0: 'row', 1: 'unstack', 2: 'vertical_square'}
-                elif task_type == 'unstack':
-                    policy_names = {0: 'row', 1: 'stack', 2: 'vertical_square'}
-                elif task_type == 'vertical_square':
-                    policy_names = {0: 'row', 1: 'stack', 2: 'unstack'}
+                if use_demo:
+                    # Save selected policy NOTE(adit98) this is not a great method of doing this...
+                    if task_type == 'row':
+                        policy_names = {0: 'stack', 1: 'unstack', 2: 'vertical_square'}
+                    elif task_type == 'stack':
+                        policy_names = {0: 'row', 1: 'unstack', 2: 'vertical_square'}
+                    elif task_type == 'unstack':
+                        policy_names = {0: 'row', 1: 'stack', 2: 'vertical_square'}
+                    elif task_type == 'vertical_square':
+                        policy_names = {0: 'row', 1: 'stack', 2: 'unstack'}
 
-                selected_policy_log = [policy_names[i] for i in nonlocal_variables['best_trainer_log']]
-                logger.write_to_log('selected-policy', selected_policy_log)
+                    # TODO(adit98) store selected policy log
+                    selected_policy_log = [[policy_names[i]] for i in nonlocal_variables['best_trainer_log']]
+                    logger.write_to_log('selected-policy', selected_policy_log, fmt='%s')
 
                 # NOTE(zhe) compute the best (rotAng, x, y)
                 # Compute 3D position of pixel
@@ -1890,7 +1892,8 @@ def main(args):
         else:
             prev_color_success = None
 
-        prev_best_trainer_ind = nonlocal_variables['best_trainer_log'][-2]
+        if use_demo:
+            prev_best_trainer_ind = nonlocal_variables['best_trainer_log'][-1]
 
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
