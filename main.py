@@ -809,7 +809,7 @@ def main(args):
                     task_progress = nonlocal_variables['stack_height']
                     if check_z_height:
                         # NOTE(adit98) check if we should round or cut off float -> int
-                        task_progress = np.rint(task_progress)
+                        task_progress = int(np.rint(task_progress))
 
                     # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
                     if task_type == 'unstack':
