@@ -2345,8 +2345,8 @@ class Robot(object):
     def manual_progress_check(self, prev_structure_progress, task_type):
         while True:
             try:
-                progress = float(input("For task", task_type.upper(),
-                    "input current structure size:"))
+                progress = float(input(" ".join(["For task", task_type.upper(),
+                    "input current structure size:"])))
                 break
             except ValueError:
                 print("ENTER AN INTEGER!!!!")
