@@ -8,7 +8,8 @@ from collections import OrderedDict
 from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, compute_cc_dist
 from trainer import Trainer
 from demo import Demonstration, load_all_demos
-import pickle
+import _pickle as cPickle
+import bz2
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -191,76 +192,79 @@ if __name__ == '__main__':
                 vertical_square_push, vertical_square_grasp, vertical_square_place = \
                         vertical_square_push.filled(0.0), vertical_square_grasp.filled(0.0), vertical_square_place.filled(0.0)
 
-            # TODO(adit98) add logic for pushing here
-            if action == 'grasp':
-                if stack_trainer is not None:
-                    stack_preds = stack_grasp
-                if row_trainer is not None:
-                    row_preds = row_grasp
-                if unstack_trainer is not None:
-                    unstack_preds = unstack_grasp
-                if vertical_square_trainer is not None:
-                    vertical_square_preds = vertical_square_grasp
+            # run the correspondence if not writing embeddings
+            if not args.write_embed:
+                # TODO(adit98) add logic for pushing here
+                if action == 'grasp':
+                    if stack_trainer is not None:
+                        stack_preds = stack_grasp
+                    if row_trainer is not None:
+                        row_preds = row_grasp
+                    if unstack_trainer is not None:
+                        unstack_preds = unstack_grasp
+                    if vertical_square_trainer is not None:
+                        vertical_square_preds = vertical_square_grasp
 
-            else:
-                if stack_trainer is not None:
-                    stack_preds = stack_place
-                if row_trainer is not None:
-                    row_preds = row_place
-                if unstack_trainer is not None:
-                    unstack_preds = unstack_place
-                if vertical_square_trainer is not None:
-                    vertical_square_preds = vertical_square_place
+                else:
+                    if stack_trainer is not None:
+                        stack_preds = stack_place
+                    if row_trainer is not None:
+                        row_preds = row_place
+                    if unstack_trainer is not None:
+                        unstack_preds = unstack_place
+                    if vertical_square_trainer is not None:
+                        vertical_square_preds = vertical_square_place
 
-            print("Evaluating distance for stack height:", k, "| Action:", action)
+                print("Evaluating distance for stack height:", k, "| Action:", action)
 
-            # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
-            example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
+                # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
+                example_actions = np.array([*example_actions_dict[k][action].values()], dtype=object).T
 
-            # extract demo action inds
-            demo_action_inds = example_actions[-1].tolist()
+                # extract demo action inds
+                demo_action_inds = example_actions[-1].tolist()
 
-            # store preds we want to use (after leave one out) in preds, and get relevant example actions
-            # order of example actions is row, stack, unstack, vertical square
-            if args.task_type == 'row':
-                preds = [stack_preds, unstack_preds, vertical_square_preds]
-                example_actions = example_actions[1:-1].tolist()
-            elif args.task_type == 'stack':
-                preds = [row_preds, unstack_preds, vertical_square_preds]
-                example_actions = example_actions[[0, 2, 3]].tolist()
-            elif args.task_type == 'unstack':
-                preds = [row_preds, stack_preds, vertical_square_preds]
-                example_actions = example_actions[[0, 1, 3]].tolist()
-            elif args.task_type == 'vertical_square':
-                preds = [row_preds, stack_preds, unstack_preds]
-                example_actions = example_actions[:3].tolist()
-            else:
-                raise NotImplementedError(args.task_type + ' is not implemented.')
+                # store preds we want to use (after leave one out) in preds, and get relevant example actions
+                # order of example actions is row, stack, unstack, vertical square
+                if args.task_type == 'row':
+                    preds = [stack_preds, unstack_preds, vertical_square_preds]
+                    example_actions = example_actions[1:-1].tolist()
+                elif args.task_type == 'stack':
+                    preds = [row_preds, unstack_preds, vertical_square_preds]
+                    example_actions = example_actions[[0, 2, 3]].tolist()
+                elif args.task_type == 'unstack':
+                    preds = [row_preds, stack_preds, vertical_square_preds]
+                    example_actions = example_actions[[0, 1, 3]].tolist()
+                elif args.task_type == 'vertical_square':
+                    preds = [row_preds, stack_preds, unstack_preds]
+                    example_actions = example_actions[:3].tolist()
+                else:
+                    raise NotImplementedError(args.task_type + ' is not implemented.')
 
-            if not args.cycle_consistency:
-                # evaluate distance based action mask - leave one out is above
-                im_mask, match_ind = compute_demo_dist(preds=preds, example_actions=example_actions,
-                        metric=args.metric)
+                if not args.cycle_consistency:
+                    # evaluate distance based action mask - leave one out is above
+                    im_mask, match_ind, selected_policy = compute_demo_dist(preds=preds, example_actions=example_actions,
+                            metric=args.metric)
 
-            else:
-                # evaluate distance based action mask with cycle consistency
-                im_mask, match_ind = compute_cc_dist(preds=preds, example_actions=example_actions,
-                        demo_action_inds=demo_action_inds, valid_depth_heightmap=im_depth,
-                        metric=args.metric, cc_match=False)
+                else:
+                    # evaluate distance based action mask with cycle consistency
+                    im_mask, match_ind, selected_policy = compute_cc_dist(preds=preds, example_actions=example_actions,
+                            demo_action_inds=demo_action_inds, valid_depth_heightmap=im_depth,
+                            metric=args.metric, cc_match=False)
 
-            if args.save_visualizations:
-                # fix dynamic range of im_depth
-                im_depth = (im_depth * 255 / np.max(im_depth)).astype(np.uint8)
+                if args.save_visualizations:
+                    # fix dynamic range of im_depth
+                    im_depth = (im_depth * 255 / np.max(im_depth)).astype(np.uint8)
 
-                # visualize with rotation, match_ind
-                depth_canvas = get_prediction_vis(im_mask, im_depth, match_ind, blend_ratio=args.blend_ratio)
-                rgb_canvas = get_prediction_vis(im_mask, im_color, match_ind, blend_ratio=args.blend_ratio)
+                    # visualize with rotation, match_ind
+                    depth_canvas = get_prediction_vis(im_mask, im_depth, match_ind, blend_ratio=args.blend_ratio)
+                    rgb_canvas = get_prediction_vis(im_mask, im_color, match_ind, blend_ratio=args.blend_ratio)
 
-                # write blended images
-                cv2.imwrite(depth_filename, depth_canvas)
-                cv2.imwrite(color_filename, rgb_canvas)
+                    # write blended images
+                    cv2.imwrite(depth_filename, depth_canvas)
+                    cv2.imwrite(color_filename, rgb_canvas)
 
     if args.write_embed:
         # pickle dictionary
-        with open(os.path.join(args.example_demo, 'embeddings', 'embed_dict.pickle', 'wb')) as f:
-            pickle.dump(example_actions_dict, f)
+        file_path = os.path.join(args.example_demo, 'embeddings', 'embed_dict.pbz2')
+        with bz2.BZ2File(file_path, 'w') as f:
+            cPickle.dump(example_actions_dict, f)
