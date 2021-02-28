@@ -424,7 +424,10 @@ def main(args):
     prev_grasp_success = False
 
     if check_z_height:
-        is_goal_conditioned = False
+        if place:
+            is_goal_conditioned = True
+        else:
+            is_goal_conditioned = False
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
