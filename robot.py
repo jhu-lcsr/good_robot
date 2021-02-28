@@ -2319,7 +2319,7 @@ class Robot(object):
         stack_height: number of blocks in stack
         """
         if check_z_height:
-            _, stack_height = self.check_z_height(depth_img, prev_structure_progress)
+            _, stack_height, _ = self.check_z_height(depth_img, prev_structure_progress)
             stack_height = int(np.rint(stack_height))
         else:
             # get object positions (array with each object position)
