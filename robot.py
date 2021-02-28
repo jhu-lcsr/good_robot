@@ -736,52 +736,54 @@ class Robot(object):
 
                 print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
 
-            place_pose_history = self.place_pose_history.copy()
-            place_pose_history.reverse()
-
-            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
-            place_pose_history.append(place_pose_history[-1])
-
-            holding_object = not(self.close_gripper())
-            # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
-            if holding_object:
-                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
-                rand_angle = rand_orientation[0]
-
-                self.place(rand_position, rand_angle, save_history=False)
             else:
-                self.open_gripper()
+                place_pose_history = self.place_pose_history.copy()
+                place_pose_history.reverse()
 
-            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
-            for pose in place_pose_history:
-                x, y, z, angle = pose
+                # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
+                place_pose_history.append(place_pose_history[-1])
 
-                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
-
-                # get depth_heightmap pixel_coordinates of where the previous place was
-                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
-
-                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                y_pixel = min(y_pixel, 223)
-
-                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
-
-                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
-                # plus an offset. There
-                z = primitive_position[2]
-
-                grasp_success, color_success = self.grasp([x, y, z], angle)
-                if grasp_success:
+                holding_object = not(self.close_gripper())
+                # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
+                if holding_object:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle, save_history=False)
+                else:
+                    self.open_gripper()
 
-            # clear the place hisory after unstacking
-            self.place_pose_history = []
+                # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+                for pose in place_pose_history:
+                    x, y, z, angle = pose
+
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+
+                    # get depth_heightmap pixel_coordinates of where the previous place was
+                    x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                    x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+
+                    y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                    y_pixel = min(y_pixel, 223)
+
+                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
+
+                    # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                    # plus an offset. There
+                    z = primitive_position[2]
+
+                    grasp_success, color_success = self.grasp([x, y, z], angle)
+                    if grasp_success:
+                        _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                        rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
+                        rand_angle = rand_orientation[0]
+
+                        self.place(rand_position, rand_angle, save_history=False)
+
+                # clear the place hisory after unstacking
+                self.place_pose_history = []
+
             print("------- UNSTACKING COMPLETE --------")
 
         else:

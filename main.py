@@ -237,6 +237,13 @@ def main(args):
         args.unstack = True
         print('--unstack is automatically enabled')
 
+        if args.task_type is not None and args.task_type != 'stack':
+            # don't do auto unstacking
+            save_history = False
+        else:
+            # do auto unstacking
+            save_history = True
+
     # ------ Pre-loading and logging options ------
     snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
 
@@ -1199,7 +1206,7 @@ def main(args):
                         over_block = not check_row
 
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block, save_history=save_history)
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
