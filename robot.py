@@ -2335,7 +2335,7 @@ class Robot(object):
                 top_idx = -2
 
             # run check stack to get height of stack
-            _, stack_height, _ = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
+            _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
         # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
         structure_progress = 5 - stack_height
