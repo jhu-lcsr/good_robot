@@ -1661,7 +1661,7 @@ def main(args):
         if 'prev_color_img' in locals():
 
             # Detect changes
-            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap[:, :, 0], prev_depth_heightmap[:, :, 0], prev_grasp_success, no_change_count)
+            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count)
 
             if no_height_reward:
                 # used to assess the value of the reward multiplier
@@ -1674,7 +1674,7 @@ def main(args):
             # prev_reward_value == current_reward (without future rewards)
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
-                prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap[:, :, 0],
+                prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
                 place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
             # label_value is also known as expected_reward in trainer.get_label_value(), this is what the nn predicts.
