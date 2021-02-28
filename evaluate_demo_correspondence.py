@@ -26,6 +26,13 @@ if __name__ == '__main__':
     parser.add_argument('--depth_channels_history', default=False, action='store_true', help='use depth channel history when passing frames to model?')
     parser.add_argument('--viz', dest='save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
     parser.add_argument('--write_embed', dest='write_embed', default=False, action='store_true', help='write embeddings to disk')
+    parser.add_argument('--save_neighborhood', dest='save_neighborhood', default=False, action='store_true', help='save neighborhood around demo action')
+    parser.add_argument('--neighborhood_size', dest='neighborhood_size', default=5, type=int, help='size of neighborhood to save')
+
+    # if we want to save neighborhood, make sure some other args are set
+    if args.save_neighborhood:
+        args.cycle_consistency = True
+        args.write_embed = True
 
     args = parser.parse_args()
 
@@ -266,8 +273,22 @@ if __name__ == '__main__':
         # pickle dictionary
         if not args.cycle_consistency:
             name = 'embed_dict_single.pickle'
+        elif args.save_neighborhood:
+            # get neighborhood around embedding
+            name = 'embed_dict_neighb.pickle'
+            for a in example_actions_dict.keys():
+                for b in example_actions_dict[a].keys():
+                    for c in example_actions_dict[a][b].keys():
+                        tmp = example_actions_dict[a][b][c]
+                        demo_action = tmp[-1]
+                        for i in range(len(tmp)):
+                            tmp[i] = tmp[demo_action[0], :,
+                                    demo_action[1] - args.neighborhood_size:demo_action[1] + args.neighborhood_size + 1,
+                                    demo_action[2] - args.neighborhood_size:demo_action[2] + args.neighborhood_size + 2]
+
         else:
             name = 'embed_dict.pickle'
+
         file_path = os.path.join(args.example_demo, 'embeddings', name)
         with open(file_path, 'wb') as f:
             pickle.dump(example_actions_dict, f)
