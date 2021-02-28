@@ -689,7 +689,7 @@ def main(args):
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
             else:
                 # not resetting, so set stack goal to proper value
-                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
+                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
                 print(mismatch_str)
 
         return needed_to_reset
@@ -1095,7 +1095,7 @@ def main(args):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
                                 # instead of calling next, set progress
-                                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
+                                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
 
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
