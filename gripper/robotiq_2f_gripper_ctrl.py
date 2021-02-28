@@ -11,10 +11,11 @@ from .robotiq_2f_gripper_control_msg import inputMsg
 from .baseRobotiq2FGripper import robotiqbaseRobotiq2FGripper
 from .comModbusTcp import communication
 import time
+import threading
 
 
 class RobotiqCGripper(object):
-    def __init__(self, address):
+    def __init__(self, address, keep_alive_thread=True):
         self.cur_status = None
         #Gripper is a 2F with a TCP connection
         self.gripper = robotiqbaseRobotiq2FGripper()
@@ -22,6 +23,15 @@ class RobotiqCGripper(object):
 
         #We connect to the address received as an argument
         self.gripper.client.connectToDevice(address)
+        if keep_alive_thread:
+            # TODO(ahundt) FIX HACK TO KEEP THE GRIPPER CONNECTION ALIVE THERE IS NO LEGIT SHUTDOWN AND A RACE CONDITION
+            def update_status():
+
+                while True:
+                    time.sleep(10)
+                    self.get_cur_status()
+            t = threading.Thread(target=update_status)
+            t.start()
 
     def update(self, outputmsg):
         self.gripper.refreshCommand(outputmsg)
