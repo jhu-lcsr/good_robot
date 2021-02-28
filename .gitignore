@@ -50,3 +50,5 @@ data/
 data/*
 
 figures/
+
+**/.ipynb*
