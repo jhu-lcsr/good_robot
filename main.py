@@ -244,6 +244,9 @@ def main(args):
             # do auto unstacking
             save_history = True
 
+    else:
+        save_history = False
+
     # ------ Pre-loading and logging options ------
     snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
 
