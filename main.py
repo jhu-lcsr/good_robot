@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import time
-import _pickle as cPickle
+import pickle
 import bz2
 import os
 import signal
@@ -182,8 +182,8 @@ def main(args):
 
         pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pbz2')
         if os.path.exists(pickle_filename):
-            data = bz2.BZ2File(pickle_filename, 'rb')
-            example_actions_dict = cPickle.load(data)
+            with open(pickle_filename, 'rb') as data:
+                example_actions_dict = pickle.load(data)
 
         else:
             example_actions_dict = None
