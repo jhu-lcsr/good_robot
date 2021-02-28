@@ -8,8 +8,7 @@ from collections import OrderedDict
 from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, compute_cc_dist
 from trainer import Trainer
 from demo import Demonstration, load_all_demos
-import _pickle as cPickle
-import bz2
+import pickle
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -265,6 +264,6 @@ if __name__ == '__main__':
 
     if args.write_embed:
         # pickle dictionary
-        file_path = os.path.join(args.example_demo, 'embeddings', 'embed_dict.pbz2')
-        with bz2.BZ2File(file_path, 'w') as f:
-            cPickle.dump(example_actions_dict, f)
+        file_path = os.path.join(args.example_demo, 'embeddings', 'embed_dict.pickle')
+        with open(file_path, 'wb') as f:
+            pickle.dump(example_actions_dict, f)
