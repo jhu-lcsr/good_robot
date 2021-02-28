@@ -116,7 +116,7 @@ def main(args):
             # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way.
             workspace_limits[2][0] += 0.02
 
-        if use_demo:
+        if args.use_demo:
             # define sim_workspace limits if use_demo is set
             sim_workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 
