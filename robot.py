@@ -2318,20 +2318,20 @@ class Robot(object):
         success: will be True if the stack matches the specified order from bottom to top, False otherwise.
         stack_height: number of blocks in stack
         """
-        # get object positions (array with each object position)
-        pos = np.asarray(self.get_obj_positions())
-
-        # sort indices of blocks by z value
-        low2high_idx = np.array(pos[:, 2]).argsort()
-
-        # check if we are currently holding a block, then we need to use -2 for top_idx
-        if pos[low2high_idx[-1], 2] > 0.2:
-            top_idx = -2
-
         if check_z_height:
             _, stack_height = self.check_z_height(depth_img, prev_structure_progress)
             stack_height = int(np.rint(stack_height))
         else:
+            # get object positions (array with each object position)
+            pos = np.asarray(self.get_obj_positions())
+
+            # sort indices of blocks by z value
+            low2high_idx = np.array(pos[:, 2]).argsort()
+
+            # check if we are currently holding a block, then we need to use -2 for top_idx
+            if pos[low2high_idx[-1], 2] > 0.2:
+                top_idx = -2
+
             # run check stack to get height of stack
             _, stack_height, _ = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
