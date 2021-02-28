@@ -909,11 +909,19 @@ def main(args):
                     if use_demo:
                         # get parameters of current action to do dict lookup
                         task_progress = nonlocal_variables['stack_height']
-                        action = nonlocal_variables['primitive_action']
+                        if check_z_height:
+                            # NOTE(adit98) check if we should round or cut off float -> int
+                            task_progress = int(np.rint(task_progress))
+
+                            # NOTE(adit98) HACK, make sure task_progress starts at 1 when stack_height is initialized to 0.0
+                            if task_progress == 0:
+                                task_progress = 1
 
                         # clamp task_progress at 3 if task_type is unstack
                         if task_type == 'unstack':
                             task_progress = min(3, task_progress)
+
+                        action = nonlocal_variables['primitive_action']
 
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
