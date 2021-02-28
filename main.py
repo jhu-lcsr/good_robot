@@ -1217,7 +1217,7 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
-                        if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
+                        if ((check_z_height and nonlocal_variables['stack_height'] >= check_z_height_goal) or
                                 (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
