@@ -589,7 +589,7 @@ def main(args):
                 else:
                     # TODO(adit98) make sure we have path for real robot here
                     stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                            num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                            num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0],
                             prev_z_height=nonlocal_variables['prev_stack_height'])
 
                     # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
@@ -601,7 +601,7 @@ def main(args):
 
         elif check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                    num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                    num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0],
                     prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             if not check_z_height:
@@ -677,7 +677,8 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap)
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                            num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0])
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
             else:
                 # not resetting, so set stack goal to proper value
@@ -997,13 +998,13 @@ def main(args):
                 # NOTE: typically not necessary and can reduce final performance.
                 if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
                     print('Change not detected for more than two pushes. Running heuristic pushing.')
-                    nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap)
+                    nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap[:, :, 0])
                     no_change_count[0] = 0
                     predicted_value = push_predictions[nonlocal_variables['best_pix_ind']]
                     use_heuristic = True
                 elif heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'grasp' and no_change_count[1] >= 2:
                     print('Change not detected for more than two grasps. Running heuristic grasping.')
-                    nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap)
+                    nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap[:, :, 0])
                     no_change_count[1] = 0
                     predicted_value = grasp_predictions[nonlocal_variables['best_pix_ind']]
                     use_heuristic = True
@@ -1041,10 +1042,12 @@ def main(args):
 
                 # NOTE(zhe) calculate the action in terms of the robot pose
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x,
+                        best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap[:, :, 0])
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
-                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
+                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']],
+                    nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
                 # TODO(adit98) set this up to work with demos
@@ -1131,7 +1134,7 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
+                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push[:, :, 0],
                                 use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
 
 
@@ -1142,8 +1145,8 @@ def main(args):
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
 
-                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or
-                            valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
+                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x][0]) or
+                            valid_depth_heightmap[best_pix_y][best_pix_x][0] < 0.01)):
                         # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
                         print('Grasp action failure, heuristics determined grasp would not contact anything.')
@@ -1163,7 +1166,7 @@ def main(args):
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print('running check_stack_update_goal for grasp action')
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
-                                depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo,
+                                depth_img=valid_depth_heightmap_grasp[:, :, 0], task_type=task_type, use_imitation=use_demo,
                                 check_z_height=check_z_height)
 
                     if nonlocal_variables['grasp_success']:
@@ -1202,7 +1205,7 @@ def main(args):
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
                             heightmap_resolution, logger, trainer, '2')
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place[:, :, 0],
                             task_type=task_type, use_imitation=use_demo, check_z_height=check_z_height)
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
@@ -1442,7 +1445,7 @@ def main(args):
             f = plt.figure()
             f.suptitle(str(trainer.iteration))
             f.add_subplot(1,3, 1)
-            plt.imshow(valid_depth_heightmap)
+            plt.imshow(valid_depth_heightmap[:, :, 0])
             f.add_subplot(1,3, 2)
             # f.add_subplot(1,2, 1)
             if robot.background_heightmap is not None:
@@ -1651,7 +1654,7 @@ def main(args):
         if 'prev_color_img' in locals():
 
             # Detect changes
-            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap, prev_depth_heightmap, prev_grasp_success, no_change_count)
+            change_detected, no_change_count = detect_changes(prev_primitive_action, depth_heightmap[:, :, 0], prev_depth_heightmap[:, :, 0], prev_grasp_success, no_change_count)
 
             if no_height_reward:
                 # used to assess the value of the reward multiplier
@@ -1664,7 +1667,7 @@ def main(args):
             # prev_reward_value == current_reward (without future rewards)
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
-                prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
+                prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap[:, :, 0],
                 prev_color_success, goal_condition=prev_goal_condition, prev_place_predictions=prev_place_predictions,
                 place_success=prev_partial_stack_success, reward_multiplier=reward_multiplier)
             # label_value is also known as expected_reward in trainer.get_label_value(), this is what the nn predicts.

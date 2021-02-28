@@ -772,7 +772,7 @@ class Trainer(object):
             f = plt.figure()
             # f.suptitle(str(trainer.iteration))
             f.add_subplot(1,3, 1)
-            plt.imshow(depth_heightmap)
+            plt.imshow(depth_heightmap[:, :, 0])
             f.add_subplot(1,3, 2)
             # f.add_subplot(1,2, 1)
             # if contactable_regions is not None:
