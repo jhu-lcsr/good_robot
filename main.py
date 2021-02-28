@@ -988,7 +988,7 @@ def main(args):
                         if cycle_consistency:
                             correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
                                     compute_cc_dist(preds, example_actions, demo_action_inds,
-                                            metric=primitive_distance_method, cc_match=False)
+                                            metric=primitive_distance_method, neighborhood_match=False, cc_match=False)
                         else:
                             correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)

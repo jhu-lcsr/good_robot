@@ -134,65 +134,65 @@ if __name__ == '__main__':
                     example_actions_dict[k][action][ind] = [example_action_row, example_action_stack,
                             example_action_unstack, example_action_vertical_square, demo_action_ind]
 
-            if action == 'grasp':
-                im_color, im_depth = imitation_demo.get_heightmaps(action,
-                        imitation_demo.action_dict[k]['grasp_image_ind'], use_hist=args.depth_channels_history)
-            else:
-                im_color, im_depth = imitation_demo.get_heightmaps(action,
-                        imitation_demo.action_dict[k]['place_image_ind'], use_hist=args.depth_channels_history)
-
-            # create filenames to be saved
-            depth_filename = os.path.join(args.imitation_demo, 'correspondences',
-                    str(k) + '.' + action + '.depth.png')
-            color_filename = os.path.join(args.imitation_demo, 'correspondences',
-                    str(k) + '.' + action + '.color.png')
-
-            # run forward pass for imitation_demo
-            stack_preds, row_preds, unstack_preds, vertical_square_preds = None, None, None, None
-
-            # get stack features if stack_trainer is provided
-            if stack_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with keep_action_feat
-                stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color,
-                        im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
-
-                # fill all masked arrays (convert to regular np arrays)
-                stack_push, stack_grasp, stack_place = stack_push.filled(0.0), \
-                        stack_grasp.filled(0.0), stack_place.filled(0.0)
-
-            # get row features if row_trainer is provided
-            if row_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with keep_action_feat
-                row_push, row_grasp, row_place = row_trainer.forward(im_color,
-                        im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
-
-                # fill all masked arrays (convert to regular np arrays)
-                row_push, row_grasp, row_place = row_push.filled(0.0), \
-                        row_grasp.filled(0.0), row_place.filled(0.0)
-
-            # get unstack features if unstack_trainer is provided
-            if unstack_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with keep_action_feat
-                unstack_push, unstack_grasp, unstack_place = unstack_trainer.forward(im_color,
-                        im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
-
-                # fill all masked arrays (convert to regular np arrays)
-                unstack_push, unstack_grasp, unstack_place = unstack_push.filled(0.0), \
-                        unstack_grasp.filled(0.0), unstack_place.filled(0.0)
-
-            # get vertical_square features if vertical_square_trainer is provided
-            if vertical_square_trainer is not None:
-                # to get vector of 64 vals, run trainer.forward with keep_action_feat
-                vertical_square_push, vertical_square_grasp, vertical_square_place = \
-                        vertical_square_trainer.forward(im_color, im_depth,
-                                is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
-
-                # fill all masked arrays (convert to regular np arrays)
-                vertical_square_push, vertical_square_grasp, vertical_square_place = \
-                        vertical_square_push.filled(0.0), vertical_square_grasp.filled(0.0), vertical_square_place.filled(0.0)
-
             # run the correspondence if not writing embeddings
             if not args.write_embed:
+                if action == 'grasp':
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['grasp_image_ind'], use_hist=args.depth_channels_history)
+                else:
+                    im_color, im_depth = imitation_demo.get_heightmaps(action,
+                            imitation_demo.action_dict[k]['place_image_ind'], use_hist=args.depth_channels_history)
+
+                # create filenames to be saved
+                depth_filename = os.path.join(args.imitation_demo, 'correspondences',
+                        str(k) + '.' + action + '.depth.png')
+                color_filename = os.path.join(args.imitation_demo, 'correspondences',
+                        str(k) + '.' + action + '.color.png')
+
+                # run forward pass for imitation_demo
+                stack_preds, row_preds, unstack_preds, vertical_square_preds = None, None, None, None
+
+                # get stack features if stack_trainer is provided
+                if stack_trainer is not None:
+                    # to get vector of 64 vals, run trainer.forward with keep_action_feat
+                    stack_push, stack_grasp, stack_place = stack_trainer.forward(im_color,
+                            im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
+
+                    # fill all masked arrays (convert to regular np arrays)
+                    stack_push, stack_grasp, stack_place = stack_push.filled(0.0), \
+                            stack_grasp.filled(0.0), stack_place.filled(0.0)
+
+                # get row features if row_trainer is provided
+                if row_trainer is not None:
+                    # to get vector of 64 vals, run trainer.forward with keep_action_feat
+                    row_push, row_grasp, row_place = row_trainer.forward(im_color,
+                            im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
+
+                    # fill all masked arrays (convert to regular np arrays)
+                    row_push, row_grasp, row_place = row_push.filled(0.0), \
+                            row_grasp.filled(0.0), row_place.filled(0.0)
+
+                # get unstack features if unstack_trainer is provided
+                if unstack_trainer is not None:
+                    # to get vector of 64 vals, run trainer.forward with keep_action_feat
+                    unstack_push, unstack_grasp, unstack_place = unstack_trainer.forward(im_color,
+                            im_depth, is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
+
+                    # fill all masked arrays (convert to regular np arrays)
+                    unstack_push, unstack_grasp, unstack_place = unstack_push.filled(0.0), \
+                            unstack_grasp.filled(0.0), unstack_place.filled(0.0)
+
+                # get vertical_square features if vertical_square_trainer is provided
+                if vertical_square_trainer is not None:
+                    # to get vector of 64 vals, run trainer.forward with keep_action_feat
+                    vertical_square_push, vertical_square_grasp, vertical_square_place = \
+                            vertical_square_trainer.forward(im_color, im_depth,
+                                    is_volatile=True, keep_action_feat=True, demo_mask=True)[:3]
+
+                    # fill all masked arrays (convert to regular np arrays)
+                    vertical_square_push, vertical_square_grasp, vertical_square_place = \
+                            vertical_square_push.filled(0.0), vertical_square_grasp.filled(0.0), vertical_square_place.filled(0.0)
+
                 # TODO(adit98) add logic for pushing here
                 if action == 'grasp':
                     if stack_trainer is not None:
@@ -264,6 +264,10 @@ if __name__ == '__main__':
 
     if args.write_embed:
         # pickle dictionary
-        file_path = os.path.join(args.example_demo, 'embeddings', 'embed_dict.pickle')
+        if not args.cycle_consistency:
+            name = 'embed_dict_single.pickle'
+        else:
+            name = 'embed_dict.pickle'
+        file_path = os.path.join(args.example_demo, 'embeddings', name)
         with open(file_path, 'wb') as f:
             pickle.dump(example_actions_dict, f)
