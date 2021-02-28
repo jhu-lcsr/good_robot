@@ -180,10 +180,12 @@ def main(args):
         example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
                 task_type=args.task_type)
 
-        pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pbz2')
+        pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pickle')
         if os.path.exists(pickle_filename):
             with open(pickle_filename, 'rb') as data:
                 example_actions_dict = pickle.load(data)
+
+            print("main.py: loaded example_actions_dict")
 
         else:
             example_actions_dict = None
