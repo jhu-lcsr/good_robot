@@ -8,6 +8,7 @@ from collections import OrderedDict
 from utils import ACTION_TO_ID, compute_demo_dist, get_prediction_vis, compute_cc_dist
 from trainer import Trainer
 from demo import Demonstration, load_all_demos
+import pickle
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -24,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--cycle_consistency', default=False, action='store_true', help='use cycle consistency to get matching action in demo')
     parser.add_argument('--depth_channels_history', default=False, action='store_true', help='use depth channel history when passing frames to model?')
     parser.add_argument('--viz', dest='save_visualizations', default=False, action='store_true', help='store depth heightmaps with imitation signal')
+    parser.add_argument('--write_embed', dest='write_embed', default=False, action='store_true', help='write embeddings to disk')
 
     args = parser.parse_args()
 
@@ -35,6 +37,10 @@ if __name__ == '__main__':
     if args.save_visualizations:
         if not os.path.exists(os.path.join(args.imitation_demo, 'correspondences')):
             os.makedirs(os.path.join(args.imitation_demo, 'correspondences'))
+
+    if args.write_embed:
+        if not os.path.exists(os.path.join(args.example_demo, 'embeddings')):
+            os.makedirs(os.path.join(args.example_demo, 'embeddings'))
 
     # create both demo classes
     example_demos = load_all_demos(demo_path=args.example_demo, check_z_height=False,
@@ -253,3 +259,8 @@ if __name__ == '__main__':
                 # write blended images
                 cv2.imwrite(depth_filename, depth_canvas)
                 cv2.imwrite(color_filename, rgb_canvas)
+
+    if args.write_embed:
+        # pickle dictionary
+        with open(os.path.join(args.example_demo, 'embeddings', 'embed_dict.pickle', 'wb')) as f:
+            pickle.dump(example_actions_dict, f)

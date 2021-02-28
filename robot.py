@@ -2304,7 +2304,7 @@ class Robot(object):
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
 
-    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1):
+    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1, check_z_height=False, depth_img=None):
         """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
 
         # Arguments
@@ -2328,8 +2328,12 @@ class Robot(object):
         if pos[low2high_idx[-1], 2] > 0.2:
             top_idx = -2
 
-        # run check stack to get height of stack
-        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
+        if check_z_height:
+            _, stack_height = self.check_z_height(depth_img, prev_structure_progress)
+            stack_height = int(np.rint(stack_height))
+        else:
+            # run check stack to get height of stack
+            _, stack_height, _ = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
         # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
         structure_progress = 5 - stack_height
@@ -2346,7 +2350,7 @@ class Robot(object):
         while True:
             try:
                 progress = float(input(" ".join(["For task", task_type.upper(),
-                    "input current structure size:"])))
+                    "input current structure size: "])))
                 break
             except ValueError:
                 print("ENTER AN INTEGER!!!!")
@@ -2358,6 +2362,8 @@ class Robot(object):
             needed_to_reset = False
 
         if progress > prev_structure_progress:
+            stack_matches_goal = True
+        elif task_type == 'unstack' and progress >= prev_structure_progress:
             stack_matches_goal = True
         else:
             stack_matches_goal = False
