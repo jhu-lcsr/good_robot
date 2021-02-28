@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import time
+import _pickle as cPickle
+import bz2
 import os
 import signal
 import sys
@@ -104,6 +106,7 @@ def main(args):
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        sim_workspace_limits = workspace_limits
     else:
         # Corner near window on robot base side
         # [0.47984089 0.34192974 0.02173636]
@@ -171,6 +174,20 @@ def main(args):
     primitive_distance_method = args.primitive_distance_method
     cycle_consistency = args.cycle_consistency
     depth_channels_history = args.depth_channels_history
+
+    # load example demos, load embeddings if they exist
+    if use_demo:
+        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
+                task_type=args.task_type)
+
+        pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pbz2')
+        if os.path.exists(pickle_filename):
+            data = bz2.BZ2File(pickle_filename, 'rb')
+            example_actions_dict = cPickle.load(data)
+
+        else:
+            example_actions_dict = None
+
 
     # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
     if task_type is not None and 'unstack' in args.task_type:
@@ -373,6 +390,10 @@ def main(args):
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
                           'best_trainer_log': []}
+    
+    # load example_actions_dict if it exists
+    if use_demo:
+        nonlocal_variables['example_actions_dict'] = example_actions_dict
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -542,12 +563,10 @@ def main(args):
                             robot.vertical_square_partial_success(current_stack_goal,
                                     check_z_height=check_z_height, stack_dist_thresh=0.04)
             elif task_type == 'unstack':
-                if check_z_height:
-                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
-                else:
-                    # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
-                    stack_matches_goal, nonlocal_variables['stack_height'] = \
-                            robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
+                # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
+                stack_matches_goal, nonlocal_variables['stack_height'] = \
+                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'],
+                                check_z_height=check_z_height, depth_img=depth_img)
 
             elif task_type == 'stack':
                 if check_z_height:
@@ -1072,7 +1091,7 @@ def main(args):
 
                             elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 # instead of calling next, set progress
-                                nonlocal_variables['stack'].set_progress(nonlocal_variables['stack_height'])
+                                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
 
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
@@ -1384,10 +1403,6 @@ def main(args):
         exit_called = True
         robot.shutdown()
         return
-
-    if use_demo:
-        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
-                task_type=args.task_type)
 
     num_trials = trainer.num_trials()
     do_continue = False
