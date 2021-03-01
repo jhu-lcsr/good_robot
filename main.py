@@ -855,9 +855,8 @@ def main(args):
                         if task_progress == 0:
                             task_progress = 1
 
-                    # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
-                    if task_type == 'unstack':
-                        task_progress = min(3, task_progress)
+                    # max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
+                    task_progress = min(3, task_progress)
 
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
