@@ -1019,7 +1019,7 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
     else:
         im_mask = dist
 
-    return im_mask, match_ind[1:], match_ind[0]
+    return im_mask, match_ind[1:], (match_ind[0] // 2)
 
 def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=True, cc_match=False):
     """
