@@ -598,7 +598,7 @@ def main(args):
                             robot.check_stack(current_stack_goal, top_idx=top_idx)
 
             elif task_type == 'row':
-                stack_matches_goal, nonlocal_variables['stack_height'], _ = robot.check_row(current_stack_goal,
+                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
                         check_z_height=check_z_height, valid_depth_heightmap=depth_img,
                         prev_z_height=nonlocal_variables['prev_stack_height'])
 
