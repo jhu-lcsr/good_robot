@@ -1675,35 +1675,243 @@ stack:
 
 
 
-STACK - depth time fix - now watch this imitation - with backprop - 2021-02-28
+STACK - depth time fix - now watch this imitation - with backprop - with cycle consistency - 2021-02-28
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19990 --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 Commit: 6be89e20de35d25396e8528319194bac2fce519d
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
 GPU 0, Tab 0, port 19990, top left v-rep window, v-rep tab 7
 
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 3.754294
+> Training loss: 3.724739
+> Selected Policy #: 0 demo number: 1
+> Action: grasp at (4, 108, 63)
+> Executing: grasp at (-0.598000, -0.008000, 0.000997) orientation: 1.570796
+> gripper position: 0.03214468061923981
+> gripper position: 0.026252830401062965
+> gripper position: 0.001346200704574585
+> gripper position: -0.02260546386241913
+> gripper position: -0.04199568182229996
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.051106864803419985 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 4.288888888888889  actions/full stack: 103.92307692307692 (lower is better)  Grasp Count: 781, grasp success rate: 0.7464788732394366 place_on_stack_rate: 0.5526315789473685 place_attempts: 570  partial_stack_successes: 315  stack_successes: 13 trial_success_rate: 0.2549019607843137 stack goal: [2 0] current_height: 1
+> trial_complete_indices: [  11.   41.   51.   81.  111.  123.  153.  182.  209.  239.  269.  299.
+>   329.  359.  389.  419.  449.  475.  505.  535.  541.  571.  578.  608.
+>   638.  653.  683.  708.  738.  768.  798.  828.  858.  888.  902.  932.
+>   962.  992. 1022. 1052. 1082. 1112. 1130. 1160. 1190. 1220. 1250. 1280.
+>  1305. 1335. 1350.]
+> Max trial success rate: 0.24, at action iteration: 1347. (total of 1349 actions, max excludes first 1347 actions)
+> Max grasp success rate: 0.7471116816431322, at action iteration: 1347. (total of 1349 actions, max excludes first 1347 actions)
+> Max place success rate: 0.5518453427065027, at action iteration: 1347. (total of 1350 actions, max excludes first 1347 actions)
+> Max action efficiency: 0.05790645879732739, at action iteration: 1349. (total of 1350 actions, max excludes first 1347 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History-Sim-Stack-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.24, 'trial_success_rate_best_index': 1347, 'grasp_success_rate_best_value': 0.7471116816431322, 'grasp_success_rate_best_index': 1347, 'place_success_rate_best_value': 0.5518453427065027, 'place_success_rate_best_index': 1347, 'action_efficiency_best_value': 0.05790645879732739, 'action_efficiency_best_index': 1349}
 
+Efficiency correction 255/(50*6) = 85%
 
-ROW - depth time fix - now watch this imitation - with backprop - 2021-02-28
+ROW - depth time fix - now watch this imitation - with backprop - with cycle consistency - 2021-02-28
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19998 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 Commit: 6be89e20de35d25396e8528319194bac2fce519d
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History
 GPU 1, Tab 1, port 19998, top right v-rep window, v-rep tab 8
 
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 0.530125
+> Training loss: 2.040664
+> Selected Policy #: 2 demo number: 1
+> Action: grasp at (1, 141, 157)
+> Executing: grasp at (-0.410000, 0.058000, 0.050925) orientation: 0.392699
+> gripper position: 0.031177490949630737
+> gripper position: 0.026643991470336914
+> gripper position: 0.0015409588813781738
+> gripper position: -0.023096054792404175
+> gripper position: -0.04206940531730652
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.05110583306163792 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_row: False | row_size: 1 | blocks: []
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 4.103092783505154  actions/full stack: 53.06666666666667 (lower is better)  Grasp Count: 461, grasp success rate: 0.7310195227765727 place_on_stack_rate: 0.5791044776119403 place_attempts: 335  partial_stack_successes: 194  stack_successes: 15 trial_success_rate: 0.29411764705882354 stack goal: [3 0] current_height: 1
+> trial_complete_indices: [ 29.  50.  80.  89.  99. 111. 117. 147. 164. 169. 184. 214. 226. 246.
+>  268. 298. 315. 330. 343. 354. 364. 372. 382. 402. 412. 427. 446. 476.
+>  482. 491. 517. 526. 532. 535. 545. 555. 577. 587. 608. 638. 648. 672.
+>  680. 690. 708. 738. 763. 771. 772. 789. 795.]
+> Max trial success rate: 0.3, at action iteration: 792. (total of 794 actions, max excludes first 792 actions)
+> Max grasp success rate: 0.7342047930283224, at action iteration: 793. (total of 794 actions, max excludes first 792 actions)
+> Max place success rate: 0.5269461077844312, at action iteration: 792. (total of 795 actions, max excludes first 792 actions)
+> Max action efficiency: 0.11363636363636363, at action iteration: 792. (total of 795 actions, max excludes first 792 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History-Sim-Row-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.3, 'trial_success_rate_best_index': 792, 'grasp_success_rate_best_value': 0.7342047930283224, 'grasp_success_rate_best_index': 793, 'place_success_rate_best_value': 0.5269461077844312, 'place_success_rate_best_index': 792, 'action_efficiency_best_value': 0.11363636363636363, 'action_efficiency_best_index': 792}
 
-UNSTACKING - depth time fix - now watch this imitation - with backprop - 2021-02-28
+
+
+UNSTACKING - depth time fix - now watch this imitation - with backprop - with cycle consistency - 2021-02-28
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19999 --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 Commit: 050bcb194f87a469f4783d0601ea34fd43c7c189
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
 GPU 2, Tab 2, port 19999, bottom left v-rep window, v-rep tab 9
 
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 8.358418
+> Training loss: 6.704939
+> Selected Policy #: 0 demo number: 1
+> Action: grasp at (4, 183, 83)
+> Executing: grasp at (-0.558000, 0.142000, 0.000998) orientation: 1.570796
+> gripper position: 0.030406540259718895
+> gripper position: 0.026421135291457176
+> gripper position: 0.0012620240449905396
+> gripper position: -0.023003622889518738
+> gripper position: -0.041529685258865356
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.20709581490092904 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_stack() current detected stack height: 4
+> unstacking_partial_success() structure_progress: 1 prev_structure_progress: 1 goal_success: True
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: False
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 2.176470588235294  actions/full stack: 7.617647058823529 (lower is better)  Grasp Count: 140, grasp success rate: 0.85 place_on_stack_rate: 1.0 place_attempts: 119  partial_stack_successes: 119  stack_successes: 34 trial_success_rate: 0.6666666666666666 stack goal: [2 1] current_height: 1
+> trial_complete_indices: [  1.   7.  10.  18.  24.  27.  33.  34.  40.  41.  44.  49.  50.  51.
+>   57.  63.  66.  74.  80.  87.  93.  99. 105. 112. 118. 124. 130. 133.
+>  134. 142. 148. 154. 160. 166. 177. 180. 186. 192. 195. 201. 207. 213.
+>  219. 227. 230. 236. 242. 245. 251. 252. 258.]
+> Max trial success rate: 0.66, at action iteration: 255. (total of 257 actions, max excludes first 255 actions)
+> Max grasp success rate: 0.8623188405797102, at action iteration: 256. (total of 257 actions, max excludes first 255 actions)
+> Max place success rate: 1.0, at action iteration: 255. (total of 258 actions, max excludes first 255 actions)
+> Max action efficiency: 1.8352941176470587, at action iteration: 257. (total of 258 actions, max excludes first 255 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History-Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.66, 'trial_success_rate_best_index': 255, 'grasp_success_rate_best_value': 0.8623188405797102, 'grasp_success_rate_best_index': 256, 'place_success_rate_best_value': 1.0, 'place_success_rate_best_index': 255, 'action_efficiency_best_value': 1.8352941176470587, 'action_efficiency_best_index': 257}
+> 
 
-
-VERTICAL SQUARE - depth time fix - now watch this imitation - with backprop - 2021-02-28
+VERTICAL SQUARE - depth time fix - now watch this imitation - with backprop - with cycle consistency - 2021-02-28
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 Commit: 6be89e20de35d25396e8528319194bac2fce519d
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing
 GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
+
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 3.156120
+> Training loss: 0.187084
+> Selected Policy #: 1 demo number: 0
+> Action: grasp at (9, 104, 131)
+> Executing: grasp at (-0.462000, -0.016000, 0.001001) orientation: 3.534292
+> gripper position: 0.031445086002349854
+> gripper position: 0.025618553161621094
+> gripper position: 0.0003680288791656494
+> gripper position: -0.02381548285484314
+> gripper position: -0.042302727699279785
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.051159463079032366 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_stack() False, not enough nearby objects for a successful stack! expected at least 2 nearby objects, but only counted: 1
+> check_stack() current detected stack height: 1
+> vertical square partial success: structure height: 1 has_row: False num stacks: 0
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 5.983333333333333  actions/full stack: 89.75 (lower is better)  Grasp Count: 625, grasp success rate: 0.736 place_on_stack_rate: 0.39823008849557523 place_attempts: 452  partial_stack_successes: 180  stack_successes: 12 trial_success_rate: 0.23529411764705882 stack goal: [2 1] current_height: 1
+> trial_complete_indices: [  29.   33.   63.   93.  117.  119.  129.  159.  189.  204.  234.  243.
+>   257.  287.  317.  341.  355.  385.  415.  430.  448.  453.  476.  502.
+>   516.  546.  554.  566.  584.  614.  632.  662.  692.  702.  709.  739.
+>   757.  766.  795.  807.  830.  860.  866.  896.  921.  927.  957.  987.
+>  1017. 1046. 1076.]
+> Max trial success rate: 0.24, at action iteration: 1073. (total of 1075 actions, max excludes first 1073 actions)
+> Max grasp success rate: 0.7395498392282959, at action iteration: 1073. (total of 1075 actions, max excludes first 1073 actions)
+> Max place success rate: 0.336283185840708, at action iteration: 1073. (total of 1076 actions, max excludes first 1073 actions)
+> Max action efficiency: 0.06710158434296365, at action iteration: 1073. (total of 1076 actions, max excludes first 1073 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing-Sim-Vertical-Square-Imitation-Masked-Testing_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing
+> Training results:
+>  {'trial_success_rate_best_value': 0.24, 'trial_success_rate_best_index': 1073, 'grasp_success_rate_best_value': 0.7395498392282959, 'grasp_success_rate_best_index': 1073, 'place_success_rate_best_value': 0.336283185840708, 'place_success_rate_best_index': 1073, 'action_efficiency_best_value': 0.06710158434296365, 'action_efficiency_best_index': 1073}
+> 
+
+
+
+
+
+
+Stack:
+python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
+Row:
+python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
+Unstacking:
+python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
+Vertical Square:
+python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --disable_two_step_backprop
