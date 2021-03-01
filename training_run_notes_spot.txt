@@ -1907,11 +1907,31 @@ GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
 
 
 
-Stack:
-python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
-Row:
-python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
-Unstacking:
-python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --disable_two_step_backprop
-Vertical Square:
-python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --disable_two_step_backprop
+STACK - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 19990 --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+GPU 0, Tab 0, port 19990, top left v-rep window, v-rep tab 7                        
+
+
+ROW - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 19998 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+
+Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+GPU 1, Tab 1, port 19998, top right v-rep window, v-rep tab 8                       
+
+
+UNSTACK - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 1999 --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+
+Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+GPU 2, Tab 2, port 19999, bottom left v-rep window, v-rep tab 9                     
+
+
+VERTICAL SQUARE - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
+export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --no_common_sense_backprop --future_reward_discount 0.65
+
+Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
