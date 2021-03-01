@@ -855,9 +855,11 @@ def main(args):
                         if task_progress == 0:
                             task_progress = 1
 
-                    # max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
-                    task_progress = min(3, task_progress)
+                    if task_type in ['row', 'vertical_square', 'unstack']
+                        # HACK: max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
+                        task_progress = min(3, task_progress)
 
+                    # NOTE(adit98) add is in dict checks to trigger graceful exits
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
                         nonlocal_variables['example_actions_dict'][task_progress] = {}
