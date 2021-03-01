@@ -180,7 +180,11 @@ def main(args):
         example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
                 task_type=args.task_type)
 
-        pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pickle')
+        if cycle_consistency:
+            pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pickle')
+        else:
+            pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict_single.pickle')
+
         if os.path.exists(pickle_filename):
             with open(pickle_filename, 'rb') as data:
                 example_actions_dict = pickle.load(data)
@@ -402,7 +406,7 @@ def main(args):
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
                           'best_trainer_log': []}
-    
+
     # load example_actions_dict if it exists
     if use_demo:
         nonlocal_variables['example_actions_dict'] = example_actions_dict

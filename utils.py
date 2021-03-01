@@ -1021,7 +1021,6 @@ def compute_demo_dist(preds, example_actions, metric='l2'):
 
     return im_mask, match_ind[1:], match_ind[0]
 
-
 def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=True, cc_match=False):
     """
     Function to evaluate l2 distance and generate demo-signal mask
