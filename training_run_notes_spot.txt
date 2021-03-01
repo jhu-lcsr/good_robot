@@ -1903,10 +1903,9 @@ GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
 > 
 
 
-----------------------------------------------------------------------------------------
+======================
 
-
-Command to generate and save demo embeddings dict, which are saved as a cache to speed up processing in demos/<demo_folder>/embedding/embed_dict_single.pickle:
+Command to generate and save demo embeddings dict with NO CYCLE CONSISTENCY, which are saved as a cache to speed up processing in demos/<demo_folder>/embedding/embed_dict_single.pickle:
 Stack:
 python3 evaluate_demo_correspondence.py -e demos/stack_demos/ -d demos/stack_demos/ -t stack --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --write_embed --depth_channels_history
 Row:
@@ -1920,36 +1919,83 @@ Commit ID: 944e2b15f41fa2070041a56dcd595cb5f49a767b
 ======================
 
 
-stack:
-± export CUDA_VISIBLE_DEVICES="3" & python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --tcp_port 20000
-
-
-
 STACK - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
 ----------------------------------------------------------------------------------------
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 19990 --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
-Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19990 --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-17-30_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+Commit: cba754eb68c4930f92dd7b6ca62f54c6ae0538a2
 GPU 0, Tab 0, port 19990, top left v-rep window, v-rep tab 7                        
 
 
 ROW - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
 ----------------------------------------------------------------------------------------
-export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 19998 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
-
-Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19998 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-32-14_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+Commit: 1807a779fd2cadaf76fefed4baab377d6ea04c03
 GPU 1, Tab 1, port 19998, top right v-rep window, v-rep tab 8                       
 
 
 UNSTACK - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
 ----------------------------------------------------------------------------------------
-export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place ---tcp_port 1999 --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
-
-Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19999 --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
+Commit: cba754eb68c4930f92dd7b6ca62f54c6ae0538a2
 GPU 2, Tab 2, port 19999, bottom left v-rep window, v-rep tab 9                     
 
 
-VERTICAL SQUARE - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
-export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --no_common_sense_backprop --future_reward_discount 0.65
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 0.100337
+> Training loss: 0.098259
+> Action: grasp at (14, 168, 71)
+> Executing: grasp at (-0.582000, 0.112000, 0.000997) orientation: 5.497787
+> gripper position: 0.030450761318206787
+> gripper position: 0.026750892400741577
+> gripper position: 0.001738518476486206
+> gripper position: -0.022598624229431152
+> gripper position: -0.04193034768104553
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.20712161475998536 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_stack() current detected stack height: 4
+> unstacking_partial_success() structure_progress: 1 prev_structure_progress: 1 goal_success: True
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: False
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 2.5692307692307694  actions/full stack: 17.57894736842105 (lower is better)  Grasp Count: 204, grasp success rate: 0.6372549019607843 place_on_stack_rate: 1.0 place_attempts:
+> 130  partial_stack_successes: 130  stack_successes: 19 trial_success_rate: 0.37254901960784315 stack goal: [3 2] current_height: 1
+> trial_complete_indices: [ 12.  19.  26.  33.  34.  40.  50.  60.  63.  66.  77.  80.  89.  96.
+>  103. 106. 112. 137. 146. 155. 165. 174. 182. 190. 194. 197. 198. 207.
+>  210. 219. 222. 226. 237. 240. 244. 254. 261. 264. 268. 273. 274. 279.
+>  282. 286. 298. 301. 306. 314. 321. 330. 333.]
+> Max trial success rate: 0.38, at action iteration: 330. (total of 332 actions, max excludes first 330 actions)
+> Max grasp success rate: 0.6435643564356436, at action iteration: 330. (total of 332 actions, max excludes first 330 actions)
+> Max place success rate: 1.0, at action iteration: 330. (total of 333 actions, max excludes first 330 actions)
+> Max action efficiency: 1.0909090909090908, at action iteration: 330. (total of 333 actions, max excludes first 330 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History-Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.38, 'trial_success_rate_best_index': 330, 'grasp_success_rate_best_value': 0.6435643564356436, 'grasp_success_rate_best_index': 330, 'place_success_rate_best_value': 1.0, 'place_success_rate_best_index': 330, 'action_efficiency_best_value': 1.0909090909090908, 'action_efficiency_best_index': 330}
 
-Commit: 944e2b15f41fa2070041a56dcd595cb5f49a767b
+
+
+VERTICAL SQUARE - depth time fix - NO CYCLE CONSISTENCY - now watch this imitation - with backprop - 2021-03-01
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --no_common_sense_backprop --future_reward_discount 0.65
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-01-16-52-28_Sim-Vertical-Square-Imitation-Masked-Testing
+Commit: 3d7e6d245a2765ed6ee689310e8902b61453e149
 GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
