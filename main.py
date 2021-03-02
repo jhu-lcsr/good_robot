@@ -857,7 +857,8 @@ def main(args):
 
                     if task_type in ['row', 'vertical_square', 'unstack']:
                         # HACK: max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
-                        print('WARNING: main.py +Activating HACK workaround, limiting max task progress value to 3.')
+                        if task_progress > 3:
+                            print('WARNING: main.py +Activating HACK workaround, limiting max task progress value to 3.')
                         task_progress = min(3, task_progress)
 
                     # NOTE(adit98) add is in dict checks to trigger graceful exits
@@ -955,8 +956,10 @@ def main(args):
                             if task_progress == 0:
                                 task_progress = 1
 
-                        # clamp task_progress at 3 if task_type is unstack
-                        if task_type == 'unstack':
+                        if task_type in ['row', 'vertical_square', 'unstack']:
+                            # HACK: max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
+                            if task_progress > 3:
+                                print('WARNING: main.py +Activating HACK workaround, limiting max task progress value to 3.')
                             task_progress = min(3, task_progress)
 
                         action = nonlocal_variables['primitive_action']
