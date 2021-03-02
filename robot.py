@@ -723,20 +723,22 @@ class Robot(object):
             goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
-            print("------- UNSTACKING --------")
+            print("------- SCENE RESET --------")
 
             if len(self.place_pose_history) == 0:
                 print("NO PLACE HISTORY TO UNSTACK YET.")
                 print("HUMAN, PLEASE MOVE BLOCKS AROUND")
                 print("SLEEPING FOR 10 SECONDS")
-
+                # play a sound to get the human's attention.
+                print('\a')
                 for i in range(10):
                     print("SLEEPING FOR %d" % (10 - i))
                     time.sleep(1)
 
-                print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
+                print("-------- RESUMING AFTER MANUAL SCENE RESET --------")
 
             else:
+                # note, this can be run in simulation so we can test the real robot unstacking operations in the simulator
                 place_pose_history = self.place_pose_history.copy()
                 place_pose_history.reverse()
 
@@ -784,7 +786,7 @@ class Robot(object):
                 # clear the place hisory after unstacking
                 self.place_pose_history = []
 
-            print("------- UNSTACKING COMPLETE --------")
+            print("------- SCENE RESET COMPLETE --------")
 
         else:
             if self.is_sim:
