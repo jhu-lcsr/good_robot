@@ -598,13 +598,15 @@ def main(args):
                             robot.check_stack(current_stack_goal, top_idx=top_idx)
 
             elif task_type == 'row':
-                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                        check_z_height=check_z_height, valid_depth_heightmap=depth_img,
-                        prev_z_height=nonlocal_variables['prev_stack_height'])
-
                 if not check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                            check_z_height=check_z_height, valid_depth_heightmap=depth_img,
+                            prev_z_height=nonlocal_variables['prev_stack_height'])
+
                     # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
                     stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+                else:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height', task_type)
 
             else:
                 # TODO(adit98) trigger graceful exit here
