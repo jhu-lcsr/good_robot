@@ -36,8 +36,9 @@ real_good_robot_logs_2020_02
 
 paper_figures/
 
-CoppeliaSim_Edu_V4_0_0_Mac
-CoppeliaSim_Edu_V4_0_0_Mac/*
+CoppeliaSim_Edu_V4_*
+CoppeliaSim_Edu_V4_*/*
+
 
 grid_scripts
 grid_scripts/*
