@@ -2133,15 +2133,15 @@ Commit: 8d08a160efc75f91dc358a88cfa61334b799b06c
 
 
 
-SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
-----------------------------------------------------------------------------------------
+X SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+X ----------------------------------------------------------------------------------------
+X killed because of human error, removing all blocks from scene during a run.
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
+X Commit: 8eed6ccdc21d8be3b1ce4f387805e19766226709
 
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
-Commit: 8eed6ccdc21d8be3b1ce4f387805e19766226709
 
 
-
-SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-28
 ----------------------------------------------------------------------------------------
 ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop             
 Commit: 5a02e9f1755db8ea78b944b78a7c9a06424a6143
@@ -2224,3 +2224,37 @@ With corrections from human observation:
 
 > Testing results: 
 >  {'trial_success_rate_best_value': 0.3, 'trial_success_rate_best_index': 266, 'grasp_success_rate_best_value': 0.7402597402597403, 'grasp_success_rate_best_index': 267, 'place_success_rate_best_value': 0.7280701754385965, 'place_success_rate_best_index': 268, 'action_efficiency_best_value': 0.2510460251, 'action_efficiency_best_index': 268}
+
+
+
+SIM TO REAL WATCH THIS - ROWS - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --disable_two_step_backprop
+Commit: 1bd62ebd45e7c35bca0f9fda6323213bd4852593
+
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 12 actions/partial: 3.5135135135135136  actions/full stack: 21.666666666666668 (lower is better)  Grasp Count: 78, grasp success rate: 0.6666666666666666 place_on_stack_rate: 0.7115384615384616 place_attempts: 52  partial_stack_successes: 37  stack_successes: 6 trial_success_rate: 0.5 stack goal: [3 1 2] current_height: 1.0
+> Move to Home Position Complete
+> Move to Home Position Complete
+> trial_complete_indices: [  4.  10.  12.  20.  25.  25.  40.  70.  74.  79. 105. 129.]
+> Max trial success rate: 0.5454545454545454, at action iteration: 126. (total of 128 actions, max excludes first 126 actions)
+> Max grasp success rate: 0.6842105263157895, at action iteration: 126. (total of 128 actions, max excludes first 126 actions)
+> Max place success rate: 0.7115384615384616, at action iteration: 127. (total of 129 actions, max excludes first 126 actions)
+> Max action efficiency: 0.2857142857142857, at action iteration: 126. (total of 129 actions, max excludes first 126 actions)
+> saving trial success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History-Real-Row-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.5454545454545454, 'trial_success_rate_best_index': 126, 'grasp_success_rate_best_value': 0.6842105263157895, 'grasp_success_rate_best_index': 126, 'place_success_rate_best_value': 0.7115384615384616, 'place_success_rate_best_index': 127, 'action_efficiency_best_value': 0.2857142857142857, 'action_efficiency_best_index': 126}
+
+We looked at the images from above and manually counted, this left the trial success rate at 30%.
+There were also two trials where there was a code crash due to a typo, two of trials 4, 5, 6, and we removed the relevant two trials from being counted.
