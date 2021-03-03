@@ -2041,7 +2041,7 @@ def parse_resume_and_snapshot_file_args(args):
 
     # if neither snapshot file is provided
     if continue_logging:
-        if (not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file):
+        if ((not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file)) and (args.task_type is None):
             snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
             print('loading snapshot file: ' + snapshot_file)
             if not os.path.isfile(snapshot_file):
