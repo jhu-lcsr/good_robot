@@ -2351,6 +2351,9 @@ class Robot(object):
         return goal_success, structure_progress
 
     def manual_progress_check(self, prev_structure_progress, task_type):
+
+        # play a sound to get the human's attention.
+        print('\a')
         while True:
             try:
                 progress = float(input(" ".join(["For task", task_type.upper(),
