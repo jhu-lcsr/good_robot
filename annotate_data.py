@@ -138,8 +138,17 @@ class Pair:
         return pair 
 
     def infer_from_stacksequence(self, stack_sequence):
-        src_color = stack_sequence.color_names[((stack_sequence.object_color_index) % stack_sequence.color_len)]
-        tgt_color = stack_sequence.color_names[stack_sequence.object_color_sequence[stack_sequence.object_color_index-1] % stack_sequence.color_len]
+        src_idx = stack_sequence.object_color_index 
+        src_color_idx = stack_sequence.object_color_sequence[src_idx]
+        src_color = stack_sequence.color_names[src_color_idx]
+        try:
+            assert(src_idx >= 0)
+            tgt_idx = src_idx - 1
+            tgt_color_idx = stack_sequence.object_color_sequence[tgt_idx]
+        except (AssertionError, IndexError) as e: 
+            raise ValueError(f"StackSequence error: object asked fo doesn't exist") 
+
+        tgt_color = stack_sequence.color_names[tgt_color_idx]
         self.source_code = src_color
         self.target_code = tgt_color
         return src_color, tgt_color 
@@ -334,7 +343,8 @@ class Pair:
             if self.is_row: 
                 return row_template.format(source_color = self.source_code,
                                         target_color = self.target_code, 
-                                        relation = relation_lookup_dict[self.relation_code])
+                                        relation = "next to")
+                                        # relation = relation_lookup_dict[self.relation_code])
             else:
                 return stack_template.format(source_color = self.source_code,
                                             target_color = self.target_code,

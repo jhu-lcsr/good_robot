@@ -12,13 +12,15 @@ import torch
 from scipy.special import softmax
 import pathlib
 import matplotlib.pyplot as plt
+import pygame
+import pdb 
 
 # Import necessary packages
 #try:
 from spacy.lang.en import English
 from spacy.tokenizer import Tokenizer
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
-from transformer import TransformerEncoder
+from transformer import TransformerEncoder, tiles_to_image
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 #except ImportError:
 #    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
@@ -251,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.8):
     """
     Adds a language mask to the predictions array.
 
@@ -267,54 +269,53 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
             raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
     
     # Extract current masks
-    currMask = np.ma.getmask(predictions)
+    curr_mask = np.ma.getmask(predictions).copy()
 
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
     # language_data should have shape torch([1, 256, 2, 1])
-    languageMask = softmax(language_data[0,:,:,0], axis=1)
-    languageMask = np.float32(languageMask[:,1] > 0.5).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+    language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
+    language_data = softmax(language_data, axis = 1)
+    # take prob yes 
+    language_mask = language_data[:,1,:,:]
+    language_mask = np.float32(language_mask).reshape(64,64, 1)
+    #language_mask = softmax(language_data[0,:,:,0], axis=1)
+    #language_mask = np.float32(language_mask[:,1] > 0.8).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+    if threshold is not None:
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
 
     # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
-
     # Scale language masks to match the prediction array sizes
-    languageMask = cv2.resize(languageMask, currMask.shape[1:3], interpolation=cv2.INTER_NEAREST)
-    languageMask = np.broadcast_to(languageMask, predictions.shape, subok=True)
+    new_w = curr_mask.shape[1]
+    language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+    language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
 
     # Catching errors
-    assert languageMask.shape == currMask.shape and languageMask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
+    assert language_mask.shape == curr_mask.shape and language_mask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
 
     # Combine language mask with existing masks if necessary
-    if currMask is np.ma.nomask:
-        predictions.mask = languageMask
+    if curr_mask is np.ma.nomask:
+        predictions.mask = language_mask
     else:
-        predictions.mask = 1 - np.logical_and(1 - currMask,  1 - languageMask)
+        # TODO (elias) why not just multiply probs in with the mask 
+        if threshold is not None:
+            predictions.mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
 
-    
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
-        f = plt.figure()
-        # f.suptitle(str(trainer.iteration))
-        f.add_subplot(1,2, 1)
-        #if predictions is not None:
-        plt.imshow(predictions.mask[0,:,:])
-        f.add_subplot(1,2, 2)
+        # plt.figure()
+        fig, ax = plt.subplots(2,3)
+        ax[0,0].imshow(curr_mask[0,:,:])
+        ax[0,1].imshow(1 - language_mask[0,:,:])
+        ax[0,2].imshow(predictions.mask[0,:,:])
+        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
         if color_heightmap is not None:
-            plt.imshow(color_heightmap)
-        # f.add_subplot(1,4, 2)
-        # if push_predictions is not None:
-        #     plt.imshow(push_contactable_regions)
-        # f.add_subplot(1,4, 3)
-        # plt.imshow(depth_heightmap)
-        # f.add_subplot(1,4, 4)
-        # if color_heightmap is not None:
-        #     plt.imshow(color_heightmap)
+            ax[1,1].imshow(color_heightmap)
+       
         plt.show(block=True)
-
     return predictions
-
-
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
 def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):
@@ -876,6 +877,7 @@ class StackSequence(object):
         if self.is_goal_conditioned_task:
             # 3 is currently the red block
             # object_color_index = 3
+            # start with 1st object fixed, move 2nd object onto it 
             self.object_color_index = 0
 
             # Choose a random sequence to stack
@@ -1098,7 +1100,130 @@ def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
 
         return prediction_vis
 
-def compute_demo_dist(preds, example_actions):
+def compute_demo_dist(preds, example_actions, metric='l2'):
+    """
+    Function to evaluate l2 distance and generate demo-signal mask
+    """
+
+    # TODO(adit98) see if we should use cos_sim instead of l2_distance as low-level distance metric
+    def cos_sim(test_feat, demo_action_embed):
+        """
+        Helper function to compute cosine similarity.
+        Arguments:
+            test_feat: pixel-wise embeddings output by NN for test env
+            demo_action_embed: embedding of demo action
+        """
+        # no need to normalize since we are only concerned with relative values
+        cos_sim = np.sum(np.multiply(test_feat, demo_action_embed), axis=1)
+        norm_factor = np.linalg.norm(test_feat, axis=1) + 1e-4
+        return (cos_sim / norm_factor)
+
+    # reshape each example_action to 1 x 64 x 1 x 1
+    for i in range(len(example_actions)):
+        # check if policy was supplied (entry will be None if it wasn't)
+        if example_actions[i][0] is None:
+            continue
+
+        # get actions and expand dims
+        actions = np.expand_dims(np.stack(example_actions[i]), (1, 3, 4))
+
+        # reshape and update list
+        example_actions[i] = actions
+
+    # get mask for each model
+    masks = []
+    mask_shape = None
+    exit = True
+    for pred in preds:
+        if pred is not None:
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask_shape = mask.shape
+            masks.append(mask)
+            exit = False
+
+        else:
+            masks.append(None)
+
+    # exit if no policies were provided
+    if exit:
+        raise ValueError("Must provide at least one model")
+
+    # calculate distance between example action embedding and preds for each policy and demo
+    dists = []
+    for ind, actions in enumerate(example_actions):
+        for i, action in enumerate(actions):
+            # if policy not supplied, insert pixel-wise array of inf distance
+            if metric == 'l2':
+                if action is None:
+                    dists.append(np.ones(mask_shape) * np.inf)
+                    continue
+
+                # calculate pixel-wise l2 distance (16x224x224)
+                dist = np.sum(np.square(action - preds[ind]), axis=1)
+                invert = True
+
+            elif metric == 'cos_sim':
+                if action is None:
+                    dists.append(np.ones(mask_shape) * np.NINF)
+                    continue
+
+                dist = cos_sim(preds[ind], action)
+                #print('Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
+                #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
+                invert = False
+
+            # TODO(adit98) UMAP distance?
+            else:
+                raise NotImplementedError
+
+            if invert:
+                # set all masked spaces to have max l2 distance (select appropriate mask from list of masks)
+                dist[masks[ind]] = np.max(dist) * 1.1
+
+            else:
+                # set all masked spaces to have min similarity (select appropriate mask from list of masks)
+                dist[masks[ind]] = np.min(dist) * 0.9
+
+            #print('Post-Mask | Policy Number:', ind, '| Primitive Action:', i, '| Best Match Ind:',
+            #        np.unravel_index(np.argmax(dist), dist.shape), '| Similarity:', np.max(dist))
+
+            # append to dists list
+            dists.append(dist)
+
+    # stack pixel-wise distance array per policy (4x16x224x224)
+    dists = np.stack(dists)
+
+    if invert:
+        # find overall minimum distance across all policies and get index
+        match_ind = np.unravel_index(np.argmin(dists), dists.shape)
+    else:
+        # find overall maximum similarity across all policies and get index
+        match_ind = np.unravel_index(np.argmax(dists), dists.shape)
+
+    #print("Selected match_ind:", match_ind)
+
+    # select distance array for policy which contained minimum distance index
+    dist = dists[match_ind[0]]
+
+    # discard first dimension of match_ind to get it in the form (theta, y, x)
+    match_ind = match_ind[1:]
+
+    # make dist >=0 and max_normalize
+    dist = dist - np.min(dist)
+    dist = dist / np.max(dist)
+
+    # if our distance metric returns high values for values that are far apart, we need to invert (for viz)
+    if invert:
+        # invert values of dist so that large values indicate correspondence
+        im_mask = 1 - dist
+
+    else:
+        im_mask = dist
+
+    return im_mask, match_ind
+
+# TODO(adit98) implement this
+def compute_cc_dist(test_preds, demo_preds):
     """
     Function to evaluate l2 distance and generate demo-signal mask
     """
@@ -1186,3 +1311,54 @@ def compute_demo_dist(preds, example_actions):
     im_mask = 1 - l2_dist
 
     return im_mask, match_ind
+
+def annotate_success_manually(command, prev_image, next_image):
+    """
+    # Returns
+
+      description, comment.
+    """
+    print(
+        "\nPress a key to label the file: 1. success, 2. failure, 3. skip \n"
+        "What to look for:\n"
+        " - A successful stack is 3 blocks tall or 4 blocks tall with the gripper completely removed from the field of view.\n"
+        " - If the tower is 3 blocks tall and blocks will clearly slide off if not for the wall press 2 for 'failure',\n"
+        "   if it is merely in contact with a wall, press 1 for 'success'."
+        " - When the robot doesn't move but there is already a visible successful stack, that's an error.failure.falsely_appears_correct, so press 1 for 'success'!\n"
+        " - If you can see the gripper, the example is a failure even if the stack is tall enough!\n")
+    # , 3: error.failure
+    flag = 0
+    comment = 'none'
+    mark_previous_unconfirmed = None
+    pygame.init()
+    font = pygame.font.Font('freesansbold.ttf', 32)
+    textsurface = font.render(command, True, "black", "white")
+    text_rect = textsurface.get_rect()
+    text_rect.center = (350, 16)
+    screen = pygame.display.set_mode((700, 500))
+    screen.blit(textsurface, text_rect)
+    screen.blit(prev_image, (200,33))
+    w = prev_image.get_size()[0]
+    screen.blit(next_image, (200, 33 + w+1))
+    pygame.display.update()
+    while flag == 0:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    print("label set to success")
+                    flag = 1
+                    pygame.quit()
+                    return "success", comment
+                elif event.key == pygame.K_2:
+                    print("label set to failure")
+                    flag = 1
+                    pygame.quit()
+                    return "failure", comment 
+                elif event.key == pygame.K_3:
+                    flag = 1
+                    pygame.quit()
+                    return 'skip', comment 
+      

@@ -512,7 +512,11 @@ class FlatLanguageTrainer(LanguageTrainer):
 
 
 def get_free_gpu():
-    gpu_stats = subprocess.check_output(["nvidia-smi", "--format=csv", "--query-gpu=memory.used,memory.free"]).decode("utf-8") 
+    try:
+        gpu_stats = subprocess.check_output(["nvidia-smi", "--format=csv", "--query-gpu=memory.used,memory.free"]).decode("utf-8") 
+    except FileNotFoundError:
+        # on a laptop
+        return -1
     gpu_df = pd.read_csv(StringIO(u"".join(gpu_stats)),
                          names=['memory.used', 'memory.free'],
                          skiprows=1)
