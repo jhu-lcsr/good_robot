@@ -567,6 +567,9 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
 
+        if check_z_height:
+            max_workspace_height = ' (see max_workspace_height printout above) '
+
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
@@ -588,7 +591,6 @@ def main(args):
                 if check_z_height:
                     # decrease_threshold = None  # None means decrease_threshold will be disabled
                     stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
-                    max_workspace_height = ' (see max_workspace_height printout above) '
                     # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
                     # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
 
@@ -623,7 +625,6 @@ def main(args):
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
-            max_workspace_height = ' (see max_workspace_height printout above) '
             # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
 
@@ -2040,7 +2041,7 @@ def parse_resume_and_snapshot_file_args(args):
 
     # if neither snapshot file is provided
     if continue_logging:
-        if (not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file):
+        if ((not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file)) and (args.task_type is None):
             snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
             print('loading snapshot file: ' + snapshot_file)
             if not os.path.isfile(snapshot_file):
