@@ -1653,6 +1653,9 @@ DEPTH CHANNEL HISTORY, DENSENET - SIM 2x2 VERTICAL SQUARE - SPOT-Q-MASKED SPOT F
 export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port 19999 --random_seed 1238 --max_train_actions 20000 --random_actions --task_type vertical_square --depth_channels_history
 Creating data logging session: '/home/ahundt/src/real_good_robot/logs/2021-03-01-18-41-49_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Training-Three-Step-History' 
 Commit: 1324a10a5f06dfa9bc1fe088a0841c0c6e07893a
+Simulator state went bad, resuming:
+Resume: export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port 19999 --random_seed 1238 --max_train_actions 20000 --random_actions --task_type vertical_square --depth_channels_history --resume /home/ahundt/src/real_good_robot/logs/2021-03-01-18-41-49_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Training-Three-Step-History
+Resume commit: 43674441a15e8fc9b5288ced83e2aae7f4566b1c
 GPU 2, Tab 2, port 19999, bottom left v-rep window, v-rep tab 9
 
 
@@ -2170,6 +2173,51 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-03-
 Commit: 5b738b22f279e862dde5df914421d0dd7436f026
 GPU 0, Tab 0, port 19990, top right v-rep window, v-rep tab 7
 
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 1.422205
+> Training loss: 1.419498
+> Action: grasp at (13, 117, 123)
+> Executing: grasp at (-0.478000, 0.010000, 0.001001) orientation: 5.105088
+> gripper position: 0.03113444149494171
+> gripper position: 0.02627687156200409
+> gripper position: 0.0011387020349502563
+> gripper position: -0.02303934097290039
+> gripper position: -0.04186791181564331
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.05113517280726622 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_row: False | row_size: 1 | blocks: []
+> check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 51 actions/partial: 6.450980392156863  actions/full stack: 164.5 (lower is better)  Grasp Count: 625, grasp success rate: 0.5888 place_on_stack_rate: 0.42265193370165743 place_attempts: 362  partial_stack_successes: 153  stack_successes: 6 trial_success_rate: 0.11764705882352941 stack goal: [1 0] current_height: 1
+> trial_complete_indices: [ 29.  59.  76. 106. 118. 129. 140. 156. 165. 175. 205. 235. 264. 280.
+>  300. 308. 338. 362. 377. 407. 435. 465. 495. 504. 511. 541. 567. 575.
+>  603. 633. 653. 660. 676. 705. 707. 712. 733. 747. 764. 771. 782. 812.
+>  841. 871. 884. 902. 928. 939. 940. 956. 986.]
+> Max trial success rate: 0.12, at action iteration: 983. (total of 985 actions, max excludes first 983 actions)
+> Max grasp success rate: 0.5890850722311396, at action iteration: 983. (total of 985 actions, max excludes first 983 actions)
+> Max place success rate: 0.33240997229916897, at action iteration: 983. (total of 986 actions, max excludes first 983 actions)
+> Max action efficiency: 0.03662258392675483, at action iteration: 983. (total of 986 actions, max excludes first 983 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History-Sim-Row-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-03-03-11-00-08_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.12, 'trial_success_rate_best_index': 983, 'grasp_success_rate_best_value': 0.5890850722311396, 'grasp_success_rate_best_index': 983, 'place_success_rate_best_value': 0.33240997229916897, 'place_success_rate_best_index': 983, 'action_efficiency_best_value': 0.03662258392675483, 'action_efficiency_best_index': 983}
 
 
 
@@ -2180,6 +2228,56 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-03-
 Commit: 5b738b22f279e862dde5df914421d0dd7436f026
 GPU 1, Tab 1, port 20000, top right v-rep window, v-rep tab 8
 
+TODO: check for a problem with this run, compare with previous run above
+
+> Trial logging complete: 51 --------------------------------------------------------------
+> Running two step backprop()
+> main.py: running demo.get_action for stack height 1 and primitive action grasp
+> main.py nonlocal_variables['executing_action']: got demo actions
+> Training loss: 4.546655
+> Training loss: 1.359749
+> Action: grasp at (2, 19, 179)
+> Executing: grasp at (-0.366000, -0.186000, 0.001005) orientation: 0.785398
+> gripper position: 0.02993941307067871
+> gripper position: 0.026867568492889404
+> gripper position: 0.0018458366394042969
+> gripper position: -0.02245292067527771
+> gripper position: -0.04204699397087097
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> Grasp successful: False
+> moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+> prev_height: 0.0 max_z: 0.051117538131247656 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> check_stack() False, not enough nearby objects for a successful stack! expected at least 2 nearby objects, but only counted: 1
+> check_stack() current detected stack height: 1
+> vertical square partial success: structure height: 2 has_row: True num stacks: 0
+> check_stack() stack_height: 2 stack matches current goal: True partial_stack_success: True Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: True
+> STACK:  trial: 51 actions/partial: 16.80597014925373  actions/full stack: inf (lower is better)  Grasp Count: 931, grasp success rate: 0.21160042964554243 place_on_stack_rate: 0.3435897435897436 place_attempts: 195  partial_stack_successes: 67  stack_successes: 0 trial_success_rate: inf stack goal: [2 1] current_height: 2
+> trial_complete_indices: [  18.   34.   64.   94.  118.  137.  150.  180.  183.  187.  205.  215.
+>   245.  275.  305.  335.  361.  391.  394.  401.  431.  445.  475.  498.
+>   508.  521.  546.  568.  596.  626.  643.  673.  692.  711.  716.  746.
+>   776.  806.  808.  838.  863.  893.  923.  953.  983. 1013. 1036. 1045.
+>  1075. 1105. 1125.]
+> Max trial success rate: 0.0, at action iteration: 1122. (total of 1124 actions, max excludes first 1122 actions)
+> Max grasp success rate: 0.2122844827586207, at action iteration: 1122. (total of 1124 actions, max excludes first 1122 actions)
+> Max place success rate: 0.2358974358974359, at action iteration: 1122. (total of 1125 actions, max excludes first 1122 actions)
+> Max action efficiency: 0.0, at action iteration: 1122. (total of 1125 actions, max excludes first 1122 actions)
+> saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/action-efficiency.log.csv
+> saving plot: 2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing-Sim-Vertical-Square-Imitation-Masked-Testing_success_plot.png
+> /home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/data/best_stats.json
+> saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing/best_stats.json
+> Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-28-02_Sim-Vertical-Square-Imitation-Masked-Testing
+> Training results:
+>  {'trial_success_rate_best_value': 0.0, 'trial_success_rate_best_index': 1122, 'grasp_success_rate_best_value': 0.2122844827586207, 'grasp_success_rate_best_index': 1122, 'place_success_rate_best_value': 0.2358974358974359, 'place_success_rate_best_index': 1122, 'action_efficiency_best_value': 0.0, 'action_efficiency_best_index': 1122}
 
 
 VERTICAL SQUARE - depth time fix - now watch this imitation - with backprop - with cycle consistency - 2021-03-03
@@ -2189,3 +2287,54 @@ Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-03-
 Commit: 5b738b22f279e862dde5df914421d0dd7436f026
 GPU 3, Tab 3, port 20000, bottom right v-rep window, v-rep tab 10
 
+TODO: check for a problem with this run, compare with previous run above (2021-02-28-12-19-41)
+
+Trial logging complete: 51 --------------------------------------------------------------
+Running two step backprop()
+main.py: running demo.get_action for stack height 1 and primitive action grasp
+main.py nonlocal_variables['executing_action']: got demo actions
+Training loss: 4.571099
+Training loss: 1.551911
+Selected Policy #: 1 demo number: 1
+Action: grasp at (2, 105, 145)
+Executing: grasp at (-0.434000, -0.014000, 0.001002) orientation: 0.785398
+gripper position: 0.033501625061035156
+gripper position: 0.026196211576461792
+gripper position: 0.0011466443538665771
+gripper position: -0.023223876953125
+gripper position: -0.041405677795410156
+moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+Grasp successful: False
+moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+prev_height: 0.0 max_z: 0.051153285021743725 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+running check_stack_update_goal for grasp action
+check_stack() False, not enough nearby objects for a successful stack! expected at least 2 nearby objects, but only counted: 1
+check_stack() current detected stack height: 1
+vertical square partial success: structure height: 1 has_row: False num stacks: 0
+check_stack() stack_height: 1 stack matches current goal: True partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+main.py() process_actions: place_success: False
+main.py() process_actions: partial_stack_success: False
+STACK:  trial: 51 actions/partial: 14.04  actions/full stack: inf (lower is better)  Grasp Count: 849, grasp success rate: 0.2414605418138987 place_on_stack_rate: 0.36764705882352944 place_attempts: 204  partial_stack_successes: 75  stack_successes: 0 trial_success_rate: inf stack goal: [2 1] current_height: 1
+trial_complete_indices: [  29.   52.   71.   78.   93.  123.  153.  169.  196.  200.  230.  260.
+  278.  296.  326.  356.  386.  387.  396.  415.  420.  450.  480.  505.
+  535.  543.  551.  558.  560.  590.  595.  625.  655.  669.  683.  713.
+  743.  768.  787.  817.  847.  871.  901.  904.  920.  934.  964.  971.
+  999. 1022. 1052.]
+Max trial success rate: 0.0, at action iteration: 1049. (total of 1051 actions, max excludes first 1049 actions)
+Max grasp success rate: 0.24231678486997635, at action iteration: 1049. (total of 1051 actions, max excludes first 1049 actions)
+Max place success rate: 0.2955665024630542, at action iteration: 1051. (total of 1052 actions, max excludes first 1049 actions)
+Max action efficiency: 0.0, at action iteration: 1049. (total of 1052 actions, max excludes first 1049 actions)
+saving trial success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/trial-success-rate.log.csv
+saving grasp success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/grasp-success-rate.log.csv
+saving place success rate: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/place-success-rate.log.csv
+saving action efficiency: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/transitions/action-efficiency.log.csv
+saving plot: 2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing-Sim-Vertical-Square-Imitation-Masked-Testing_success_plot.png
+/home/ahundt/src/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+  plt.savefig(save_file + file_format, dpi=300, optimize=True)
+/home/ahundt/src/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+  plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/data/best_stats.json
+saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing/best_stats.json
+Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-03-03-12-17-10_Sim-Vertical-Square-Imitation-Masked-Testing
+Training results:
+ {'trial_success_rate_best_value': 0.0, 'trial_success_rate_best_index': 1049, 'grasp_success_rate_best_value': 0.24231678486997635, 'grasp_success_rate_best_index': 1049, 'place_success_rate_best_value': 0.2955665024630542, 'place_success_rate_best_index': 1051, 'action_efficiency_best_value': 0.0, 'action_efficiency_best_index': 1049}
