@@ -2230,6 +2230,7 @@ With corrections from human observation:
 SIM TO REAL WATCH THIS - ROWS - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
 ----------------------------------------------------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --disable_two_step_backprop
+Creating data logging session: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/
 Commit: 1bd62ebd45e7c35bca0f9fda6323213bd4852593
 
 > main.py() process_actions: partial_stack_success: False
@@ -2258,3 +2259,62 @@ Commit: 1bd62ebd45e7c35bca0f9fda6323213bd4852593
 
 We looked at the images from above and manually counted, this left the trial success rate at 30%.
 There were also two trials where there was a code crash due to a typo, two of trials 4, 5, 6, and we removed the relevant two trials from being counted.
+
+
+
+
+
+X SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - NO backprop - with cycle consistency - 2021-03-03
+X ----------------------------------------------------------------------------------------
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency --disable_two_step_backprop
+X Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+X GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
+X 
+X STOPPED to run config below (limited time)
+
+
+
+W WARNING SINGLE TIME STEP INPUT WITH THREE TIME STEP MODEL - SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - NO backprop - with cycle consistency - 2021-03-03
+W ----------------------------------------------------------------------------------------
+W export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency
+W Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing
+W Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+W GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
+W 
+W > For task VERTICAL_SQUARE input current structure size: 1
+W > check_stack() stack_height: 1.0 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+W > main.py() process_actions: place_success: False
+W > main.py() process_actions: partial_stack_success: False
+W > STACK:  trial: 11 actions/partial: 4.8936170212765955  actions/full stack: 230.0 (lower is better)  Grasp Count: 136, grasp success rate: 0.6911764705882353 place_on_stack_rate: 0.5 place_attempts: 94  partial_stack_successes: 47  stack_successes: 1 trial_success_rate: 0.09090909090909091 stack goal: [3 1 2] current_height: 1.0
+W > Move to Home Position Complete
+W > Move to Home Position Complete
+W > trial_complete_indices: [ 29.  38.  68.  81. 111. 134. 164. 184. 196. 217. 229.]
+W > Max trial success rate: 0.1, at action iteration: 226. (total of 228 actions, max excludes first 226 actions)
+W > Max grasp success rate: 0.7014925373134329, at action iteration: 227. (total of 228 actions, max excludes first 226 actions)
+W > Max place success rate: 0.5053763440860215, at action iteration: 226. (total of 229 actions, max excludes first 226 actions)
+W > Max action efficiency: 0.02654867256637168, at action iteration: 226. (total of 229 actions, max excludes first 226 actions)
+W > saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/trial-success-rate.log.csv
+W > saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/grasp-success-rate.log.csv
+W > saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/place-success-rate.log.csv
+W > saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/action-efficiency.log.csv
+W > saving plot: 2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing-Real-Vertical-Square-Imitation-Masked-Testing_success_plot.png
+W > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+W >   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+W > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+W >   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+W > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/data/best_stats.json
+W > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/best_stats.json
+W > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing
+W > Training results: 
+W >  {'trial_success_rate_best_value': 0.1, 'trial_success_rate_best_index': 226, 'grasp_success_rate_best_value': 0.7014925373134329, 'grasp_success_rate_best_index': 227, 'place_success_rate_best_value': 0.5053763440860215, 'place_success_rate_best_index': 226, 'action_efficiency_best_value': 0.02654867256637168, 'action_efficiency_best_index': 226}
+W 
+W Efficiency correction: (10*6)/226
+
+
+
+
+SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - WITH backprop - with cycle consistency - 2021-03-03
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
