@@ -2,7 +2,7 @@
 
 import time
 import os
-import pdb 
+import pdb
 import signal
 import sys
 import random
@@ -34,7 +34,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from data import DatasetReader, GoodRobotDatasetReader
 from generate_logoblocks_images import BlockSetter
-from annotate_data import Pair 
+from annotate_data import Pair
 
 def run_title(args):
     """
@@ -164,7 +164,7 @@ def main(args):
     random_actions = args.random_actions
     # TODO(zhe) Added static language mask option
     static_language_mask = args.static_language_mask
-    is_bisk = args.is_bisk 
+    is_bisk = args.is_bisk
     randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
     obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
@@ -589,10 +589,10 @@ def main(args):
 
         if not is_sim and grasp_color_task:
             if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
-                nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None: 
-                success_code, comment = annotate_success_manually(nonlocal_variables['language_metadata']['command'], 
+                nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None:
+                success_code, comment = annotate_success_manually(nonlocal_variables['language_metadata']['command'],
                                                                 nonlocal_variables['language_metadata']['prev_color_heightmap'],
-                                                                nonlocal_variables['language_metadata']['next_color_heightmap']) 
+                                                                nonlocal_variables['language_metadata']['next_color_heightmap'])
 
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
 
@@ -822,7 +822,7 @@ def main(args):
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
 
                 if not use_demo:
-                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
+                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action.
                     # If we just did a successful grasp, we always need to place
                     if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                         nonlocal_variables['primitive_action'] = 'place'
@@ -990,9 +990,14 @@ def main(args):
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
-                        # add for annotation process if we're not in the sim 
-                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
+                        # add for annotation process if we're not in the sim
+                        try:
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                        except NameError:
+                            print(f"Threading issue: cannot set language metadata")
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
                         needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
@@ -1039,9 +1044,14 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
-                        # add for annotation process if we're not in the sim 
-                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
+                        # add for annotation process if we're not in the sim
+                        try:
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                        except NameError:
+                            print(f"Threading issue: cannot set language metadata")
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
                                 use_imitation=use_demo, task_type=task_type)
 
@@ -1114,10 +1124,15 @@ def main(args):
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
                             heightmap_resolution, logger, trainer, '2')
 
-                    # TODO(elias) confirm this doesn't break anything 
-                    # add for annotation process if we're not in the sim 
-                    nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                    nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap 
+                    # TODO(elias) confirm this doesn't break anything
+                    # add for annotation process if we're not in the sim
+                    try:
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                    except NameError:
+                        print(f"Threading issue: cannot set language metadata")
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
                             task_type=task_type, use_imitation=use_demo)
@@ -1250,7 +1265,11 @@ def main(args):
                 if 'vertical_square' in multi_task_snapshot_files:
                     vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
             else:
-                trainer.model.load_state_dict(torch.load(snapshot_file))
+                print(f"Snapshot file: {snapshot_file}")
+                try:
+                    trainer.model.load_state_dict(torch.load(snapshot_file))
+                except FileNotFoundError:
+                    pass
 
             if test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
@@ -1265,7 +1284,7 @@ def main(args):
 
     def sim_problem_end_trial(num_problems_detected=0):
         ''' Call when trials must be ended due to an exceptional situation from the main training loop.
-        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner, 
+        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner,
         which often means the simulator entered a physically impossible state.
         The existing code should already call the regular end_trial() function when the next iteration starts.
         '''
@@ -1337,24 +1356,24 @@ def main(args):
     language_data = None
     blockMover = None
     language_model = None
-    if static_language_mask: 
+    if static_language_mask:
         if is_sim and not is_bisk:
-            # define a dataset reader closure so that we can pass individual objects at a time 
-            # TODO(elias) turn these into command-line args 
-            dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x, 
+            # define a dataset reader closure so that we can pass individual objects at a time
+            # TODO(elias) turn these into command-line args
+            dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x,
                                                     split_type="none",
                                                     task_type="rows",
                                                     augment_by_flipping=False,
                                                     augment_language = False,
-                                                    augment_by_rotating=False, 
+                                                    augment_by_rotating=False,
                                                     leave_out_color=None,
                                                     batch_size=1,
                                                     max_seq_length=40,
                                                     resolution = 64,
                                                     is_bert = True,
-                                                    overfit=False) 
-                                                    
-        # if dealing with Bisk data, do as before 
+                                                    overfit=False)
+
+        # if dealing with Bisk data, do as before
         if is_sim and is_bisk:
             dataset_reader = DatasetReader(args.train_language_inputs,
                                         None,
@@ -1364,10 +1383,10 @@ def main(args):
             print(f"Reading data from {args.train_language_inputs}, this may take a few minutes.")
             language_data = dataset_reader.data['train']
             # END IF
-        
+
         if is_sim and is_bisk:
             blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot, side_len=0.027)
-        
+
         language_model = utils.load_language_model_from_config(configYamlPath=language_model_config, weightsPath=language_model_weights)
         language_model.eval()
 
@@ -1391,28 +1410,28 @@ def main(args):
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
-        
+
         # If using the language map, get the command sentence and set up the scene
         nonlocal_variables['intended_position'] = None
         if static_language_mask:
-            # TODO(elias) ensure prev_primitive_action is thread-safe 
-            # TODO(elias) what about unsuccessful grasp actions that move the block 
+            # TODO(elias) ensure prev_primitive_action is thread-safe
+            # TODO(elias) what about unsuccessful grasp actions that move the block
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
-                json_data = sim_object_state_to_json(robot) 
-                # TODO(elias) add depthmap 
-                pair = Pair.from_main_idxs(color_heightmap, 
-                                           valid_depth_heightmap, 
-                                           json_data, 
+                json_data = sim_object_state_to_json(robot)
+                # TODO(elias) add depthmap
+                pair = Pair.from_main_idxs(color_heightmap,
+                                           valid_depth_heightmap,
+                                           json_data,
                                            nonlocal_variables['stack'],
-                                           is_row = check_row) 
+                                           is_row = check_row)
 
-                # batchify a single example 
+                # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
-            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same 
+            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same
             #if is
 
-            # only set up the scene if working with Bisk (2018) data 
-            elif is_sim and is_bisk: 
+            # only set up the scene if working with Bisk (2018) data
+            elif is_sim and is_bisk:
                 # Update nonlocal variables with bisk goal here
                 nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
                 # RESET THE SCENE to match the "previous" state if we are in the simulator
@@ -1421,7 +1440,7 @@ def main(args):
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
             else:
-                pass 
+                pass
         else:
             language_data_instance = None
 
@@ -1453,7 +1472,7 @@ def main(args):
                 num_empty_obj -= 1
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
-        
+
         # NOTE(zhe) The pushing & grasping only task is to pick up items and teleport them to a bin outside of the workspace.
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
@@ -1491,8 +1510,8 @@ def main(args):
                         try:
                             trainer.model.load_state_dict(torch.load(snapshot_file))
                         except FileNotFoundError:
-                            # TODO(elias) make sure this is OK 
-                            pass 
+                            # TODO(elias) make sure this is OK
+                            pass
                 if place:
                     set_nonlocal_success_variables_false()
                     nonlocal_variables['stack'].reset_sequence()
@@ -1632,28 +1651,30 @@ def main(args):
             else:
                 # DONE(zhe) Need to ensure that "predictions" also have language mask
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
-                # TODO(elias) add check for if we're using language instruction 
+                # TODO(elias) add check for if we're using language instruction
                 # Generate the language mask using the language model.
                 language_output = None # 4 ndarrays with shape (batch_size, 256, 2, 1) where each pixel has two options (block is present, block is not present)
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
-
-                command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
-                nonlocal_variables['language_metadata']['command'] = command
-                print(f"Command: {' '.join(command)}") 
+                if language_data_instance is not None: 
+                    command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
+                    nonlocal_variables['language_metadata']['command'] = command
+                    print(f"Command: {' '.join(command)}")
 
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
                                 is_volatile=True, goal_condition=goal_condition, language_output=language_output)
 
-                # min of 5 active pixels or we kill the sim 
-                if np.sum(1-grasp_predictions.mask) < 5: 
-                    print(f"Grasp action '{command}' cannot be executed because of missing blocks, exiting!")
-                    no_change_count = end_trial()
-                if np.sum(1-place_predictions.mask) < 5: 
-                    print(f"Place action '{command}' cannot be executed because of missing blocks, exiting!")
-                    no_change_count = end_trial()
+                # min of 5 active pixels or we kill the sim
+                # if np.sum(1-grasp_predictions.mask) < 5:
+                #     print(f"Grasp action '{command}' cannot be executed because of missing blocks, exiting!")
+                #     no_change_count = end_trial()
+                #     nonlocal_pause['exit_called'] = True
+                # if np.sum(1-place_predictions.mask) < 5:
+                #     print(f"Place action '{command}' cannot be executed because of missing blocks, exiting!")
+                #     no_change_count = end_trial()
+                #     nonlocal_pause['exit_called'] = True
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1968,10 +1989,10 @@ def main(args):
             prev_color_success = None
 
         # TODO(elias) this is where we check for trial completion nonlocal_variables['train_complete]
-        #if nonlocal_variables['trial_complete']: 
-            # load next image of the task 
-            # use trial number variable as the index to pick out the image 
-            # use that also to get/save the string 
+        #if nonlocal_variables['trial_complete']:
+            # load next image of the task
+            # use trial number variable as the index to pick out the image
+            # use that also to get/save the string
 
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
@@ -2005,11 +2026,11 @@ def main(args):
 def sim_object_state_to_json(robot):
     # Dump scene state information to a file.
     sim_positions, sim_orientations = robot.get_obj_positions_and_orientations()
-    to_ret = {'positions': sim_positions, 
-              'orientations': sim_orientations, 
-              'color_names': robot.color_names, 
+    to_ret = {'positions': sim_positions,
+              'orientations': sim_orientations,
+              'color_names': robot.color_names,
               'num_obj': robot.num_obj}
-    return to_ret 
+    return to_ret
 
 def dump_sim_object_state_to_json(robot, logger, filename):
     # Dump scene state information to a file.

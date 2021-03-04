@@ -2202,8 +2202,8 @@ class Robot(object):
                 if top_pos[2] < (bottom_pos[2] + vert_distance_threshold / 2.0):
                     if not self.grasp_color_task:
                         print('check_stack(): not high enough for idx: ' + str(idx))
-                    working_seq_found=False
-                    max_height=max(max_height, idx + 1)
+                working_seq_found=False
+                max_height=max(max_height, idx + 1)
 
                 # Check that the blocks are near each other
                 dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
@@ -2214,17 +2214,12 @@ class Robot(object):
                     working_seq_found=False
                     max_height=max(max_height, idx + 1)
             
-            if working_seq_found:
-                break
+                if working_seq_found:
+                    break
         
-        if not working_seq_found:
-            if return_inds:
-                return False, max_height, object_color_sequence
-            return False, max_height
-        
-
-        detected_height = min(idx + 2, len(object_color_sequence))
-        print('check_stack() current detected stack height: ' + str(detected_height))
+            if not working_seq_found:
+                if return_inds:
+                    return False, max_height, object_color_sequence
 
         if return_inds:
             return goal_success, detected_height, object_color_sequence
