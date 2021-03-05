@@ -253,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
     """
     Adds a language mask to the predictions array.
 
@@ -278,16 +278,24 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     language_data = softmax(language_data, axis = 1)
     # take prob yes
     language_mask = language_data[:,1,:,:]
-    language_mask = np.float32(language_mask).reshape(64,64, 1)
+    language_mask = np.float32(language_mask).reshape(64,64, 1).copy()
+    new_w = curr_mask.shape[1]
     if single_max:
-        # no threshold
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+
+        language_mask *= 1 - curr_mask[0,:,:]
+        language_mask = torch.tensor(language_mask)
+        # get max pixel
+        row_values, row_indices = torch.max(language_mask, axis=0)
+        col_values, col_idx = torch.max(row_values, dim=0)
+        row_idx = row_indices[col_idx]
         threshold = None
-        max_val = np.max(language_mask)
         # abs_threshold = 0.10
-        language_mask[np.abs(language_mask - max_val) <= abs_threshold ] = 1
+        language_mask *= 0
+        language_mask[row_idx, col_idx] = 1
         language_mask[language_mask != 1] = 0
-
-
+        language_mask = language_mask.detach().cpu().numpy()
     if threshold is not None:
 
         language_mask[language_mask > threshold] = 1
@@ -295,7 +303,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
 
     # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
     # Scale language masks to match the prediction array sizes
-    new_w = curr_mask.shape[1]
+
     language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
     language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
 
@@ -461,7 +469,8 @@ def load_language_model_from_config(configYamlPath, weightsPath):
                                  output_type = config["output_type"],
                                  positional_encoding_type = config["pos_encoding_type"],
                                  # device = device,
-                                 log_weights = config["test"])
+                                 log_weights = config["test"],
+                                 do_reconstruction = config['do_reconstruction'])
 
     # Load weights
     print(f'loading model weights from {config["checkpoint_dir"]}')
