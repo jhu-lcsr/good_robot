@@ -58,6 +58,9 @@ if __name__ == '__main__':
         trial_end = clearance_log[i][0]
         print('trial num: ' + str(i))
         print('start: ' + str(trial_start) + ' trial end: ' + str(trial_end ))
+        if trial_start == trial_end:
+            print('TRIAL ' + str(i) + ' IS EMPTY, skipping')
+            continue
         trial_heights = np.array(stack_height_log[trial_start: trial_end])
         print(trial_heights)
         max_heights += [np.max(trial_heights)]
