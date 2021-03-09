@@ -42,7 +42,7 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
-        self.place_common_sense = self.common_sense and place_common_sense and not static_language_mask
+        self.place_common_sense = self.common_sense and place_common_sense # and not static_language_mask
         self.common_sense_backprop = common_sense_backprop
         self.static_language_mask=static_language_mask
         self.show_heightmap = show_heightmap
@@ -126,7 +126,6 @@ class Trainer(object):
         self.iteration = 0
         # Load pre-trained model
         if snapshot_file:
-
             # PyTorch v0.4 removes periods in state dict keys, but no backwards compatibility :(
             self.load_snapshot_file(snapshot_file)
 
@@ -652,13 +651,12 @@ class Trainer(object):
 
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
-            # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions, color_heightmap=color_heightmap)
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
         # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
-        if self.place_common_sense and not self.static_language_mask:
+        if self.place_common_sense:
             return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
         else:
             return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
