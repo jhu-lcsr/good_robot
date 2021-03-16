@@ -235,7 +235,7 @@ def main(args):
     # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
     place = args.place
-    if grasp_color_task:
+    if grasp_color_task and not static_language_mask:
         if not is_sim:
             raise NotImplementedError('Real execution goal conditioning is not yet implemented')
         goal_condition_len = num_obj
@@ -341,6 +341,7 @@ def main(args):
                           'best_pix_ind': None,
                           'push_success': False,
                           'grasp_success': False,
+                          'grasp_color_success': False,
                           'color_success': False,
                           'place_success': False,
                           'partial_stack_success': False,
@@ -409,6 +410,8 @@ def main(args):
         is_goal_conditioned = False
     else:
         is_goal_conditioned = grasp_color_task or place
+    
+    
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     # color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
     color_names = robot.object_colors
@@ -830,6 +833,13 @@ def main(args):
                         print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
                     else:
                         print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
+                    
+                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
+                    # If we just did a successful grasp, we always need to place
+                    if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
+                        nonlocal_variables['primitive_action'] = 'place'
+                    else:
+                        nonlocal_variables['primitive_action'] = 'grasp'
 
                 # Exploitation (do best action) vs exploration (do random action)
                 if is_testing:
@@ -852,26 +862,28 @@ def main(args):
                 # NOTE(zhe) Switch grasp to push if push has better score. NO PUSHING IN LANGUAGE MODEL.
                 # determine if the network indicates we should do a push or a grasp
                 # otherwise if we are exploring and not placing choose between push and grasp randomly
-                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
+                # if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
+                #     if is_testing and method == 'reactive':
+                #         if best_push_conf > 2 * best_grasp_conf:
+                #             nonlocal_variables['primitive_action'] = 'push'
+                #     else:
+                #         nonlocal_variables['primitive_action'] = 'grasp'
+
+                # determine if the network indicates we should do a push or a grasp
+                # otherwise if we are exploring and not placing choose between push and grasp randomly
+                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place': 
                     if is_testing and method == 'reactive':
                         if best_push_conf > 2 * best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
+                    elif best_push_conf > best_grasp_conf and not static_language_mask:
+                        nonlocal_variables['primitive_action'] = 'push'
                     else:
                         nonlocal_variables['primitive_action'] = 'grasp'
 
-                    # determine if the network indicates we should do a push or a grasp
-                    # otherwise if we are exploring and not placing choose between push and grasp randomly
-                    if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
-                        if is_testing and method == 'reactive':
-                            if best_push_conf > 2 * best_grasp_conf:
-                                nonlocal_variables['primitive_action'] = 'push'
-                        else:
-                            if best_push_conf > best_grasp_conf:
-                                nonlocal_variables['primitive_action'] = 'push'
-                        if explore_actions:
-                            # explore the choices of push actions vs place actions
-                            push_frequency_one_in_n = 5
-                            nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
+                    if explore_actions:
+                        # explore the choices of push actions vs place actions
+                        push_frequency_one_in_n = 5
+                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
 
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
@@ -879,13 +891,12 @@ def main(args):
                     # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                     # logger.write_to_log('trial', trainer.trial_log)
 
-                # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value.
+                # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value. Random actions
                 if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
                     # Half the time we actually explore the full 2D action space
                     print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob/2))
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
-
                 else:
                     if use_demo:
                         # get parameters of current action to do dict lookup
@@ -1453,8 +1464,6 @@ def main(args):
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
-            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same
-            #if is
 
             # only set up the scene if working with Bisk (2018) data
             elif is_sim and is_bisk:
@@ -1675,7 +1684,6 @@ def main(args):
                                 push_predictions_vertical_square, grasp_predictions_vertical_square, place_predictions_vertical_square
 
             else:
-                # DONE(zhe) Need to ensure that "predictions" also have language mask
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
                 # TODO(elias) add check for if we're using language instruction
                 # Generate the language mask using the language model.
@@ -2033,7 +2041,6 @@ def main(args):
                 unstack_trainer.iteration += 1
             if vertical_square_trainer is not None:
                 vertical_square_trainer.iteration += 1
-
         else:
             trainer.iteration += 1
 

@@ -538,6 +538,7 @@ class GoodRobotDatasetReader:
                 augment_by_rotating: bool = True, 
                 augment_language: bool = True, 
                 leave_out_color: str = None, 
+                color_pair: tuple = None,
                 batch_size: int = 32,
                 max_seq_length: int = 60,
                 resolution: int = 64,
@@ -594,7 +595,15 @@ class GoodRobotDatasetReader:
             dev_data = self.all_data
             test_data = self.all_data 
         elif split_type == "leave-out-color":
-            pass
+            # train on everything except (<color_a>, <color_b>) combos in either direction 
+            allowed_data = [x for x in self.all_data if not(x.source_code in color_pair and x.target_code in color_pair)]
+            held_out_data = [x for x in self.all_data if x.source_code in color_pair and x.target_code in color_pair]
+            train_data = allowed_data 
+            held_out_len = len(held_out_data)
+            dev_len = int(held_out_len/3)
+            dev_data = held_out_data[0:dev_len]
+            test_data = held_out_data[dev_len: ]
+
         elif split_type == "train-stack-test-row":
             pass
         elif split_type == "train-row-test-stack":
@@ -681,8 +690,10 @@ class GoodRobotDatasetReader:
         commands = []
         prev_pos_input = []
         prev_pos_for_pred = []
-        prev_pos_for_acc  = []
+        prev_pos_for_vis  = []
+        prev_pos_for_acc = []
         next_pos_for_pred = []
+        next_pos_for_vis = []
         next_pos_for_acc = []
         next_pos_for_regression = []
         block_to_move = []
@@ -714,11 +725,15 @@ class GoodRobotDatasetReader:
             prev_pos_input.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
             if pair.prev_location is not None: 
                 prev_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.prev_location).copy()).unsqueeze(0))
-                prev_pos_for_acc.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
+                prev_pos_for_vis.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
+                # TODO (elias)
+                prev_pos_for_acc.append(torch.from_numpy(pair.prev_state_image.copy()).unsqueeze(0))
 
             if pair.next_location is not None:
                 next_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.next_location).copy()).unsqueeze(0))
-                next_pos_for_acc.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
+                next_pos_for_vis.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
+                # TODO (elias) 
+                # next_pos_for_acc.append(torch.from_numpy(pair.next_state_image.copy()).unsqueeze(0))
             pairs.append(pair)
             block_to_move.append(None) 
 
@@ -729,20 +744,28 @@ class GoodRobotDatasetReader:
         if len(prev_pos_for_acc) > 0:
             prev_pos_for_acc  = torch.cat(prev_pos_for_acc, 0)
             prev_pos_for_acc  = prev_pos_for_acc.float() 
+        if len(prev_pos_for_vis) > 0:
+            prev_pos_for_vis  = torch.cat(prev_pos_for_vis, 0)
+            prev_pos_for_vis  = prev_pos_for_vis.float() 
         if len(next_pos_for_pred) > 0:
             next_pos_for_pred  = torch.cat(next_pos_for_pred, 0) 
             next_pos_for_pred = next_pos_for_pred.float().unsqueeze(-1)
         if len(next_pos_for_acc) > 0:
             next_pos_for_acc = torch.cat(next_pos_for_acc, 0) 
             next_pos_for_acc = next_pos_for_acc.float() 
+        if len(next_pos_for_vis) > 0:
+            next_pos_for_vis = torch.cat(next_pos_for_vis, 0) 
+            next_pos_for_vis = next_pos_for_vis.float() 
 
         prev_pos_input = prev_pos_input.permute(0, 3, 1, 2).float() 
 
         return {"command": commands,
                 "prev_pos_input": prev_pos_input,
                 "prev_pos_for_acc": prev_pos_for_acc,
+                "prev_pos_for_vis": prev_pos_for_vis,
                 "prev_pos_for_pred": prev_pos_for_pred,
                 "next_pos_for_acc": next_pos_for_acc,
+                "next_pos_for_vis": next_pos_for_vis,
                 "next_pos_for_pred": next_pos_for_pred,
                 "next_pos_for_regression": None,
                 "block_to_move": None,
@@ -752,8 +775,6 @@ class GoodRobotDatasetReader:
 if __name__ == "__main__":
     reader = DatasetReader("blocks_data/devset.json", "blocks_data/devset.json", "blocks_data/devset.json")  
     reader.read_data("train") 
-    #reader = DatasetReader("blocks_data/devset.json", "blocks_data/devset.json", "blocks_data/devset.json", batch_by_line=True)
-    #reader.read_data("train") 
     
     for trajectory in reader.data["train"]:
         for instance in trajectory: 
