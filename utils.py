@@ -253,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
     """
     Adds a language mask to the predictions array.
 
@@ -334,7 +334,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         plt.show(block=True)
     return predictions
 
-def infect_mask(language_mask, curr_mask, block_width = 14):
+def infect_mask(language_mask, curr_mask, block_width = 16):
     # expand out from intersection: if any pixel of a block is yes under language mask, then whole block should be yes
     curr_mask = 1 - curr_mask
     intersection_mask = np.logical_and(curr_mask,  language_mask).astype(float)
@@ -929,7 +929,7 @@ def is_jsonable(x):
 
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
+    def __init__(self, num_obj, goal_num_obj = None, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -943,6 +943,7 @@ class StackSequence(object):
 
         """
         self.num_obj = num_obj
+        self.goal_num_obj = goal_num_obj if goal_num_obj is not None else num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
         self.trial = trial
         self.reset_sequence()

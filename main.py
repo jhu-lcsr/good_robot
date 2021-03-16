@@ -96,6 +96,7 @@ def main(args):
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
     num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
+    goal_num_obj = args.goal_num_obj
     num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
     timeout = args.timeout # time to wait before simulator reset
     if num_obj is not None:
@@ -169,6 +170,7 @@ def main(args):
     obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
     language_model_weights = args.language_model_weights
+    end_on_incorrect_order = args.end_on_incorrect_order
 
     # -------------- Demo options -----------------------
     use_demo = args.use_demo
@@ -249,7 +251,8 @@ def main(args):
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, None,
                   place, grasp_color_task, unstack=unstack,
-                  heightmap_resolution=heightmap_resolution, randomized=randomized, obj_scale=obj_scale, task_type=task_type)
+                  heightmap_resolution=heightmap_resolution, randomized=randomized, obj_scale=obj_scale, task_type=task_type,
+                  language=static_language_mask)
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
@@ -407,9 +410,10 @@ def main(args):
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
-    color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
+    # color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
+    color_names = robot.object_colors
     if num_obj is not None:
-        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, goal_num_obj=goal_num_obj, is_goal_conditioned_task=is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
     else:
         nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
 
@@ -551,7 +555,12 @@ def main(args):
             # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+            # pdb.set_trace()
+            if static_language_mask:
+                # current_stack_goal = nonlocal_variables['stack'].object_color_sequence[0:4]
+                stack_matches_goal, nonlocal_variables['stack_height'], pred_stack_goal = robot.check_stack(current_stack_goal, top_idx=top_idx, goal_num_obj=goal_num_obj, return_inds=True)
+            else:
+                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, goal_num_obj=goal_num_obj)
 
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
 
@@ -568,6 +577,7 @@ def main(args):
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
+                    pdb.set_trace()
                     toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
                 elif nonlocal_variables['primitive_action'] == 'grasp' and not nonlocal_variables['grasp_success']:
                     # can't progress legally if we have failed grasp
@@ -600,6 +610,16 @@ def main(args):
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
+
+        if static_language_mask and end_on_incorrect_order:
+            # check order, if it is the right length and bad then kill this trial
+            pdb.set_trace()
+            if not np.array_equal(pred_stack_goal, current_stack_goal) and (len(pred_stack_goal) == len(current_stack_goal) or\
+                                                                            (nonlocal_variables['prev_stack_height'] > 1 and
+                                                                            len(pred_stack_goal) < nonlocal_variables['prev_stack_height'])):
+                print('ERROR: Stack is irreparably misordered, trial is a failure. Ending...')
+                needed_to_reset = True
+                toppled = True
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
@@ -980,6 +1000,7 @@ def main(args):
 
                 # NOTE(zhe) Execute the primitive action (grasp, push, or place)
                 # Execute primitive
+                # pdb.set_trace()
                 if nonlocal_variables['primitive_action'] == 'push':
                     if skip_noncontact_actions and not push_may_contact_something:
                         # We are too high to contact anything, don't bother actually pushing.
@@ -1007,13 +1028,15 @@ def main(args):
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                                 print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+                                # print('nonlocal_variables[stack].goal_num_obj: ' + str(nonlocal_variables['stack'].goal_num_obj))
+
                             elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 nonlocal_variables['stack'].next()
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
-                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
+                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
                                     # we are in testing mode which is frequently recorded,
@@ -1109,6 +1132,7 @@ def main(args):
                         print(grasp_str)
 
                 elif nonlocal_variables['primitive_action'] == 'place':
+                    # pdb.set_trace()
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block for vertical square and stacking
                     if task_type is not None and ((task_type == 'unstack') or (task_type == 'row')):
@@ -1149,8 +1173,9 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
+                        # pdb.set_trace()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
-                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
+                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj))):
                             print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                             if is_testing:
                                 # we are in testing mode which is frequently recorded,
@@ -1165,7 +1190,8 @@ def main(args):
                             get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
                             robot.reposition_objects()
                             # We don't need to reset here because the algorithm already reset itself
-                            # nonlocal_variables['stack'].reset_sequence()
+                            if static_language_mask:
+                                nonlocal_variables['stack'].reset_sequence()
                             nonlocal_variables['stack'].next()
                             nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
@@ -1657,7 +1683,7 @@ def main(args):
                 if static_language_mask and language_data_instance is not None:
                     with torch.no_grad():
                         language_output = language_model.forward(language_data_instance)
-                if language_data_instance is not None: 
+                if language_data_instance is not None:
                     command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
                     nonlocal_variables['language_metadata']['command'] = command
                     print(f"Command: {' '.join(command)}")
@@ -2458,6 +2484,7 @@ if __name__ == '__main__':
     parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',                  help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
+    parser.add_argument('--goal_num_obj', dest='goal_num_obj', type=int, action='store', default=4,                       help='max height of the desired stack. Set when not using extra objects with language command')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as TCP client (UR5)')
     parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as real-time client (UR5)')
@@ -2526,7 +2553,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
     parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
-
+    parser.add_argument('--end_on_incorrect_order', action='store_true', default=False,          help='set if trial should end immediately whenever blocks are placed in incorrect order')
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                  help='multi model stacking snapshot file to load for the model (use --snapshot_file if you are training one model)')
