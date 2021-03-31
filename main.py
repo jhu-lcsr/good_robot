@@ -235,7 +235,7 @@ def main(args):
     # ------ Stacking Blocks and Grasping Specific Colors -----
     grasp_color_task = args.grasp_color_task
     place = args.place
-    if grasp_color_task and not static_language_mask:
+    if grasp_color_task:
         if not is_sim:
             raise NotImplementedError('Real execution goal conditioning is not yet implemented')
         goal_condition_len = num_obj
@@ -341,7 +341,6 @@ def main(args):
                           'best_pix_ind': None,
                           'push_success': False,
                           'grasp_success': False,
-                          'grasp_color_success': False,
                           'color_success': False,
                           'place_success': False,
                           'partial_stack_success': False,
@@ -410,8 +409,6 @@ def main(args):
         is_goal_conditioned = False
     else:
         is_goal_conditioned = grasp_color_task or place
-    
-    
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     # color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
     color_names = robot.object_colors
@@ -580,7 +577,7 @@ def main(args):
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
-                    pdb.set_trace()
+                    # pdb.set_trace()
                     toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
                 elif nonlocal_variables['primitive_action'] == 'grasp' and not nonlocal_variables['grasp_success']:
                     # can't progress legally if we have failed grasp
@@ -616,11 +613,25 @@ def main(args):
 
         if static_language_mask and end_on_incorrect_order:
             # check order, if it is the right length and bad then kill this trial
-            pdb.set_trace()
-            if not np.array_equal(pred_stack_goal, current_stack_goal) and (len(pred_stack_goal) == len(current_stack_goal) or\
-                                                                            (nonlocal_variables['prev_stack_height'] > 1 and
-                                                                            len(pred_stack_goal) < nonlocal_variables['prev_stack_height'])):
-                print('ERROR: Stack is irreparably misordered, trial is a failure. Ending...')
+            # if there is a mistake further down in the stack than the top-most block, there's no way to recover
+            # but if it's the top-most one, we can still unstack it, so don't kill the trial quite yet
+            if len(pred_stack_goal) == 2:
+                # if there are only 2 blocks and it places it on the wrong block, it can recover
+                # pred_matches_goal_up_to_top = pred_stack_goal[-1] == current_stack_goal[-1]
+                # just check that it isn't buried
+                pred_matches_goal_up_to_top = pred_stack_goal[0] != current_stack_goal[1]
+            else:
+                pred_matches_goal_up_to_top = np.array_equal(pred_stack_goal, current_stack_goal)
+            # only check for this if the predicted stack and goal stack are the same height
+            lens_match = len(pred_stack_goal) >= len(current_stack_goal)
+            # also check for toppling, but only if the previous stack was more than 2 block high
+            was_over_one = nonlocal_variables['prev_stack_height'] > 1
+            decreased_height = len(pred_stack_goal) < nonlocal_variables['prev_stack_height']
+            # conditions for ending a trial:
+            # either a mistake is made in the bottom of the stack, or the stack has toppled
+            if (not pred_matches_goal_up_to_top and lens_match) or (was_over_one and decreased_height):
+                # pdb.set_trace()
+                print('ERROR: Stack is irreparably misordered or has toppled, trial is a failure. Ending...')
                 needed_to_reset = True
                 toppled = True
         # if place and needed_to_reset:
@@ -833,13 +844,6 @@ def main(args):
                         print('Primitive confidence scores: %f (push), %f (grasp), %f (place)' % (best_push_conf, best_grasp_conf, best_place_conf))
                     else:
                         print('Primitive confidence scores: %f (push), %f (grasp)' % (best_push_conf, best_grasp_conf))
-                    
-                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
-                    # If we just did a successful grasp, we always need to place
-                    if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
-                        nonlocal_variables['primitive_action'] = 'place'
-                    else:
-                        nonlocal_variables['primitive_action'] = 'grasp'
 
                 # Exploitation (do best action) vs exploration (do random action)
                 if is_testing:
@@ -862,28 +866,26 @@ def main(args):
                 # NOTE(zhe) Switch grasp to push if push has better score. NO PUSHING IN LANGUAGE MODEL.
                 # determine if the network indicates we should do a push or a grasp
                 # otherwise if we are exploring and not placing choose between push and grasp randomly
-                # if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
-                #     if is_testing and method == 'reactive':
-                #         if best_push_conf > 2 * best_grasp_conf:
-                #             nonlocal_variables['primitive_action'] = 'push'
-                #     else:
-                #         nonlocal_variables['primitive_action'] = 'grasp'
-
-                # determine if the network indicates we should do a push or a grasp
-                # otherwise if we are exploring and not placing choose between push and grasp randomly
-                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place': 
+                if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
                     if is_testing and method == 'reactive':
                         if best_push_conf > 2 * best_grasp_conf:
                             nonlocal_variables['primitive_action'] = 'push'
-                    elif best_push_conf > best_grasp_conf and not static_language_mask:
-                        nonlocal_variables['primitive_action'] = 'push'
                     else:
                         nonlocal_variables['primitive_action'] = 'grasp'
 
-                    if explore_actions:
-                        # explore the choices of push actions vs place actions
-                        push_frequency_one_in_n = 5
-                        nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
+                    # determine if the network indicates we should do a push or a grasp
+                    # otherwise if we are exploring and not placing choose between push and grasp randomly
+                    if not grasp_only and not nonlocal_variables['primitive_action'] == 'place':
+                        if is_testing and method == 'reactive':
+                            if best_push_conf > 2 * best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        else:
+                            if best_push_conf > best_grasp_conf:
+                                nonlocal_variables['primitive_action'] = 'push'
+                        if explore_actions:
+                            # explore the choices of push actions vs place actions
+                            push_frequency_one_in_n = 5
+                            nonlocal_variables['primitive_action'] = 'push' if np.random.randint(0, push_frequency_one_in_n) == 0 else 'grasp'
 
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
@@ -891,12 +893,13 @@ def main(args):
                     # trainer.trial_log.append([nonlocal_variables['stack'].trial])
                     # logger.write_to_log('trial', trainer.trial_log)
 
-                # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value. Random actions
+                # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value.
                 if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
                     # Half the time we actually explore the full 2D action space
                     print('Strategy: explore ' + nonlocal_variables['primitive_action'] + '2D action space (exploration probability: %f)' % (explore_prob/2))
                     # explore a random action from the masked predictions
                     nonlocal_variables['best_pix_ind'], each_action_max_coordinate, predicted_value = action_space_explore_random(nonlocal_variables['primitive_action'], push_predictions, grasp_predictions, place_predictions)
+
                 else:
                     if use_demo:
                         # get parameters of current action to do dict lookup
@@ -1456,6 +1459,13 @@ def main(args):
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot)
                 # TODO(elias) add depthmap
+                plt.imshow(color_heightmap)
+                plt.show(block=True)
+                pdb.set_trace()
+                plt.figure()
+                plt.imshow(valid_depth_heightmap)
+                plt.show(block=True)
+                pdb.set_trace()
                 pair = Pair.from_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
                                            json_data,
@@ -1464,6 +1474,8 @@ def main(args):
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same
+            #if is
 
             # only set up the scene if working with Bisk (2018) data
             elif is_sim and is_bisk:
@@ -1684,6 +1696,7 @@ def main(args):
                                 push_predictions_vertical_square, grasp_predictions_vertical_square, place_predictions_vertical_square
 
             else:
+                # DONE(zhe) Need to ensure that "predictions" also have language mask
                 # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
                 # TODO(elias) add check for if we're using language instruction
                 # Generate the language mask using the language model.
@@ -2041,6 +2054,7 @@ def main(args):
                 unstack_trainer.iteration += 1
             if vertical_square_trainer is not None:
                 vertical_square_trainer.iteration += 1
+
         else:
             trainer.iteration += 1
 

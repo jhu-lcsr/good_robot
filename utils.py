@@ -253,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
     """
     Adds a language mask to the predictions array.
 
@@ -281,6 +281,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     language_mask = np.float32(language_mask).reshape(64,64, 1).copy()
     new_w = curr_mask.shape[1]
     if single_max:
+        language_mask_before = language_mask.copy()
         # mask out non-blocks
         language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
 
@@ -301,11 +302,18 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         language_mask[language_mask > threshold] = 1
         language_mask[language_mask <= threshold] = 0
 
+    # largest_four = np.argpartition(language_mask_before, -64, axis=None)[-64:]
+    # largest_four_values = language_mask_before.reshape(-1)[largest_four]
+    # threshold = np.min(largest_four_values) - 0.00001
+    # language_mask_before[language_mask_before >= threshold] = 1
+    # language_mask_before[language_mask_before < threshold] = 0
+
     # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
     # Scale language masks to match the prediction array sizes
 
     language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
     language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
+    language_mask_before = cv2.resize(language_mask_before, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
 
     # Catching errors
     assert language_mask.shape == curr_mask.shape and language_mask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
@@ -325,9 +333,11 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         # show the heightmap
         fig, ax = plt.subplots(2,3)
         ax[0,0].imshow(curr_mask[0,:,:])
-        ax[0,1].imshow(1 - language_mask[0,:,:])
+        ax[0,1].imshow(1 - language_mask_before)
         ax[0,2].imshow(predictions.mask[0,:,:])
-        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
+        # ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
+        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask_before)/2)
+
         if color_heightmap is not None:
             ax[1,1].imshow(color_heightmap)
 
@@ -360,11 +370,16 @@ def infect_mask(language_mask, curr_mask, block_width = 16):
             neighbors.append((x-1, y+1))
         return neighbors
 
-    for it in range(block_width * 2):
+    total_infected = 0
+    total_it = 0
+    max_it = block_width * 2
+    # for it in range(block_width * 2):
+    while total_infected < (2*block_width)**2 and total_it < max_it:
         # get selected indices
 
         curr_idxs = np.where(curr_mask == 1000)
-        curr_idxs = zip(curr_idxs[0], curr_idxs[1])
+        curr_idxs = list(zip(curr_idxs[0], curr_idxs[1]))
+        total_infected = len(curr_idxs)
         # look one pix in each direction
         neighbors = get_neighbors(curr_idxs)
         done = []
@@ -379,6 +394,7 @@ def infect_mask(language_mask, curr_mask, block_width = 16):
                     continue
             except IndexError:
                 continue
+        total_it += 1
 
     curr_mask[curr_mask < 1000] = 0
     curr_mask[curr_mask == 1000] = 1
