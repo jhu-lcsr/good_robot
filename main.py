@@ -322,7 +322,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation, static_language_mask=static_language_mask)
+                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row) 
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -542,7 +542,7 @@ def main(args):
                 raise NotImplementedError(task_type)
 
         elif check_row:
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+            stack_matches_goal, nonlocal_variables['stack_height'], pred_stack_goal = robot.check_row(current_stack_goal,
                     num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
                     prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
@@ -611,7 +611,7 @@ def main(args):
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
 
-        if static_language_mask and end_on_incorrect_order:
+        if static_language_mask and end_on_incorrect_order and not check_row:
             # check order, if it is the right length and bad then kill this trial
             # if there is a mistake further down in the stack than the top-most block, there's no way to recover
             # but if it's the top-most one, we can still unstack it, so don't kill the trial quite yet
@@ -634,6 +634,8 @@ def main(args):
                 print('ERROR: Stack is irreparably misordered or has toppled, trial is a failure. Ending...')
                 needed_to_reset = True
                 toppled = True
+        else:
+            pdb.set_trace()
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):

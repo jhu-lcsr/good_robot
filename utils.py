@@ -253,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
     """
     Adds a language mask to the predictions array.
 
@@ -408,7 +408,7 @@ def infect_mask(language_mask, curr_mask, block_width = 16):
 
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None, check_row = False):
     """
     Processes the language output into a mask and combine it with existing masks in prediction arrays
     """
@@ -421,7 +421,7 @@ def common_sense_language_model_mask(language_output, push_predictions=None, gra
     #push_predictions = process_prediction_language_masking(language_output['prev_position'], push_predictions, color_heightmap=color_heightmap, threshold = 0.6)
     # TODO (elias) tune these values
     grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap, threshold = 0.6, abs_threshold = 0.03)
-    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.5, abs_threshold = 0.10)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.5, abs_threshold = 0.10, single_max = check_row)
 
 
     return push_predictions, grasp_predictions, place_predictions
@@ -1062,6 +1062,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
+
         if x.size == 0 or y.size == 0:
             return False, 0
 

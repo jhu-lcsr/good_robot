@@ -2034,6 +2034,7 @@ class Robot(object):
                                     for length in range(1, num_obj+1)]
 
             successful_block_indices = []
+
             for block_indices_of_length in all_block_indices:
                 for block_indices in block_indices_of_length:
                     # check each rotation angle for a possible row
@@ -2054,7 +2055,7 @@ class Robot(object):
 
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
-            return success, row_size
+            return success, row_size, successful_block_indices
 
     def check_specific_blocks_for_row(self, pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success):
         """ check_row helper function to workaround that it cannot currently check vertical rows of blocks.

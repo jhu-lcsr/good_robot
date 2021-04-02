@@ -33,7 +33,7 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False, check_row = False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -52,6 +52,7 @@ class Trainer(object):
         self.is_testing = is_testing
         self.place_dilation = place_dilation
         self.trial_reward = trial_reward
+        self.check_row = check_row
         if self.place:
             # # Stacking Reward Schedule
             # reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -631,6 +632,7 @@ class Trainer(object):
             grasp_predictions = np.ma.masked_array(grasp_predictions)
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions)
+                masked_place_predictions = np.ma.masked_array(place_predictions)
 
         # return components depending on flags
         if keep_action_feat and not use_demo:
@@ -656,7 +658,7 @@ class Trainer(object):
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row)
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
