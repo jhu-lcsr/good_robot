@@ -1459,13 +1459,13 @@ def main(args):
             if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot)
                 # TODO(elias) add depthmap
-                plt.imshow(color_heightmap)
-                plt.show(block=True)
-                pdb.set_trace()
-                plt.figure()
-                plt.imshow(valid_depth_heightmap)
-                plt.show(block=True)
-                pdb.set_trace()
+                #plt.imshow(color_heightmap)
+                #plt.show(block=True)
+                #pdb.set_trace()
+                #plt.figure()
+                #plt.imshow(valid_depth_heightmap)
+                #plt.show(block=True)
+                #pdb.set_trace()
                 pair = Pair.from_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
                                            json_data,
