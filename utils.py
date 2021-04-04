@@ -297,6 +297,13 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         language_mask[row_idx, col_idx] = 1
         language_mask[language_mask != 1] = 0
         language_mask = language_mask.detach().cpu().numpy()
+    else:
+        language_mask_before = language_mask.copy()
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
+
     if threshold is not None:
 
         language_mask[language_mask > threshold] = 1
@@ -420,8 +427,8 @@ def common_sense_language_model_mask(language_output, push_predictions=None, gra
 
     #push_predictions = process_prediction_language_masking(language_output['prev_position'], push_predictions, color_heightmap=color_heightmap, threshold = 0.6)
     # TODO (elias) tune these values
-    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap, threshold = 0.6, abs_threshold = 0.03)
-    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.5, abs_threshold = 0.10, single_max = check_row)
+    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.03)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.10, single_max = not check_row)
 
 
     return push_predictions, grasp_predictions, place_predictions

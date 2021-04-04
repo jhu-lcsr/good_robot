@@ -2035,10 +2035,34 @@ class Robot(object):
 
             successful_block_indices = []
 
+            if self.language:
+                # we only check for the current stack goal 
+                # need the language iteration to tell which length to look at
+                num_blocks = len(object_color_sequence) - 1
+                print(f"object_color_sequence {object_color_sequence}")
+                print(f"object_color_sequence {np.array(self.color_names)[object_color_sequence]}")
+                # need the correct object ordering to tell which set to look at 
+                correct_ordering = object_color_sequence
+                print(all_block_indices)
+                new_all_block_indices = [[]]
+                for x in all_block_indices[num_blocks]:
+                    print(list(x))
+                    print(correct_ordering)
+                    print(list(x) == correct_ordering)
+                    if np.all(list(x) == correct_ordering):
+                        new_all_block_indices[0].append(x)
+
+                #all_block_indices = [x for x in all_block_indices[num_blocks] if np.all(list(x) == correct_ordering)]
+                all_block_indices = new_all_block_indices
+                print(all_block_indices)
+                # need to modify check_specific_blocks_for_row to respect the order 
+
+
             for block_indices_of_length in all_block_indices:
                 for block_indices in block_indices_of_length:
                     # check each rotation angle for a possible row
-                    # print('checking {}'.format(block_indices))
+                    #print('checking {}'.format(block_indices))
+                    print('checking {}'.format(np.array(self.color_names)[block_indices]))
                     specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
                     if specific_row_size > row_size:
                         success = specific_success
@@ -2052,7 +2076,7 @@ class Robot(object):
                             row_size = max(row_size, specific_row_size)
                             successful_block_indices = specific_successful_block_indices
 
-
+            print(successful_block_indices)
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
             return success, row_size, successful_block_indices

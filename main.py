@@ -635,7 +635,8 @@ def main(args):
                 needed_to_reset = True
                 toppled = True
         else:
-            pdb.set_trace()
+            #pdb.set_trace()
+            pass
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):

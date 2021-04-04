@@ -659,10 +659,12 @@ class Trainer(object):
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row)
+            masked_place_predictions = place_predictions.copy()
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
         # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
+        pdb.set_trace() 
         if self.place_common_sense and not self.static_language_mask:
             return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
         elif self.place_common_sense and self.static_language_mask: 
