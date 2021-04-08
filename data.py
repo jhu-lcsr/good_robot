@@ -13,8 +13,9 @@ import pdb
 import copy 
 import pathlib 
 import pickle as pkl
+from tqdm import tqdm 
 
-from annotate_data import Pair, flip_pair, rotate_pair 
+from annotate_data import Pair, flip_pair, rotate_pair, gaussian_augment 
 np.random.seed(12) 
 torch.manual_seed(12) 
 
@@ -536,6 +537,7 @@ class GoodRobotDatasetReader:
                 task_type: str = "rows-and-stacks",
                 augment_by_flipping: bool = True, 
                 augment_by_rotating: bool = True, 
+                augment_with_noise: bool = False, 
                 augment_language: bool = True, 
                 leave_out_color: str = None, 
                 color_pair: tuple = None,
@@ -550,6 +552,9 @@ class GoodRobotDatasetReader:
         self.resolution = resolution 
         self.max_seq_length = max_seq_length
 
+        self.noise_gaussian_params = [0.0, 0.05]
+        self.noise_num_samples = 2
+
         if type(path_or_obj) == str:
             self.path = pathlib.Path(path_or_obj)
             self.pkl_files = self.path.glob("*/*.pkl")
@@ -560,28 +565,6 @@ class GoodRobotDatasetReader:
                     self.all_data.extend(data) 
         else:
             self.all_data = [path_or_obj]
-
-        # augment by flipping across 4 axes 
-        if augment_by_flipping:
-            new_data = []
-            for pair in self.all_data:
-                for axis in range(1,5):
-                    new_pair = flip_pair(pair, axis) 
-                    new_data.append(new_pair) 
-            self.all_data += new_data 
-
-        if augment_by_rotating:
-            new_data = []
-            for pair in self.all_data:
-                for rot in range(1, 4):
-                    new_pair = rotate_pair(pair, rot)
-                    new_data.append(new_pair)
-            self.all_data += new_data
-
-        if task_type == "rows":
-            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
-        elif task_type == "stacks": 
-            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
 
         if split_type == "random": 
             np.random.shuffle(self.all_data)
@@ -610,10 +593,45 @@ class GoodRobotDatasetReader:
             pass
         else:
             raise AssertionError(f"split strategy {split_type} is invalid")
+        
+        # only augment train data 
+        # augment by flipping across 4 axes 
+        if augment_by_flipping:
+            new_data = []
+            for pair in train_data:
+                for axis in range(1,5):
+                    new_pair = flip_pair(pair, axis) 
+                    new_data.append(new_pair) 
+            train_data += new_data 
+
+        if augment_by_rotating:
+            new_data = []
+            for pair in train_data:
+                for rot in range(1, 4):
+                    new_pair = rotate_pair(pair, rot)
+                    new_data.append(new_pair)
+            train_data += new_data
+
+        if augment_with_noise:
+            new_data = []
+            print(f"augmenting with noise")
+            for pair in tqdm(train_data):
+                for i in range(self.noise_num_samples):
+                    new_pair = gaussian_augment(pair, self.noise_gaussian_params)
+                    new_data.append(new_pair)
+            train_data += new_data
+
+        if task_type == "rows":
+            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
+        elif task_type == "stacks": 
+            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
+
 
         self.data = {"train": train_data,
                      "dev": dev_data,
                      "test": test_data}
+
+        print(f"DATA STATS: train: {len(train_data)}, dev: {len(dev_data)}, test: {len(test_data)}")
 
         if overfit:
             # for debugging, overfit just to dev 

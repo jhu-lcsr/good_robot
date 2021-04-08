@@ -484,6 +484,7 @@ def main(args):
                                             task_type=args.task_type,
                                             augment_by_flipping = args.augment_by_flipping,
                                             augment_by_rotating = args.augment_by_rotating, 
+                                            augment_with_noise = args.augment_with_noise, 
                                             augment_language = args.augment_language,
                                             leave_out_color = args.leave_out_color,
                                             batch_size=args.batch_size,
@@ -686,6 +687,7 @@ if __name__ == "__main__":
     parser.add_argument("--leave-out-color", type=str, default=None) 
     parser.add_argument("--augment-by-flipping", action="store_true")
     parser.add_argument("--augment-by-rotating", action="store_true")
+    parser.add_argument("--augment-with-noise", action="store_true")
     parser.add_argument("--augment-language", action="store_true")
     parser.add_argument("--overfit", action = "store_true")
     # language embedder 
