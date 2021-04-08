@@ -138,7 +138,6 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
 
         return prev_pixel_loss 
 
-
     def compute_weighted_loss(self, inputs, next_outputs, prev_outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
@@ -149,10 +148,11 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
         true_prev_image = inputs["prev_pos_for_pred"]
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
-        pred_prev_image = pred_prev_image.reshape(-1, n_blocks)
-        pred_next_image = pred_next_image.reshape(-1, n_blocks)
-        true_next_image = true_next_image.reshape(-1)
-        true_prev_image = true_prev_image.reshape(-1)
+
+        pred_prev_image = pred_prev_image.reshape(bsz, n_blocks, width, height)
+        pred_next_image = pred_next_image.reshape(bsz, n_blocks, width, height)
+        true_next_image = true_next_image.reshape(bsz, width, height)
+        true_prev_image = true_prev_image.reshape(bsz, width, height)
         true_next_image = true_next_image.long().to(self.device) 
         true_prev_image = true_prev_image.long().to(self.device) 
 

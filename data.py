@@ -641,9 +641,9 @@ class GoodRobotDatasetReader:
             else:
                 print("EXITING...")
                 sys.exit() 
-            self.data = {"train": dev_data[3:6],
-                         "dev": dev_data[3:6],
-                         "test": dev_data[3:6]} 
+            self.data = {"train": dev_data[3:4],
+                         "dev": dev_data[3:4],
+                         "test": dev_data[3:4]} 
 
         self.vocab = set()
         for pair in self.data['train']:
