@@ -126,13 +126,12 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
         """
         compute per-pixel for all pixels
         """
-        pred_prev_image = prev_outputs["prev_position"]
+        pred_prev_image = prev_outputs["reconstruction"]
         true_prev_image = inputs["prev_pos_for_pred"]
 
         bsz, n_blocks, width, height, depth = pred_prev_image.shape
-        true_next_image = true_next_image.reshape((bsz, width, height, depth)).long()
-        true_prev_image = true_prev_image.reshape((bsz, width, height, depth)).long()
-        true_next_image = true_next_image.to(self.device) 
+        pred_prev_image = pred_prev_image.reshape((bsz, n_blocks, width, height)) 
+        true_prev_image = true_prev_image.reshape((bsz, width, height)).long()
         true_prev_image = true_prev_image.to(self.device) 
         prev_pixel_loss = self.xent_loss_fxn(pred_prev_image, true_prev_image) 
 
@@ -233,11 +232,12 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
         prev_recon_acc = 0.0
         if self.do_reconstruction:
             bsz, w, h = batch_instance["prev_pos_for_acc"].shape
-            true_prev_image_recon = image_to_tiles(batch_instance["prev_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size)       
-            # take max of each patch so that even mixed patches count as having a block 
-            true_prev_image_recon, __ = torch.max(true_prev_image_recon, dim=2) 
-            prev_recon_acc = self.reconstruction_metric(true_prev_image_recon,
-                                                           outputs['prev_per_patch_class']) 
+            true_prev_image_recon = batch_instance["prev_pos_for_acc"].reshape(bsz, w, h)
+            total_n_pixels = true_prev_image_recon.reshape(-1).shape[0]
+            pred_recon_image = torch.argmax(prev_outputs['reconstruction'], dim=1).squeeze(-1)
+            true_prev_image_recon = true_prev_image_recon.to(pred_recon_image.device)
+
+            prev_recon_acc = torch.sum(true_prev_image_recon == pred_recon_image).float() / float(total_n_pixels)
 
         return {"next_f1": next_f1, 
                 "prev_f1": prev_f1,
@@ -347,7 +347,8 @@ def main(args):
                      unet_type = args.unet_type, 
                      dropout = args.dropout,
                      depth = depth,
-                     device=device)
+                     device=device,
+                     do_reconstruction=args.do_reconstruction)
 
 
     if args.compute_block_dist:
