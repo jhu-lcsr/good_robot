@@ -9,20 +9,21 @@ import pdb
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from IPython.display import clear_output
-from tqdm import tqdm
+from tqdm import tqdm 
+from skimage.util import random_noise
 
 
 def check_success(data, idx):
     return data[idx][0] == 1
 
 class Pair:
-    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224, is_row = True):
+    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224, w = 40, is_row = True):
         self.prev_image = prev_image
         self.prev_location = prev_location
         self.next_image = next_image
-        self.next_location = next_location
-        self.w = 40
-        self.source_code = None
+        self.next_location = next_location 
+        self.w = w 
+        self.source_code = None 
         self.source_location = None
         self.target_code = None
         self.target_location = None
@@ -91,7 +92,7 @@ class Pair:
         return mask
 
     @classmethod
-    def from_idxs(cls, grasp_idx, place_idx, data, image_home, is_row = True):
+    def from_idxs(cls, grasp_idx, place_idx, data, image_home, is_row = True, w = 40):
         prev_location = data[grasp_idx][2:][::-1]
         next_location = data[place_idx][2:][::-1]
         grasp_prefix = str(1000000 + grasp_idx)[1:]
@@ -104,26 +105,32 @@ class Pair:
 
         prev_image = cv2.imread(grasp_color_path)
         prev_image = cv2.cvtColor(prev_image, cv2.COLOR_BGR2RGB)
-        prev_depth = cv2.imread(grasp_depth_path)
-        prev_depth = cv2.cvtColor(prev_depth, cv2.COLOR_BGR2RGB)
+        prev_depth = cv2.imread(grasp_depth_path, -1)
+        prev_depth = prev_depth.astype(np.float32)/100000
+        prev_depth = np.stack([prev_depth] * 3, axis=-1)
+        #prev_depth = cv2.cvtColor(prev_depth, cv2.COLOR_BGR2RGB)
         next_image = cv2.imread(place_color_path)
         next_image = cv2.cvtColor(next_image, cv2.COLOR_BGR2RGB)
-        next_depth = cv2.imread(place_depth_path)
-        next_depth = cv2.cvtColor(next_depth, cv2.COLOR_BGR2RGB)
+        next_depth = cv2.imread(place_depth_path, -1)
+        next_depth = next_depth.astype(np.float32)/100000
+        next_depth = np.stack([next_depth] * 3, axis=-1)
+        #next_depth = cv2.cvtColor(next_depth, cv2.COLOR_BGR2RGB)
 
         prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
         next_image = np.concatenate([next_image, next_depth], axis=-1)
 
-        return cls(prev_image, prev_location, next_image, next_location, is_row = is_row)
+        return cls(prev_image, prev_location, next_image, next_location, is_row = is_row, w = w)
 
     @classmethod
-    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home, is_row=True):
-        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home, is_row = is_row)
-        # annotate based on sim data
+    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home, is_row=True, w = 40, filter_colors = False): 
+        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home, is_row = is_row, w = w)
+        # annotate based on sim data 
         grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
         json_data = pair.read_json(grasp_json_path)
-        src_color, tgt_color = pair.combine_json_data(json_data)
+        src_color, tgt_color = pair.combine_json_data(json_data, filter_colors = filter_colors)
+        if src_color is None or tgt_color is None:
+            return None 
         pair.json_data = json_data
         return pair
 
@@ -205,8 +212,56 @@ class Pair:
 
         return state
 
+    def color_similarity(self, a, b):
+        if type(a) == tuple:
+            a = np.array(a)
+        if type(b) == tuple:
+            b = np.array(b)
+        return np.linalg.norm(a-b)
 
-    def combine_json_data(self, json_data, next_to=True, filter_left=False):
+    def get_most_common_color(self, color_swatch, same_thresh = 1):
+        count_dict = {}
+        for i in range(0, color_swatch.shape[0]):
+            for j in range(0, color_swatch.shape[1]):
+                color = color_swatch[i,j,:]
+                already_in = False
+                for k in count_dict.keys():
+                    if self.color_similarity(k,color) < same_thresh:
+                        count_dict[k] += 1
+                        already_in = True
+                if not already_in:
+                    color = tuple([x for x in color])
+
+                    count_dict[color] = 1
+
+        count_dict_items = count_dict.items()
+        most_freq = sorted(count_dict_items, key = lambda x:x[1])[-1][0]
+        return most_freq
+
+    def filter_color_against_keycolors(self, color_name, pred_loc, image):
+        # check whether color names and actual color match up, filter out examples where they don't 
+        # prototypical colors: 
+        color_name_dict = { (217,74,76) : "red",
+          (76,137,68) :"green",
+          (67,103,142) :"blue",
+          (202,171,62) :"yellow",
+          (206,121,37) : "orange",
+          (158,148,146) :"gray",
+          (131,100,81) :"brown",
+          (148,104,137) :"purple",
+          (45,45,45): "background",
+          (0,0,0): "shadow"}
+        # get most common color in color swatch 
+        image = image[:,:,0:3]
+        pred_loc = pred_loc.astype(int)
+        pred_color_swatch = image[pred_loc[1]: pred_loc[1] + self.w, pred_loc[0]: pred_loc[0] + self.w, :] 
+        pred_color = self.get_most_common_color(pred_color_swatch) 
+        distances = [(name, self.color_similarity(k,pred_color)) for k,name in  color_name_dict.items()]
+
+        pred_color_name = sorted(distances, key = lambda x:x[1])[0]
+        return pred_color_name[0] == color_name, pred_color_name[0]
+
+    def combine_json_data(self, json_data, next_to=True, filter_left=False, filter_colors=True): 
         # first pass: all prompts say "next to" and reference the closest block to the left of the target location
         # if no such block exists, skip for now
         def euclid_dist(p1, p2):
@@ -285,7 +340,18 @@ class Pair:
 
         self.relation_code = "next_to"
 
-        return min_grasp_color, min_place_color
+        if filter_colors: 
+            # use previous image for both so it's not covered up by placed block 
+            place_color_correct, pred_place_color = self.filter_color_against_keycolors(min_place_color, self.next_location, self.prev_image)
+            grasp_color_correct, pred_grasp_color = self.filter_color_against_keycolors(min_grasp_color, self.prev_location, self.prev_image)
+
+            if not place_color_correct or not grasp_color_correct:
+                # print(f"place color: {min_place_color} vs inferred {pred_place_color}, grasp color: {min_grasp_color} vs inferred {pred_grasp_color}")
+                # self.show()
+                # pdb.set_trace() 
+                return None, None
+
+        return min_grasp_color, min_place_color  
 
     def clean(self):
         # re-order codes so that "top", "bottom", come bfore "left" "right"
@@ -380,6 +446,14 @@ def rotate_pair(pair, deg):
     new_pair.next_location = rotate_coords(new_pair.next_location)
     return new_pair
 
+
+def gaussian_augment(pair, params):
+    mean, var = params
+    new_pair = copy.deepcopy(pair)
+    new_pair.prev_image = random_noise(new_pair.prev_image, mode='gaussian', mean=mean, var=var, clip=True)
+    new_pair.next_image = random_noise(new_pair.next_image, mode='gaussian', mean=mean, var=var, clip=True)
+    return new_pair
+
 def flip_pair(pair, axis):
     pair.clean()
     flip_lookup = {1: {"w": "w", "a": "d", "s": "s", "d": "a"},
@@ -450,7 +524,7 @@ def flip_pair(pair, axis):
     return new_pair
 
 
-def get_pairs(data_home, resolution = 224, is_sim = False, is_row = True):
+def get_pairs(data_home, resolution = 224, w = 40, is_sim = False, is_row = True, filter_colors = False):
     image_home = data_home.joinpath("data/color-heightmaps")
     if is_sim:
         json_home = data_home.joinpath("data/variables")
@@ -465,29 +539,38 @@ def get_pairs(data_home, resolution = 224, is_sim = False, is_row = True):
     prev_act = None
     prev_grasp_idx = None
     pick_place_pairs = []
+    skipped_by_filter, skipped_for_push = 0, 0
+    successes = 0
+    num_grasps = 0
+    grasp_and_success = 0
     for demo_idx in range(len(executed_action_data)):
         ex_act = executed_action_data[demo_idx]
         grasp = False
         if int(ex_act[0]) == 0:
+            skipped_push += 1
             continue
         elif int(ex_act[0]) == 1:
             data = grasp_succ_data
             grasp = True
+            num_grasps += 1
         elif int(ex_act[0]) == 2:
             data = place_succ_data
         else:
             raise AssertionError(f"action must be of on [0, 1, 2]")
 
         try:
-            was_success = check_success(data, demo_idx)
+            was_success = check_success(data, demo_idx) 
+            if was_success: 
+                successes += 1
         except IndexError:
+            print(f"hit end!")
             break
 
         if prev_act == "grasp":
             # next action must be place if prev was successful grasp
             try:
                 assert(not grasp)
-            except AssertionError:
+            except AssertionError:  
                 print(f"double grasp at {demo_idx}")
         if prev_act == "place":
             try:
@@ -500,15 +583,26 @@ def get_pairs(data_home, resolution = 224, is_sim = False, is_row = True):
             prev_act = "grasp"
             prev_grasp_idx = demo_idx
         if not grasp and was_success:
+            grasp_and_success += 1
             prev_act = "place"
             # now you can create a pair with the previous action's grasp and current place
             if is_sim:
-                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row)
+                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row, w = w, filter_colors = filter_colors)
+                if pair is None:
+                    skipped_by_filter += 1
+                    prev_grasp_idx = None 
+                    continue 
             else:
                 pair = Pair.from_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home)
             pick_place_pairs.append(pair)
             prev_grasp_idx = None
 
+    print(f"grasp and success {grasp_and_success}")
+    print(f"total successes {successes}")
+    print(f"total grasps {num_grasps}")
+
+    print(f"skipped for push {skipped_for_push}")
+    print(f"skipped {skipped_by_filter} of {len(executed_action_data)}: {skipped_by_filter * 100 / len(executed_action_data):.2f}%")
     return pick_place_pairs
 
 def get_input(prompt, valid_gex):

@@ -37,12 +37,14 @@ class SharedUNet(torch.nn.Module):
                 unet_type: str = "unet_with_attention",
                 share_level: str = "encoder",
                 fusion: str = "concat",
-                device: torch.device = "cpu"):
+                device: torch.device = "cpu",
+                do_reconstruction: bool = False):
         super(SharedUNet, self).__init__()        
 
         self.share_level = SHARE_LEVELS[share_level]
         self.compute_block_dist = False
         self.unet_type = unet_type
+        self.do_reconstruction = do_reconstruction 
 
         if self.share_level < 2:
             # need to create copy encoder 
@@ -91,7 +93,8 @@ class SharedUNet(torch.nn.Module):
                                            #mlp_num_layers=mlp_num_layers,
                                            dropout=dropout,
                                            depth=depth,
-                                           device=device)
+                                           device=device,
+                                           do_reconstruction=do_reconstruction)
         else: 
             # make a pointer 
             self.prev_encoder = self.next_encoder

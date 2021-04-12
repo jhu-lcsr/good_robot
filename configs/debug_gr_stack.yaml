@@ -4,7 +4,7 @@ batch_size: 32
 max_seq_length: 40
 resolution: 64
 split_type: "random"
-task_type: "rows-and-stacks" 
+task_type: "stacks" 
 overfit: true
 augment_by_flipping: False
 augment_language: False 
@@ -35,5 +35,4 @@ num_epochs: 1000
 generate_after_n: 998
 score_type: "acc"
 zero_weight: 0.1
-do_reconstruction: True
 
