@@ -13,7 +13,7 @@ from scipy.special import softmax
 import pathlib
 import matplotlib.pyplot as plt
 import pygame
-import pdb 
+import pdb
 
 # Import necessary packages
 #try:
@@ -122,10 +122,10 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
 
 def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5, color_median_filter_pixels=5):
     """ Note:
-    Arg median_filter_pixels is used for the depth image. 
+    Arg median_filter_pixels is used for the depth image.
     Arg color_median_filter_pixels is used for the color image.
     """
-    
+
     if median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=median_filter_pixels)
 
@@ -213,8 +213,8 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     """ Convert predictions to a masked array indicating if tasks may make progress in this region, based on depth_heightmap.
 
     The masked arrays will indicate 0 where progress may be possible (no mask applied), and 1 where our model confidently indicates no progress will be made.
-    Note the mask values here are the opposite of the common_sense_failure_heuristic() function, so where that function has a mask value of 0, this function has a value of 1. 
-    In other words the mask values returned here are equivalent to 1-common_sense_action_failure_heuristic(). 
+    Note the mask values here are the opposite of the common_sense_failure_heuristic() function, so where that function has a mask value of 0, this function has a value of 1.
+    In other words the mask values returned here are equivalent to 1-common_sense_action_failure_heuristic().
     This is because in the numpy MaksedArray a True value inticates the data at the corresponding location is INVALID.
 
     # Returns
@@ -253,7 +253,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=True, color_heightmap=None, tile_size = 4, threshold = 0.8):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
     """
     Adds a language mask to the predictions array.
 
@@ -267,7 +267,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
             predictions = np.ma.masked_array(predictions, mask=False)
         else:
             raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
-    
+
     # Extract current masks
     curr_mask = np.ma.getmask(predictions).copy()
 
@@ -276,20 +276,44 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     # language_data should have shape torch([1, 256, 2, 1])
     language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
     language_data = softmax(language_data, axis = 1)
-    # take prob yes 
+    # take prob yes
     language_mask = language_data[:,1,:,:]
-    language_mask = np.float32(language_mask).reshape(64,64, 1)
-    #language_mask = softmax(language_data[0,:,:,0], axis=1)
-    #language_mask = np.float32(language_mask[:,1] > 0.8).reshape((16,-1))      # using mask index 1 here to use the negative mask.
+    language_mask = np.float32(language_mask).reshape(64,64, 1).copy()
+    new_w = curr_mask.shape[1]
+    if single_max:
+        language_mask_before = language_mask.copy()
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+
+        language_mask *= 1 - curr_mask[0,:,:]
+        language_mask = torch.tensor(language_mask)
+        # get max pixel
+        row_values, row_indices = torch.max(language_mask, axis=0)
+        col_values, col_idx = torch.max(row_values, dim=0)
+        row_idx = row_indices[col_idx]
+        threshold = None
+        # abs_threshold = 0.10
+        language_mask *= 0
+        language_mask[row_idx, col_idx] = 1
+        language_mask[language_mask != 1] = 0
+        language_mask = language_mask.detach().cpu().numpy()
     if threshold is not None:
+
         language_mask[language_mask > threshold] = 1
         language_mask[language_mask <= threshold] = 0
 
+    # largest_four = np.argpartition(language_mask_before, -64, axis=None)[-64:]
+    # largest_four_values = language_mask_before.reshape(-1)[largest_four]
+    # threshold = np.min(largest_four_values) - 0.00001
+    # language_mask_before[language_mask_before >= threshold] = 1
+    # language_mask_before[language_mask_before < threshold] = 0
+
     # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
     # Scale language masks to match the prediction array sizes
-    new_w = curr_mask.shape[1]
+
     language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
     language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
+    language_mask_before = cv2.resize(language_mask_before, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
 
     # Catching errors
     assert language_mask.shape == curr_mask.shape and language_mask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
@@ -298,35 +322,106 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     if curr_mask is np.ma.nomask:
         predictions.mask = language_mask
     else:
-        # TODO (elias) why not just multiply probs in with the mask 
-        if threshold is not None:
-            predictions.mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
+        # TODO (elias) why not just multiply probs in with the mask
+        if threshold is not None or single_max:
+            # intersection_mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
+            # expand out: if any pixel of a block is yes under language mask, then whole block is yes
+            predictions.mask = infect_mask(language_mask.astype(bool), curr_mask.copy().astype(bool))
 
     if show_heightmap:
         # visualize the common sense function results
         # show the heightmap
-        # plt.figure()
         fig, ax = plt.subplots(2,3)
         ax[0,0].imshow(curr_mask[0,:,:])
-        ax[0,1].imshow(1 - language_mask[0,:,:])
+        ax[0,1].imshow(1 - language_mask_before)
         ax[0,2].imshow(predictions.mask[0,:,:])
-        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
+        # ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
+        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask_before)/2)
+
         if color_heightmap is not None:
             ax[1,1].imshow(color_heightmap)
-       
+
         plt.show(block=True)
     return predictions
 
+def infect_mask(language_mask, curr_mask, block_width = 16):
+    # expand out from intersection: if any pixel of a block is yes under language mask, then whole block should be yes
+    curr_mask = 1 - curr_mask
+    intersection_mask = np.logical_and(curr_mask,  language_mask).astype(float)
+    # use inf as sentinel value
+    orig_intersection_mask = intersection_mask.copy()
+    intersection_mask *= 1000
+    # top-down, left to right across mask
+    language_mask = language_mask[0]
+    curr_mask = curr_mask[0]
+    intersection_mask = intersection_mask[0]
+    curr_mask[intersection_mask == 1000] = 1000
+
+    def get_neighbors(idxs):
+        neighbors = []
+        for (x,y) in idxs:
+            neighbors.append((x-1, y))
+            neighbors.append((x+1, y))
+            neighbors.append((x, y-1))
+            neighbors.append((x, y+1))
+            neighbors.append((x-1, y-1))
+            neighbors.append((x+1, y+1))
+            neighbors.append((x-1, y+1))
+            neighbors.append((x-1, y+1))
+        return neighbors
+
+    total_infected = 0
+    total_it = 0
+    max_it = block_width * 2
+    # for it in range(block_width * 2):
+    while total_infected < (2*block_width)**2 and total_it < max_it:
+        # get selected indices
+
+        curr_idxs = np.where(curr_mask == 1000)
+        curr_idxs = list(zip(curr_idxs[0], curr_idxs[1]))
+        total_infected = len(curr_idxs)
+        # look one pix in each direction
+        neighbors = get_neighbors(curr_idxs)
+        done = []
+        for x,y in neighbors:
+            try:
+                if curr_mask[x,y] == 1000:
+                    continue
+                if curr_mask[x,y] == 1:
+                    curr_mask[x,y] = 1000
+                else:
+                    # if you hit a zero, that's the border
+                    continue
+            except IndexError:
+                continue
+        total_it += 1
+
+    curr_mask[curr_mask < 1000] = 0
+    curr_mask[curr_mask == 1000] = 1
+    curr_mask = curr_mask.astype(bool).reshape(1, 224, 224)
+    curr_mask = np.tile(curr_mask, (16, 1, 1))
+    # fig, ax = plt.subplots(1,2)
+    # ax[0].imshow(orig_intersection_mask[0,:,:])
+    # ax[1].imshow(curr_mask[0,:,:])
+    # plt.show(block=True)
+    return 1 - curr_mask
+
+
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
 def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):
-    """ 
+    """
     Processes the language output into a mask and combine it with existing masks in prediction arrays
     """
 
     # language masks are currently for grasp and place only. The push predictions will not be operated upon.
-    push_predictions = push_predictions
-    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap)
-    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap)
+    # TODO (elias) remove this after solving other problems, makes push illegal
+    #push_predictions = 1 - push_predictions * np.inf
+    push_predictions = np.ones_like(push_predictions) * -np.inf
+
+    #push_predictions = process_prediction_language_masking(language_output['prev_position'], push_predictions, color_heightmap=color_heightmap, threshold = 0.6)
+    # TODO (elias) tune these values
+    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap, threshold = 0.6, abs_threshold = 0.03)
+    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.5, abs_threshold = 0.10)
 
 
     return push_predictions, grasp_predictions, place_predictions
@@ -340,7 +435,7 @@ def load_language_model_from_config(configYamlPath, weightsPath):
             config=yaml.load(file, Loader=yaml.FullLoader)
     else:
         raise FileNotFoundError(f'unable to find {configYamlPath}')
-    
+
     # Move model to available gpu
     device = "cpu"
     if config["cuda"] is not None and config["cuda"] >= 0:
@@ -348,10 +443,10 @@ def load_language_model_from_config(configYamlPath, weightsPath):
         if free_gpu_id > -1:
             device = f"cuda:{free_gpu_id}"
 
-    device = torch.device(device)  
-    print(f"Language Model on device {device}") 
+    device = torch.device(device)
+    print(f"Language Model on device {device}")
     test = torch.ones((1))
-    test = test.to(device) 
+    test = test.to(device)
 
     # Read the vocab from a json file.
     checkpoint_dir = pathlib.Path(config["checkpoint_dir"])
@@ -361,39 +456,40 @@ def load_language_model_from_config(configYamlPath, weightsPath):
             train_vocab = json.load(f1)
     else:
         raise FileNotFoundError(f'unable to find {checkpoint_dir.joinpath("vocab.json")}')
-    
+
     # Load the embedder (type specified in the config.yaml)
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
     if config['embedder'] == "random":
         embedder = RandomEmbedder(tokenizer, train_vocab, config["embedding_dim"], trainable=True)
     elif config['embedder'] == "glove":
-        embedder = GloveEmbedder(tokenizer, train_vocab, config["embedding_file"], config["embedding_dim"], trainable=True) 
-    elif config['embedder'].startswith("bert"): 
-        embedder = BERTEmbedder(model_name = config["embedder"],  max_seq_len = config["max_seq_length"]) 
+        embedder = GloveEmbedder(tokenizer, train_vocab, config["embedding_file"], config["embedding_dim"], trainable=True)
+    elif config['embedder'].startswith("bert"):
+        embedder = BERTEmbedder(model_name = config["embedder"],  max_seq_len = config["max_seq_length"])
     else:
-        raise NotImplementedError(f'No embedder {config["embedder"]}') 
+        raise NotImplementedError(f'No embedder {config["embedder"]}')
 
     # Initiate the encoder
     encoder = TransformerEncoder(image_size = config["resolution"],
-                                 patch_size = config["patch_size"], 
-                                 language_embedder = embedder, 
+                                 patch_size = config["patch_size"],
+                                 language_embedder = embedder,
                                  n_layers_shared = config["n_shared_layers"],
                                  n_layers_split  = config["n_split_layers"],
                                  n_classes = 2,
-                                 channels = config["channels"], 
+                                 channels = config["channels"],
                                  n_heads = config["n_heads"],
                                  hidden_dim = config["hidden_dim"],
                                  ff_dim = config["ff_dim"],
                                  dropout = config["dropout"],
                                  embed_dropout = config["embed_dropout"],
-                                 output_type = config["output_type"], 
+                                 output_type = config["output_type"],
                                  positional_encoding_type = config["pos_encoding_type"],
                                  # device = device,
-                                 log_weights = config["test"])
+                                 log_weights = config["test"],
+                                 do_reconstruction = config['do_reconstruction'])
 
     # Load weights
-    print(f'loading model weights from {config["checkpoint_dir"]}') 
+    print(f'loading model weights from {config["checkpoint_dir"]}')
     state_dict = torch.load(pathlib.Path(config["checkpoint_dir"]).joinpath("best.th"), map_location = device)
     encoder.load_state_dict(state_dict, strict=True)
 
@@ -849,7 +945,7 @@ def is_jsonable(x):
 
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
+    def __init__(self, num_obj, goal_num_obj = None, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -863,6 +959,7 @@ class StackSequence(object):
 
         """
         self.num_obj = num_obj
+        self.goal_num_obj = goal_num_obj if goal_num_obj is not None else num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
         self.trial = trial
         self.reset_sequence()
@@ -877,7 +974,7 @@ class StackSequence(object):
         if self.is_goal_conditioned_task:
             # 3 is currently the red block
             # object_color_index = 3
-            # start with 1st object fixed, move 2nd object onto it 
+            # start with 1st object fixed, move 2nd object onto it
             self.object_color_index = 0
 
             # Choose a random sequence to stack
@@ -901,7 +998,7 @@ class StackSequence(object):
             The command could follow the format:
             Place a {color of object_color_index} on top of {color of (object_color_index - 1)}.
         """
-        if self.is_goal_conditioned_task and self.color_names is not None:   # generating commands sentences only work for 
+        if self.is_goal_conditioned_task and self.color_names is not None:   # generating commands sentences only work for
             if self.object_color_index == 0:    # If we are just starting a stack
                 firstBlockColor = self.color_names[(self.object_color_index) % self.color_len]
                 return f'Start with a {firstBlockColor} block.'
@@ -940,7 +1037,7 @@ class StackSequence(object):
         else:
             return None
 
-    def next(self): 
+    def next(self):
         self.total_steps += 1
         if self.is_goal_conditioned_task:
             self.object_color_index += 1
@@ -949,7 +1046,7 @@ class StackSequence(object):
 
 
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
-    """ Return if the current arrangement of blocks in the heightmap is a valid row 
+    """ Return if the current arrangement of blocks in the heightmap is a valid row
     """
     heightmap_trans = np.copy(depth_heightmap)
     heightmap_trans = np.transpose(heightmap_trans)
@@ -961,7 +1058,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         # threshold pixels which contain a block
         block_pixels = heightmap > block_height_threshold
 
-        # get positions of all those pixels  
+        # get positions of all those pixels
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
@@ -983,7 +1080,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
 
         # centroid of block_pixels
         centroid = (int(np.mean(x)), int(np.mean(y)))
-        
+
         # get row_boundary_rectangle points
         x1_r = int(centroid[0] - x_unit * row_boundary_length - y_unit * row_boundary_width)
         y1_r = int(centroid[1] - y_unit * row_boundary_length + x_unit * row_boundary_width)
@@ -1001,7 +1098,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         cv2.fillPoly(mask, [pts], (255,255,255))
         mask = mask > 0  # convert to bool
 
-        # get all block_pixels inside of row_boundary_rectangle and count them 
+        # get all block_pixels inside of row_boundary_rectangle and count them
         block_pixels_in_row = np.logical_and(mask, block_pixels)
         count = np.count_nonzero(block_pixels_in_row)
 
@@ -1276,7 +1373,7 @@ def compute_cc_dist(test_preds, demo_preds):
         # check if policy was supplied (entry will be [None, None] if it wasn't)
         if actions[0] is None:
             # if policy not supplied, insert pixel-wise array of inf distance
-            # apply 
+            # apply
             l2_dists.append(np.ones(mask_shape) * np.inf)
             continue
 
@@ -1356,9 +1453,9 @@ def annotate_success_manually(command, prev_image, next_image):
                     print("label set to failure")
                     flag = 1
                     pygame.quit()
-                    return "failure", comment 
+                    return "failure", comment
                 elif event.key == pygame.K_3:
                     flag = 1
                     pygame.quit()
-                    return 'skip', comment 
-      
+                    return 'skip', comment
+

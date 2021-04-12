@@ -1,2 +1,4 @@
 
 python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense  --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --depth_channels_history --static_language_mask --language_model_config ~/Downloads/gr_model/config.yaml --language_model_weights ~/Downloads/gr_model/best.th --is_testing
+
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense  --place --depth_channels_history --static_language_mask --language_model_config models/gr_train_augment_only_depthmaps_fixed/config.yaml --language_model_weights models/gr_train_augment_only_depthmaps_fixed/best.th --snapshot_file models/2020-06-05-18-28-46_Real-Stack-SPOT-Trial-Reward-Masked-Testing/models/snapshot.reinforcement_action_efficiency_best_value.pth --goal_num_obj=4 --end_on_incorrect_order

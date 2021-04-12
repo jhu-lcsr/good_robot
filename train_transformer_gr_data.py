@@ -136,22 +136,16 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             total_next_acc += score_dict['next_f1']
             total_block_acc += score_dict['block_acc']
             total_tele_score += score_dict['tele_dist']
-            total_prev_recon += score_dict['prev_recon_acc']
             total += 1
 
         mean_next_acc = total_next_acc / total 
         mean_prev_acc = total_prev_acc / total 
         mean_block_acc = total_block_acc / total
         mean_tele_score = total_tele_score / total
-        mean_prev_recon = total_prev_recon / total 
-        if not self.do_reconstruction:
-            print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100:.2f} prev F1 {mean_prev_acc * 100:.2f}, block_acc {mean_block_acc * 100:.2f}, tele score: {mean_tele_score:.3f}")
-        else:
-            print(f"Epoch {epoch} has next pixel F2 {mean_next_acc * 100:.2f} prev F1 {mean_prev_acc * 100:.2f}, block_acc {mean_block_acc * 100:.2f}, tele score: {mean_tele_score:.3f}, prev recon: {100 * mean_prev_recon:.2f}")
+
+        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block_acc {mean_block_acc * 100}, tele score: {mean_tele_score}")
         if self.score_type == "acc":
             return (mean_next_acc + mean_prev_acc)/2, -1.0
-        elif self.score_type == "block_acc":
-            return mean_block_acc, -1 
         else:
             raise AssertionError(f"invalid score type {self.score_type}")
 
@@ -228,25 +222,24 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         if self.do_reconstruction:
             # do state reconstruction from image input for previous and next image 
-            # true_next_image_recon = image_to_tiles(inputs["next_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size) 
+            true_next_image_recon = image_to_tiles(inputs["next_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size) 
             true_prev_image_recon = image_to_tiles(inputs["prev_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size)       
             # take max of each patch so that even mixed patches count as having a block 
-            # true_next_image_recon, __ = torch.max(true_next_image_recon, dim=2) 
+            true_next_image_recon, __ = torch.max(true_next_image_recon, dim=2) 
             true_prev_image_recon, __ = torch.max(true_prev_image_recon, dim=2) 
 
-            # pred_next_image_recon = outputs["next_per_patch_class"]
+            pred_next_image_recon = outputs["next_per_patch_class"]
             pred_prev_image_recon = outputs["prev_per_patch_class"]
-            bsz, n = true_prev_image_recon.shape 
-            # pred_next_image_recon  = pred_next_image_recon.reshape(bsz * n, 21)
+            bsz, n = true_next_image_recon.shape 
+            pred_next_image_recon  = pred_next_image_recon.reshape(bsz * n, 21)
             pred_prev_image_recon  = pred_prev_image_recon.reshape(bsz * n, 21)
             
-            # true_next_image_recon = true_next_image_recon.reshape(-1).to(pred_next_image_recon.device).long()
-            true_prev_image_recon = true_prev_image_recon.reshape(-1).to(pred_prev_image_recon.device).long() 
+            true_next_image_recon = true_next_image_recon.reshape(-1).to(pred_next_image_recon.device).long()
+            true_prev_image_recon = true_prev_image_recon.reshape(-1).to(pred_next_image_recon.device).long() 
 
             prev_loss = self.xent_loss_fxn(pred_prev_image_recon, true_prev_image_recon)
-            # next_loss = self.xent_loss_fxn(pred_next_image_recon, true_next_image_recon)
-            # total_loss += prev_loss + next_loss
-            total_loss += prev_loss 
+            next_loss = self.xent_loss_fxn(pred_next_image_recon, true_next_image_recon)
+            total_loss += prev_loss + next_loss
 
         return total_loss
 
@@ -397,8 +390,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                 command = batch_instance["command"][i]
                 command = [x for x in command if x != "<PAD>"]
                 command = " ".join(command) 
-                next_pos = batch_instance["next_pos_for_vis"][i]
-                prev_pos = batch_instance["prev_pos_for_vis"][i]
+                next_pos = batch_instance["next_pos_for_acc"][i]
+                prev_pos = batch_instance["prev_pos_for_acc"][i]
                 self.generate_debugging_image(next_pos,
                                              batch_instance['pairs'][i].next_location,
                                              next_position[i], 
@@ -424,20 +417,10 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                     # train-time, pass 
                     pass
 
-        prev_recon_acc = 0.0
-        if self.do_reconstruction:
-            bsz, w, h = batch_instance["prev_pos_for_acc"].shape
-            true_prev_image_recon = image_to_tiles(batch_instance["prev_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size)       
-            # take max of each patch so that even mixed patches count as having a block 
-            true_prev_image_recon, __ = torch.max(true_prev_image_recon, dim=2) 
-            prev_recon_acc = self.reconstruction_metric(true_prev_image_recon,
-                                                           outputs['prev_per_patch_class']) 
-
         return {"next_f1": next_f1, 
                 "prev_f1": prev_f1,
                 "block_acc": block_acc,
-                "tele_dist": tele_dist,
-                "prev_recon_acc": prev_recon_acc} 
+                "tele_dist": tele_dist} 
 
     def compute_f1(self, true_pos, pred_pos):
         eps = 1e-8
@@ -477,10 +460,8 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
-    color_pair = args.color_pair.split(",") if args.color_pair is not None else None 
     dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
-                                            color_pair=color_pair,
                                             task_type=args.task_type,
                                             augment_by_flipping = args.augment_by_flipping,
                                             augment_by_rotating = args.augment_by_rotating, 
@@ -538,7 +519,7 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = args.do_reconstruction) 
+                          do_reconstruction = False) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
     # Initialize encoder 
@@ -613,7 +594,7 @@ def main(args):
                               next_weight = args.next_weight,
                               prev_weight = args.prev_weight,
                               do_regression = False,
-                              do_reconstruction = args.do_reconstruction) 
+                              do_reconstruction = False) 
         trainer.train() 
 
     else:
@@ -652,7 +633,7 @@ def main(args):
                                    generate_after_n = args.generate_after_n,
                                    score_type=args.score_type,
                                    do_regression = False, 
-                                   do_reconstruction = args.do_reconstruction) 
+                                   do_reconstruction = False) 
         print(f"evaluating") 
         eval_trainer.evaluate(out_path)
 
@@ -681,7 +662,6 @@ if __name__ == "__main__":
                                                              "train-stack-test-row",
                                                              "train-row-test-stack"],
                                                              default="random")
-    parser.add_argument("--color-pair", type=str, default = None, help = "pair of colors to hold out, e.g. red,blue or green,yellow, etc.")
     parser.add_argument("--task-type", type=str, choices = ["rows", "stacks", "rows-and-stacks"],
                         default="rows-and-stacks") 
     parser.add_argument("--leave-out-color", type=str, default=None) 
@@ -722,7 +702,6 @@ if __name__ == "__main__":
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
     parser.add_argument("--init-scale", type=int, default = 4, help = "initalization scale for transformer weights")
     parser.add_argument("--seed", type=int, default=12) 
-    parser.add_argument("--do-reconstruction", action="store_true", help="add a reconstruction task to learning") 
 
     args = parser.parse_args() 
 
