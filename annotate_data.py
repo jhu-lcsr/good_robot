@@ -10,8 +10,7 @@ from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from IPython.display import clear_output
 from tqdm import tqdm 
-from skimage.util import random_noise
-
+#from skimage.util import random_noise
 
 def check_success(data, idx):
     return data[idx][0] == 1

@@ -151,9 +151,11 @@ class Robot(object):
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
         if grasp_color_task:
-            self.color_names = ['blue', 'green', 'yellow', 'red']
+            #self.color_names = ['blue', 'green', 'yellow', 'red']
+            self.color_names = ['red', 'blue', 'green','yellow']
         else:
-            self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+            #self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+            self.color_names = ['red', 'blue', 'green','yellow', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
         # task type (defaults to None)
         self.task_type = task_type
@@ -181,15 +183,18 @@ class Robot(object):
             #                                [118, 183, 178], # cyan
             #                                [255, 157, 167]])/255.0 #pink
             if grasp_color_task:
-                self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+                self.color_space = np.asarray( [
+                                [255.0, 87.0, 89.0] # red
+                                [78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
-                                [255.0, 87.0, 89.0]])/255.0 # red
+                                ])/255.0 
             else:
-                self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+                self.color_space = np.asarray([
+                                [255.0, 87.0, 89.0], # red
+                                [78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
-                                [255.0, 87.0, 89.0], # red
                                 [156, 117, 95], # brown
                                 [242, 142, 43], # orange
                                 [186, 176, 172], # gray
@@ -1439,8 +1444,7 @@ class Robot(object):
         grasped_object_handle = self.object_handles[grasped_object_ind]
         # color_index = np.where(color==1)
         # if grasped_object_ind == color_index[0]:
-
-        if self.grasp_color_task:
+        if self.grasp_color_task or self.language:
             color_ind = color_ind % self.color_space.shape[0]
             grasped_object_ind = grasped_object_ind % self.color_space.shape[0]
 
@@ -1539,7 +1543,7 @@ class Robot(object):
 
             # HK: Check if right color is grasped
             color_success = False
-            if grasp_success and self.grasp_color_task:
+            if grasp_success and (self.grasp_color_task or self.language):
                 color_success = self.check_correct_color_grasped(object_color)
                 print('Correct color was grasped: ' + str(color_success))
 
@@ -2030,40 +2034,21 @@ class Robot(object):
             # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
             # So for 3 objects, this would be:
             # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
-            all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
-                                    for length in range(1, num_obj+1)]
+            #all_block_indices = [map(list, itertools.permutations(np.arange(num_obj), length))
+            #                        for length in range(1, num_obj+1)]
+
+            # only check row size rows 
+            all_block_indices = [map(list, itertools.permutations(np.arange(num_obj), row_length))]
 
             successful_block_indices = []
-
-            if self.language:
-                # we only check for the current stack goal 
-                # need the language iteration to tell which length to look at
-                num_blocks = len(object_color_sequence) - 1
-                print(f"object_color_sequence {object_color_sequence}")
-                print(f"object_color_sequence {np.array(self.color_names)[object_color_sequence]}")
-                # need the correct object ordering to tell which set to look at 
-                correct_ordering = object_color_sequence
-                print(all_block_indices)
-                new_all_block_indices = [[]]
-                for x in all_block_indices[num_blocks]:
-                    print(list(x))
-                    print(correct_ordering)
-                    print(list(x) == correct_ordering)
-                    if np.all(list(x) == correct_ordering):
-                        new_all_block_indices[0].append(x)
-
-                #all_block_indices = [x for x in all_block_indices[num_blocks] if np.all(list(x) == correct_ordering)]
-                all_block_indices = new_all_block_indices
-                print(all_block_indices)
-                # need to modify check_specific_blocks_for_row to respect the order 
-
-
             for block_indices_of_length in all_block_indices:
+                do_break = False
                 for block_indices in block_indices_of_length:
                     # check each rotation angle for a possible row
                     #print('checking {}'.format(block_indices))
-                    print('checking {}'.format(np.array(self.color_names)[block_indices]))
+                    #print('checking {}'.format(np.array(self.color_names)[block_indices]))
                     specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                    #print(f"horizontal SUCCESS: {specific_success}")
                     if specific_row_size > row_size:
                         success = specific_success
                         row_size = max(row_size, specific_row_size)
@@ -2071,15 +2056,25 @@ class Robot(object):
                     else:
                         # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
                         specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(posyx, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                        #print(f"vertical SUCCESS: {specific_success}")
                         if specific_row_size > row_size:
                             success = specific_success
                             row_size = max(row_size, specific_row_size)
                             successful_block_indices = specific_successful_block_indices
 
+                    if specific_success:
+                        success = specific_success
+                        successful_block_indices = specific_successful_block_indices
+                        row_size = len(successful_block_indices)
+                        do_break = True
+                        break
+
+                if do_break:
+                    break
             print(successful_block_indices)
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
-            return success, row_size, successful_block_indices
+            return success, row_size
 
     def check_specific_blocks_for_row(self, pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success):
         """ check_row helper function to workaround that it cannot currently check vertical rows of blocks.
@@ -2107,23 +2102,57 @@ class Robot(object):
 
         aligned = True
         median_z = np.median(aligned_pos[:, 2])
+        print(f"pos: {aligned_pos} \n block_indices {block_indices} object_color_sequence {object_color_sequence}")
         for p in aligned_pos:
             # print('distance from line: {:.03f}'.format(p[1]))
             if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
                 # too far from line on table, or blocks are not on the same Z plane
+                #print(f"distance is too far")
                 aligned = False
                 break
 
-        indices = aligned_pos[:, 0].argsort()
-        xs = aligned_pos[indices, 0]
-        if aligned and utils.check_separation(xs, separation_threshold):
+        #print(f"called check_specific_blocks_for_row with pos: {pos}, block_indices: {block_indices}, distance_threshold: {distance_threshold}, separation_threshold: {separation_threshold}, object_color_sequence: {object_color_sequence}, row_size: {row_size}, success: {success}") 
+
+        # if using language, don't sort them, just take them as is, should work since we're using permutations not combinations 
+        if self.language:
+            xs = aligned_pos[:,0]
+        else:
+            indices = aligned_pos[:, 0].argsort()
+            xs = aligned_pos[indices, 0]
+
+        try:
+            separation_p = utils.check_separation(xs, separation_threshold)
+        except AssertionError:
+            # blocks are not left-to-right
+            separation_p = False 
+
+        if aligned and separation_p:
             # print('valid row along', theta, 'with indices', block_indices)
-            if self.grasp_color_task:
-                success = np.equal(indices, object_color_sequence).all()
+            if self.grasp_color_task or self.language:
+                block_inds = np.array(block_indices)
+                min_len = min(len(block_inds), len(object_color_sequence))
+                detected_colors = np.array(self.color_names)[block_inds[0:min_len]]
+                detected_colors_reverse = np.array(self.color_names)[block_inds[::-1][0:min_len]]
+                expected_colors = np.array(self.color_names)[np.array(object_color_sequence[0:min_len])]
+                eq_forward = [detected_colors[i] == expected_colors[i] for i in range(len(detected_colors))] 
+                eq_backward = [detected_colors_reverse[i] == expected_colors[i] for i in range(len(detected_colors_reverse))] 
+                success = np.array(eq_forward).all() or np.array(eq_backward).all() 
+                print(f"detected: {detected_colors} expected {expected_colors} success {success}")
+                #success = np.equal(indices[0:min_len], object_color_sequence[0:min_len]).all() or \
+                #          np.equal(indices[0:min_len][::-1], object_color_sequence[0:min_len]).all()
             else:
                 success = True
             successful_block_indices = block_indices
-            row_size = max(len(block_indices), row_size)
+            #row_size = max(len(block_indices), row_size)
+            # if row_size > 1 and success:
+            if row_size == 4:
+                pass
+                # if detected row size is 4 and correct so far, then must have rest correct so return that 
+            #print(f"separation is too far")
+        # if we have found a candidate, make sure that it's the right color order 
+        if success:
+            print(f"predicted stack {successful_block_indices} matches color sequence {object_color_sequence}!!!!!!")
+            print(f"PLACE SUCCESS")
         return success, row_size, successful_block_indices
 
     def detect_stack(self, pos, curr_sequence, horiz_distance_threshold=0.06, top_idx = -1):
@@ -2229,7 +2258,6 @@ class Robot(object):
         max_height = 0
         # The outside for loop is to check all possible stacks that fit the color order.
         # It is mainly used for grasp_color_task (color stacking)
-        # pdb.set_trace()
         for sequence in sequences:
             working_seq_found = True
             for idx in range(checks):

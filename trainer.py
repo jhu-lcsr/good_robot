@@ -168,6 +168,7 @@ class Trainer(object):
         self.trial_success_log = []
         self.grasp_success_log = []
         self.color_success_log = []
+        self.grasp_color_success_log = []
         self.change_detected_log = []
         if place:
             self.stack_height_log = []
@@ -256,6 +257,12 @@ class Trainer(object):
             self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), **kwargs)
             self.color_success_log = self.color_success_log[0:self.iteration]
             self.color_success_log = self.color_success_log.tolist()
+
+        if os.path.exists(os.path.join(transitions_directory, 'grasp-color-success.log.txt')):
+            self.grasp_color_success_log = np.loadtxt(os.path.join(transitions_directory, 'grasp-color-success.log.txt'), **kwargs)
+            self.grasp_color_success_log = self.grasp_color_success_log[0:self.iteration]
+            self.grasp_color_success_log = self.grasp_color_success_log.tolist()
+
         self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), **kwargs)
         self.change_detected_log = self.change_detected_log[0:self.iteration]
         self.change_detected_log = self.change_detected_log.tolist()
@@ -658,13 +665,18 @@ class Trainer(object):
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
+            if self.check_row:
+                # mask grasp predictions, not place predictions, with common-sense mask  
+                __, grasp_predictions, __ = \
+                        utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                        push_predictions, grasp_predictions, place_predictions,
+                        self.place_dilation, self.show_heightmap, color_heightmap)
             push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row)
             masked_place_predictions = place_predictions.copy()
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
         # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
-        pdb.set_trace() 
         if self.place_common_sense and not self.static_language_mask:
             return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
         elif self.place_common_sense and self.static_language_mask: 
