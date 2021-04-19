@@ -165,6 +165,7 @@ def main(args):
     random_actions = args.random_actions
     # TODO(zhe) Added static language mask option
     static_language_mask = args.static_language_mask
+    baseline_language_mask = args.baseline_language_mask
     is_bisk = args.is_bisk
     randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
     obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
@@ -324,7 +325,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row) 
+                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask) 
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -558,7 +559,6 @@ def main(args):
             # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
         else:
-            # pdb.set_trace()
             if static_language_mask:
                 # current_stack_goal = nonlocal_variables['stack'].object_color_sequence[0:4]
                 stack_matches_goal, nonlocal_variables['stack_height'], pred_stack_goal = robot.check_stack(current_stack_goal, top_idx=top_idx, goal_num_obj=goal_num_obj, return_inds=True)
@@ -580,7 +580,6 @@ def main(args):
                 # also reset if we toppled while unstacking
                 if nonlocal_variables['primitive_action'] == 'place':
                     # can't progress unstacking with place action, so this must have been a topple
-                    # pdb.set_trace()
                     toppled = nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']
                 elif nonlocal_variables['primitive_action'] == 'grasp' and not nonlocal_variables['grasp_success']:
                     # can't progress legally if we have failed grasp
@@ -633,12 +632,10 @@ def main(args):
             # conditions for ending a trial:
             # either a mistake is made in the bottom of the stack, or the stack has toppled
             if (not pred_matches_goal_up_to_top and lens_match) or (was_over_one and decreased_height):
-                # pdb.set_trace()
                 print('ERROR: Stack is irreparably misordered or has toppled, trial is a failure. Ending...')
                 needed_to_reset = True
                 toppled = True
         else:
-            #pdb.set_trace()
             pass
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
@@ -1020,7 +1017,6 @@ def main(args):
 
                 # NOTE(zhe) Execute the primitive action (grasp, push, or place)
                 # Execute primitive
-                # pdb.set_trace()
                 if nonlocal_variables['primitive_action'] == 'push':
                     if skip_noncontact_actions and not push_may_contact_something:
                         # We are too high to contact anything, don't bother actually pushing.
@@ -1107,8 +1103,8 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
-                    if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
+                    if nonlocal_variables['stack'].object_color_index is not None and (grasp_color_task or static_language_mask):
+                        grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
 
@@ -1118,7 +1114,15 @@ def main(args):
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
                         print('Grasp action failure, heuristics determined grasp would not contact anything.')
                     else:
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
+                        if static_language_mask:
+                            #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
+                            stack_idx = nonlocal_variables['stack'].object_color_index
+                            grasp_color_idx = nonlocal_variables['stack'].object_color_sequence[stack_idx]
+                            grasp_color_name = robot.color_names[grasp_color_idx]
+                            object_color = grasp_color_name
+                        else:
+                            object_color = nonlocal_variables['stack'].object_color_index
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color) 
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
@@ -1146,7 +1150,6 @@ def main(args):
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
                                 nonlocal_variables['trial_complete'] = True
-
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
 
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
@@ -1158,7 +1161,6 @@ def main(args):
                         print(grasp_str)
 
                 elif nonlocal_variables['primitive_action'] == 'place':
-                    # pdb.set_trace()
                     # TODO(adit98) set over_block when calling demo.get_action()
                     # NOTE we always assume we are placing over a block for vertical square and stacking
                     if task_type is not None and ((task_type == 'unstack') or (task_type == 'row')):
@@ -1199,7 +1201,6 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
-                        # pdb.set_trace()
                         if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
                                 (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj))):
 
@@ -1483,11 +1484,10 @@ def main(args):
                 # TODO(elias) add depthmap
                 #plt.imshow(color_heightmap)
                 #plt.show(block=True)
-                #pdb.set_trace()
                 #plt.figure()
                 #plt.imshow(valid_depth_heightmap)
                 #plt.show(block=True)
-                #pdb.set_trace()
+                print(nonlocal_variables['stack'].object_color_sequence, nonlocal_variables['stack'].object_color_index)
                 pair = Pair.from_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
                                            json_data,
@@ -2581,6 +2581,7 @@ if __name__ == '__main__':
     # Language Mask Options
     parser.add_argument('--is_bisk', dest = 'is_bisk', action='store_true', default = False,                                help='running on bisk (2018) AAAI dataset')
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
+    parser.add_argument('--baseline_language_mask', dest='baseline_language_mask', action='store_true', default=False,      help='set to true to run random baseline for language experiments, where language mask allows everything')
     parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json',                   help='specify the language data file to use during reinforcement learning')
     parser.add_argument('--language_model_config', dest='language_model_config', type=str, default='blocks_data/config.yaml', help='relative path to the yaml file containing the model hyperparameters')
     parser.add_argument('--language_model_weights', dest='language_model_weights', type=str, default='blocks_data/best.th', help='file containing the language model weights (*.th) as a state dict.')

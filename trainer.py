@@ -33,7 +33,8 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False, check_row = False):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False, check_row = False,
+                 baseline_language_mask = False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -53,6 +54,7 @@ class Trainer(object):
         self.place_dilation = place_dilation
         self.trial_reward = trial_reward
         self.check_row = check_row
+        self.baseline_language_mask = baseline_language_mask
         if self.place:
             # # Stacking Reward Schedule
             # reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -671,7 +673,7 @@ class Trainer(object):
                         utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
                         push_predictions, grasp_predictions, place_predictions,
                         self.place_dilation, self.show_heightmap, color_heightmap)
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row, baseline_language_mask=self.baseline_language_mask)
             masked_place_predictions = place_predictions.copy()
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')

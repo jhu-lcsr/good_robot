@@ -33,6 +33,7 @@ from tqdm import tqdm
 import cv2
 from typing import List, Dict, Tuple, Optional
 from scipy.spatial.transform import Rotation as R
+import pdb
 
 from robot import Robot
 from data import DatasetReader, SimpleTrajectory
@@ -234,12 +235,13 @@ def main(args):
             if len(pos[0])==len(ppos[0]) and np.abs((np.array(pos)-np.array(ppos))).sum() < 1e-6:
                 continue
         
+        pdb.set_trace() 
         # Load the setup
         if imc is None:
             imc = BlockSetter(args.num_blocks, args.offset, pos=pos[0], rot=rot[0], blocks_path=args.blocks_path, side_len=args.side_length)
         else:
             imc.load_setup(pos[0], rot[0], prevPositions=ppos[0], prevOrientations=prot[0])
-        
+
         # Capture the image and save it
         imc.captureAndSaveImages(trajectory.images[0], args.colorimg_folder, args.depthimg_folder, args.colorHm_folder, args.depthHm_folder)
         

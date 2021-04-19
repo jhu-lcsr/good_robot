@@ -255,7 +255,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10, from_transformer = True):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10, from_transformer = True, baseline_language_mask = False):
     """
     Adds a language mask to the predictions array.
 
@@ -334,7 +334,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         predictions.mask = language_mask
     else:
         # TODO (elias) why not just multiply probs in with the mask
-        if threshold is not None or single_max:
+        if (threshold is not None or single_max) and not baseline_language_mask:
             # intersection_mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
             # expand out: if any pixel of a block is yes under language mask, then whole block is yes
             predictions.mask = infect_mask(language_mask.astype(bool), curr_mask.copy().astype(bool))
@@ -419,7 +419,7 @@ def infect_mask(language_mask, curr_mask, block_width = 16):
 
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None, check_row = False):
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None, check_row = False, baseline_language_mask = False):
     """
     Processes the language output into a mask and combine it with existing masks in prediction arrays
     """
@@ -439,8 +439,14 @@ def common_sense_language_model_mask(language_output, push_predictions=None, gra
         from_transformer = False
     else:
         prev_pos, next_pos = language_output['prev_position'], language_output['next_position']
-    grasp_predictions = process_prediction_language_masking(prev_pos, grasp_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.03, from_transformer = from_transformer)
-    place_predictions = process_prediction_language_masking(next_pos, place_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.10, single_max = not check_row, from_transformer = from_transformer)
+
+    if baseline_language_mask:
+        print(f"RUNNING RANDOM BASELINE FOR LANGUAGE")
+        prev_pos = torch.ones(prev_pos.shape).to(prev_pos.device)
+        next_pos = torch.ones(next_pos.shape).to(next_pos.device)
+
+    grasp_predictions = process_prediction_language_masking(prev_pos, grasp_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.03, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
+    place_predictions = process_prediction_language_masking(next_pos, place_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.10, single_max = not check_row, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
 
 
     return push_predictions, grasp_predictions, place_predictions

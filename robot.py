@@ -1453,6 +1453,20 @@ class Robot(object):
         else:
             return False
 
+    def check_correct_color_grasped_from_string(self, color_name):
+        '''
+        color_name: the name of the color to grasp.
+        '''
+        object_positions = np.asarray(self.get_obj_positions())
+        object_positions = object_positions[:,2]
+        # Get the index at the highest position (ie, the picked object)
+        grasped_object_ind = np.argmax(object_positions)
+        grasped_object_color = self.object_colors[grasped_object_ind]
+
+        if grasped_object_color == color_name:
+            return True
+        return False
+
 
     def get_highest_object_list_index_and_handle(self):
         """
@@ -1543,8 +1557,12 @@ class Robot(object):
 
             # HK: Check if right color is grasped
             color_success = False
-            if grasp_success and (self.grasp_color_task or self.language):
+            if grasp_success and self.grasp_color_task:
                 color_success = self.check_correct_color_grasped(object_color)
+                print('Correct color was grasped: ' + str(color_success))
+
+            elif grasp_success and self.language:
+                color_success = self.check_correct_color_grasped_from_string(object_color)
                 print('Correct color was grasped: ' + str(color_success))
 
             # HK: Place grasped object at a random place
