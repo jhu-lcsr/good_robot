@@ -285,7 +285,9 @@ class TransformerEncoder(torch.nn.Module):
                  device: torch.device = "cpu",
                  log_weights: bool = False,
                  do_regression: bool = False,
-                 do_reconstruction: bool = False):
+                 do_reconstruction: bool = False,
+                 long_command: bool = False,
+                 pretrained_weights: str = None):
         super(TransformerEncoder, self).__init__() 
 
         self.compute_block_dist = False 
@@ -308,6 +310,7 @@ class TransformerEncoder(torch.nn.Module):
         self.pos_embedding = torch.nn.Parameter(torch.randn(1, num_patches + 1, hidden_dim))
         self.patch_projection = torch.nn.Linear(patch_dim, hidden_dim)
         self.language_projection = torch.nn.Linear(self.language_dim, hidden_dim)
+        self.long_command = long_command 
 
         self.cls_token = torch.nn.Parameter(torch.randn(1, 1, hidden_dim))
         self.sep_token = torch.nn.Parameter(torch.randn(1, 1, hidden_dim))
@@ -352,6 +355,19 @@ class TransformerEncoder(torch.nn.Module):
                 nn.Linear(hidden_dim, 21)
             )
 
+        if self.long_command:
+            self.cls_position = None
+            self.source_color_class_head = nn.Sequential(
+                nn.LayerNorm(hidden_dim),
+                nn.Linear(hidden_dim, 8)
+            )
+
+        if pretrained_weights is not None:
+            # initialize from pretrained 
+            state_dict = torch.load(pretrained_weights)
+            # remove vocabulary 
+            new_state_dict = {k:v for k,v in state_dict.items() if "language_embedder.embeddings" not in k}
+            self.load_state_dict(new_state_dict, strict=False)
 
     def get_lang_mask(self, lang): 
         bsz = len(lang)
@@ -386,6 +402,8 @@ class TransformerEncoder(torch.nn.Module):
         language_input = torch.cat([self.language_embedder(x).unsqueeze(0) for x  in language], dim = 0) 
         language_input = self.language_projection(language_input) 
 
+        if self.long_command:
+            self.cls_position = num_patches
         if self.positional_encoding_type == "learned":
             # add positional features to image patches 
             model_input += self.pos_embedding[:, :num_patches]
@@ -491,11 +509,18 @@ class TransformerEncoder(torch.nn.Module):
         prev_image_output = tiles_to_image(prev_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
         next_image_output = tiles_to_image(next_classes, self.patch_size, self.output_type, False).unsqueeze(-1) 
 
+        if self.long_command:
+            sep_token = prev_output[:, self.cls_position, :]
+            pred_source_color = self.source_color_class_head(sep_token)
+        else:
+            pred_source_color = None
+
         return {"prev_position": prev_image_output,
                 "next_position": next_image_output,
                 "next_per_patch_class": next_patch_class,
                 "prev_per_patch_class": prev_patch_class,
                 "next_pos_xyz": next_pos_xyz, 
+                "pred_source_color": pred_source_color,
                 "prev_attn_weights": prev_attn_out,
                 "next_attn_weights": next_attn_out}
 

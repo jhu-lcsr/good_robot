@@ -535,10 +535,12 @@ class GoodRobotDatasetReader:
                 path_or_obj: str,
                 split_type: str = 'random',
                 task_type: str = "rows-and-stacks",
+                color_pair: List[str] = None, 
                 augment_by_flipping: bool = True, 
                 augment_by_rotating: bool = True, 
                 augment_with_noise: bool = False, 
                 augment_language: bool = True, 
+                noise_num_samples: int = 2,
                 leave_out_color: str = None, 
                 batch_size: int = 32,
                 max_seq_length: int = 60,
@@ -552,7 +554,7 @@ class GoodRobotDatasetReader:
         self.max_seq_length = max_seq_length
 
         self.noise_gaussian_params = [0.0, 0.05]
-        self.noise_num_samples = 2
+        self.noise_num_samples = noise_num_samples
 
         if type(path_or_obj) == str:
             self.path = pathlib.Path(path_or_obj)
@@ -577,7 +579,15 @@ class GoodRobotDatasetReader:
             dev_data = self.all_data
             test_data = self.all_data 
         elif split_type == "leave-out-color":
-            pass
+            # train on everything except (<color_a>, <color_b>) combos in either direction
+            allowed_data = [x for x in self.all_data if not(x.source_code in color_pair and x.target_code in color_pair)]
+            held_out_data = [x for x in self.all_data if x.source_code in color_pair and x.target_code in color_pair]
+            train_data = allowed_data
+            held_out_len = len(held_out_data)
+            dev_len = int(held_out_len/3)
+            dev_data = held_out_data[0:dev_len]
+            test_data = held_out_data[dev_len: ]
+
         elif split_type == "train-stack-test-row":
             pass
         elif split_type == "train-row-test-stack":
@@ -611,12 +621,14 @@ class GoodRobotDatasetReader:
                     new_pair = gaussian_augment(pair, self.noise_gaussian_params)
                     new_data.append(new_pair)
             train_data += new_data
+            print(f"added")
 
         if task_type == "rows":
             all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
         elif task_type == "stacks": 
             all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
 
+        self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
         self.data = {"train": train_data,
                      "dev": dev_data,
@@ -657,7 +669,7 @@ class GoodRobotDatasetReader:
             # rows 
             if rows and pair.is_row:
                 filtered_data.append(pair)
-            if not rows and not pair.is_row: 
+            if not rows and (not hasattr(pair, "is_row") or not pair.is_row): 
                 filtered_data.append(pair)
         return filtered_data 
 
@@ -704,6 +716,7 @@ class GoodRobotDatasetReader:
         next_pos_for_acc = []
         next_pos_for_regression = []
         block_to_move = []
+
         image = []
         pairs = []
         # get max len 
@@ -738,7 +751,7 @@ class GoodRobotDatasetReader:
                 next_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.next_location).copy()).unsqueeze(0))
                 next_pos_for_acc.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
             pairs.append(pair)
-            block_to_move.append(None) 
+            block_to_move.append(self.color_names.index(pair.source_code))
 
         prev_pos_input = torch.cat(prev_pos_input, 0)
         if len(prev_pos_for_pred) > 0:
@@ -756,6 +769,8 @@ class GoodRobotDatasetReader:
 
         prev_pos_input = prev_pos_input.permute(0, 3, 1, 2).float() 
 
+        block_to_move = torch.tensor(block_to_move)
+
         return {"command": commands,
                 "prev_pos_input": prev_pos_input,
                 "prev_pos_for_acc": prev_pos_for_acc,
@@ -763,7 +778,7 @@ class GoodRobotDatasetReader:
                 "next_pos_for_acc": next_pos_for_acc,
                 "next_pos_for_pred": next_pos_for_pred,
                 "next_pos_for_regression": None,
-                "block_to_move": None,
+                "block_to_move":  block_to_move,
                 "pairs": pairs, 
                 "length": length} 
 

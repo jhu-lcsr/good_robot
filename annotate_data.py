@@ -17,7 +17,10 @@ def check_success(data, idx):
     return data[idx][0] == 1
 
 class Pair:
-    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224, w = 40, is_row = True):
+    def __init__(self, prev_image, prev_location, next_image, next_location, resolution = 224, w = 40, is_row = True,
+                 prev_image_for_inference = None,
+                 next_image_for_inference = None,
+                 long_command = None):
         self.prev_image = prev_image
         self.prev_location = prev_location
         self.next_image = next_image
@@ -31,21 +34,25 @@ class Pair:
         self.resolution = resolution
         self.prev_state_image = None
         self.next_state_image = None
+        self.prev_image_for_inference = prev_image_for_inference
+        self.next_image_for_inference = next_image_for_inference
+        self.long_command = long_command
+    
         self.json_data = None
         self.is_row = is_row
 
     def show(self):
         fig,ax = plt.subplots(1)
-        ax.imshow(self.prev_image[:,:,0:3])
+        ax.imshow(self.prev_image_for_inference[:,:,0:3])
         prev_location = self.prev_location - int(self.w/2)
         next_location = self.next_location - int(self.w/2)
         rect = patches.Rectangle(prev_location, self.w, self.w ,linewidth=3,edgecolor='w',facecolor='none')
-        ax.add_patch(rect)
+        # ax.add_patch(rect)
         plt.show()
         fig,ax = plt.subplots(1)
-        ax.imshow(self.next_image[:,:,0:3])
+        ax.imshow(self.next_image_for_inference[:,:,0:3])
         rect = patches.Rectangle(next_location, self.w, self.w,linewidth=3,edgecolor='w',facecolor='none')
-        ax.add_patch(rect)
+        # ax.add_patch(rect)
         plt.show()
 
     def resize(self):
@@ -92,7 +99,7 @@ class Pair:
         return mask
 
     @classmethod
-    def from_idxs(cls, grasp_idx, place_idx, data, image_home, is_row = True, w = 40):
+    def from_idxs(cls, grasp_idx, place_idx, data, image_home, is_row = True, w = 40, long_command = None ):
         prev_location = data[grasp_idx][2:][::-1]
         next_location = data[place_idx][2:][::-1]
         grasp_prefix = str(1000000 + grasp_idx)[1:]
@@ -105,12 +112,14 @@ class Pair:
 
         prev_image = cv2.imread(grasp_color_path)
         prev_image = cv2.cvtColor(prev_image, cv2.COLOR_BGR2RGB)
+        prev_image_for_inference = prev_image.copy() 
         prev_depth = cv2.imread(grasp_depth_path, -1)
         prev_depth = prev_depth.astype(np.float32)/100000
         prev_depth = np.stack([prev_depth] * 3, axis=-1)
         #prev_depth = cv2.cvtColor(prev_depth, cv2.COLOR_BGR2RGB)
         next_image = cv2.imread(place_color_path)
         next_image = cv2.cvtColor(next_image, cv2.COLOR_BGR2RGB)
+        next_image_for_inference = next_image.copy() 
         next_depth = cv2.imread(place_depth_path, -1)
         next_depth = next_depth.astype(np.float32)/100000
         next_depth = np.stack([next_depth] * 3, axis=-1)
@@ -119,15 +128,19 @@ class Pair:
         prev_image = np.concatenate([prev_image, prev_depth], axis=-1)
         next_image = np.concatenate([next_image, next_depth], axis=-1)
 
-        return cls(prev_image, prev_location, next_image, next_location, is_row = is_row, w = w)
+        return cls(prev_image, prev_location, next_image, next_location, is_row = is_row, w = w,
+                    prev_image_for_inference = prev_image_for_inference, 
+                    next_image_for_inference = next_image_for_inference,
+                    long_command = long_command)
+        
 
     @classmethod
-    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home, is_row=True, w = 40, filter_colors = False): 
-        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home, is_row = is_row, w = w)
+    def from_sim_idxs(cls, grasp_idx, place_idx, data, image_home, json_home, is_row=True, w = 40, filter_colors = False, long_command = None): 
+        pair = Pair.from_idxs(grasp_idx, place_idx, data, image_home, is_row = is_row, w = w, long_command = long_command)
         # annotate based on sim data 
         grasp_json_path = json_home.joinpath(f"object_positions_and_orientations_{grasp_idx}_0.json")
         place_json_path = json_home.joinpath(f"object_positions_and_orientations_{place_idx}_2.json")
-        json_data = pair.read_json(grasp_json_path)
+        json_data = Pair.read_json(grasp_json_path)
         src_color, tgt_color = pair.combine_json_data(json_data, filter_colors = filter_colors)
         if src_color is None or tgt_color is None:
             return None 
@@ -139,7 +152,7 @@ class Pair:
         # TODO(elias) infer which block to move from interpolation here
         prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
         pair = cls(prev_image, None, None, None, is_row = is_row)
-        json_data = pair.read_json(prev_json)
+        json_data = Pair.read_json(prev_json)
         pair.json_data = json_data
         src_color, tgt_color = pair.infer_from_stacksequence(stack_sequence)
         return pair
@@ -160,7 +173,8 @@ class Pair:
         self.target_code = tgt_color
         return src_color, tgt_color
 
-    def read_json(self, json_path):
+    @staticmethod
+    def read_json(json_path):
         if type(json_path) == dict:
             data = json_path
         else:
@@ -212,7 +226,8 @@ class Pair:
 
         return state
 
-    def color_similarity(self, a, b):
+    @staticmethod
+    def euclidean_distance(a, b):
         if type(a) == tuple:
             a = np.array(a)
         if type(b) == tuple:
@@ -226,7 +241,7 @@ class Pair:
                 color = color_swatch[i,j,:]
                 already_in = False
                 for k in count_dict.keys():
-                    if self.color_similarity(k,color) < same_thresh:
+                    if Pair.euclidean_distance(k,color) < same_thresh:
                         count_dict[k] += 1
                         already_in = True
                 if not already_in:
@@ -256,7 +271,7 @@ class Pair:
         pred_loc = pred_loc.astype(int)
         pred_color_swatch = image[pred_loc[1]: pred_loc[1] + self.w, pred_loc[0]: pred_loc[0] + self.w, :] 
         pred_color = self.get_most_common_color(pred_color_swatch) 
-        distances = [(name, self.color_similarity(k,pred_color)) for k,name in  color_name_dict.items()]
+        distances = [(name, Pair.euclidean_distance(k,pred_color)) for k,name in  color_name_dict.items()]
 
         pred_color_name = sorted(distances, key = lambda x:x[1])[0]
         return pred_color_name[0] == color_name, pred_color_name[0]
@@ -342,13 +357,12 @@ class Pair:
 
         if filter_colors: 
             # use previous image for both so it's not covered up by placed block 
-            place_color_correct, pred_place_color = self.filter_color_against_keycolors(min_place_color, self.next_location, self.prev_image)
-            grasp_color_correct, pred_grasp_color = self.filter_color_against_keycolors(min_grasp_color, self.prev_location, self.prev_image)
-
+            place_color_correct, pred_place_color = self.filter_color_against_keycolors(min_place_color, self.next_location, self.prev_image_for_inference)
+            grasp_color_correct, pred_grasp_color = self.filter_color_against_keycolors(min_grasp_color, self.prev_location, self.prev_image_for_inference)
             if not place_color_correct or not grasp_color_correct:
-                # print(f"place color: {min_place_color} vs inferred {pred_place_color}, grasp color: {min_grasp_color} vs inferred {pred_grasp_color}")
-                # self.show()
-                # pdb.set_trace() 
+                #print(f"place color: {min_place_color} vs inferred {pred_place_color}, grasp color: {min_grasp_color} vs inferred {pred_grasp_color}")
+                #self.show()
+                #pdb.set_trace() 
                 return None, None
 
         return min_grasp_color, min_place_color  
@@ -386,6 +400,16 @@ class Pair:
 
     def generate(self):
         self.clean()
+        try:
+            if self.long_command is None:
+                return self.generate_normal()
+            else:
+                return self.generate_long_command() 
+        except AttributeError:
+            return self.generate_normal()
+
+
+    def generate_normal(self):
         location_lookup_dict = {"w": "top", "d": "right", "a": "left", "s": "bottom", "n":""}
 
         location_lookup_fxn = lambda x: " ".join([location_lookup_dict[y] for y in list(x)])
@@ -401,6 +425,7 @@ class Pair:
                                 "sd": "down and to the right of"}
 
         #stack_template = "stack the {source_location} {source_color} block {relation} the {target_location} {target_color} block"
+        
         stack_template = "stack the {source_color} block {relation} the {target_color} block"
         row_template = "move the {source_color} block {relation} the {target_color} block"
 
@@ -417,6 +442,24 @@ class Pair:
                                             relation = "on")
         except KeyError:
             return "bad"
+
+    def generate_long_command(self):
+        stack_template = "make a stack of the {color0}, {color1}, {color2}, and {color3} blocks. {source_color}"
+        row_template = "make a row of the {color0}, {color1}, {color2}, and {color3} blocks. {source_color}"
+
+
+        if self.is_row:
+            return row_template.format(color0 = self.long_command[0],
+                                       color1 = self.long_command[1],
+                                       color2 = self.long_command[2],
+                                       color3 = self.long_command[3],
+                                       source_color = self.source_code)
+        else:
+            return stack_template.format(color0 = self.long_command[0],
+                                       color1 = self.long_command[1],
+                                       color2 = self.long_command[2],
+                                       color3 = self.long_command[3],
+                                       source_color = self.source_color)
 
 
 def rotate_pair(pair, deg):
@@ -520,11 +563,18 @@ def flip_pair(pair, axis):
     new_pair.next_image = flip_image(new_pair.next_image)
     new_pair.prev_location = flip_coords(new_pair.prev_location)
     new_pair.next_location = flip_coords(new_pair.next_location)
-    new_pair.prev_state_image = flip_image(new_pair.prev_state_image).reshape(224, 224, 1)
+    if hasattr(new_pair, "prev_state_image"):
+        new_pair.prev_state_image = flip_image(new_pair.prev_state_image).reshape(224, 224, 1)
     return new_pair
 
 
-def get_pairs(data_home, resolution = 224, w = 40, is_sim = False, is_row = True, filter_colors = False):
+def get_pairs(data_home, resolution = 224, w = 40, is_sim = False, is_row = True, filter_colors = False, long_command = False):
+    # to get whole string:
+    # - use clearance to split into separate trials
+    # - use existing code to get all grasp/place success pairs from a trial 
+    # - keep current code to get correct current action, but add in whole trial history to generate command 
+
+
     image_home = data_home.joinpath("data/color-heightmaps")
     if is_sim:
         json_home = data_home.joinpath("data/variables")
@@ -532,10 +582,59 @@ def get_pairs(data_home, resolution = 224, w = 40, is_sim = False, is_row = True
     place_successes_path = data_home.joinpath("transitions/place-success.log.txt")
     grasp_successes_path = data_home.joinpath("transitions/grasp-success.log.txt")
 
+    if long_command:
+        clearance_path = data_home.joinpath("transitions/clearance.log.txt")
+        stack_height_path = data_home.joinpath("transitions/stack-height.log.txt")
+
+
     kwargs = {'delimiter': ' ', 'ndmin': 2}
     executed_action_data = np.loadtxt(executed_action_path, **kwargs)
     place_succ_data = np.loadtxt(place_successes_path, **kwargs)
     grasp_succ_data = np.loadtxt(grasp_successes_path, **kwargs)
+
+    if long_command:
+        # TODO elias: use json data to get final block order 
+        clearance_data = np.loadtxt(clearance_path, **kwargs).astype(int)
+        stack_height_data = np.loadtxt(stack_height_path, **kwargs).astype(int)
+        color_sequences = {}
+        trial_start = 0
+        for i, trial_end in enumerate(clearance_data):
+            trial_end = trial_end[0] - 1
+            stack_height = stack_height_data[trial_end][0]
+            if stack_height < 4:
+                continue 
+            place_json_path = json_home.joinpath(f"object_positions_and_orientations_{trial_end}_2.json")
+            json_data = Pair.read_json(place_json_path)
+            # first get all at lowest position 
+            # filter out weird ones with super negative y
+            json_data = {k:v for k,v in json_data.items() if v[2] >= 0}
+            lowest_y_coord = min([x[2] for x in json_data.values()])
+            lowest_colors = [x for x in json_data.items() if abs(x[1][2] - lowest_y_coord) < 0.001]
+            lowest_color_names = [x[0] for x in lowest_colors]
+            higher_colors = [x for x in json_data.items() if x[0] not in lowest_color_names]
+
+            stack_candidates = {}
+            for lcolor, lcoord in lowest_colors:
+                stack_candidates[lcolor] = []
+                lcoord_xy = lcoord[0:2]
+                for hcolor, hcoord in higher_colors:
+                    hcoord_xy = hcoord[0:2]
+                    lh_dist = Pair.euclidean_distance(lcoord_xy, hcoord_xy)
+                    if lh_dist < 0.04:
+                        stack_candidates[lcolor].append((hcolor, hcoord))
+            try:
+                final_candidate = [x for x in stack_candidates.items() if len(x[1]) == 3][0]
+            except IndexError:
+                print(json_data)
+                print(stack_candidates)
+                raise IndexError(f"There should be 4 block candidates!")
+            colors_sorted = sorted(final_candidate[1], key = lambda x: x[1][2])
+            colors_sorted = [x[0] for x in colors_sorted]
+            colors_sorted = [final_candidate[0]] + colors_sorted 
+            for i in range(trial_start, trial_end + 1):
+                color_sequences[i] = colors_sorted
+            trial_start = trial_end + 1
+
     prev_act = None
     prev_grasp_idx = None
     pick_place_pairs = []
@@ -587,7 +686,16 @@ def get_pairs(data_home, resolution = 224, w = 40, is_sim = False, is_row = True
             prev_act = "place"
             # now you can create a pair with the previous action's grasp and current place
             if is_sim:
-                pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row, w = w, filter_colors = filter_colors)
+                if long_command:
+                    try:
+                        color_sequence = color_sequences[demo_idx]
+                    except KeyError:
+                        print(max(color_sequences.keys()))
+                        print(demo_idx)
+                        pdb.set_trace() 
+                    pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row, w = w, filter_colors = filter_colors, long_command = color_sequence)
+                else:
+                    pair = Pair.from_sim_idxs(prev_grasp_idx, demo_idx, executed_action_data, image_home, json_home, is_row = is_row, w = w, filter_colors = filter_colors)
                 if pair is None:
                     skipped_by_filter += 1
                     prev_grasp_idx = None 

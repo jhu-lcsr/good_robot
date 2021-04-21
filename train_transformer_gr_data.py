@@ -63,7 +63,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                  next_weight: float = 1.0,
                  prev_weight: float = 1.0,
                  do_regression: bool = False,
-                 do_reconstruction: bool = False):
+                 do_reconstruction: bool = False,
+                 long_command: bool = False): 
         super(GoodRobotTransformerTrainer, self).__init__(train_data=train_data,
                                                  val_data=val_data,
                                                  encoder=encoder,
@@ -93,6 +94,7 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                                                                             image_size = resolution,
                                                                             patch_size = patch_size)
 
+        self.long_command = long_command
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -240,6 +242,12 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
             prev_loss = self.xent_loss_fxn(pred_prev_image_recon, true_prev_image_recon)
             next_loss = self.xent_loss_fxn(pred_next_image_recon, true_next_image_recon)
             total_loss += prev_loss + next_loss
+
+        if self.long_command:
+            pred_source_block = outputs['pred_source_color']
+            blocks_to_move = inputs['block_to_move'].to(pred_source_block.device) 
+            block_loss = self.xent_loss_fxn(pred_source_block, blocks_to_move) 
+            total_loss += block_loss 
 
         return total_loss
 
@@ -460,13 +468,16 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
+    color_pair = args.color_pair.split(",") if args.color_pair is not None else None 
     dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
+                                            color_pair=color_pair,
                                             task_type=args.task_type,
                                             augment_by_flipping = args.augment_by_flipping,
                                             augment_by_rotating = args.augment_by_rotating, 
                                             augment_with_noise = args.augment_with_noise, 
                                             augment_language = args.augment_language,
+                                            noise_num_samples = args.noise_num_samples, 
                                             leave_out_color = args.leave_out_color,
                                             batch_size=args.batch_size,
                                             max_seq_length=args.max_seq_length,
@@ -519,7 +530,8 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = False) 
+                          do_reconstruction = False,
+                          pretrained_weights = args.pretrained_weights) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
     # Initialize encoder 
@@ -633,7 +645,7 @@ def main(args):
                                    generate_after_n = args.generate_after_n,
                                    score_type=args.score_type,
                                    do_regression = False, 
-                                   do_reconstruction = False) 
+                                   do_reconstruction = False)
         print(f"evaluating") 
         eval_trainer.evaluate(out_path)
 
@@ -670,6 +682,8 @@ if __name__ == "__main__":
     parser.add_argument("--augment-with-noise", action="store_true")
     parser.add_argument("--augment-language", action="store_true")
     parser.add_argument("--overfit", action = "store_true")
+    parser.add_argument("--color-pair", default=None, type=str) 
+    parser.add_argument("--noise-num-samples", default=2, type=int)
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
@@ -688,6 +702,7 @@ if __name__ == "__main__":
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch", "patch-softmax"], default='per-pixel')
     parser.add_argument("--do-residual", action = "store_true", help = "set to residually connect unshared and next prediction in ResidualTransformerEncoder")
+    parser.add_argument("--pretrained-weights", type=str, default=None, help = "path to best.th file for a pre-trained initialization")
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
@@ -700,6 +715,7 @@ if __name__ == "__main__":
     parser.add_argument("--generate-after-n", type=int, default=10) 
     parser.add_argument("--score-type", type=str, default="acc", choices = ["acc", "block_acc", "tele_score"])
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
+    parser.add_argument("--do-reconstruction", type=bool, default=False, action="store_true")
     parser.add_argument("--init-scale", type=int, default = 4, help = "initalization scale for transformer weights")
     parser.add_argument("--seed", type=int, default=12) 
 
