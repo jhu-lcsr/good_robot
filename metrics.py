@@ -130,11 +130,12 @@ class TransformerTeleportationMetric(TeleportationMetric):
         true_prev_image[0, pred_corner[0]:pred_corner[0] + self.block_size, pred_corner[1]: pred_corner[1] + self.block_size, 0] = pred_idx 
         return true_prev_image  
 
-    def compute_distance(self, pred_block_corner, prev_block_id, block_to_move, pair, place_location):
+    def compute_distance(self, pred_block_corner, prev_block_id, block_to_move, true_prev_image, true_next_image):
         # execute the move on the previous state 
-        pred_next_image = self.execute_move(pred_block_corner, prev_block_id, pair.prev_state_image) 
+        pred_next_image = self.execute_move(pred_block_corner, prev_block_id, true_prev_image) 
         # filter to be 1-0 
         true_next_image_oh = true_next_image.clone() 
+        pred_next_image_oh = pred_next_image.clone() 
 
         true_next_image_oh[true_next_image != block_to_move] = 0
         true_next_image_oh[true_next_image == block_to_move] = 1
@@ -143,11 +144,12 @@ class TransformerTeleportationMetric(TeleportationMetric):
         # get centers          
         true_block_center = self.euclid.get_block_center(true_next_image_oh) 
         pred_block_center = self.euclid.get_block_center(pred_next_image_oh) 
-       
+
         distance_pix = self.euclid.get_euclidean_distance(pred_block_center, true_block_center) 
         # convert to distance in block_lengths 
         distance_normalized = distance_pix / self.block_size
         return distance_normalized, pred_block_center, true_block_center
+
 
     def get_metric(self, true_next_image, true_prev_image, pred_prev_image, pred_next_patches, block_to_move, next_xyz = None): 
         true_next_image = true_next_image.detach().cpu() 
@@ -232,7 +234,6 @@ class UNetTeleportationMetric(TransformerTeleportationMetric):
 
         # get the center of the most likely next location, to move the block to 
         pred_block_center, pred_block_corner = self.select_next_location(pred_next_image) 
-
         distance_normalized, pred_block_center, true_block_center  = self.compute_distance(pred_block_corner, prev_block_id, block_to_move, true_prev_image, true_next_image) 
         # given gold source block, what is predicted distance 
         distance_oracle_source, __, __  = self.compute_distance(pred_block_corner, block_to_move, block_to_move, true_prev_image, true_next_image) 
@@ -257,6 +258,25 @@ class GoodRobotTransformerTeleportationMetric(TransformerTeleportationMetric):
         self.color_to_idx = {"red":1, "blue": 2, "green": 3, "yellow": 4, "brown": 5, "orange": 6, "gray": 7, "purple": 8, "cyan": 9, "pink": 10}
         self.idx_to_color = {v:k for k,v in self.color_to_idx.items()}
         self.block_ratio = 9/64
+
+    def compute_distance(self, pred_block_corner, prev_block_id, block_to_move, pair, place_location):
+        # execute the move on the previous state 
+        pred_next_image = self.execute_move(pred_block_corner, prev_block_id, pair.prev_state_image) 
+        # filter to be 1-0 
+        true_next_image_oh = true_next_image.clone() 
+
+        true_next_image_oh[true_next_image != block_to_move] = 0
+        true_next_image_oh[true_next_image == block_to_move] = 1
+        pred_next_image_oh[pred_next_image != block_to_move] = 0
+        pred_next_image_oh[pred_next_image == block_to_move] = 1
+        # get centers          
+        true_block_center = self.euclid.get_block_center(true_next_image_oh) 
+        pred_block_center = self.euclid.get_block_center(pred_next_image_oh) 
+       
+        distance_pix = self.euclid.get_euclidean_distance(pred_block_center, true_block_center) 
+        # convert to distance in block_lengths 
+        distance_normalized = distance_pix / self.block_size
+        return distance_normalized, pred_block_center, true_block_center
 
     def select_prev_block(self, pair, pred_prev_image):
         c, w, h = pred_prev_image.shape

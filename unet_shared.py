@@ -76,7 +76,8 @@ class SharedUNet(torch.nn.Module):
                                        #mlp_num_layers=mlp_num_layers,
                                        dropout=dropout,
                                        depth=depth,
-                                       device=device)
+                                       device=device,
+                                       do_reconstruction=do_reconstruction) 
 
         if self.share_level < 3: 
             # make a new module if not shared 
