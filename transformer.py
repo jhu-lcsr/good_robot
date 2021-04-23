@@ -362,7 +362,7 @@ class TransformerEncoder(torch.nn.Module):
                 nn.Linear(hidden_dim, 8)
             )
 
-        if pretrained_weights is not None:
+        if pretrained_weights is not None and pretrained_weights != "None":
             # initialize from pretrained 
             state_dict = torch.load(pretrained_weights)
             # remove vocabulary 

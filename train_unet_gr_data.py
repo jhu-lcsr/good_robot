@@ -281,6 +281,11 @@ def main(args):
     test = torch.ones((1))
     test = test.to(device) 
 
+    if args.test:
+        # turn off augmentation for test, waste of time 
+        args.augment_by_flipping = False
+        args.augment_with_noise = False 
+
     color_pair = args.color_pair.split(",") if args.color_pair is not None else None 
     dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
@@ -421,7 +426,6 @@ def main(args):
 
         if "test" in dataset_reader.data.keys():
             eval_data = dataset_reader.data['test']
-            pdb.set_trace() 
             out_path = "test_metrics.json"
         else:
             eval_data = dataset_reader.data['dev']

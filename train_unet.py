@@ -386,7 +386,7 @@ def main(args):
     # load the data 
     dataset_reader = DatasetReader(args.train_path,
                                    args.val_path,
-                                   None,
+                                   args.test_path,
                                    batch_by_line = args.traj_type != "flat",
                                    traj_type = args.traj_type,
                                    batch_size = args.batch_size,
@@ -408,13 +408,21 @@ def main(args):
             pass
         with open(checkpoint_dir.joinpath("vocab.json"), "w") as f1:
             json.dump(list(train_vocab), f1) 
+
+        print(f"Reading data from {args.val_path}")
+        dev_vocab = dataset_reader.read_data("dev") 
     else:
         print(f"Reading vocab from {checkpoint_dir}") 
         with open(checkpoint_dir.joinpath("vocab.json")) as f1:
             train_vocab = json.load(f1) 
         
-    print(f"Reading data from {args.val_path}")
-    dev_vocab = dataset_reader.read_data("dev") 
+
+    if args.test_path is not None:
+        print(f"reading test data from {args.test_path}")
+        test_vocab = dataset_reader.read_data("test")
+    # no test then delete
+    else:
+        del(dataset_reader.data['test'])
 
     print(f"got data")  
     # construct the vocab and tokenizer 
@@ -447,11 +455,11 @@ def main(args):
         depth = 7
 
     if args.image_path is None:
-        args.channels = 21
+        channels = 21
     else:
-        args.channels = 6
+        channels = 6
 
-    unet_kwargs = dict(in_channels = args.channels,
+    unet_kwargs = dict(in_channels = channels,
                      out_channels = args.unet_out_channels, 
                      lang_embedder = embedder,
                      lang_encoder = encoder, 
@@ -530,13 +538,20 @@ def main(args):
         trainer.train() 
 
     else:
+
+        if "test" in dataset_reader.data.keys():
+            eval_data = dataset_reader.data['test']
+            out_path = "test_metrics.json"
+        else:
+            eval_data = dataset_reader.data['dev']
+            out_path = "val_metrics.json"
         # test-time, load best model  
         print(f"loading model weights from {args.checkpoint_dir}") 
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
         encoder.load_state_dict(state_dict, strict=True)  
 
         eval_trainer = UNetLanguageTrainer(train_data = dataset_reader.data["train"], 
-                                   val_data = dataset_reader.data["dev"], 
+                                   val_data = eval_data, 
                                    encoder = encoder,
                                    optimizer = None, 
                                    num_epochs = 0, 
@@ -548,7 +563,7 @@ def main(args):
                                    num_models_to_keep = 0, 
                                    generate_after_n = args.generate_after_n) 
         print(f"evaluating") 
-        eval_trainer.evaluate()
+        eval_trainer.evaluate(out_path)
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -561,6 +576,7 @@ if __name__ == "__main__":
     # data 
     parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
+    parser.add_argument("--test-path", default = None, help = "path to test data" )
     parser.add_argument("--num-blocks", type=int, default=20) 
     parser.add_argument("--binarize-blocks", action="store_true", help="flag to treat block prediction as binary task instead of num-blocks-way classification") 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 

@@ -224,24 +224,25 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
 
         if self.do_reconstruction:
             # do state reconstruction from image input for previous and next image 
-            true_next_image_recon = image_to_tiles(inputs["next_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size) 
+            #true_next_image_recon = image_to_tiles(inputs["next_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size) 
             true_prev_image_recon = image_to_tiles(inputs["prev_pos_for_acc"].reshape(bsz, 1, w, h), self.patch_size)       
             # take max of each patch so that even mixed patches count as having a block 
-            true_next_image_recon, __ = torch.max(true_next_image_recon, dim=2) 
+            #true_next_image_recon, __ = torch.max(true_next_image_recon, dim=2) 
             true_prev_image_recon, __ = torch.max(true_prev_image_recon, dim=2) 
 
-            pred_next_image_recon = outputs["next_per_patch_class"]
+            #pred_next_image_recon = outputs["next_per_patch_class"]
             pred_prev_image_recon = outputs["prev_per_patch_class"]
-            bsz, n = true_next_image_recon.shape 
-            pred_next_image_recon  = pred_next_image_recon.reshape(bsz * n, 21)
+            bsz, n = true_prev_image_recon.shape 
+            #pred_next_image_recon  = pred_next_image_recon.reshape(bsz * n, 21)
             pred_prev_image_recon  = pred_prev_image_recon.reshape(bsz * n, 21)
             
-            true_next_image_recon = true_next_image_recon.reshape(-1).to(pred_next_image_recon.device).long()
-            true_prev_image_recon = true_prev_image_recon.reshape(-1).to(pred_next_image_recon.device).long() 
+            #true_next_image_recon = true_next_image_recon.reshape(-1).to(pred_next_image_recon.device).long()
+            true_prev_image_recon = true_prev_image_recon.reshape(-1).to(pred_prev_image_recon.device).long() 
 
             prev_loss = self.xent_loss_fxn(pred_prev_image_recon, true_prev_image_recon)
-            next_loss = self.xent_loss_fxn(pred_next_image_recon, true_next_image_recon)
-            total_loss += prev_loss + next_loss
+            #next_loss = self.xent_loss_fxn(pred_next_image_recon, true_next_image_recon)
+            #total_loss += prev_loss + next_loss
+            total_loss += prev_loss 
 
         if self.long_command:
             pred_source_block = outputs['pred_source_color']
@@ -468,6 +469,11 @@ def main(args):
     test = test.to(device) 
 
     # load the data 
+    if args.test:
+        # turn off augmentation for test, waste of time 
+        args.augment_by_flipping = False
+        args.augment_with_noise = False 
+
     color_pair = args.color_pair.split(",") if args.color_pair is not None else None 
     dataset_reader = GoodRobotDatasetReader(path_or_obj=args.path,
                                             split_type=args.split_type,
@@ -530,7 +536,7 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = False,
+                          do_reconstruction = args.do_reconstruction,
                           pretrained_weights = args.pretrained_weights) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
@@ -606,7 +612,7 @@ def main(args):
                               next_weight = args.next_weight,
                               prev_weight = args.prev_weight,
                               do_regression = False,
-                              do_reconstruction = False) 
+                              do_reconstruction = args.do_reconstruction) 
         trainer.train() 
 
     else:
@@ -645,7 +651,7 @@ def main(args):
                                    generate_after_n = args.generate_after_n,
                                    score_type=args.score_type,
                                    do_regression = False, 
-                                   do_reconstruction = False)
+                                   do_reconstruction = args.do_reconstruction)
         print(f"evaluating") 
         eval_trainer.evaluate(out_path)
 

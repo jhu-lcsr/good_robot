@@ -307,6 +307,7 @@ class ImageTrajectory(SimpleTrajectory):
         def imread_safe(path):
             try:
                 image = cv2.imread(str(path))
+                print(path)
                 image = cv2.resize(image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
                 # add border to right edge  
                 path = pathlib.Path(path)  
@@ -556,6 +557,7 @@ class GoodRobotDatasetReader:
         self.noise_gaussian_params = [0.0, 0.05]
         self.noise_num_samples = noise_num_samples
 
+
         if type(path_or_obj) == str:
             self.path = pathlib.Path(path_or_obj)
             self.pkl_files = self.path.glob("*/*.pkl")
@@ -566,6 +568,11 @@ class GoodRobotDatasetReader:
                     self.all_data.extend(data) 
         else:
             self.all_data = [path_or_obj]
+
+        if task_type == "rows":
+            self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
+        elif task_type == "stacks": 
+            self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
 
         if split_type == "random": 
             np.random.shuffle(self.all_data)
@@ -623,10 +630,6 @@ class GoodRobotDatasetReader:
             train_data += new_data
             print(f"added")
 
-        if task_type == "rows":
-            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
-        elif task_type == "stacks": 
-            all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
 
         self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
 
@@ -712,8 +715,10 @@ class GoodRobotDatasetReader:
         prev_pos_input = []
         prev_pos_for_pred = []
         prev_pos_for_acc  = []
+        prev_pos_for_vis = []
         next_pos_for_pred = []
         next_pos_for_acc = []
+        next_pos_for_vis = []
         next_pos_for_regression = []
         block_to_move = []
 
@@ -745,11 +750,12 @@ class GoodRobotDatasetReader:
             prev_pos_input.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
             if pair.prev_location is not None: 
                 prev_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.prev_location).copy()).unsqueeze(0))
-                prev_pos_for_acc.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
+                prev_pos_for_vis.append(torch.from_numpy(pair.prev_image.copy()).unsqueeze(0))
+                prev_pos_for_acc.append(torch.from_numpy(pair.prev_state_image.copy()).unsqueeze(0))
 
             if pair.next_location is not None:
                 next_pos_for_pred.append(torch.from_numpy(pair.get_mask(pair.next_location).copy()).unsqueeze(0))
-                next_pos_for_acc.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
+                next_pos_for_vis.append(torch.from_numpy(pair.next_image.copy()).unsqueeze(0))
             pairs.append(pair)
             block_to_move.append(self.color_names.index(pair.source_code))
 
@@ -760,6 +766,9 @@ class GoodRobotDatasetReader:
         if len(prev_pos_for_acc) > 0:
             prev_pos_for_acc  = torch.cat(prev_pos_for_acc, 0)
             prev_pos_for_acc  = prev_pos_for_acc.float() 
+        if len(prev_pos_for_vis) > 0:
+            prev_pos_for_vis  = torch.cat(prev_pos_for_vis, 0)
+            prev_pos_for_vis  = prev_pos_for_vis.float()
         if len(next_pos_for_pred) > 0:
             next_pos_for_pred  = torch.cat(next_pos_for_pred, 0) 
             next_pos_for_pred = next_pos_for_pred.float().unsqueeze(-1)
@@ -775,7 +784,9 @@ class GoodRobotDatasetReader:
                 "prev_pos_input": prev_pos_input,
                 "prev_pos_for_acc": prev_pos_for_acc,
                 "prev_pos_for_pred": prev_pos_for_pred,
+                "prev_pos_for_vis": prev_pos_for_vis,
                 "next_pos_for_acc": next_pos_for_acc,
+                "next_pos_for_vis": next_pos_for_vis,
                 "next_pos_for_pred": next_pos_for_pred,
                 "next_pos_for_regression": None,
                 "block_to_move":  block_to_move,
