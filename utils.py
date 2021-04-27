@@ -19,7 +19,9 @@ import pdb
 #try:
 from spacy.lang.en import English
 from spacy.tokenizer import Tokenizer
+from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
+from unet_shared import SharedUNet
 from transformer import TransformerEncoder, tiles_to_image
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
 #except ImportError:
@@ -253,7 +255,7 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     return push_predictions, grasp_predictions, place_predictions
 
 
-def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10):
+def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10, from_transformer = True, baseline_language_mask = False):
     """
     Adds a language mask to the predictions array.
 
@@ -274,7 +276,9 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
     # Peform data processing on the language model output to convert float values to logits
     # NOTE(zhe) should the function be more generic and take in a reformatted list?
     # language_data should have shape torch([1, 256, 2, 1])
-    language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
+    if from_transformer:
+        language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
+
     language_data = softmax(language_data, axis = 1)
     # take prob yes
     language_mask = language_data[:,1,:,:]
@@ -297,6 +301,13 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         language_mask[row_idx, col_idx] = 1
         language_mask[language_mask != 1] = 0
         language_mask = language_mask.detach().cpu().numpy()
+    else:
+        language_mask_before = language_mask.copy()
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
+
     if threshold is not None:
 
         language_mask[language_mask > threshold] = 1
@@ -323,7 +334,7 @@ def process_prediction_language_masking(language_data, predictions, show_heightm
         predictions.mask = language_mask
     else:
         # TODO (elias) why not just multiply probs in with the mask
-        if threshold is not None or single_max:
+        if (threshold is not None or single_max) and not baseline_language_mask:
             # intersection_mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
             # expand out: if any pixel of a block is yes under language mask, then whole block is yes
             predictions.mask = infect_mask(language_mask.astype(bool), curr_mask.copy().astype(bool))
@@ -408,7 +419,7 @@ def infect_mask(language_mask, curr_mask, block_width = 16):
 
 
 # TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
-def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None):
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None, check_row = False, baseline_language_mask = False):
     """
     Processes the language output into a mask and combine it with existing masks in prediction arrays
     """
@@ -420,8 +431,22 @@ def common_sense_language_model_mask(language_output, push_predictions=None, gra
 
     #push_predictions = process_prediction_language_masking(language_output['prev_position'], push_predictions, color_heightmap=color_heightmap, threshold = 0.6)
     # TODO (elias) tune these values
-    grasp_predictions = process_prediction_language_masking(language_output['prev_position'], grasp_predictions, color_heightmap=color_heightmap, threshold = 0.6, abs_threshold = 0.03)
-    place_predictions = process_prediction_language_masking(language_output['next_position'], place_predictions, color_heightmap=color_heightmap, threshold = 0.5, abs_threshold = 0.10)
+    from_transformer = True 
+    if type(language_output) == tuple: 
+        next_pos, prev_pos = language_output
+        next_pos = next_pos['next_position']
+        prev_pos = prev_pos['next_position']
+        from_transformer = False
+    else:
+        prev_pos, next_pos = language_output['prev_position'], language_output['next_position']
+
+    if baseline_language_mask:
+        print(f"RUNNING RANDOM BASELINE FOR LANGUAGE")
+        prev_pos = torch.ones(prev_pos.shape).to(prev_pos.device)
+        next_pos = torch.ones(next_pos.shape).to(next_pos.device)
+
+    grasp_predictions = process_prediction_language_masking(prev_pos, grasp_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.03, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
+    place_predictions = process_prediction_language_masking(next_pos, place_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.10, single_max = not check_row, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
 
 
     return push_predictions, grasp_predictions, place_predictions
@@ -469,24 +494,64 @@ def load_language_model_from_config(configYamlPath, weightsPath):
     else:
         raise NotImplementedError(f'No embedder {config["embedder"]}')
 
-    # Initiate the encoder
-    encoder = TransformerEncoder(image_size = config["resolution"],
-                                 patch_size = config["patch_size"],
-                                 language_embedder = embedder,
-                                 n_layers_shared = config["n_shared_layers"],
-                                 n_layers_split  = config["n_split_layers"],
-                                 n_classes = 2,
-                                 channels = config["channels"],
-                                 n_heads = config["n_heads"],
-                                 hidden_dim = config["hidden_dim"],
-                                 ff_dim = config["ff_dim"],
-                                 dropout = config["dropout"],
-                                 embed_dropout = config["embed_dropout"],
-                                 output_type = config["output_type"],
-                                 positional_encoding_type = config["pos_encoding_type"],
-                                 # device = device,
-                                 log_weights = config["test"],
-                                 do_reconstruction = config['do_reconstruction'])
+    if "encoder_type" in config.keys() and config["encoder_type"] == "TransformerEncoder":
+        # Initiate the encoder
+        encoder = TransformerEncoder(image_size = config["resolution"],
+                                    patch_size = config["patch_size"],
+                                    language_embedder = embedder,
+                                    n_layers_shared = config["n_shared_layers"],
+                                    n_layers_split  = config["n_split_layers"],
+                                    n_classes = 2,
+                                    channels = config["channels"],
+                                    n_heads = config["n_heads"],
+                                    hidden_dim = config["hidden_dim"],
+                                    ff_dim = config["ff_dim"],
+                                    dropout = config["dropout"],
+                                    embed_dropout = config["embed_dropout"],
+                                    output_type = config["output_type"],
+                                    positional_encoding_type = config["pos_encoding_type"],
+                                    # device = device,
+                                    log_weights = config["test"],
+                                    do_reconstruction = config['do_reconstruction'])
+    else:
+        if config['embedder'] == "random":
+            embedder = RandomEmbedder(tokenizer, train_vocab, config['embedding_dim'], trainable=True)
+        elif config['embedder'] == "glove":
+            embedder = GloveEmbedder(tokenizer, train_vocab, config['embedding_file'], config['embedding_dim'], trainable=True) 
+        elif config['embedder'].startswith("bert"): 
+            embedder = BERTEmbedder(model_name = config['embedder'],  max_seq_len = config['max_seq_length']) 
+        else:
+            raise NotImplementedError(f"No embedder {config['embedder']}") 
+        # get the encoder from args  
+        if config['encoder'] == "lstm":
+            encoder = LSTMEncoder(input_dim = config['embedding_dim'],
+                                hidden_dim = config['encoder_hidden_dim'],
+                                num_layers = config['encoder_num_layers'],
+                                dropout = config['dropout'],
+                                bidirectional = config['bidirectional']) 
+        else:
+            raise NotImplementedError(f"No encoder {config['encoder']}") # construct the model  add UNet code here 
+        unet_kwargs = dict(in_channels = 6,
+                        out_channels = config["unet_out_channels"],
+                        lang_embedder = embedder,
+                        lang_encoder = encoder, 
+                        hc_large = config["unet_hc_large"],
+                        hc_small = config["unet_hc_small"],
+                        kernel_size = config["unet_kernel_size"],
+                        stride = config["unet_stride"],
+                        num_layers = config["unet_num_layers"],
+                        num_blocks = 1,
+                        unet_type = config["unet_type"],
+                        dropout = config["dropout"],
+                        depth = 1,
+                        #device=device,
+                        do_reconstruction=config['do_reconstruction'])
+
+        if config['compute_block_dist']:
+            unet_kwargs["mlp_num_layers"] = config['mlp_num_layers']
+
+        encoder = SharedUNet(**unet_kwargs) 
+
 
     # Load weights
     print(f'loading model weights from {config["checkpoint_dir"]}')
@@ -907,7 +972,7 @@ def calib_grid_cartesian(workspace_limits, calib_grid_step):
     return num_calib_grid_pts, calib_grid_pts
 
 
-def check_separation(values, distance_threshold):
+def check_separation(values, distance_threshold, small_distance_threshold = 0.05):
     """Checks that the separation among the values is close enough about distance_threshold.
 
     :param values: array of values to check, assumed to be sorted from low to high
@@ -920,10 +985,10 @@ def check_separation(values, distance_threshold):
         x = values[i]
         y = values[i + 1]
         assert x < y, '`values` assumed to be sorted'
-        if y < x + distance_threshold / 2.:
-            # print('check_separation(): not long enough for idx: {}'.format(i))
+        if y < x + small_distance_threshold / 2.:
+        #    # print('check_separation(): not long enough for idx: {}'.format(i))
             return False
-        if y - x > distance_threshold:
+        if abs(y - x) > distance_threshold:
             # print('check_separation(): too far apart')
             return False
     return True
@@ -991,27 +1056,6 @@ class StackSequence(object):
             self.object_color_sequence = None
         self.trial += 1
 
-    def generate_color_command_string(self):
-        """ Generates an English command sentence for stacking the last block in the current stacking sequence
-            on top of the second to last block using block colors.
-
-            The command could follow the format:
-            Place a {color of object_color_index} on top of {color of (object_color_index - 1)}.
-        """
-        if self.is_goal_conditioned_task and self.color_names is not None:   # generating commands sentences only work for
-            if self.object_color_index == 0:    # If we are just starting a stack
-                firstBlockColor = self.color_names[(self.object_color_index) % self.color_len]
-                return f'Start with a {firstBlockColor} block.'
-            elif self.object_color_index > 0:    # If we are in the middle of stacking
-                colorStrs = {'bottom': self.color_names[self.object_color_sequence[self.object_color_index-1] % self.color_len],
-                             'top': self.color_names[self.object_color_sequence[self.object_color_index] % self.color_len]}
-                command = f'Place a {colorStrs["top"]} block on top of the highest {colorStrs["bottom"]} block.'
-                return command
-            else:
-                return None
-        else:
-            return None
-
     def current_one_hot(self):
         """ Return the one hot encoding for the current specific object.
         """
@@ -1062,6 +1106,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
+
         if x.size == 0 or y.size == 0:
             return False, 0
 
