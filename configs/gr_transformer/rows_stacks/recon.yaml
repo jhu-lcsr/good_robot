@@ -1,6 +1,7 @@
 augment_by_flipping: true
 augment_by_rotating: false
 augment_language: false
+augment_with_noise: false
 batch_size: 64
 channels: 6
 checkpoint_dir: 
@@ -29,12 +30,12 @@ num_models_to_keep: 5
 output_type: per-patch
 overfit: false
 patch_size: 4
-path: /srv/local1/estengel/gr_data_sim/
+path: /srv/local1/estengel/gr_data_sim_small_w/
 pos_encoding_type: fixed-separate
 prev_weight: 1.0
 resolution: 64
 resume: false
-score_type: block_acc
+score_type: acc
 seed: 12
 split_type: random
 task_type: rows-and-stacks

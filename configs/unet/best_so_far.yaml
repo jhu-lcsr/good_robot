@@ -33,7 +33,7 @@ resume: false
 seed: 12
 test: false
 top_only: true
-train_path: blocks_data/trainset_v2.json
+train_path: blocks_data/devset.json
 traj_type: flat
 val_path: blocks_data/devset.json
 warmup: 1000
