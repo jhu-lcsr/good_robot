@@ -663,7 +663,7 @@ def main(args):
         # TODO (elias): confirm this number 
         depth = 7
 
-    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else "TransformerEncoder"
+    encoder_cls = ResidualTransformerEncoder if args.encoder_type == "ResidualTransformerEncoder" else TransformerEncoder
     encoder_kwargs = dict(image_size = args.resolution,
                           patch_size = args.patch_size, 
                           language_embedder = embedder, 
@@ -682,7 +682,7 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = False) 
+                          do_reconstruction = args.do_reconstruction) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
     # Initialize encoder 

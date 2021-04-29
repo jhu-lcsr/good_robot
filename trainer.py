@@ -17,6 +17,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils_torch import action_space_argmax, demo_space_argmax
+import pdb 
 
 try:
     import ptflops
@@ -32,7 +33,8 @@ class Trainer(object):
     def __init__(self, method, push_rewards, future_reward_discount,
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
-                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False):
+                 common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True, static_language_mask=False, check_row = False,
+                 baseline_language_mask = False):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -42,13 +44,17 @@ class Trainer(object):
         self.flops = flops
         self.goal_condition_len = goal_condition_len
         self.common_sense = common_sense
-        self.place_common_sense = self.common_sense and place_common_sense and not static_language_mask
+        #self.place_common_sense = self.common_sense and place_common_sense and not static_language_mask
+	# TODO (elias) clean this up 
+        self.place_common_sense = True
         self.common_sense_backprop = common_sense_backprop
         self.static_language_mask=static_language_mask
         self.show_heightmap = show_heightmap
         self.is_testing = is_testing
         self.place_dilation = place_dilation
         self.trial_reward = trial_reward
+        self.check_row = check_row
+        self.baseline_language_mask = baseline_language_mask
         if self.place:
             # # Stacking Reward Schedule
             # reward_schedule = (np.arange(5)**2/(2*np.max(np.arange(5)**2)))+0.75
@@ -164,6 +170,7 @@ class Trainer(object):
         self.trial_success_log = []
         self.grasp_success_log = []
         self.color_success_log = []
+        self.grasp_color_success_log = []
         self.change_detected_log = []
         if place:
             self.stack_height_log = []
@@ -252,6 +259,12 @@ class Trainer(object):
             self.color_success_log = np.loadtxt(os.path.join(transitions_directory, 'color-success.log.txt'), **kwargs)
             self.color_success_log = self.color_success_log[0:self.iteration]
             self.color_success_log = self.color_success_log.tolist()
+
+        if os.path.exists(os.path.join(transitions_directory, 'grasp-color-success.log.txt')):
+            self.grasp_color_success_log = np.loadtxt(os.path.join(transitions_directory, 'grasp-color-success.log.txt'), **kwargs)
+            self.grasp_color_success_log = self.grasp_color_success_log[0:self.iteration]
+            self.grasp_color_success_log = self.grasp_color_success_log.tolist()
+
         self.change_detected_log = np.loadtxt(os.path.join(transitions_directory, 'change-detected.log.txt'), **kwargs)
         self.change_detected_log = self.change_detected_log[0:self.iteration]
         self.change_detected_log = self.change_detected_log.tolist()
@@ -628,6 +641,7 @@ class Trainer(object):
             grasp_predictions = np.ma.masked_array(grasp_predictions)
             if self.place:
                 place_predictions = np.ma.masked_array(place_predictions)
+                masked_place_predictions = np.ma.masked_array(place_predictions)
 
         # return components depending on flags
         if keep_action_feat and not use_demo:
@@ -653,12 +667,21 @@ class Trainer(object):
         # TODO(zhe) Assign value to language_masks variable using Elias's model.
         if self.static_language_mask and language_output is not None:
             # NOTE(zhe) Maybe we should generate the language output here instead... It would keep potentially trainable models in the trainer object.
-            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, place_predictions, color_heightmap=color_heightmap)
+            if self.check_row:
+                # mask grasp predictions, not place predictions, with common-sense mask  
+                __, grasp_predictions, __ = \
+                        utils.common_sense_action_space_mask(depth_heightmap[:, :, 0],
+                        push_predictions, grasp_predictions, place_predictions,
+                        self.place_dilation, self.show_heightmap, color_heightmap)
+            push_predictions, grasp_predictions, place_predictions = utils.common_sense_language_model_mask(language_output, push_predictions, grasp_predictions, masked_place_predictions, color_heightmap=color_heightmap, check_row = self.check_row, baseline_language_mask=self.baseline_language_mask)
+            masked_place_predictions = place_predictions.copy()
         # elif (self.static_language_mask and language_output is None) or (not self.static_language_mask and language_output is not None):
             # raise Exception('need to input the language_output into the trainer.forward AND assign True to init argument "static_language_mask"')
         
         # NOTE(zhe) Place common sense would adversely affect the language task. The language task involves placing blocks away from other blocks.
         if self.place_common_sense and not self.static_language_mask:
+            return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob
+        elif self.place_common_sense and self.static_language_mask: 
             return push_predictions, grasp_predictions, masked_place_predictions, state_feat, output_prob
         else:
             return push_predictions, grasp_predictions, place_predictions, state_feat, output_prob

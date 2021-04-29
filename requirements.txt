@@ -68,7 +68,7 @@ llvmlite==0.35.0
 locket==0.2.0
 Markdown==3.3.3
 MarkupSafe==1.1.1
-matplotlib==3.3.0
+matplotlib
 mistune==0.8.4
 moviepy==2.0.0.dev2
 msgpack==1.0.2
@@ -113,6 +113,8 @@ pyserial==3.4
 pytest==6.1.2
 python-dateutil==2.8.1
 pytz==2020.1
+pyviz
+pyviz-comms
 PyWavelets==1.1.1
 PyYAML==5.3.1
 pyzmq==19.0.1
@@ -148,7 +150,10 @@ tifffile==2020.9.3
 tokenizers==0.9.3
 toml==0.10.2
 toolz==0.11.1
+<<<<<<< HEAD
 torch==1.6.0
+=======
+>>>>>>> 474bf2ecad18dfebd48884ac72784a64d9e16278
 tornado==6.0.4
 tqdm==4.48.2
 traitlets==4.3.3
