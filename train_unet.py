@@ -26,7 +26,7 @@ from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from unet_shared import SharedUNet
-from metrics import UNetTeleportationMetric
+from metrics import UNetTeleportationMetric, F1Metric
 from mlp import MLP 
 from losses import ScheduledWeightedCrossEntropyLoss
 
@@ -82,7 +82,7 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         self.fore_loss_fxn = torch.nn.CrossEntropyLoss(ignore_index=0)
 
         self.teleportation_metric = UNetTeleportationMetric(block_size = 4, image_size = self.resolution) 
-
+        self.f1_metric = F1Metric()
 
     def train_and_validate_one_epoch(self, epoch): 
         print(f"Training epoch {epoch}...") 
@@ -230,8 +230,8 @@ class UNetLanguageTrainer(FlatLanguageTrainer):
         self.encoder.eval() 
         next_outputs, prev_outputs = self.encoder(batch_instance) 
 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"])
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
+        prev_p, prev_r, prev_f1 = self.f1_metric.compute_f1(batch_instance["prev_pos_for_pred"], prev_outputs["next_position"])
+        next_p, next_r, next_f1 = self.f1_metric.compute_f1(batch_instance["next_pos_for_pred"], next_outputs["next_position"]) 
         if self.compute_block_dist:
             block_accuracy = self.compute_block_accuracy(batch_instance, next_outputs) 
         else:
@@ -541,10 +541,16 @@ def main(args):
 
         if "test" in dataset_reader.data.keys():
             eval_data = dataset_reader.data['test']
-            out_path = "test_metrics.json"
+            if args.out_path is None: 
+                out_path = "test_metrics.json"
+            else:
+                out_path = args.out_path
         else:
             eval_data = dataset_reader.data['dev']
-            out_path = "val_metrics.json"
+            if args.out_path is None: 
+                out_path = "val_metrics.json"
+            else:
+                out_path = args.out_path
         # test-time, load best model  
         print(f"loading model weights from {args.checkpoint_dir}") 
         state_dict = torch.load(pathlib.Path(args.checkpoint_dir).joinpath("best.th"))
@@ -619,6 +625,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-epochs", type=int, default=3) 
     parser.add_argument("--generate-after-n", type=int, default=10) 
     parser.add_argument("--zero-weight", type=float, default = 0.05, help = "weight for loss weighting negative vs positive examples") 
+    parser.add_argument("--out-path", type=str, default=None, help = "when decoding, path to output file")
 
     args = parser.parse_args()
     main(args) 

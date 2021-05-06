@@ -380,6 +380,25 @@ class TransformerEncoder(torch.nn.Module):
 
         return mask.bool().to(self.device) 
 
+    def get_neighbors(self, patch_idx, num_patches, neighborhood = 5): 
+        image_w = int(num_patches**(1/2))
+        patch_idxs = np.arange(num_patches).reshape(image_w, image_w)
+        patch_row = int(patch_idx / image_w) 
+        patch_col = patch_idx % image_w 
+
+        neighbor_idxs = patch_idxs[patch_row - neighborhood:patch_row + neighborhood, patch_col - neighborhood:patch_col + neighborhood]
+        neighbor_idxs = neighbor_idxs.reshape(-1)
+        return neighbor_idxs
+
+
+    def get_image_local_mask(self, num_patches, image_dim, neighborhood = 5): 
+        # make a mask so that each image patch can only attend to patches close to it 
+        mask = torch.zeros((bsz, num_patches, num_patches))
+        for i in range(num_patches):
+            neighbors = self.get_neighbors(i, num_patches, neighborhood)
+            mask[:,i,neighbors] = 1
+        return mask.bool().to(self.device)
+
     def _prepare_input(self, image, language, mask = None):
         # patchify 
         p = self.patch_size 
@@ -388,8 +407,13 @@ class TransformerEncoder(torch.nn.Module):
 
         # get mask
         if mask is not None:
-            # all image regions allowed 
-            long_mask = torch.ones((batch_size, num_patches + 1)).bool().to(self.device)
+            if self.locality_mask: 
+                image_dim = int(num_patches**(1/2))
+                long_mask = self.get_image_local_mask(num_patches, image_dim, neighborhood = self.locality_neighborhood)
+                pdb.set_trace() 
+            else:
+                # all image regions allowed 
+                long_mask = torch.ones((batch_size, num_patches + 1)).bool().to(self.device)
             # concat in language mask 
             long_mask = torch.cat((long_mask, mask), dim = 1) 
         else:
@@ -435,6 +459,7 @@ class TransformerEncoder(torch.nn.Module):
             model_input = torch.cat([model_input, language_input], dim = 1)
         elif self.positional_encoding_type == "fixed-2d-separate":
              # add fixed pos encoding to language and image separately 
+            pdb.set_trace() 
             model_input = add_positional_features_2d(model_input)
             language_input = add_positional_features(language_input)
             # repeat [SEP] across batch 

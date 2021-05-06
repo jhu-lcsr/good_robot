@@ -14,6 +14,7 @@ import copy
 import pathlib 
 import pickle as pkl
 from tqdm import tqdm 
+from matplotlib import pyplot as plt 
 
 from annotate_data import Pair, flip_pair, rotate_pair, gaussian_augment 
 np.random.seed(12) 
@@ -43,7 +44,8 @@ class BaseTrajectory:
                  do_one_hot: bool = True,
                  top_only: bool = True, 
                  binarize_blocks: bool = False,
-                 image_path: str = None):
+                 image_path: str = None,
+                 include_depth: bool = True):
 
         if batch_size is None:
             batch_size = len(commands)
@@ -57,7 +59,10 @@ class BaseTrajectory:
         if self.image_path is not None:
             self.image_path = pathlib.Path(self.image_path)
 
-        self.block_size = int((4 * self.resolution)/64)
+        self.include_depth = include_depth 
+
+        # TODO: try this 
+        self.block_size = int((4 * self.resolution)/64) + 1
 
         self.line_id = line_id
         self.commands = commands
@@ -88,7 +93,10 @@ class BaseTrajectory:
                                                                 self.next_positions_for_pred, 
                                                                 self.next_positions_for_acc)
 
-        self.previous_positions_input = self.get_input_positions()
+        if self.image_path is not None:
+            self.previous_positions_input = self.get_input_positions(self.include_depth)
+        else:
+            self.previous_positions_input = self.get_input_positions()
        
         if self.do_filter: 
             # for loss, only look at the single block moved 
@@ -267,7 +275,8 @@ class SimpleTrajectory(BaseTrajectory):
                  resolution: int, 
                  top_only: bool,
                  binarize_blocks: bool,
-                 image_path: str = None):
+                 image_path: str = None,
+                 include_depth: bool = True):
         super(SimpleTrajectory, self).__init__(line_id=line_id,
                                                commands=commands, 
                                                previous_positions=previous_positions,
@@ -283,13 +292,15 @@ class SimpleTrajectory(BaseTrajectory):
                                                do_one_hot = do_one_hot,
                                                top_only=top_only,
                                                binarize_blocks=binarize_blocks,
-                                               image_path = image_path) 
+                                               image_path = image_path,
+                                               include_depth = include_depth) 
         self.tokenizer = tokenizer
         # commands is a list of #timestep text strings 
         self.commands = self.tokenize(commands)
         self.image_path = image_path
         if self.image_path is not None:
             self.image_path = pathlib.Path(self.image_path)
+        self.include_depth = include_depth
 
     def tokenize(self, command): 
         # lowercase everything 
@@ -303,11 +314,10 @@ class ImageTrajectory(SimpleTrajectory):
     def __init__(self, *args, **kwargs):
         super(ImageTrajectory, self).__init__(*args, **kwargs) 
 
-    def get_input_positions(self):            
+    def get_input_positions(self, include_depth = True):            
         def imread_safe(path):
             try:
                 image = cv2.imread(str(path))
-                print(path)
                 image = cv2.resize(image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
                 # add border to right edge  
                 path = pathlib.Path(path)  
@@ -320,16 +330,20 @@ class ImageTrajectory(SimpleTrajectory):
         # get image names 
         color_image_path = self.image_path.joinpath("color-heightmaps")
         color_image_names = [color_image_path.joinpath(x) for x in self.images]
-        depth_image_path = self.image_path.joinpath("depth-heightmaps")
-        depth_image_names = [depth_image_path.joinpath(x) for x in self.images]
+        if include_depth: 
+            depth_image_path = self.image_path.joinpath("depth-heightmaps")
+            depth_image_names = [depth_image_path.joinpath(x) for x in self.images]
         # read images 
         color_images = [imread_safe(x) for x in color_image_names]
-        depth_images = [imread_safe(x) for x in depth_image_names]
+        if include_depth: 
+            depth_images = [imread_safe(x) for x in depth_image_names]
         # tensorize and concatenate 
         color_images = [torch.tensor(x).permute(2,0,1).float() for x in color_images]
-        depth_images = [torch.tensor(x).permute(2,0,1).float() for x in depth_images]
-        combined_images = [torch.cat([x,y], dim=0).unsqueeze(0) for (x, y) in zip(color_images, depth_images)]
-
+        if include_depth: 
+            depth_images = [torch.tensor(x).permute(2,0,1).float() for x in depth_images]
+            combined_images = [torch.cat([x,y], dim=0).unsqueeze(0) for (x, y) in zip(color_images, depth_images)]
+        else:
+            combined_images = [x.unsqueeze(0) for x in color_images]
         return combined_images 
 
 class DatasetReader:
@@ -337,6 +351,7 @@ class DatasetReader:
                        dev_path,
                        test_path,
                        image_path = None,
+                       include_depth = True, 
                        batch_by_line=False,
                        traj_type = "flat",
                        batch_size = 32,
@@ -361,6 +376,8 @@ class DatasetReader:
         self.resolution = resolution
         self.is_bert = is_bert
         self.image_path = image_path 
+        self.include_depth = include_depth 
+
         if self.image_path is None:
             self.trajectory_class = SimpleTrajectory
         else:
@@ -393,7 +410,10 @@ class DatasetReader:
                 images = line_data["images"]
                 positions = line_data["states"]
                 rotations = line_data["rotations"]
-                commands = sorted(line_data["notes"], key = lambda x: x["start"])
+                try:
+                    commands = sorted(line_data["notes"], key = lambda x: x["start"])
+                except KeyError:
+                    pdb.set_trace() 
                 # split off previous and subsequent positions and rotations 
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
@@ -406,9 +426,11 @@ class DatasetReader:
                         trajectory = self.trajectory_class(line_id,
                                                     command, 
                                                     [previous_positions[timestep]],
-                                                    [previous_rotations[timestep]],
+                                                    #[previous_rotations[timestep]],
+                                                    None,
                                                     [next_positions[timestep]],
-                                                    [previous_rotations[timestep]],
+                                                    #[previous_rotations[timestep]],
+                                                    None,
                                                     images=[images[timestep],images[timestep+1]],
                                                     lengths = [None],
                                                     tokenizer=self.tokenizer,
@@ -419,7 +441,8 @@ class DatasetReader:
                                                     resolution=self.resolution, 
                                                     top_only = self.top_only,
                                                     binarize_blocks = self.binarize_blocks,
-                                                    image_path = self.image_path) 
+                                                    image_path = self.image_path,
+                                                    include_depth = self.include_depth) 
                         self.data[split].append(trajectory) 
                         vocab |= trajectory.traj_vocab
 

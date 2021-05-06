@@ -26,7 +26,7 @@ from encoders import LSTMEncoder
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from unet_module import BaseUNet, UNetWithLanguage, UNetWithBlocks
 from unet_shared import SharedUNet
-from metrics import GoodRobotUNetTeleportationMetric
+from metrics import GoodRobotUNetTeleportationMetric, F1Metric
 from mlp import MLP 
 from losses import ScheduledWeightedCrossEntropyLoss
 
@@ -70,6 +70,7 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
                                                           zero_weight=zero_weight)
 
         self.teleportation_metric = GoodRobotUNetTeleportationMetric(block_size = 4, image_size = self.resolution) 
+        self.f1_metric = F1Metric() 
         self.do_reconstruction = do_reconstruction
         self.set_all_seeds(seed) 
 
@@ -179,8 +180,8 @@ class GoodRobotUNetLanguageTrainer(UNetLanguageTrainer):
         prev_position = prev_outputs['next_position']
 
         # f1 metric 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
+        prev_p, prev_r, prev_f1 = self.f1_metric.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
+        next_p, next_r, next_f1 = self.f1_metric.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
         # block accuracy metric 
         # looks like there's some shuffling going on here 
         tele_metric_data = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}

@@ -15,7 +15,8 @@ def write_config(config, path):
 
 
 def enumerate_configs(original_path, out_path):
-    colors = ['blue','red','green','yellow','gray','orange','purple','brown']
+    #colors = ['blue','red','green','yellow','gray','orange','purple','brown']
+    colors = ['blue','red','green', 'yellow']
     combos = combinations(colors,2) 
     original_config = read_config(original_path) 
     for combo in combos:

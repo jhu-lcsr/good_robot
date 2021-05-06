@@ -30,7 +30,7 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
-from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric
+from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric, F1Metric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -93,6 +93,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         self.teleportation_metric = GoodRobotTransformerTeleportationMetric(block_size=block_size,
                                                                             image_size = resolution,
                                                                             patch_size = patch_size)
+
+        self.f1_metric = F1Metric() 
 
         self.long_command = long_command
 
@@ -376,8 +378,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
         # f1 metric 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
+        prev_p, prev_r, prev_f1 = self.f1_metric.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
+        next_p, next_r, next_f1 = self.f1_metric.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
         # block accuracy metric 
         # looks like there's some shuffling going on here 
         tele_metric_data = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}
