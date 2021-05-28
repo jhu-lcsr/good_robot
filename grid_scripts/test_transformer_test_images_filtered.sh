@@ -16,9 +16,8 @@ source activate blocks
 python -u train_transformer.py \
          --cfg ${CHECKPOINT_DIR}/config.yaml \
          --test \
-         --test-path blocks_data/testset_v2.json \
-         --val-path blocks_data/singleset.json \
-         --out-path ${CHECKPOINT_DIR}/test_metrics.json \
+         --test-path blocks_data/filtered/test.jsonlines \
          --image-path /home/estengel/real_good_robot/blocks_data/generated_images/data_32mm_with_test \
+         --out-path ${CHECKPOINT_DIR}/filtered_test_metrics.json \
          --batch-size 1 \
          --generate-after-n 10000

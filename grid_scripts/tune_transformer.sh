@@ -19,6 +19,6 @@ python -u train_transformer.py \
         --n-heads ${NHEADS} \
         --warmup ${WARMUP} \
         --zero-weight ${ZERO_WEIGHT} \
-        --num-epochs 15 \
-        --batch-size 64 \
         --checkpoint-dir ${CHECKPOINT_DIR} | tee ${CHECKPOINT_DIR}/stdout.log 
+        #--num-epochs 15 \
+        #--batch-size 64 \

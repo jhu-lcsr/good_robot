@@ -13,10 +13,10 @@
 
 source activate blocks 
 
-python -u train_transformer.py \
-         --cfg ${CHECKPOINT_DIR}/config.yaml \
-         --test \
-         --test-path blocks_data/testset_v2.json \
-         --out-path ${CHECKPOINT_DIR}/test_metrics.json \
-         --batch-size 1 \
-         --generate-after-n 10000
+python -u train_unet.py  \
+    --cfg ${CHECKPOINT_DIR}/config.yaml \
+    --test \
+    --test-path blocks_data/filtered/test.jsonlines \
+    --out-path ${CHECKPOINT_DIR}/filtered_test_metrics.json \
+    --batch-size 1 \
+    --generate-after-n 1000

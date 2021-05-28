@@ -13,10 +13,11 @@
 
 source activate blocks 
 
-python -u train_transformer.py \
-         --cfg ${CHECKPOINT_DIR}/config.yaml \
-         --test \
-         --test-path blocks_data/testset_v2.json \
-         --out-path ${CHECKPOINT_DIR}/test_metrics.json \
-         --batch-size 1 \
-         --generate-after-n 10000
+
+python -u train_transformer_navigation.py  \
+    --cfg ${CONFIG} \
+    --checkpoint-dir ${CHECKPOINT_DIR} \
+    --read-limit 3 \
+    --overfit \
+    --cuda -1
+
