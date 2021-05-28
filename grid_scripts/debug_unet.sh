@@ -13,7 +13,7 @@
 
 source activate blocks 
 
-CHECKPOINT_DIR="models/language_pretrain"
+#CHECKPOINT_DIR="models/language_pretrain"
 
 mkdir -p ${CHECKPOINT_DIR}/code
 # copy all code 
@@ -23,30 +23,10 @@ echo "RUNNING ON VERSION: " > ${CHECKPOINT_DIR}/stdout.log
 git branch >> ${CHECKPOINT_DIR}/stdout.log
 git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 
-python -u train_unet.py \
-        --train-path blocks_data/singleset.json \
-        --val-path blocks_data/singleset.json \
-        --resolution 32 \
-        --checkpoint-dir ${CHECKPOINT_DIR} \
-        --num-epochs 110 \
-        --num-blocks 1 \
-        --binarize-blocks \
-        --generate-after-n 108 \
-        --traj-type flat \
-        --batch-size 256  \
-        --max-seq-length 40 \
-        --do-filter \
-        --top-only \
-        --unet-type unet_with_attention \
-        --embedder glove \
-        --embedding-dim 50 \
-        --embedding-file /home/estengel/glove/glove.6B.50d.txt \
-        --encoder-hidden-dim 16 \
-        --encoder-num-layers 2 \
-        --share-level none \
-        --mlp-hidden-dim 32 \
-        --mlp-num-layers 2 \
-        --dropout 0.0 \
-        --bidirectional \
-        --zero-weight 0.001 \
-        --cuda 0  
+python -u train_unet.py  \
+    --cfg ${CONFIG} \
+    --train-path blocks_data/singleset.json\
+    --val-path blocks_data/singleset.json\
+    --checkpoint-dir ${CHECKPOINT_DIR} \
+    --cuda -1 
+

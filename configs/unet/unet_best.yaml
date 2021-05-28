@@ -8,6 +8,7 @@ batch_size: 64
 max_seq_length: 40
 do_filter: True
 do_one_hot: True
+do_reconstruction: true
 top_only: True
 resolution: 64
 zero_weight: 0.05

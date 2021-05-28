@@ -26,5 +26,7 @@ git reflog | head -n 1 >> ${CHECKPOINT_DIR}/stdout.log
 python -u train_transformer.py  \
     --cfg ${CONFIG} \
     --checkpoint-dir ${CHECKPOINT_DIR} \
+    --train-path blocks_data/singleset.json \
+    --val-path blocks_data/singleset.json \
     --cuda -1
 
