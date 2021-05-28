@@ -8,7 +8,8 @@ import numpy as np
 if __name__ == "__main__":
     output_dir = pathlib.Path(sys.argv[1])
 
-    colors = ['blue','red','green','yellow','gray','orange','purple','brown']
+    #colors = ['blue','red','green','yellow','gray','orange','purple','brown']
+    colors = ['blue','red','green','yellow']
     combos = combinations(colors,2) 
     aggregate_dict = defaultdict(list) 
     for c in combos:

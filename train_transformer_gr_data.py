@@ -30,7 +30,7 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
-from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric
+from metrics import  MSEMetric, AccuracyMetric, GoodRobotTransformerTeleportationMetric, F1Metric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader, GoodRobotDatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -94,6 +94,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
                                                                             image_size = resolution,
                                                                             patch_size = patch_size)
 
+        self.f1_metric = F1Metric() 
+
         self.long_command = long_command
 
     def train_and_validate_one_epoch(self, epoch): 
@@ -148,6 +150,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block_acc {mean_block_acc * 100}, tele score: {mean_tele_score}")
         if self.score_type == "acc":
             return (mean_next_acc + mean_prev_acc)/2, -1.0
+        elif self.score_type == "tele_score":
+            return mean_tele_score, -1
         else:
             raise AssertionError(f"invalid score type {self.score_type}")
 
@@ -376,8 +380,8 @@ class GoodRobotTransformerTrainer(TransformerTrainer):
         prev_position = tiles_to_image(prev_position, self.patch_size, output_type="per-patch", upsample=True) 
         next_position = tiles_to_image(next_position, self.patch_size, output_type="per-patch", upsample=True) 
         # f1 metric 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
+        prev_p, prev_r, prev_f1 = self.f1_metric.compute_f1(batch_instance["prev_pos_for_pred"].squeeze(-1), prev_position) 
+        next_p, next_r, next_f1 = self.f1_metric.compute_f1(batch_instance["next_pos_for_pred"].squeeze(-1), next_position) 
         # block accuracy metric 
         # looks like there's some shuffling going on here 
         tele_metric_data = {"distance": [], "block_acc": [], "pred_center": [], "true_center": []}
@@ -489,6 +493,7 @@ def main(args):
                                             max_seq_length=args.max_seq_length,
                                             resolution = args.resolution,
                                             is_bert = "bert" in args.embedder,
+                                            data_subset = args.data_subset, 
                                             overfit=args.overfit) 
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
@@ -690,6 +695,7 @@ if __name__ == "__main__":
     parser.add_argument("--overfit", action = "store_true")
     parser.add_argument("--color-pair", default=None, type=str) 
     parser.add_argument("--noise-num-samples", default=2, type=int)
+    parser.add_argument("--data-subset", default = -1, type=float, help = "subset of the data to train on (percentage)")
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")

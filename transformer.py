@@ -221,7 +221,7 @@ class Attention(nn.Module):
         torch.nn.init.normal_(self.to_out[0].weight, mean = 0, std = _get_std_from_tensor(self.init_scale, self.to_out[0].weight))
         torch.nn.init.constant_(self.to_out[0].bias, 0) 
 
-    def forward(self, x, mask = None):
+    def forward(self, x, mask = None, attn_mask = None):
         b, n, _, h = *x.shape, self.heads
         qkv = self.to_qkv(x).chunk(3, dim = -1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = h), qkv)
@@ -235,6 +235,12 @@ class Attention(nn.Module):
             mask = mask[:, None, :] * mask[:, :, None]
             dots.masked_fill_(~mask, mask_value)
             del mask
+
+        if attn_mask is not None: 
+            bsz, __, n, n = dots.shape
+            attn_mask = attn_mask.reshape(1,1,n,n)
+            assert(attn_mask.shape[2:] == dots.shape[2:])
+            dots.masked_fill(~attn_mask, mask_value) 
 
         attn = dots.softmax(dim=-1)
         self.attn_weight = attn 
@@ -256,10 +262,10 @@ class Transformer(nn.Module):
 
         self.log_weights = log_weights
 
-    def forward(self, x, mask = None):
+    def forward(self, x, mask = None, attn_mask = None):
         attn_values = []
         for attn, ff in self.layers:
-            x = attn(x, mask = mask)
+            x = attn(x, mask = mask, attn_mask = attn_mask)
             x = ff(x)
             if self.log_weights:
                 attn_values.append(attn._modules["fn"]._modules["fn"].attn_weight.detach().cpu().numpy().tolist())
@@ -367,7 +373,12 @@ class TransformerEncoder(torch.nn.Module):
             state_dict = torch.load(pretrained_weights)
             # remove vocabulary 
             new_state_dict = {k:v for k,v in state_dict.items() if "language_embedder.embeddings" not in k}
-            self.load_state_dict(new_state_dict, strict=False)
+            try:
+                self.load_state_dict(new_state_dict, strict=False)
+            except RuntimeError:
+                new_state_dict = {k:v for k,v in state_dict.items() if "language_embedder.embeddings" not in k and 
+                                                                    "pos_embedding" not in k and "patch_projection.weight" not in k} 
+                self.load_state_dict(new_state_dict, strict=False)
 
     def get_lang_mask(self, lang): 
         bsz = len(lang)
@@ -379,6 +390,25 @@ class TransformerEncoder(torch.nn.Module):
                     mask[i,j] = 0
 
         return mask.bool().to(self.device) 
+
+    def get_neighbors(self, patch_idx, num_patches, neighborhood = 5): 
+        image_w = int(num_patches**(1/2))
+        patch_idxs = np.arange(num_patches).reshape(image_w, image_w)
+        patch_row = int(patch_idx / image_w) 
+        patch_col = patch_idx % image_w 
+
+        neighbor_idxs = patch_idxs[patch_row - neighborhood:patch_row + neighborhood, patch_col - neighborhood:patch_col + neighborhood]
+        neighbor_idxs = neighbor_idxs.reshape(-1)
+        return neighbor_idxs
+
+
+    def get_image_local_mask(self, num_patches, image_dim, neighborhood = 5): 
+        # make a mask so that each image patch can only attend to patches close to it 
+        mask = torch.zeros((bsz, num_patches, num_patches))
+        for i in range(num_patches):
+            neighbors = self.get_neighbors(i, num_patches, neighborhood)
+            mask[:,i,neighbors] = 1
+        return mask.bool().to(self.device)
 
     def _prepare_input(self, image, language, mask = None):
         # patchify 
@@ -435,8 +465,18 @@ class TransformerEncoder(torch.nn.Module):
             model_input = torch.cat([model_input, language_input], dim = 1)
         elif self.positional_encoding_type == "fixed-2d-separate":
              # add fixed pos encoding to language and image separately 
+            pdb.set_trace() 
             model_input = add_positional_features_2d(model_input)
             language_input = add_positional_features(language_input)
+            # repeat [SEP] across batch 
+            sep_tokens = repeat(self.sep_token, '() n d -> b n d', b=batch_size)
+            # tack on [SEP]
+            model_input = torch.cat([model_input, sep_tokens], dim = 1)
+            # tack on language after [SEP]
+
+        elif self.positional_encoding_type == "fixed-img-only": 
+            # add fixed pos encoding to image only since language has already from BERT 
+            model_input = add_positional_features(model_input)
             # repeat [SEP] across batch 
             sep_tokens = repeat(self.sep_token, '() n d -> b n d', b=batch_size)
             # tack on [SEP]
@@ -451,33 +491,7 @@ class TransformerEncoder(torch.nn.Module):
     def forward(self, batch_instance): 
         language = batch_instance['command']
         image = batch_instance['prev_pos_input']
-        # TODO (elias): remove
-        if False:
-            pdb.set_trace() 
-            import cv2 
-            input = batch_instance['prev_pos_input'][0]
-            #input = input[0:3,:,:]
-            output = batch_instance["prev_pos_for_pred"][0]
-            output = output.reshape((1, 224, 224)).repeat((3, 1, 1))
-            output[output!=0]=255
-            image_to_write = input + output 
-            image_to_write = image_to_write.permute(1,2,0)
-            path = "/home/estengel/scratch/fixed.png"
-            cv2.imwrite(path, image_to_write.detach().cpu().numpy())
-            img_alone = input.permute(1,2,0)
-            path = "/home/estengel/scratch/fixed_img.png"
-            cv2.imwrite(path, img_alone.detach().cpu().numpy())
-
-            #input = batch_instance['prev_pos_input'][1]
-            #depth_input = input[3:,:,:]
-            #output = batch_instance["prev_pos_for_acc"][1]
-            #output = output.reshape((1, 64, 64)).repeat((3, 1, 1))
-            #output[output!=0]=255
-            #depth_image = depth_input + output 
-            #depth_image = depth_image.permute(1,2,0)
-            #path = "/home/estengel/scratch/fixed_depth.png"
-            #cv2.imwrite(path, depth_image.detach().cpu().numpy())
-
+      
         language_mask = self.get_lang_mask(language) 
         tfmr_input, mask, n_patches = self._prepare_input(image, language, language_mask) 
 

@@ -14,6 +14,8 @@ import copy
 import pathlib 
 import pickle as pkl
 from tqdm import tqdm 
+from matplotlib import pyplot as plt 
+from skimage.util import random_noise
 
 from annotate_data import Pair, flip_pair, rotate_pair, gaussian_augment 
 np.random.seed(12) 
@@ -43,7 +45,8 @@ class BaseTrajectory:
                  do_one_hot: bool = True,
                  top_only: bool = True, 
                  binarize_blocks: bool = False,
-                 image_path: str = None):
+                 image_path: str = None,
+                 include_depth: bool = True):
 
         if batch_size is None:
             batch_size = len(commands)
@@ -57,7 +60,10 @@ class BaseTrajectory:
         if self.image_path is not None:
             self.image_path = pathlib.Path(self.image_path)
 
-        self.block_size = int((4 * self.resolution)/64)
+        self.include_depth = include_depth 
+
+        # TODO: try this 
+        self.block_size = int((4 * self.resolution)/64) + 1
 
         self.line_id = line_id
         self.commands = commands
@@ -88,7 +94,10 @@ class BaseTrajectory:
                                                                 self.next_positions_for_pred, 
                                                                 self.next_positions_for_acc)
 
-        self.previous_positions_input = self.get_input_positions()
+        if self.image_path is not None:
+            self.previous_positions_input = self.get_input_positions(self.include_depth)
+        else:
+            self.previous_positions_input = self.get_input_positions()
        
         if self.do_filter: 
             # for loss, only look at the single block moved 
@@ -267,7 +276,8 @@ class SimpleTrajectory(BaseTrajectory):
                  resolution: int, 
                  top_only: bool,
                  binarize_blocks: bool,
-                 image_path: str = None):
+                 image_path: str = None,
+                 include_depth: bool = True):
         super(SimpleTrajectory, self).__init__(line_id=line_id,
                                                commands=commands, 
                                                previous_positions=previous_positions,
@@ -283,13 +293,15 @@ class SimpleTrajectory(BaseTrajectory):
                                                do_one_hot = do_one_hot,
                                                top_only=top_only,
                                                binarize_blocks=binarize_blocks,
-                                               image_path = image_path) 
+                                               image_path = image_path,
+                                               include_depth = include_depth) 
         self.tokenizer = tokenizer
         # commands is a list of #timestep text strings 
         self.commands = self.tokenize(commands)
         self.image_path = image_path
         if self.image_path is not None:
             self.image_path = pathlib.Path(self.image_path)
+        self.include_depth = include_depth
 
     def tokenize(self, command): 
         # lowercase everything 
@@ -303,11 +315,10 @@ class ImageTrajectory(SimpleTrajectory):
     def __init__(self, *args, **kwargs):
         super(ImageTrajectory, self).__init__(*args, **kwargs) 
 
-    def get_input_positions(self):            
+    def get_input_positions(self, include_depth = True):            
         def imread_safe(path):
             try:
                 image = cv2.imread(str(path))
-                print(path)
                 image = cv2.resize(image, (self.resolution,self.resolution), interpolation = cv2.INTER_AREA)
                 # add border to right edge  
                 path = pathlib.Path(path)  
@@ -320,16 +331,20 @@ class ImageTrajectory(SimpleTrajectory):
         # get image names 
         color_image_path = self.image_path.joinpath("color-heightmaps")
         color_image_names = [color_image_path.joinpath(x) for x in self.images]
-        depth_image_path = self.image_path.joinpath("depth-heightmaps")
-        depth_image_names = [depth_image_path.joinpath(x) for x in self.images]
+        if include_depth: 
+            depth_image_path = self.image_path.joinpath("depth-heightmaps")
+            depth_image_names = [depth_image_path.joinpath(x) for x in self.images]
         # read images 
         color_images = [imread_safe(x) for x in color_image_names]
-        depth_images = [imread_safe(x) for x in depth_image_names]
+        if include_depth: 
+            depth_images = [imread_safe(x) for x in depth_image_names]
         # tensorize and concatenate 
         color_images = [torch.tensor(x).permute(2,0,1).float() for x in color_images]
-        depth_images = [torch.tensor(x).permute(2,0,1).float() for x in depth_images]
-        combined_images = [torch.cat([x,y], dim=0).unsqueeze(0) for (x, y) in zip(color_images, depth_images)]
-
+        if include_depth: 
+            depth_images = [torch.tensor(x).permute(2,0,1).float() for x in depth_images]
+            combined_images = [torch.cat([x,y], dim=0).unsqueeze(0) for (x, y) in zip(color_images, depth_images)]
+        else:
+            combined_images = [x.unsqueeze(0) for x in color_images]
         return combined_images 
 
 class DatasetReader:
@@ -337,6 +352,7 @@ class DatasetReader:
                        dev_path,
                        test_path,
                        image_path = None,
+                       include_depth = True, 
                        batch_by_line=False,
                        traj_type = "flat",
                        batch_size = 32,
@@ -346,7 +362,9 @@ class DatasetReader:
                        resolution: int = 64, 
                        top_only: bool = True, 
                        is_bert: bool = False,
-                       binarize_blocks: bool = False): 
+                       binarize_blocks: bool = False,
+                       augment_with_noise: bool = False,
+                       noise_num_samples: int = 2): 
         self.train_path = train_path
         self.dev_path = dev_path
         self.test_path = test_path
@@ -361,6 +379,11 @@ class DatasetReader:
         self.resolution = resolution
         self.is_bert = is_bert
         self.image_path = image_path 
+        self.include_depth = include_depth 
+        self.augment_with_noise = augment_with_noise 
+        self.noise_num_samples = noise_num_samples
+        self.noise_gaussian_params = [0.0, 0.05]
+
         if self.image_path is None:
             self.trajectory_class = SimpleTrajectory
         else:
@@ -393,7 +416,10 @@ class DatasetReader:
                 images = line_data["images"]
                 positions = line_data["states"]
                 rotations = line_data["rotations"]
-                commands = sorted(line_data["notes"], key = lambda x: x["start"])
+                try:
+                    commands = sorted(line_data["notes"], key = lambda x: x["start"])
+                except KeyError:
+                    pdb.set_trace() 
                 # split off previous and subsequent positions and rotations 
                 previous_positions, next_positions = positions[0:-1], positions[1:]
                 previous_rotations, next_rotations = rotations[0:-1], rotations[1:]
@@ -406,9 +432,11 @@ class DatasetReader:
                         trajectory = self.trajectory_class(line_id,
                                                     command, 
                                                     [previous_positions[timestep]],
-                                                    [previous_rotations[timestep]],
+                                                    #[previous_rotations[timestep]],
+                                                    None,
                                                     [next_positions[timestep]],
-                                                    [previous_rotations[timestep]],
+                                                    #[previous_rotations[timestep]],
+                                                    None,
                                                     images=[images[timestep],images[timestep+1]],
                                                     lengths = [None],
                                                     tokenizer=self.tokenizer,
@@ -419,15 +447,28 @@ class DatasetReader:
                                                     resolution=self.resolution, 
                                                     top_only = self.top_only,
                                                     binarize_blocks = self.binarize_blocks,
-                                                    image_path = self.image_path) 
+                                                    image_path = self.image_path,
+                                                    include_depth = self.include_depth) 
                         self.data[split].append(trajectory) 
+                        if self.augment_with_noise and split == "train":
+                            for i in range(self.noise_num_samples):
+                                new_traj = self.gaussian_augment(trajectory, self.noise_gaussian_params)
+                                self.data[split].append(new_traj)
                         vocab |= trajectory.traj_vocab
 
         if not self.batch_by_line:
             # shuffle and batch data 
             self.shuffle_and_batch_trajectories(split)
 
+
         return vocab
+
+    def gaussian_augment(self, traj, params):
+        mean, var = params
+        new_traj = copy.deepcopy(traj)
+        dtype = new_traj.previous_positions_input[0].dtype
+        new_traj.previous_positions_input = [torch.tensor(random_noise(x, mode='gaussian', mean=mean, var=var, clip=True), dtype=dtype) for x in new_traj.previous_positions_input]
+        return new_traj
 
     def batchify(self, batch_as_list): 
         """
@@ -547,6 +588,7 @@ class GoodRobotDatasetReader:
                 max_seq_length: int = 60,
                 resolution: int = 64,
                 is_bert: bool = True,
+                data_subset: float = None, 
                 overfit: bool = False):
         # TODO(elias) add depth heightmaps 
         self.batch_size = batch_size
@@ -602,6 +644,11 @@ class GoodRobotDatasetReader:
         else:
             raise AssertionError(f"split strategy {split_type} is invalid")
         
+        if data_subset > -1: 
+            new_train_data_len = int(data_subset * len(train_data))
+            new_train_data = np.random.choice(train_data, size=new_train_data_len, replace=False)
+            train_data = list(new_train_data)
+
         # only augment train data 
         # augment by flipping across 4 axes 
         if augment_by_flipping:

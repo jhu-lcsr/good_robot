@@ -137,6 +137,7 @@ class BERTEmbedder(torch.nn.Module):
             with torch.no_grad():
                 outputs = self.bert_model(tokens_tensor) 
         else:
+            self.bert_model.train()
             outputs = self.bert_model(tokens_tensor, token_type_ids=segments_tensors)
 
         # use top layer 

@@ -19,8 +19,10 @@ do
     
     #export CONFIG=configs/patch_transformer/tune_fixed.yaml;
     #export CONFIG=configs/image_transformer/bert.yaml
-    export CONFIG=configs/image_transformer/tune32mm.yaml
-    dir="/srv/local1/estengel/models/transformer_tune_images/${dr}_${w}_${n_sh}_${n_sp}_${nh}_${warm}";
+    #export CONFIG=configs/image_transformer/tune32mm_glove_no_recon.yaml
+    #export CONFIG=configs/image_transformer/tune32mm_bert_no_recon.yaml
+    export CONFIG=configs/image_tuning_bisk/bert_no_recon_for_tuning.yaml
+    dir="/srv/local1/estengel/models/transformer_tune_images_bert_no_recon/${dr}_${w}_${n_sh}_${n_sp}_${nh}_${warm}";
     export CHECKPOINT_DIR=${dir};
     export ZERO_WEIGHT=${w};
     export SHARED_LAYERS=${n_sh};
