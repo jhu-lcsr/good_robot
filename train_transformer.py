@@ -168,7 +168,7 @@ class TransformerTrainer(FlatLanguageTrainer):
             mean_next_acc = total_dict["next_f1"]
             mean_prev_acc = total_dict["prev_f1"]
             mean_block_acc = total_dict["block_accuracy"]
-            mean_tele_score = total_dict["distance"]
+            mean_tele_score = total_dict["tele_score"]
 
             #print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}, MSE: {mean_mse}, prev recon acc: {mean_prev_recon*100}, next recon acc {mean_next_recon*100}")
             #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
@@ -182,8 +182,13 @@ class TransformerTrainer(FlatLanguageTrainer):
             else:
                 raise AssertionError(f"invalid score type {self.score_type}")
         else:
-            # return s.t. best epoch is latest, but will never be greater than an actual validation
-            return 0 + 0.00001 * epoch, 0
+            if self.score_type == "acc" or self.score_type == "block_acc":
+                # return s.t. best epoch is latest, but will never be greater than an actual validation
+                return 0 + 0.00001 * epoch, 0
+            else:   
+                # return s.t. best epoch is latest, but will never be less than an actual tele score
+                return 100 - 0.001 * epoch, 0 
+
     def compute_weighted_loss(self, inputs, outputs, it):
         """
         compute per-pixel for all pixels, with additional loss term for only foreground pixels (where true label is 1) 
@@ -621,7 +626,8 @@ def main(args):
                                    top_only = args.top_only,
                                    resolution = args.resolution, 
                                    is_bert = "bert" in args.embedder,
-                                   binarize_blocks = args.binarize_blocks)  
+                                   binarize_blocks = args.binarize_blocks,
+                                   augment_with_noise = args.augment_with_noise)  
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
     if not args.test:
@@ -650,6 +656,7 @@ def main(args):
         del(dataset_reader.data['test'])
 
     print(f"got data")  
+    print(f"train/dev: {len(dataset_reader.data['train'])}/{len(dataset_reader.data['dev'])}")
     # construct the vocab and tokenizer 
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
@@ -689,7 +696,8 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = args.do_reconstruction) 
+                          do_reconstruction = args.do_reconstruction,
+                          pretrained_weights = args.pretrained_weights) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
     # Initialize encoder 
@@ -844,6 +852,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     parser.add_argument("--next-weight", type=float, default=1)
     parser.add_argument("--prev-weight", type=float, default=1) 
+    parser.add_argument("--augment-with-noise", type=bool, action='store_true', default=False, help = "set to augment training images with gaussian noise")
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
@@ -862,6 +871,7 @@ if __name__ == "__main__":
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch", "patch-softmax"], default='per-pixel')
     parser.add_argument("--do-residual", action = "store_true", help = "set to residually connect unshared and next prediction in ResidualTransformerEncoder")
+    parser.add_argument("--pretrained-weights", type=str, default=None, help = "path to best.th file for a pre-trained initialization")
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 

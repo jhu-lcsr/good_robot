@@ -3,5 +3,8 @@
 		{
 			"path": "."
 		}
-	]
+	],
+	"settings": {
+		"python.pythonPath": "/home/estengel/miniconda3/envs/blocks/bin/python"
+	}
 }

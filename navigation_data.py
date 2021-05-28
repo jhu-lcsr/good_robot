@@ -230,6 +230,14 @@ class NavigationDatasetReader:
                 "start_position": start_position,
                 "length": length} 
 
+    def pad_command(self, commands, max_len):
+        for i, c in enumerate(commands):
+            c = c[0:max_len]
+            l = len(c)
+            c = c + [PAD for i in range(max_len - l)]
+            commands[i] = c
+        return commands 
+
     def read(self, split, limit=None):
         path = self.path_dict[split]
         all_batches = path.glob("*.pkl")
@@ -244,6 +252,8 @@ class NavigationDatasetReader:
             image_paths = batch_data['image_paths']
             image_data = [torch.tensor(plt.imread(p), dtype=torch.float64).unsqueeze(0) for p in image_paths]
             batch_data['input_image'] = torch.cat(image_data, dim=0) 
+            if self.is_bert:
+                batch_data['command'] = self.pad_command(batch_data['command'], self.max_len)
 
             yield batch_data 
 
@@ -290,8 +300,8 @@ def configure_parser():
     parser.add_argument("--dropout", type=float, default=0.2) 
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--pretrained-weights", type=str, default=None, help = "path to best.th file for a pre-trained initialization")
-    parser.add_argument("--locality-mask", type = bool, default = False, action='store_true', help="mask image transformer to only attend to nearby regions")
-    parser.add_argument("--locality-neighborhood", type = int, default = 5, action='store_true', help="size of the region to attend to in locality masking, extends in each direction from the center point") 
+    parser.add_argument("--locality-mask", type=bool, default = False, action='store_true', help="mask image transformer to only attend to nearby regions")
+    parser.add_argument("--locality-neighborhood", type=int, default = 5, help="size of the region to attend to in locality masking, extends in each direction from the center point") 
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
@@ -307,6 +317,8 @@ def configure_parser():
     parser.add_argument("--init-scale", type=int, default = 4, help = "initalization scale for transformer weights")
     parser.add_argument("--checkpoint-every", type=int, default=64, help = "save a checkpoint every n training steps")
     parser.add_argument("--seed", type=int, default=12) 
+    parser.add_argument("--debug-image-top-k", type=int, default=-1, help = "for generating debugging images, only show the top k regions")
+    parser.add_argument("--debug-image-threshold", type=float, default=-1, help = "for generating debugging images, only predicted patches above a fixed threshold")
 
     return parser
 

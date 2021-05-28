@@ -15,6 +15,7 @@ import pathlib
 import pickle as pkl
 from tqdm import tqdm 
 from matplotlib import pyplot as plt 
+from skimage.util import random_noise
 
 from annotate_data import Pair, flip_pair, rotate_pair, gaussian_augment 
 np.random.seed(12) 
@@ -361,7 +362,9 @@ class DatasetReader:
                        resolution: int = 64, 
                        top_only: bool = True, 
                        is_bert: bool = False,
-                       binarize_blocks: bool = False): 
+                       binarize_blocks: bool = False,
+                       augment_with_noise: bool = False,
+                       noise_num_samples: int = 2): 
         self.train_path = train_path
         self.dev_path = dev_path
         self.test_path = test_path
@@ -377,6 +380,9 @@ class DatasetReader:
         self.is_bert = is_bert
         self.image_path = image_path 
         self.include_depth = include_depth 
+        self.augment_with_noise = augment_with_noise 
+        self.noise_num_samples = noise_num_samples
+        self.noise_gaussian_params = [0.0, 0.05]
 
         if self.image_path is None:
             self.trajectory_class = SimpleTrajectory
@@ -444,13 +450,25 @@ class DatasetReader:
                                                     image_path = self.image_path,
                                                     include_depth = self.include_depth) 
                         self.data[split].append(trajectory) 
+                        if self.augment_with_noise and split == "train":
+                            for i in range(self.noise_num_samples):
+                                new_traj = self.gaussian_augment(trajectory, self.noise_gaussian_params)
+                                self.data[split].append(new_traj)
                         vocab |= trajectory.traj_vocab
 
         if not self.batch_by_line:
             # shuffle and batch data 
             self.shuffle_and_batch_trajectories(split)
 
+
         return vocab
+
+    def gaussian_augment(self, traj, params):
+        mean, var = params
+        new_traj = copy.deepcopy(traj)
+        dtype = new_traj.previous_positions_input[0].dtype
+        new_traj.previous_positions_input = [torch.tensor(random_noise(x, mode='gaussian', mean=mean, var=var, clip=True), dtype=dtype) for x in new_traj.previous_positions_input]
+        return new_traj
 
     def batchify(self, batch_as_list): 
         """
@@ -570,6 +588,7 @@ class GoodRobotDatasetReader:
                 max_seq_length: int = 60,
                 resolution: int = 64,
                 is_bert: bool = True,
+                data_subset: float = None, 
                 overfit: bool = False):
         # TODO(elias) add depth heightmaps 
         self.batch_size = batch_size
@@ -625,6 +644,11 @@ class GoodRobotDatasetReader:
         else:
             raise AssertionError(f"split strategy {split_type} is invalid")
         
+        if data_subset > -1: 
+            new_train_data_len = int(data_subset * len(train_data))
+            new_train_data = np.random.choice(train_data, size=new_train_data_len, replace=False)
+            train_data = list(new_train_data)
+
         # only augment train data 
         # augment by flipping across 4 axes 
         if augment_by_flipping:

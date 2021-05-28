@@ -62,7 +62,9 @@ class NavigationTransformerTrainer(TransformerTrainer):
                  score_type: str = "acc",
                  best_epoch: int = -1,
                  seed: int = 12, 
-                 zero_weight: float = 0.05):
+                 zero_weight: float = 0.05,
+                 debug_image_top_k: int = None,
+                 debug_image_threshold: float = None):
         super(NavigationTransformerTrainer, self).__init__(train_data=[],
                                                  val_data=[],
                                                  encoder=encoder,
@@ -88,6 +90,12 @@ class NavigationTransformerTrainer(TransformerTrainer):
         self.batch_size = batch_size 
         self.checkpoint_every = checkpoint_every
         self.validation_limit = validation_limit
+        if debug_image_top_k < 0:
+            debug_image_top_k = None
+        if debug_image_threshold < 0:
+            debug_image_threshold = None
+        self.debug_image_top_k = debug_image_top_k
+        self.debug_image_threshold = debug_image_threshold
 
     def split_large_batch(self, batch):
         large_bsz = batch['path_state'].shape[0]
@@ -122,7 +130,7 @@ class NavigationTransformerTrainer(TransformerTrainer):
         for b, dev_batch_instance in tqdm(enumerate(self.dataset_reader.read("dev", self.validation_limit))): 
             actual_batches = self.split_large_batch(dev_batch_instance)
             for small_batch in actual_batches:
-                score_dict = self.validate(small_batch, 10, b, 0) 
+                score_dict = self.validate(small_batch, 10, b, 0, self.debug_image_top_k, self.debug_image_threshold) 
                 total_acc += score_dict['next_f1']
                 total += 1
 
@@ -205,8 +213,8 @@ class NavigationTransformerTrainer(TransformerTrainer):
                                  pred_path, 
                                  out_path, 
                                  caption = None,
-                                 pred_center = None,
-                                 true_center = None):
+                                 top_k = None,
+                                 threshold = None): 
         caption = self.wrap_caption(caption)
 
         fig, ax = plt.subplots(2,2, figsize=(16,16))
@@ -236,7 +244,21 @@ class NavigationTransformerTrainer(TransformerTrainer):
         pred_path = torch.softmax(pred_path, dim=0)
         pred_path = pred_path[1,:,:]
 
+
         pred_path = pred_path.cpu().detach().numpy().reshape(512, 512, 1)
+
+        if top_k is not None:
+            top_k_inds = np.argpartition(pred_path, -top_k, axis=None)[-top_k:]
+            top_k_inds = np.unravel_index(top_k_inds, shape = (512, 512))
+            pred_path[top_k_inds] = 1.1
+            pred_path[pred_path<1.0] = 0
+            pred_path[top_k_inds] = 1.0
+        elif threshold is not None:
+            pred_path[pred_path < threshold] = 0
+        else:
+            pred_path = pred_path 
+
+
         pred_path = np.tile(pred_path, (1,1,3)).astype(float)
 
         pred_ax = ax[1,1]
@@ -247,7 +269,7 @@ class NavigationTransformerTrainer(TransformerTrainer):
         plt.savefig(file_path) 
         plt.close() 
 
-    def validate(self, batch_instance, epoch_num, batch_num, instance_num): 
+    def validate(self, batch_instance, epoch_num, batch_num, instance_num, top_k, threshold): 
         self.encoder.eval() 
         outputs = self.encoder(batch_instance) 
         next_position = outputs['next_position']
@@ -270,7 +292,9 @@ class NavigationTransformerTrainer(TransformerTrainer):
                                              path_state,
                                              pred_path,
                                              output_path,
-                                             caption = command)
+                                             caption = command,
+                                             top_k = top_k,
+                                             threshold = threshold)
 
         return {"next_f1": next_f1} 
 
@@ -345,7 +369,7 @@ def main(args):
     elif args.embedder == "glove":
         embedder = GloveEmbedder(tokenizer, train_vocab, args.embedding_file, args.embedding_dim, trainable=True) 
     elif args.embedder.startswith("bert"): 
-        embedder = BERTEmbedder(model_name = args.embedder,  max_seq_len = args.max_seq_length) 
+        embedder = BERTEmbedder(model_name = args.embedder,  max_seq_len = args.max_len) 
     else:
         raise NotImplementedError(f"No embedder {args.embedder}") 
 
@@ -366,6 +390,8 @@ def main(args):
                           positional_encoding_type = args.pos_encoding_type,
                           device = device,
                           log_weights = args.test,
+                          locality_mask = args.locality_mask,
+                          locality_neighborhood = args.locality_neighborhood,
                           init_scale = args.init_scale) 
 
     # Initialize encoder 
@@ -447,7 +473,9 @@ def main(args):
                             block_size = block_size, 
                             best_epoch = best_epoch,
                             seed = args.seed,
-                            zero_weight = args.zero_weight) 
+                            zero_weight = args.zero_weight,
+                            debug_image_top_k = args.debug_image_top_k,
+                            debug_image_threshold = args.debug_image_threshold) 
 
     if not args.test:
         trainer.train() 

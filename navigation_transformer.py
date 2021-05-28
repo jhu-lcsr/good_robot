@@ -3,6 +3,7 @@ import torch
 from torch import nn 
 from torch.nn import functional as F
 import einops 
+import numpy as np 
 from einops import rearrange, repeat 
 from allennlp.nn.util import get_range_vector, get_device_of, add_positional_features
 from transformer import add_positional_features_2d, image_to_tiles, upsample_tiles, tiles_to_image, _get_std_from_tensor, Transformer, TransformerEncoder
@@ -48,7 +49,7 @@ class NavigationTransformerEncoder(TransformerEncoder):
                                                            device=device)
 
         self.start_pos_projection = torch.nn.Linear(2, hidden_dim)
-        self.locality_mask
+        self.locality_mask = locality_mask
         self.locality_neighborhood = locality_neighborhood
 
     def get_neighbors(self, patch_idx, num_patches, neighborhood = 5): 
@@ -57,16 +58,16 @@ class NavigationTransformerEncoder(TransformerEncoder):
         patch_row = int(patch_idx / image_w) 
         patch_col = patch_idx % image_w 
 
-        neighbor_idxs = patch_idxs[patch_row - neighborhood:patch_row + neighborhood, patch_col - neighborhood:patch_col + neighborhood]
+        neighbor_idxs = patch_idxs[max(0,patch_row - neighborhood):patch_row + neighborhood, max(0,patch_col - neighborhood):patch_col + neighborhood]
         neighbor_idxs = neighbor_idxs.reshape(-1)
         return neighbor_idxs
 
     def get_image_local_mask(self, num_patches, image_dim, neighborhood = 5): 
         # make a mask so that each image patch can only attend to patches close to it 
-        mask = torch.zeros((bsz, num_patches, num_patches))
+        mask = torch.zeros((num_patches, num_patches))
         for i in range(num_patches):
             neighbors = self.get_neighbors(i, num_patches, neighborhood)
-            mask[:,i,neighbors] = 1
+            mask[i,neighbors] = 1
         return mask.bool().to(self.device)
 
     def _prepare_input(self, image, language, start_pos, mask = None):
@@ -79,13 +80,8 @@ class NavigationTransformerEncoder(TransformerEncoder):
 
         # get mask
         if mask is not None:
-            if self.locality_mask: 
-                image_dim = int(num_patches**(1/2))
-                long_mask = self.get_image_local_mask(num_patches, image_dim, neighborhood = self.locality_neighborhood)
-                pdb.set_trace() 
-            else:
-                # all image regions allowed 
-                long_mask = torch.ones((batch_size, num_patches + 1)).bool().to(self.device)
+            # all image regions allowed as input 
+            long_mask = torch.ones((batch_size, num_patches + 1)).bool().to(self.device)
             # concat in language mask 
             long_mask = torch.cat((long_mask, mask), dim = 1) 
             # concat in one for positional token and sep 
@@ -119,7 +115,15 @@ class NavigationTransformerEncoder(TransformerEncoder):
         else:
             raise AssertionError(f"invalid positional type {self.positional_encoding_type}")
 
-        return model_input, long_mask, num_patches
+        if self.locality_mask: 
+            image_dim = int(num_patches**(1/2))
+            image_mask = self.get_image_local_mask(num_patches, image_dim, neighborhood = self.locality_neighborhood)
+            __, total_len, __ = model_input.shape
+            large_image_mask = torch.ones(total_len, total_len)
+            large_image_mask[0:image_mask.shape[0], 0:image_mask.shape[1]] = image_mask
+            large_image_mask = large_image_mask.bool().to(self.device)
+
+        return model_input, long_mask, large_image_mask, num_patches
 
     def forward(self, batch_instance): 
         language = batch_instance['command']
@@ -127,9 +131,9 @@ class NavigationTransformerEncoder(TransformerEncoder):
         start_pos = batch_instance['start_position'].float() 
 
         language_mask = self.get_lang_mask(language) 
-        tfmr_input, mask, n_patches = self._prepare_input(image, language, start_pos, mask = language_mask) 
+        tfmr_input, mask, attn_mask, n_patches = self._prepare_input(image, language, start_pos, mask = language_mask) 
 
-        tfmr_output, __ = self.start_transformer(tfmr_input, mask) 
+        tfmr_output, __ = self.start_transformer(tfmr_input, mask = mask, attn_mask = attn_mask) 
         # trim off language 
         next_just_image_output = tfmr_output[:, 0:n_patches, :]
         # run final MLP 
