@@ -66,10 +66,11 @@ if __name__ == '__main__':
         max_heights += [np.max(trial_heights)]
         stack_height = 1
         progress_reversal = 0.
-        for j in range(trial_start, trial_end):
+        for j in range(trial_start, max(trial_start, trial_end - 1)):
             # allow a little bit of leeway, 0.1 progress, to consider something a reversal
-            if stack_height_log[j][0] + 0.1 < stack_height_log[j+1][0]:
+            if stack_height_log[j][0] - 0.1 > stack_height_log[j+1][0]:
                 progress_reversal = 1.
+                print('trial ' + str(i) + ' progress reversal at overall step: ' + str(j) + ' (this trial step: ' + str(j - trial_start) + ') because ' + str(stack_height_log[j][0] ) + ' - 0.1 > ' + str(stack_height_log[j+1][0]))
         progress_reversals += [progress_reversal]
         trial_successful = trial_success_log[trial_end] > trial_success_log[trial_start]
         successful_trials += [trial_successful]
@@ -77,14 +78,19 @@ if __name__ == '__main__':
             recoveries += [1.] if trial_successful == 1 else [0.]
         trial_start = trial_end
 
+    max_heights = np.array(max_heights)
     print('------------------------------')
     print('data dir: ' + str(args.data_dir))
     print('max_heights: ' + str(max_heights))
+    print('trials over 4 height: ' + str(max_heights > 4.))
     print('reversals: ' + str(progress_reversals))
     print('recoveries: ' + str(recoveries))
-    print('avg max height: ' + str(np.mean(max_heights)))
-    print('avg max progress (avg max height/4): ' + str(np.mean(max_heights)/4.))
-    print('avg recoveries: ' + str(np.mean(recoveries)))
+    print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better)')
+    print('avg max progress (avg(round(max_heights))/4): ' + str(np.mean(np.rint(max_heights))/4.) + ' (higher is better)')
+    print('avg reversals: ' + str(np.mean(progress_reversals)) + ' (lower is better)')
+    print('avg recoveries : ' + str(np.mean(recoveries)) + ' (higher is better, no need for recovery attempts is best)')
+    print('avg trials over 4 height: ' + str(np.mean(max_heights > 4.)) + ' (higher is better)')
+    print('data dir: ' + str(args.data_dir))
 
 
 
