@@ -1597,6 +1597,15 @@ GPU 3, Tab 3, port 19998, bottom right v-rep window, v-rep tab 10
 >  {'trial_success_rate_best_value': 0.8478260869565217, 'trial_success_rate_best_index': 15414, 'grasp_success_rate_best_value': 0.8759398496240601, 'grasp_success_rate_best_index': 24223, 'place_success_rate_best_value': 0.8355555555555556, 'place_success_rate_best_index': 15767, 'action_efficiency_best_value': 0.6, 'action_efficiency_best_index': 20165}
 > 
 
+> Test stats:
+> python test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History:
+> avg max height: 4.13167690632 (higher is better)
+> avg max progress (avg(round(max_heights))/4): 0.9975 (higher is better)
+> avg reversals: 0.31 (lower is better)
+> avg recoveries : 0.967741935484 (higher is better, no need for recovery attempts is best)
+> avg trials over 4 height: 0.99 (higher is better)
+> data dir: /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+
 
 DEPTH CHANNEL HISTORY, DENSENET - SIM 2x2 VERTICAL SQUARE - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - TRIAL REWARD - GRASP ONLY - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-19
 ----------------------------------------------------------------------------------------
