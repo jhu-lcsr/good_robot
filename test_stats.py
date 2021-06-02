@@ -11,6 +11,7 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data_dir', required=True, help='path to logged run')
+    parser.add_argument('-t', dest='num_trials', type=int, action='store', default=None,                                help='Number of trials to evaluate from start, default is all trials.')
     args = parser.parse_args()
 
     # load executed actions
@@ -46,14 +47,18 @@ if __name__ == '__main__':
     # update the reward values for a whole trial, not just recent time steps
     end = int(clearance_log[-1][0])
     clearance_length = len(clearance_log)
-    print('clearance_length: ' + str(clearance_length))
+    num_trials = clearance_length - 1 # the code typically collects one more trial than needed
+    print('clearance_length (total number of trials saved): ' + str(clearance_length))
+    if args.num_trials is not None:
+        num_trials = min(args.num_trials, clearance_length)
+
 
     max_heights = []
     progress_reversals = []
     recoveries = []
     successful_trials = []
     trial_start = 0
-    for i in range(clearance_length-1):
+    for i in range(num_trials):
         trial_successful = 0
         trial_end = clearance_log[i][0]
         print('trial num: ' + str(i))
@@ -85,6 +90,8 @@ if __name__ == '__main__':
     print('trials over 4 height: ' + str(max_heights > 4.))
     print('reversals: ' + str(progress_reversals))
     print('recoveries: ' + str(recoveries))
+    print('clearance_length (total number of trials): ' + str(clearance_length))
+    print('num_trials (actual number of trials evaluated): ' + str(num_trials))
     print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better)')
     print('avg max progress (avg(round(max_heights))/4): ' + str(np.mean(np.rint(max_heights))/4.) + ' (higher is better)')
     print('avg reversals: ' + str(np.mean(progress_reversals)) + ' (lower is better)')
