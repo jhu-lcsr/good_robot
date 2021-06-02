@@ -12,6 +12,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data_dir', required=True, help='path to logged run')
     parser.add_argument('-t', dest='num_trials', type=int, action='store', default=None,                                help='Number of trials to evaluate from start, default is all trials.')
+    parser.add_argument('-s', dest='success_height', type=float, action='store', default=4.0,                                help='Max height (number of task progress steps) for considering a trial successful, default is 4, such as a stack of 4 blocks.')
+    parser.add_argument('-e', dest='epsilon', type=float, action='store', default=0.1,                                help='Permissible height error margin, i.e. default .1 will count 3.9 as a full stack of 4 when success_height is 4.')
     args = parser.parse_args()
 
     # load executed actions
@@ -51,6 +53,9 @@ if __name__ == '__main__':
     print('clearance_length (total number of trials saved): ' + str(clearance_length))
     if args.num_trials is not None:
         num_trials = min(args.num_trials, clearance_length)
+    epsilon = args.epsilon
+    success_height = args.success_height
+    print('num_trials (total number of trials to evaluate): ' + str(num_trials))
 
 
     max_heights = []
@@ -61,7 +66,7 @@ if __name__ == '__main__':
     for i in range(num_trials):
         trial_successful = 0
         trial_end = clearance_log[i][0]
-        print('trial num: ' + str(i))
+        print('----------\ntrial num: ' + str(i))
         print('start: ' + str(trial_start) + ' trial end: ' + str(trial_end ))
         if trial_start == trial_end:
             print('TRIAL ' + str(i) + ' IS EMPTY, skipping')
@@ -73,9 +78,10 @@ if __name__ == '__main__':
         progress_reversal = 0.
         for j in range(trial_start, max(trial_start, trial_end - 1)):
             # allow a little bit of leeway, 0.1 progress, to consider something a reversal
-            if stack_height_log[j][0] - 0.1 > stack_height_log[j+1][0]:
+            if stack_height_log[j][0] - epsilon > stack_height_log[j+1][0]:
                 progress_reversal = 1.
-                print('trial ' + str(i) + ' progress reversal at overall step: ' + str(j) + ' (this trial step: ' + str(j - trial_start) + ') because ' + str(stack_height_log[j][0] ) + ' - 0.1 > ' + str(stack_height_log[j+1][0]))
+                print('trial ' + str(i) + ' progress reversal at overall step: ' + str(j) + ' (this trial step: ' + str(j - trial_start) + ') because ' + 
+                      str(stack_height_log[j][0] ) + ' - ' + str(epsilon) + ' > ' + str(stack_height_log[j+1][0]))
         progress_reversals += [progress_reversal]
         trial_successful = trial_success_log[trial_end] > trial_success_log[trial_start]
         successful_trials += [trial_successful]
@@ -87,16 +93,18 @@ if __name__ == '__main__':
     print('------------------------------')
     print('data dir: ' + str(args.data_dir))
     print('max_heights: ' + str(max_heights))
-    print('trials over 4 height: ' + str(max_heights > 4.))
+    print('successful trials according to trial_success_log.txt: ' + str(successful_trials))
+    print('trials (success_height - epsilon) height or higher, another way of counting trial successes: ' + str(max_heights >= (success_height - epsilon)))
     print('reversals: ' + str(progress_reversals))
     print('recoveries: ' + str(recoveries))
     print('clearance_length (total number of trials): ' + str(clearance_length))
     print('num_trials (actual number of trials evaluated): ' + str(num_trials))
     print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better)')
-    print('avg max progress (avg(round(max_heights))/4): ' + str(np.mean(np.rint(max_heights))/4.) + ' (higher is better)')
+    print('avg max progress (avg(round(max_heights))/' + str(success_height) + '): ' + str(np.mean(np.rint(max_heights))/success_height) + ' (higher is better)')
     print('avg reversals: ' + str(np.mean(progress_reversals)) + ' (lower is better)')
     print('avg recoveries : ' + str(np.mean(recoveries)) + ' (higher is better, no need for recovery attempts is best)')
-    print('avg trials over 4 height: ' + str(np.mean(max_heights > 4.)) + ' (higher is better)')
+    print('avg successful trials according to trial_success_log.txt: ' + str(np.mean(successful_trials)))
+    print('avg trials ' + str(success_height - epsilon) + ' height or higher: ' + str(np.mean(max_heights >= (success_height - epsilon))) + ' (higher is better)')
     print('data dir: ' + str(args.data_dir))
 
 
