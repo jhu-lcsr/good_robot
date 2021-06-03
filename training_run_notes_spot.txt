@@ -1636,10 +1636,10 @@ X Canceled due to lack of convergence, maybe there is a bug when the grasp_only 
 
 
 
-DENSENET - UNSTACKING - masked - trial reward - common sense - 2020-02-23
+DENSENET - UNSTACKING - masked - trial reward - common sense - 2021-02-23
 ----------------------------------------------------------------------------------------
 ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type unstack --trial_reward                                                                                                  
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-23-02-23-36_Sim-Unstacking-SPOT-Trial-Reward-Masked-TrainingCommit: 61758dd9f669e57245160a3e1aad4017bafb88df
+Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-02-23-02-23-36_Sim-Unstacking-SPOT-Trial-Reward-Masked-Training
 Commit: 61758dd9f669e57245160a3e1aad4017bafb88df
 GPU 0, Tab 0, port 19990, top left v-rep window, v-rep tab 7
 
