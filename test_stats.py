@@ -88,10 +88,6 @@ if __name__ == '__main__':
             max_heights += [1]
         else:
             max_heights += [np.max(trial_heights)]
-        
-        # workaround trials that end in fewer actions than it would be possible to optimally succeed
-        efficiency_actions_six += max(len(trial_heights), 6)
-        efficiency_actions_four += max(len(trial_heights), 4)
 
         for j in range(trial_start, max(trial_start, trial_end - 1)):
             # allow a little bit of leeway, 0.1 progress, to consider something a reversal
@@ -109,6 +105,11 @@ if __name__ == '__main__':
         successful_trials += [trial_successful]
         if progress_reversal == 1.:
             recoveries += [1.] if trial_successful == 1 else [0.]
+
+        # workaround failed trials that end in fewer actions than would be possible to optimally succeed
+        efficiency_actions_six += len(trial_heights) if trial_successful == 1 else max(len(trial_heights), 6)
+        efficiency_actions_four += len(trial_heights) if trial_successful == 1 else max(len(trial_heights), 4)
+
         trial_start = trial_end
 
     max_heights = np.array(max_heights)
