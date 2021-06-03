@@ -80,7 +80,7 @@ for session_idx in range(len(session_directories)):
 
     for step in range(max_iteration):
 
-        # Get indicies for previous x grasps, where x is the interval size
+        # Get indicies for previous fig3 grasps, where fig3 is the interval size
         grasp_attempt_ind = np.argwhere(executed_action_log[:,0] == 1)
         grasp_attempt_ind_before_step = grasp_attempt_ind[np.argwhere(grasp_attempt_ind[:,0] < step)]
         grasp_attempt_ind_over_interval = grasp_attempt_ind_before_step[max(0,len(grasp_attempt_ind_before_step)-interval_size):len(grasp_attempt_ind_before_step),0]
@@ -95,7 +95,7 @@ for session_idx in range(len(session_directories)):
             grasp_success_over_interval *= (float(step)/float(interval_size))
         grasp_success[step] = grasp_success_over_interval
 
-        # Get grasp to push ratio over previous x attempts, where x is the interval size
+        # Get grasp to push ratio over previous fig3 attempts, where fig3 is the interval size
         grasp_to_push_ratio_over_interval = float(np.sum(executed_action_log[max(0,step-interval_size):step,0] == 1))/float(min(interval_size,max(step,1)))
         grasp_to_push_ratio[step] = grasp_to_push_ratio_over_interval
 
