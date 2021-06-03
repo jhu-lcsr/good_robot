@@ -12,8 +12,9 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data_dir', required=True, help='path to logged run')
+    parser.add_argument('-s', dest='start_trial', type=int, action='store', default=0,                                help='Trial to start from, default is 0.')
     parser.add_argument('-t', dest='num_trials', type=int, action='store', default=None,                                help='Number of trials to evaluate from start, default is all trials.')
-    parser.add_argument('-s', dest='success_height', type=float, action='store', default=4.0,                                help='Max height (number of task progress steps) for considering a trial successful, default is 4, such as a stack of 4 blocks.')
+    parser.add_argument('-v', dest='success_height', type=float, action='store', default=4.0,                                help='Max height (number of task progress steps) for considering a trial successful, default is 4, such as a stack of 4 blocks.')
     parser.add_argument('-e', dest='epsilon', type=float, action='store', default=0.1,                                help='Permissible height error margin, i.e. default .1 will count 3.9 as a full stack of 4 when success_height is 4.')
     args = parser.parse_args()
 
@@ -51,11 +52,12 @@ if __name__ == '__main__':
 
     # update the reward values for a whole trial, not just recent time steps
     end = int(clearance_log[-1][0])
+    start_trial = args.start_trial
     clearance_length = len(clearance_log)
     num_trials = clearance_length - 1 # the code typically collects one more trial than needed
-    print('clearance_length (total number of trials saved): ' + str(clearance_length))
+    print('clearance_length (total number of trials saved): ' + str(clearance_length) + ' start trial: ' + str(start_trial))
     if args.num_trials is not None:
-        num_trials = min(args.num_trials, clearance_length)
+        num_trials = min(args.num_trials, clearance_length - start_trial)
     epsilon = args.epsilon
     success_height = args.success_height
     print('num_trials (total number of trials to evaluate): ' + str(num_trials))
@@ -68,7 +70,7 @@ if __name__ == '__main__':
     trial_start = 0
     efficiency_actions_six = 0
     efficiency_actions_four = 0
-    for i in range(num_trials):
+    for i in range(start_trial, start_trial + num_trials):
         trial_successful = 0
         trial_end = clearance_log[i][0]
         progress_reversal = 0.
@@ -118,7 +120,7 @@ if __name__ == '__main__':
     print('reversals: ' + str(progress_reversals))
     print('recoveries: ' + str(recoveries))
     print('total trials: ' + str(clearance_length) + ' (clearance_length, total number of trials)')
-    print('num trials evaluated: ' + str(num_trials))
+    print('num trials evaluated: ' + str(num_trials) + ' start trial: ' + str(start_trial))
     print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better, find max height for each trial, then average those values)')
     print('avg max progress: ' + str(np.mean(np.rint(max_heights))/success_height) + ' (higher is better,  (avg(round(max_heights))/' + str(success_height) + '))')
     print('avg reversals: ' + str(np.mean(progress_reversals)) + ' (lower is better)')
