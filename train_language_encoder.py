@@ -109,16 +109,16 @@ class LanguageTrainer:
         
 
     def train(self):
-        best_score = 0.0 if self.score_type in ['block_acc', 'acc'] else np.inf   
+        self.best_score = 0.0 if self.score_type in ['block_acc', 'acc'] else np.inf   
 
         for epoch in range(self.best_epoch + 1, self.num_epochs, 1): 
             score, __ = self.train_and_validate_one_epoch(epoch)
             # handle checkpointing 
             is_best = False
 
-            if self.is_better(score, best_score):
+            if self.is_better(score, self.best_score):
                 is_best = True
-                best_score = score
+                self.best_score = score
             self.save_model(epoch, is_best) 
 
     def train_and_validate_one_epoch(self, epoch): 
@@ -496,7 +496,7 @@ class FlatLanguageTrainer(LanguageTrainer):
                     mean_dict[k].append(v)
 
         for k, v in mean_dict.items():
-            if k in ["next_f1", "prev_f1", "block_acc"]: 
+            if k in ["next_f1", "prev_f1", "block_acc", "next_r", "prev_r", "next_p", "prev_p"]: 
                 v = 100 * np.mean(v) 
             else:
                 v = np.mean(v) 

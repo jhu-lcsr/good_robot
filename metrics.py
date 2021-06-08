@@ -47,7 +47,38 @@ class EuclideanMetric:
                     return center 
         # should never happen 
         return (self.block_size/2, self.block_size/2) 
-                
+
+class F1Metric:
+    def __init__(self, mask=False):
+        self.mask = mask
+
+    def compute_f1(self, true_pos, pred_pos):
+        eps = 1e-8
+        values, pred_pixels = torch.max(pred_pos, dim=1) 
+
+        gold_pixels = true_pos 
+        pred_pixels = pred_pixels.unsqueeze(-1) 
+
+        if self.mask: 
+            # where there is no block, automatically put down a 0 
+            zero_mask = true_pos == 0
+            zero_mask = zero_mask.reshape(pred_pixels.shape)
+            pred_pixels[zero_mask] = 0 
+
+        pred_pixels = pred_pixels.detach().cpu().float() 
+        gold_pixels = gold_pixels.detach().cpu().float() 
+
+        total_pixels = sum(pred_pixels.shape) 
+
+        true_pos = torch.sum(pred_pixels * gold_pixels).item() 
+        true_neg = torch.sum((1-pred_pixels) * (1 - gold_pixels)).item() 
+        false_pos = torch.sum(pred_pixels * (1 - gold_pixels)).item() 
+        false_neg = torch.sum((1-pred_pixels) * gold_pixels).item() 
+        precision = true_pos / (true_pos + false_pos + eps)
+        recall = true_pos / (true_pos + false_neg + eps) 
+        f1 = 2 * (precision * recall) / (precision + recall + eps)
+        return precision, recall, f1
+
 class TransformerEuclideanMetric(EuclideanMetric):
     def __init__(self,
                  block_size: int = 4,

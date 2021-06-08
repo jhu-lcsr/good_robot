@@ -29,7 +29,7 @@ from allennlp.training.learning_rate_schedulers import NoamLR
 import pandas as pd 
 
 from transformer import TransformerEncoder, ResidualTransformerEncoder, image_to_tiles, tiles_to_image
-from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric
+from metrics import TransformerTeleportationMetric, MSEMetric, AccuracyMetric, F1Metric
 from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
 from data import DatasetReader
 from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
@@ -61,7 +61,8 @@ class TransformerTrainer(FlatLanguageTrainer):
                  next_weight: float = 1.0,
                  prev_weight: float = 1.0,
                  do_regression: bool = False,
-                 do_reconstruction: bool = False):
+                 do_reconstruction: bool = False,
+                 n_epochs_pre_valid: int = 0):
         super(TransformerTrainer, self).__init__(train_data=train_data,
                                                  val_data=val_data,
                                                  encoder=encoder,
@@ -80,9 +81,13 @@ class TransformerTrainer(FlatLanguageTrainer):
 
         weight = torch.tensor([zero_weight, 1.0-zero_weight]).to(device) 
         total_steps = num_epochs * len(train_data) 
+        self.n_epochs_pre_valid = n_epochs_pre_valid
         print(f"total steps {total_steps}") 
         self.weighted_xent_loss_fxn = torch.nn.CrossEntropyLoss(weight = weight) 
         self.xent_loss_fxn = torch.nn.CrossEntropyLoss() 
+
+        self.next_loss_weight = next_weight
+        self.prev_loss_weight = prev_weight
 
         self.scheduler = scheduler 
         self.patch_size = patch_size 
@@ -92,6 +97,10 @@ class TransformerTrainer(FlatLanguageTrainer):
         self.teleportation_metric = TransformerTeleportationMetric(block_size = block_size,
                                                                    image_size = resolution,
                                                                    patch_size = patch_size) 
+
+        self.f1_metric = F1Metric()
+        self.masked_f1_metric = F1Metric(mask=True)
+
         if self.do_regression: 
             self.mse_metric = MSEMetric()
             self.reg_loss_fxn = torch.nn.MSELoss()
@@ -134,45 +143,51 @@ class TransformerTrainer(FlatLanguageTrainer):
 
         print(f"skipped {skipped} examples") 
         print(f"Validating epoch {epoch}...") 
-        total_prev_acc, total_next_acc = 0.0, 0.0
-        total = 0 
-        total_block_acc = 0.0 
-        total_tele_score = 0.0
-        total_mse = 0.0 
-        total_prev_recon, total_next_recon = 0.0, 0.0
 
-        self.encoder.eval() 
-        for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
-            #prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
-            score_dict = self.validate(dev_batch_instance, epoch, b, 0) 
-            total_prev_acc += score_dict['prev_f1']
-            total_next_acc += score_dict['next_f1']
-            total_block_acc += score_dict['block_acc']
-            total_tele_score += score_dict['tele_score']
-            total_mse += score_dict['mse']
-            total_prev_recon += score_dict['prev_recon_acc']
-            total_next_recon += score_dict['next_recon_acc']
+        total_dict = defaultdict(float)
+        total = 0
+        if epoch >= self.n_epochs_pre_valid:
+            self.encoder.eval() 
+            for b, dev_batch_instance in tqdm(enumerate(self.val_data)): 
+                #prev_pixel_acc, block_acc = self.validate(dev_batch_instance, epoch, b, 0) 
+                score_dict = self.validate(dev_batch_instance, epoch, b, 0) 
+                for k,v in score_dict.items():
+                    if type(v) in [float, int, np.float64, np.int]: 
+                        total_dict[k] += score_dict[k]
 
-            total += 1
+                total += 1
 
-        mean_next_acc = total_next_acc / total 
-        mean_prev_acc = total_prev_acc / total 
-        mean_block_acc = total_block_acc / total
-        mean_tele_score = total_tele_score / total 
-        mean_mse = total_mse / total
-        mean_prev_recon = total_prev_recon / total
-        mean_next_recon = total_next_recon / total
-        print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}, MSE: {mean_mse}, prev recon acc: {mean_prev_recon*100}, next recon acc {mean_next_recon*100}")
-        #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
-        #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
-        if self.score_type == "acc":
-            return (mean_next_acc + mean_prev_acc)/2, mean_block_acc
-        elif self.score_type == "block_acc":
-            return mean_block_acc, 0.0
-        elif self.score_type == "tele_score":
-            return mean_tele_score, 0.0
+            for k,v in total_dict.items():
+                total_dict[k] = v / total
+
+            print(f"Epoch {epoch}")
+            ordered_keys = sorted(list(total_dict.keys()))
+            for k in ordered_keys:
+                if type(v) in [float, int, np.float64, np.int]: 
+                    print(f"\t{k}: {total_dict[k]:.2f}")
+            mean_next_acc = total_dict["next_f1"]
+            mean_prev_acc = total_dict["prev_f1"]
+            mean_block_acc = total_dict["block_accuracy"]
+            mean_tele_score = total_dict["tele_score"]
+
+            #print(f"Epoch {epoch} has next pixel F1 {mean_next_acc * 100} prev F1 {mean_prev_acc * 100}, block acc {mean_block_acc * 100} teleportation score: {mean_tele_score}, MSE: {mean_mse}, prev recon acc: {mean_prev_recon*100}, next recon acc {mean_next_recon*100}")
+            #print(f"Epoch {epoch}  prev acc {mean_prev_acc * 100} ") 
+            #return (mean_next_acc + mean_prev_acc)/2, mean_block_acc 
+            if self.score_type == "acc":
+                return (mean_next_acc + mean_prev_acc)/2, mean_block_acc
+            elif self.score_type == "block_acc":
+                return mean_block_acc, 0.0
+            elif self.score_type == "tele_score":
+                return mean_tele_score, 0.0
+            else:
+                raise AssertionError(f"invalid score type {self.score_type}")
         else:
-            raise AssertionError(f"invalid score type {self.score_type}")
+            if self.score_type == "acc" or self.score_type == "block_acc":
+                # return s.t. best epoch is latest, but will never be greater than an actual validation
+                return 0 + 0.00001 * epoch, 0
+            else:   
+                # return s.t. best epoch is latest, but will never be less than an actual tele score
+                return 100 - 0.001 * epoch, 0 
 
     def compute_weighted_loss(self, inputs, outputs, it):
         """
@@ -186,7 +201,7 @@ class TransformerTrainer(FlatLanguageTrainer):
         true_next_image = true_next_image.squeeze(-1).squeeze(-1)
         true_next_image = true_next_image.long().to(self.device) 
 
-        next_pixel_loss = self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
+        next_pixel_loss = self.next_loss_weight * self.weighted_xent_loss_fxn(pred_next_image, true_next_image) 
 
         pred_prev_image = outputs["prev_position"]
         true_prev_image = inputs["prev_pos_for_pred"]
@@ -195,7 +210,7 @@ class TransformerTrainer(FlatLanguageTrainer):
         true_prev_image = true_prev_image.squeeze(-1).squeeze(-1)
         true_prev_image = true_prev_image.long().to(self.device) 
 
-        prev_pixel_loss = self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
+        prev_pixel_loss = self.prev_loss_weight * self.weighted_xent_loss_fxn(pred_prev_image, true_prev_image)  
 
         total_loss = next_pixel_loss + prev_pixel_loss 
         print(f"loss {total_loss.item()}")
@@ -324,8 +339,10 @@ class TransformerTrainer(FlatLanguageTrainer):
         else:
             pass
 
-        prev_p, prev_r, prev_f1 = self.compute_f1(batch_instance["prev_pos_for_pred"], prev_position) 
-        next_p, next_r, next_f1 = self.compute_f1(batch_instance["next_pos_for_pred"], next_position) 
+        prev_p, prev_r, prev_f1 = self.f1_metric.compute_f1(batch_instance["prev_pos_for_pred"], prev_position) 
+        next_p, next_r, next_f1 = self.f1_metric.compute_f1(batch_instance["next_pos_for_pred"], next_position) 
+        masked_prev_p, masked_prev_r, masked_prev_f1 = self.masked_f1_metric.compute_f1(batch_instance["prev_pos_for_pred"], prev_position) 
+        masked_next_p, masked_next_r, masked_next_f1 = self.masked_f1_metric.compute_f1(batch_instance["next_pos_for_pred"], next_position) 
 
         all_tele_scores = []
         all_oracle_tele_scores = []
@@ -432,8 +449,19 @@ class TransformerTrainer(FlatLanguageTrainer):
                     # train-time, pass 
                     pass
 
-        return {"next_f1": next_f1, 
+        return {
+                "prev_r": prev_r,
+                "prev_p": prev_p,
                 "prev_f1": prev_f1, 
+                "next_r": next_r,
+                "next_p": next_p,
+                "next_f1": next_f1, 
+                "masked_prev_r": masked_prev_r,
+                "masked_prev_p": masked_prev_p,
+                "masked_prev_f1": masked_prev_f1, 
+                "masked_next_r": masked_next_r,
+                "masked_next_p": masked_next_p,
+                "masked_next_f1": masked_next_f1, 
                 "block_acc": block_accuracy, 
                 "mse": mse,
                 "prev_recon_acc": prev_recon_metric,
@@ -442,25 +470,6 @@ class TransformerTrainer(FlatLanguageTrainer):
                 "oracle_tele_score": total_oracle_tele_score,
                 "bin_dict": bin_dict} 
 
-    def compute_f1(self, true_pos, pred_pos):
-        eps = 1e-8
-        values, pred_pixels = torch.max(pred_pos, dim=1) 
-        gold_pixels = true_pos 
-        pred_pixels = pred_pixels.unsqueeze(-1) 
-
-        pred_pixels = pred_pixels.detach().cpu().float() 
-        gold_pixels = gold_pixels.detach().cpu().float() 
-
-        total_pixels = sum(pred_pixels.shape) 
-
-        true_pos = torch.sum(pred_pixels * gold_pixels).item() 
-        true_neg = torch.sum((1-pred_pixels) * (1 - gold_pixels)).item() 
-        false_pos = torch.sum(pred_pixels * (1 - gold_pixels)).item() 
-        false_neg = torch.sum((1-pred_pixels) * gold_pixels).item() 
-        precision = true_pos / (true_pos + false_pos + eps) 
-        recall = true_pos / (true_pos + false_neg + eps) 
-        f1 = 2 * (precision * recall) / (precision + recall + eps) 
-        return precision, recall, f1
 
     def compute_localized_accuracy(self, true_pos, pred_pos, waste): 
         values, pred_pixels = torch.max(pred_pos, dim=1) 
@@ -607,6 +616,7 @@ def main(args):
                                    args.val_path,
                                    args.test_path,
                                    image_path = args.image_path, 
+                                   include_depth = args.include_depth, 
                                    batch_by_line = args.traj_type != "flat",
                                    traj_type = args.traj_type,
                                    batch_size = args.batch_size,
@@ -616,7 +626,8 @@ def main(args):
                                    top_only = args.top_only,
                                    resolution = args.resolution, 
                                    is_bert = "bert" in args.embedder,
-                                   binarize_blocks = args.binarize_blocks)  
+                                   binarize_blocks = args.binarize_blocks,
+                                   augment_with_noise = args.augment_with_noise)  
 
     checkpoint_dir = pathlib.Path(args.checkpoint_dir)
     if not args.test:
@@ -632,9 +643,11 @@ def main(args):
         print(f"Reading vocab from {checkpoint_dir}") 
         with open(checkpoint_dir.joinpath("vocab.json")) as f1:
             train_vocab = json.load(f1) 
-        
-    print(f"Reading data from {args.val_path}")
-    dev_vocab = dataset_reader.read_data("dev") 
+    
+    # don't read if doing test 
+    if args.test_path is None:
+        print(f"Reading data from {args.val_path}")
+        dev_vocab = dataset_reader.read_data("dev") 
 
     if args.test_path is not None:
         test_vocab = dataset_reader.read_data("test")
@@ -643,6 +656,7 @@ def main(args):
         del(dataset_reader.data['test'])
 
     print(f"got data")  
+    print(f"train/dev: {len(dataset_reader.data['train'])}/{len(dataset_reader.data['dev'])}")
     # construct the vocab and tokenizer 
     nlp = English()
     tokenizer = Tokenizer(nlp.vocab)
@@ -682,7 +696,8 @@ def main(args):
                           log_weights = args.test,
                           init_scale = args.init_scale, 
                           do_regression = False,
-                          do_reconstruction = args.do_reconstruction) 
+                          do_reconstruction = args.do_reconstruction,
+                          pretrained_weights = args.pretrained_weights) 
     if args.encoder_type == "ResidualTransformerEncoder":
         encoder_kwargs["do_residual"] = args.do_residual 
     # Initialize encoder 
@@ -756,7 +771,8 @@ def main(args):
                               next_weight = args.next_weight,
                               prev_weight = args.prev_weight,
                               do_regression = args.do_regression,
-                              do_reconstruction = args.do_reconstruction)
+                              do_reconstruction = args.do_reconstruction,
+                              n_epochs_pre_valid = args.n_epochs_pre_valid)
         trainer.train() 
 
     else:
@@ -772,10 +788,16 @@ def main(args):
 
         if "test" in dataset_reader.data.keys():
             eval_data = dataset_reader.data['test']
-            out_path = "test_metrics.json"
+            if args.out_path is None: 
+                out_path = "test_metrics.json"
+            else:
+                out_path = args.out_path
         else:
             eval_data = dataset_reader.data['dev']
-            out_path = "val_metrics.json"
+            if args.out_path is None: 
+                out_path = "val_metrics.json"
+            else:
+                out_path = args.out_path
 
         eval_trainer = TransformerTrainer(train_data = dataset_reader.data["train"], 
                                    val_data = eval_data, 
@@ -817,6 +839,7 @@ if __name__ == "__main__":
     parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data" )
     parser.add_argument("--test-path", default = None, help = "path to test data" )
     parser.add_argument("--image-path", default = None, help = "path to simulation-generated heighmap images of scenes")
+    parser.add_argument("--include-depth", default=True, action = "store_true", help = "include depth heightmap with images when training from images of state")
     parser.add_argument("--num-blocks", type=int, default=20) 
     parser.add_argument("--binarize-blocks", action="store_true", help="flag to treat block prediction as binary task instead of num-blocks-way classification") 
     parser.add_argument("--traj-type", type=str, default="flat", choices = ["flat", "trajectory"]) 
@@ -829,6 +852,7 @@ if __name__ == "__main__":
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
     parser.add_argument("--next-weight", type=float, default=1)
     parser.add_argument("--prev-weight", type=float, default=1) 
+    parser.add_argument("--augment-with-noise", type=bool, action='store_true', default=False, help = "set to augment training images with gaussian noise")
     # language embedder 
     parser.add_argument("--embedder", type=str, default="random", choices = ["random", "glove", "bert-base-cased", "bert-base-uncased"])
     parser.add_argument("--embedding-file", type=str, help="path to pretrained glove embeddings")
@@ -847,10 +871,12 @@ if __name__ == "__main__":
     parser.add_argument("--embed-dropout", type=float, default=0.2) 
     parser.add_argument("--output-type", type=str, choices = ["per-pixel", "per-patch", "patch-softmax"], default='per-pixel')
     parser.add_argument("--do-residual", action = "store_true", help = "set to residually connect unshared and next prediction in ResidualTransformerEncoder")
+    parser.add_argument("--pretrained-weights", type=str, default=None, help = "path to best.th file for a pre-trained initialization")
     # misc
     parser.add_argument("--cuda", type=int, default=None) 
     parser.add_argument("--learn-rate", type=float, default = 3e-5) 
     parser.add_argument("--warmup", type=int, default=4000, help = "warmup setps for learn-rate scheduling")
+    parser.add_argument("--n-epochs-pre-valid", type=int, default = 0, help = "number of epochs to run before doing validation")
     parser.add_argument("--lr-factor", type=float, default = 1.0, help = "factor for learn-rate scheduling") 
     parser.add_argument("--gamma", type=float, default = 0.7) 
     parser.add_argument("--checkpoint-dir", type=str, default="models/language_pretrain")
@@ -863,6 +889,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=12) 
     parser.add_argument("--do-regression", action="store_true", help="add a regression task to learning") 
     parser.add_argument("--do-reconstruction", action="store_true", help="add a reconstruction task to learning") 
+    parser.add_argument("--out-path", type=str, default=None, help = "when decoding, path to output file")
 
     args = parser.parse_args() 
     if args.do_one_hot:

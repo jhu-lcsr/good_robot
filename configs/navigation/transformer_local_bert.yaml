@@ -1,0 +1,39 @@
+# DATA 
+data_dir: /srv/local2/estengel/nav_data/drif_workspace_corl2019
+out_path: /srv/local2/estengel/nav_data/preprocessed
+validation_limit: 16
+batch_size: 64
+small_batch_size: 64
+max_len: 40
+resolution: 512
+channels: 3
+
+# LANGUAGE EMBEDDER
+embedder: bert-base-uncased
+embedding_dim: 768
+embedding_file: null
+
+# TRANSFORMER
+patch_size: 16
+n_layers: 6
+n_classes: 2
+n_heads: 8
+hidden_dim: 512
+ff_dim: 2048
+dropout: 0.1
+embed_dropout: 0.33
+init_scale: 1
+pos_encoding_type: fixed-separate
+locality_mask: true
+locality_neighborhood: 4
+
+# MISC
+cuda: 0
+learn_rate: 0.00
+warmup: 4000
+checkpoint_dir: "" #"models/language_pretrain"
+num_epochs: 400
+generate_after_n: 998
+score_type: "acc"
+num_models_to_keep: 1
+checkpoint_every: 256
