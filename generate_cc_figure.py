@@ -65,7 +65,7 @@ if __name__ == "__main__":
                             common_sense_backprop=True, trial_reward='spot',
                             num_dilation=0)
 
-    demo = Demonstration("logs/stack_demos", 0, None)
+    demo = Demonstration("logs/demos/stack_demos", 0, None)
     demo_color_heightmap, demo_depth_heightmap = demo.get_heightmaps("grasp", 2)
 
     # demo_features = stack_trainer.forward(demo_color_heightmap, demo_depth_heightmap)
