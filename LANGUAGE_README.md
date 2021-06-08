@@ -20,7 +20,7 @@ Models are trained from the `train_<model>.py` files, i.e. the `main()` function
 The path to the config can be passed to the `--cfg` parameter. Note that with the config files, all yaml arguments can be overwritten by using the command line. For example, `grid_scripts/train_transformer.sh` calls training with the following command: 
 
 ```
-python -u train_transformer.sh --cfg ${CONFIG} --checkpoint-dir ${CHECKPOINT_DIR}
+python -u train_transformer.py --cfg ${CONFIG} --checkpoint-dir ${CHECKPOINT_DIR}
 ```
 
 This is desirable, since we might decide to train multiple models from the same config (for example, before/after a code change), but want separate output directories to store the checkpoints and logs. This lets us avoid rewriting the config file each time we want to change the output directory.
@@ -28,6 +28,19 @@ In general, the `checkpoint-dir` is where the `train_transformer.py` will store 
 The best-performing checkpoint (chosen based on `--score-type`) will be saved in `${CHECKPOINT_DIR}/best.th` 
 
 `train_transformer.py` has two other parameters that are useful to overwrite: `--resume` and `--test`. `--resume` resumes training an existing model. If this flag is not set and the `--checkpoint-dir` is non-empty, the program will error-out to avoid overwriting an existing model. If it is set, the script will load the parameters stored in `best.th` and training will resume from the epoch stored in `best_training_state.json`. 
+
+### Training on GoodRobot Data
+To train on the GoodRobot data, a different trainer is used (we need a different dataset reader, different metrics, etc. so this was easiest). 
+You can run the same way as before, but now with 
+
+```
+python -u train_trainsformer_gr_data.py --cfg ${CONFIG} --checkpoint-dir ${CHECKPOINT_DIR}
+```
+
+The same command-line arguments apply as before, but the config files will look slightly different. Specifically, the `--path` argument should point to a parent dir where you have stored the GoodRobot runs, each run in a separate dir. 
+These dirs need to be preprocessed using the notebook `blocks_data/explore_gr_data.ipynb` 
+Another important flag is `--task-type` which tells the dataset reader 
+
 
 ## Evaluating a model 
 If `--test` is set, the model will load from `best.th` and run all metrics. By default (if `--test-path` is set to None) it will evaluate against development data, saving all metrics to `val_metrics.json`.

@@ -669,7 +669,7 @@ if __name__ == "__main__":
     parser.add_argument("--test", action="store_true", help="load model and test")
     parser.add_argument("--resume", action="store_true", help="resume training a model")
     # data 
-    parser.add_argument("--path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
+    parser.add_argument("--path", type=str, default = None, help="path to train data. Should be the parent dir where all simulation runs are stored")
     parser.add_argument("--batch-size", type=int, default = 32) 
     parser.add_argument("--max-seq-length", type=int, default = 65) 
     parser.add_argument("--resolution", type=int, help="resolution to discretize input state", default=64) 
