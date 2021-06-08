@@ -1461,7 +1461,9 @@ def annotate_success_manually(command, prev_image, next_image):
       description, comment.
     """
     print(
-        "\nPress a key to label the file: 1. success, 2. failure, 3. skip \n"
+        "\nPress a key to label the file: 1. success, 2. grasp success only, 3. full failure, 4. skip \n"
+        "Grasp success is when the gripper successfully picks up the right block but does not place it correctly\n"
+        "Full failure is when it fails to pick up the correct block\n"
         "What to look for:\n"
         " - A successful stack is 3 blocks tall or 4 blocks tall with the gripper completely removed from the field of view.\n"
         " - If the tower is 3 blocks tall and blocks will clearly slide off if not for the wall press 2 for 'failure',\n"
@@ -1495,11 +1497,16 @@ def annotate_success_manually(command, prev_image, next_image):
                     pygame.quit()
                     return "success", comment
                 elif event.key == pygame.K_2:
-                    print("label set to failure")
+                    print("label set to grasp success")
+                    flag = 1
+                    pygame.quit()
+                    return "grasp success", comment
+                elif event.key == pygame.K_3:
+                    print("label set to stack failure")
                     flag = 1
                     pygame.quit()
                     return "failure", comment
-                elif event.key == pygame.K_3:
+                elif event.key == pygame.K_4:
                     flag = 1
                     pygame.quit()
                     return 'skip', comment
