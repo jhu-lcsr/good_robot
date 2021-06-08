@@ -1,6 +1,6 @@
 # Language Instructions
 
-1. Download language models here: 
+1. Download language models here: https://drive.google.com/file/d/14typT6NTc25KjOybmAyS5Pd_0uBVFiew/view?usp=sharing
 - Both models pre-trained on state, fine-tuned on all images.
 - Unpack models `tar -xzvf models.tar.gz`
 
