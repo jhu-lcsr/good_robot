@@ -1509,8 +1509,14 @@ def main(args):
                 pos = language_data_instance.previous_positions[0]
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
-            else:
-                pass
+            elif not is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
+                pair = Pair.from_nonsim_main_idxs(color_heightmap,
+                                           valid_depth_heightmap,
+                                           is_row = check_row)
+
+                # batchify a single example
+                language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+
         else:
             language_data_instance = None
 
@@ -2216,7 +2222,9 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
     if robot.is_sim:
         # Dump scene state information to a file for analysis, training, and language models.
-        dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
+        # TODO (elias) Uncomment
+        pass
+        #dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 

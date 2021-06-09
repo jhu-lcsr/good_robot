@@ -11,6 +11,7 @@ import matplotlib.patches as patches
 from IPython.display import clear_output
 from tqdm import tqdm 
 from skimage.util import random_noise
+import pygame
 
 def check_success(data, idx):
     return data[idx][0] == 1
@@ -155,6 +156,52 @@ class Pair:
         pair.json_data = json_data
         src_color, tgt_color = pair.infer_from_stacksequence(stack_sequence)
         return pair
+
+    @classmethod
+    def from_nonsim_main_idxs(cls, prev_image, prev_heightmap,  is_row = True):
+        prev_image = np.concatenate([prev_image, prev_heightmap], axis=-1)
+        pair = cls(prev_image, None, None, None, is_row = is_row)
+        src_color, tgt_color = pair.annotate_source_target(is_row)
+        return pair
+
+    def annotate_one_color(self):
+        flag = 0
+        pygame.init()
+        screen = pygame.display.set_mode((700, 500))
+        pygame.display.update()
+        while flag == 0:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        print("label set to red")
+                        flag = 1
+                        pygame.quit()
+                        return "r"
+                    elif event.key == pygame.K_2:
+                        print("label set to green")
+                        flag = 1
+                        pygame.quit()
+                        return "g"
+                    elif event.key == pygame.K_3:
+                        print("label set to blue")
+                        flag = 1
+                        pygame.quit()
+                        return "b"
+                    elif event.key == pygame.K_4:
+                        print("label set to yellow")
+                        flag = 1
+                        pygame.quit()
+                        return "y"
+
+    def annotate_source_target(self, is_row):
+        source_color = self.annotate_one_color()
+        target_color = self.annotate_one_color() 
+        self.source_code = source_color 
+        self.target_code = target_color 
+        return source_color, target_color 
 
     def infer_from_stacksequence(self, stack_sequence):
         src_idx = stack_sequence.object_color_index

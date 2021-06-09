@@ -3,6 +3,7 @@ import os
 import random
 import threading
 import argparse
+from logger import Logger
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
@@ -10,9 +11,11 @@ import cv2
 from collections import namedtuple
 from robot import Robot
 import utils
-from utils import StackSequence
+from utils import StackSequence, annotate_success_manually
+from main import get_and_save_images
+from annotate_data import Pair 
 
-
+logger = Logger(True, "/Users/Elias/scratch", args=None, dir_name="/Users/Elias/scratch")
 ############### Testing Block Stacking #######
 is_sim = True# Run in simulation?
 obj_mesh_dir = os.path.abspath('objects/blocks') if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
@@ -70,6 +73,11 @@ num_stacks = 16
 original_position = np.array([-0.6, 0.25, 0])
 test_failure = False
 
+valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, None, depth_channels_history=False, save_image=False)
+
+prev_heightmap = color_heightmap 
+next_heightmap = None
+
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
     print('+++++++ Making New Stack                  ++++++++')
@@ -95,9 +103,19 @@ for stack in range(num_stacks):
         print('----------------------------------------------')
         stacksequence.next()
         stack_goal = stacksequence.current_sequence_progress()
+
+        pair = Pair.from_nonsim_main_idxs(color_heightmap,
+                                   valid_depth_heightmap,
+                                   is_row = check_row)
+
         block_to_move = stack_goal[-1]
         print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))
         block_positions, block_orientations = robot.get_obj_positions_and_orientations()
+
+        
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, None, depth_channels_history=False, save_image=False)
+        prev_heightmap = color_heightmap
+
         primitive_position = block_positions[block_to_move]
         rotation_angle = block_orientations[block_to_move][2]
         robot.grasp(primitive_position, rotation_angle, object_color=block_to_move)
@@ -117,6 +135,10 @@ for stack in range(num_stacks):
 
         place = robot.place(primitive_position, theta + np.pi / 2)
         print('place ' + str(i) + ' : ' + str(place))
+
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, None, depth_channels_history=False, save_image=False)
+        next_heightmap = color_heightmap
+
         # check if we don't care about color
         if not grasp_color_task:
             # Deliberately change the goal stack order to test the non-ordered check
@@ -125,6 +147,7 @@ for stack in range(num_stacks):
         if check_row:
             stack_success, height_count = robot.check_row(stack_goal, distance_threshold=distance_threshold)
         else:
+            success_code, comment = annotate_success_manually("command", prev_heightmap, next_heightmap)
             stack_success, height_count = robot.check_stack(stack_goal, distance_threshold=distance_threshold)
             print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene

@@ -1481,6 +1481,8 @@ def annotate_success_manually(command, prev_image, next_image):
     text_rect.center = (350, 16)
     screen = pygame.display.set_mode((700, 500))
     screen.blit(textsurface, text_rect)
+    prev_image =  pygame.surfarray.make_surface(prev_image)
+    next_image =  pygame.surfarray.make_surface(next_image)
     screen.blit(prev_image, (200,33))
     w = prev_image.get_size()[0]
     screen.blit(next_image, (200, 33 + w+1))
