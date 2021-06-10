@@ -644,7 +644,7 @@ class GoodRobotDatasetReader:
         else:
             raise AssertionError(f"split strategy {split_type} is invalid")
         
-        if data_subset > -1: 
+        if data_subset is not None and data_subset > -1: 
             new_train_data_len = int(data_subset * len(train_data))
             new_train_data = np.random.choice(train_data, size=new_train_data_len, replace=False)
             train_data = list(new_train_data)

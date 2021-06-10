@@ -167,6 +167,7 @@ def main(args):
     static_language_mask = args.static_language_mask
     baseline_language_mask = args.baseline_language_mask
     is_bisk = args.is_bisk
+    human_annotation = args.human_annotation
     randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
     obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
@@ -1480,7 +1481,7 @@ def main(args):
         if static_language_mask:
             # TODO(elias) ensure prev_primitive_action is thread-safe
             # TODO(elias) what about unsuccessful grasp actions that move the block
-            if is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
+            if is_sim and not human_annotation and (prev_primitive_action == "place" or prev_primitive_action is None):
                 json_data = sim_object_state_to_json(robot)
                 # TODO(elias) add depthmap
                 #plt.imshow(color_heightmap)
@@ -1501,7 +1502,7 @@ def main(args):
             #if is
 
             # only set up the scene if working with Bisk (2018) data
-            elif is_sim and is_bisk:
+            elif is_sim and not human_annotation and is_bisk:
                 # Update nonlocal variables with bisk goal here
                 nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
                 # RESET THE SCENE to match the "previous" state if we are in the simulator
@@ -1509,7 +1510,7 @@ def main(args):
                 pos = language_data_instance.previous_positions[0]
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
-            elif not is_sim and (prev_primitive_action == "place" or prev_primitive_action is None):
+            elif (human_annotation or not is_sim) and (prev_primitive_action == "place" or prev_primitive_action is None):
                 pair = Pair.from_nonsim_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
                                            is_row = check_row)
@@ -2596,6 +2597,7 @@ if __name__ == '__main__':
     parser.add_argument('--language_model_weights', dest='language_model_weights', type=str, default='blocks_data/best.th', help='file containing the language model weights (*.th) as a state dict.')
     parser.add_argument('--separation_threshold', dest='separation_threshold', type=float, default=0.02, help = "threshold distance between blocks to consider them in a row")
     parser.add_argument('--distance_threshold', dest='distance_threshold', type=float, default=0.02, help = "vertical threshold distance between blocks to consider them in a row")
+    parser.add_argument('--human_annotation', dest='human_annotation', action='store_true', default=False,                           help='During language mask execution only, ask humans for annotations of the action to take and if it succeeded before and after each action.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
