@@ -610,6 +610,7 @@ def main(args):
                 # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
                 nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
+                nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
 
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
