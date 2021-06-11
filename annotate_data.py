@@ -165,6 +165,8 @@ class Pair:
         return pair
 
     def annotate_one_color(self):
+        print(f"ANNOTATION INSTRUCTIONS: color mapping: \n" + 
+                "\t1/r: red\n\t2/g: green\n\t3/b: blue\n\t4/y: yellow") 
         flag = 0
         pygame.init()
         screen = pygame.display.set_mode((700, 500))
@@ -175,22 +177,22 @@ class Pair:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_1:
+                    if event.key in [pygame.K_1, pygame.K_r]: 
                         print("label set to red")
                         flag = 1
                         pygame.quit()
                         return "red"
-                    elif event.key == pygame.K_2:
+                    elif event.key in [pygame.K_2, pygame.K_g]: 
                         print("label set to green")
                         flag = 1
                         pygame.quit()
                         return "green"
-                    elif event.key == pygame.K_3:
+                    elif event.key in [pygame.K_3, pygame.K_b]: 
                         print("label set to blue")
                         flag = 1
                         pygame.quit()
                         return "blue"
-                    elif event.key == pygame.K_4:
+                    elif event.key in [pygame.K_4, pygame.K_y]: 
                         print("label set to yellow")
                         flag = 1
                         pygame.quit()
