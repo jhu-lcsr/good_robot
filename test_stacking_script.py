@@ -17,6 +17,7 @@ from data import GoodRobotDatasetReader
 from main import get_and_save_images
 from annotate_data import Pair 
 
+logger = Logger(True, "scratch", args=None, dir_name="scratch")
 ############### Testing Block Stacking #######
 is_sim = True# Run in simulation?
 obj_mesh_dir = os.path.abspath('objects/blocks') if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
@@ -166,7 +167,7 @@ for stack in range(num_stacks):
             stack_success, height_count = robot.check_row(stack_goal, distance_threshold=distance_threshold)
         else:
             success_code, comment = annotate_success_manually("command", prev_heightmap, next_heightmap)
-            stack_success, height_count = robot.check_stack(stack_goal, distance_threshold=distance_threshold)
+            stack_success, height_count = robot.check_stack(stack_goal, vert_distance_threshold=distance_threshold)
             print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene
     robot.reposition_objects()
