@@ -1499,16 +1499,11 @@ def annotate_success_manually(command, prev_image, next_image):
                     pygame.quit()
                     return "success", comment
                 elif event.key == pygame.K_2:
-                    print("label set to grasp success")
-                    flag = 1
-                    pygame.quit()
-                    return "grasp success", comment
-                elif event.key == pygame.K_3:
-                    print("label set to stack failure")
+                    print("label set to stack/grasp failure")
                     flag = 1
                     pygame.quit()
                     return "failure", comment
-                elif event.key == pygame.K_4:
+                elif event.key == pygame.K_3:
                     flag = 1
                     pygame.quit()
                     return 'skip', comment

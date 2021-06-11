@@ -607,7 +607,8 @@ def main(args):
                                                                 nonlocal_variables['language_metadata']['prev_color_heightmap'],
                                                                 nonlocal_variables['language_metadata']['next_color_heightmap'])
 
-                nonlocal_variables['grasp_color_success'] = True if success_code == "success" or success_code == "grasp success" else False 
+                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
+                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
 
 
