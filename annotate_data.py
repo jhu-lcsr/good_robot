@@ -184,7 +184,7 @@ class Pair:
                         print("label set to green")
                         flag = 1
                         pygame.quit()
-                        return "greed"
+                        return "green"
                     elif event.key == pygame.K_3:
                         print("label set to blue")
                         flag = 1
