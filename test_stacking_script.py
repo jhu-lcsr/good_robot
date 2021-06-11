@@ -3,6 +3,7 @@ import os
 import random
 import threading
 import argparse
+import pdb 
 from logger import Logger
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,13 +13,15 @@ from collections import namedtuple
 from robot import Robot
 import utils
 from utils import StackSequence, annotate_success_manually
+from data import GoodRobotDatasetReader
 from main import get_and_save_images
 from annotate_data import Pair 
 
-logger = Logger(True, "/Users/Elias/scratch", args=None, dir_name="/Users/Elias/scratch")
 ############### Testing Block Stacking #######
 is_sim = True# Run in simulation?
 obj_mesh_dir = os.path.abspath('objects/blocks') if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
+log_dir = os.path.abspath('logs/') 
+logger = Logger(True, log_dir, args=None, dir_name = log_dir) 
 num_obj = 4 if is_sim else None # Number of objects to add to simulation
 tcp_host_ip = args.tcp_host_ip if not is_sim else None # IP and port to robot arm as TCP client (UR5)
 tcp_port = args.tcp_port if not is_sim else None
@@ -78,6 +81,19 @@ valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = 
 prev_heightmap = color_heightmap 
 next_heightmap = None
 
+dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x,
+                                    split_type="none",
+                                    task_type="rows",
+                                    augment_by_flipping=False,
+                                    augment_language = False,
+                                    augment_by_rotating=False,
+                                    leave_out_color=None,
+                                    batch_size=1,
+                                    max_seq_length=40,
+                                    resolution = 64,
+                                    is_bert = True,
+                                    overfit=False)
+
 for stack in range(num_stacks):
     print('++++++++++++++++++++++++++++++++++++++++++++++++++')
     print('+++++++ Making New Stack                  ++++++++')
@@ -107,6 +123,8 @@ for stack in range(num_stacks):
         pair = Pair.from_nonsim_main_idxs(color_heightmap,
                                    valid_depth_heightmap,
                                    is_row = check_row)
+
+        language_data_instance = dataset_reader_fxn(pair).data['train'][0]
 
         block_to_move = stack_goal[-1]
         print('move block: ' + str(i) + ' current stack goal: ' + str(stack_goal))

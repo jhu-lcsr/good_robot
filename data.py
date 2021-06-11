@@ -599,7 +599,6 @@ class GoodRobotDatasetReader:
         self.noise_gaussian_params = [0.0, 0.05]
         self.noise_num_samples = noise_num_samples
 
-
         if type(path_or_obj) == str:
             self.path = pathlib.Path(path_or_obj)
             self.pkl_files = self.path.glob("*/*.pkl")
@@ -608,13 +607,14 @@ class GoodRobotDatasetReader:
                 with open(pkl_file, "rb") as f1:
                     data = pkl.load(f1)
                     self.all_data.extend(data) 
+            if task_type == "rows":
+                self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
+            elif task_type == "stacks": 
+                self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
+
         else:
             self.all_data = [path_or_obj]
 
-        if task_type == "rows":
-            self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=True) 
-        elif task_type == "stacks": 
-            self.all_data = GoodRobotDatasetReader.filter_data(self.all_data, rows=False) 
 
         if split_type == "random": 
             np.random.shuffle(self.all_data)
@@ -643,8 +643,8 @@ class GoodRobotDatasetReader:
             pass
         else:
             raise AssertionError(f"split strategy {split_type} is invalid")
-        
-        if data_subset > -1: 
+       
+        if data_subset is not None and data_subset > -1: 
             new_train_data_len = int(data_subset * len(train_data))
             new_train_data = np.random.choice(train_data, size=new_train_data_len, replace=False)
             train_data = list(new_train_data)

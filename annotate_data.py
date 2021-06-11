@@ -179,22 +179,22 @@ class Pair:
                         print("label set to red")
                         flag = 1
                         pygame.quit()
-                        return "r"
+                        return "red"
                     elif event.key == pygame.K_2:
                         print("label set to green")
                         flag = 1
                         pygame.quit()
-                        return "g"
+                        return "greed"
                     elif event.key == pygame.K_3:
                         print("label set to blue")
                         flag = 1
                         pygame.quit()
-                        return "b"
+                        return "blue"
                     elif event.key == pygame.K_4:
                         print("label set to yellow")
                         flag = 1
                         pygame.quit()
-                        return "y"
+                        return "yellow"
 
     def annotate_source_target(self, is_row):
         source_color = self.annotate_one_color()

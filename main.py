@@ -1488,15 +1488,21 @@ def main(args):
                 #plt.figure()
                 #plt.imshow(valid_depth_heightmap)
                 #plt.show(block=True)
-                print(nonlocal_variables['stack'].object_color_sequence, nonlocal_variables['stack'].object_color_index)
-                pair = Pair.from_main_idxs(color_heightmap,
+                pair = Pair.from_nonsim_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
-                                           json_data,
-                                           nonlocal_variables['stack'],
                                            is_row = check_row)
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+                #print(nonlocal_variables['stack'].object_color_sequence, nonlocal_variables['stack'].object_color_index)
+                #pair = Pair.from_main_idxs(color_heightmap,
+                #                           valid_depth_heightmap,
+                #                           json_data,
+                #                           nonlocal_variables['stack'],
+                #                           is_row = check_row)
+
+                ## batchify a single example
+                #language_data_instance = dataset_reader_fxn(pair).data['train'][0]
             # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same
             #if is
 
