@@ -1629,18 +1629,22 @@ def get_color_order_from_human(num_obj=4, input_description=None, color_names=No
     while True:
         print('\a')
         try:
-            object_order = input(" ".join([input_description + " for " + str(num_obj) + " objects, for example rgby or 1234 for [red green blue yellow]; or yrgb: "]))
-            for i, c in enumerate(object_order):
-                if c == 'r' or c == '1':
-                    object_color_sequence += [color_names.index('red')]
-                elif c == 'g' or c == '2':
-                    object_color_sequence += [color_names.index('green')]
-                elif c == 'b' or c == '3':
-                    object_color_sequence += [color_names.index('blue')]
-                elif c == 'y' or c == '4':
-                    object_color_sequence += [color_names.index('yellow')]
-                else:
-                    raise ValueError('unsupported input: ' + str(object_order))
+            object_order = input(" ".join([input_description + " for " + str(num_obj) + " objects, for example rgby or 1234 or [red green blue yellow] without brackets: "]))
+            if object_order.find(' ') != -1:
+                color_sequence = object_order.split(' ')
+                object_color_sequence = [color_names.index(color) for color in color_sequence]
+            else:
+                for i, c in enumerate(object_order):
+                    if c == 'r' or c == '1':
+                        object_color_sequence += [color_names.index('red')]
+                    elif c == 'g' or c == '2':
+                        object_color_sequence += [color_names.index('green')]
+                    elif c == 'b' or c == '3':
+                        object_color_sequence += [color_names.index('blue')]
+                    elif c == 'y' or c == '4':
+                        object_color_sequence += [color_names.index('yellow')]
+                    else:
+                        raise ValueError('unsupported input: ' + str(object_order))
             if len(object_color_sequence) != num_obj:
                 raise ValueError('expected ' + str(num_obj) + ' objects, but read ' + str(len(object_color_sequence)))
             # print('seq: ' + str(object_color_sequence))
@@ -1649,6 +1653,6 @@ def get_color_order_from_human(num_obj=4, input_description=None, color_names=No
             break
         except ValueError as e:
             print(e)
-            print("Something went wrong with the input, try again, input goal object color order, for example rgby or 1234 for [red green blue yellow]; or yrgb: ")
+            print("Something went wrong with the input, try again, for example rgby or 1234 for [red green blue yellow]; or yrgb: ")
             continue
     return color_names_out, object_color_sequence
