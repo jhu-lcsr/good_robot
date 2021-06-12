@@ -2380,9 +2380,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
     if robot.is_sim:
         # Dump scene state information to a file for analysis, training, and language models.
-        # TODO (elias) Uncomment
-        pass
-        #dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
+        dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
