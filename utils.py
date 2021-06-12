@@ -12,8 +12,14 @@ import torch
 from scipy.special import softmax
 import pathlib
 import matplotlib.pyplot as plt
-import pygame
 import pdb
+
+try:
+    import pygame
+except ImportError as e:
+    print(e)
+    print('pygame not available, some features may be disabled, try pip install pygame --user -upgrade')
+    pygame = None
 
 # Import necessary packages
 #try:
@@ -1010,7 +1016,7 @@ def is_jsonable(x):
 
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, goal_num_obj = None, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None):
+    def __init__(self, num_obj, goal_num_obj = None, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None, human_annotation=False):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -1027,6 +1033,7 @@ class StackSequence(object):
         self.goal_num_obj = goal_num_obj if goal_num_obj is not None else num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
         self.trial = trial
+        self.human_annotation = human_annotation
         self.reset_sequence()
         self.total_steps = total_steps
         # TODO(zhe) add list of color names, as an optional argument
@@ -1044,6 +1051,8 @@ class StackSequence(object):
 
             # Choose a random sequence to stack
             self.object_color_sequence = np.random.permutation(self.num_obj)
+            if self.human_annotation:
+                get_color_order_from_human
             # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
             self.object_color_one_hot_encodings = []
             for color in self.object_color_sequence:
@@ -1095,6 +1104,19 @@ class StackSequence(object):
         self.object_color_index = current_height
         if not self.object_color_index < self.num_obj:
             self.reset_sequence()
+    
+    def color_idx_sequence_to_string_list(self, color_index_list=None):
+        '''Simple helper function to take a list of indices and print a list of colors
+
+            if no params are specificed, it will make the list for self.object_color_sequence.
+        '''
+        # print('DELETEME: ' + str(self.object_color_sequence))
+        if color_index_list is None:
+            color_index_list = self.object_color_sequence
+        input_names = []
+        for idx in color_index_list:
+            input_names += [self.color_names[int(idx)]]
+        return input_names
 
 
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
@@ -1537,9 +1559,11 @@ def annotate_success_manually(command, prev_image, next_image):
         "What to look for:\n"
         " - A successful stack is 3 blocks tall or 4 blocks tall with the gripper completely removed from the field of view.\n"
         " - If the tower is 3 blocks tall and blocks will clearly slide off if not for the wall press 2 for 'failure',\n"
-        "   if it is merely in contact with a wall, press 1 for 'success'."
+        "   if it is merely in contact with a wall, press 1 for 'success'.\n"
         " - When the robot doesn't move but there is already a visible successful stack, that's an error.failure.falsely_appears_correct, so press 1 for 'success'!\n"
         " - If you can see the gripper, the example is a failure even if the stack is tall enough!\n")
+    if pygame is None:
+        raise ImportError('pygame is required but not installed, cannot do manual annotations')
     # , 3: error.failure
     flag = 0
     comment = 'none'
@@ -1580,3 +1604,51 @@ def annotate_success_manually(command, prev_image, next_image):
                     flag = 1
                     pygame.quit() 
                     return to_ret 
+
+def get_color_order_from_human(num_obj=4, input_description=None, color_names=None):
+    """ Read a command line sequence of color names
+
+        num_obj: the number of objects/actions to get colors for
+        input_description: what to print for the input
+        color_names: a list of strings which represents the map from index to numerical ids, ie red green blue would be 0 1 2.
+
+        returns:
+            color_names_out, object_color_sequence
+
+            color_names_out: strings for each color name
+            object_color_sequence: a list of numerical ids for each color
+
+    """
+    if color_names is None:
+        color_names = ['red', 'blue', 'green','yellow', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+    if input_description is None:
+        input_description = 'input the goal object color order'
+
+    # convert string or numerical object order from 
+    object_color_sequence = []
+    while True:
+        print('\a')
+        try:
+            object_order = input(" ".join([input_description + " for " + str(num_obj) + " objects, for example rgby or 1234 for [red green blue yellow]; or yrgb: "]))
+            for i, c in enumerate(object_order):
+                if c == 'r' or c == '1':
+                    object_color_sequence += [color_names.index('red')]
+                elif c == 'g' or c == '2':
+                    object_color_sequence += [color_names.index('green')]
+                elif c == 'b' or c == '3':
+                    object_color_sequence += [color_names.index('blue')]
+                elif c == 'y' or c == '4':
+                    object_color_sequence += [color_names.index('yellow')]
+                else:
+                    raise ValueError('unsupported input: ' + str(object_order))
+            if len(object_color_sequence) != num_obj:
+                raise ValueError('expected ' + str(num_obj) + ' objects, but read ' + str(len(object_color_sequence)))
+            # print('seq: ' + str(object_color_sequence))
+            color_names_out = [color_names[i] for i in object_color_sequence]
+            print('order received: colors: ' + str(color_names_out) +' color idxs:' + str(object_color_sequence))
+            break
+        except ValueError as e:
+            print(e)
+            print("Something went wrong with the input, try again, input goal object color order, for example rgby or 1234 for [red green blue yellow]; or yrgb: ")
+            continue
+    return color_names_out, object_color_sequence

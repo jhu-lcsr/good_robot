@@ -11,7 +11,13 @@ import matplotlib.patches as patches
 from IPython.display import clear_output
 from tqdm import tqdm 
 from skimage.util import random_noise
-import pygame
+import utils
+try:
+    import pygame
+except ImportError as e:
+    print(e)
+    print('pygame not available, some features may be disabled, try pip install pygame --user -upgrade')
+    pygame = None
 
 def check_success(data, idx):
     return data[idx][0] == 1
@@ -170,6 +176,8 @@ class Pair:
         print(f"ANNOTATION INSTRUCTIONS: color mapping: \n" + 
                 "\t1/r: red\n\t2/g: green\n\t3/b: blue\n\t4/y: yellow") 
         flag = 0
+        if pygame is None:
+            import pygame
         pygame.init()
         screen = pygame.display.set_mode((700, 500))
         pygame.display.update()
@@ -200,14 +208,23 @@ class Pair:
                         pygame.quit()
                         return 4, "yellow"
 
-    def annotate_source_target(self, is_row):
-        source_num, source_color = self.annotate_one_color()
-        target_num, target_color = self.annotate_one_color() 
-        self.source_code = source_color
-        self.source_num = source_num
-        self.target_code = target_color 
-        self.target_num = target_num
-        return source_color, target_color 
+    def annotate_source_target(self, is_row, use_pygame=False):
+        if use_pygame:
+            source_num, source_color = self.annotate_one_color()
+            target_num, target_color = self.annotate_one_color() 
+            self.source_code = source_color
+            self.source_num = source_num
+            self.target_code = target_color 
+            self.target_num = target_num
+            return source_color, target_color
+        else:
+            color_names, color_nums = utils.get_color_order_from_human(2, input_description='input the color to GRASP then the color to PLACE relative to')
+            self.source_code = color_names[0]
+            self.source_num = color_nums[0]
+            self.target_code = color_names[1] 
+            self.target_num = color_nums[1]
+            return color_names[0], color_names[1]
+
 
     def infer_from_stacksequence(self, stack_sequence):
         src_idx = stack_sequence.object_color_index

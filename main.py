@@ -578,7 +578,7 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        print(f'CURRENT STACK GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]))
+        print(f'CURRENT TASK GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]) + ' FINAL GOAL: ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
         # no need to reset by default
         needed_to_reset = False
         toppled = None
@@ -598,6 +598,8 @@ def main(args):
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
             if human_annotation:
                 stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+                print('human annotation manual_progress_check results: stack_matches_goal: ' + str(stack_matches_goal) + ' stack_height: ' + str(nonlocal_variables['stack_height']) + ' needed_to_reset: ' + str(needed_to_reset) + 
+                      ' input to robot.manual_progress_check: prev_stack_height: ' + str(nonlocal_variables['prev_stack_height']) + ' task_type: ' + str(task_type))
             elif task_type == 'vertical_square':
                 if check_z_height:
                     stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
@@ -1660,16 +1662,13 @@ def main(args):
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
             elif (human_annotation or not is_sim) and (prev_primitive_action == "place" or prev_primitive_action is None):
+                print('FINAL GOAL COLOR ORDER ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
                 pair = Pair.from_nonsim_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
                                            is_row = check_row)
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
-                # set the current top block color in the stack sequence
-                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index-1] = pair.target_num - 1
-                # set the future top block color in the stack sequence
-                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index] = pair.source_num - 1
 
         else:
             language_data_instance = None
