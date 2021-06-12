@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import time
+import pickle
+import bz2
 import os
 import pdb
 import signal
@@ -21,7 +23,7 @@ import utils
 from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
-from utils import compute_demo_dist
+from utils import compute_demo_dist, compute_cc_dist
 from utils import annotate_success_manually
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
@@ -95,9 +97,9 @@ def main(args):
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = args.num_obj if is_sim or args.check_row else None # Number of objects to add to simulation
+    num_obj = args.num_obj if is_sim or args.check_row or args.use_demo else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim or args.check_row or args.use_demo else None
     goal_num_obj = args.goal_num_obj
-    num_extra_obj = args.num_extra_obj if is_sim or args.check_row else None
     timeout = args.timeout # time to wait before simulator reset
     if num_obj is not None:
         num_obj += num_extra_obj
@@ -110,6 +112,7 @@ def main(args):
     rtc_port = args.rtc_port if not is_sim else None
     if is_sim:
         workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
+        sim_workspace_limits = workspace_limits
     else:
         # Corner near window on robot base side
         # [0.47984089 0.34192974 0.02173636]
@@ -121,6 +124,10 @@ def main(args):
             # The object sets differ for stacking, so add a bit to min z.
             # TODO(ahundt) this keeps the real gripper from colliding with the block and causing a security stop when it misses a grasp on top of blocks. However, it makes the stacks appear shorter than they really are too, so this needs to be fixed in a more nuanced way.
             workspace_limits[2][0] += 0.02
+
+        if args.use_demo:
+            # define sim_workspace limits if use_demo is set
+            sim_workspace_limits = np.asarray([[-0.724, -0.276], [-0.224, 0.224], [-0.0001, 0.5]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
 
         # Original visual pushing graping paper workspace definition
         # workspace_limits = np.asarray([[0.3, 0.748], [-0.224, 0.224], [-0.255, -0.1]]) # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
@@ -184,6 +191,26 @@ def main(args):
     cycle_consistency = args.cycle_consistency
     depth_channels_history = args.depth_channels_history
 
+    # load example demos, load embeddings if they exist
+    if use_demo:
+        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
+                task_type=args.task_type)
+
+        if cycle_consistency:
+            pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict.pickle')
+        else:
+            pickle_filename = os.path.join(demo_path, 'embeddings', 'embed_dict_single.pickle')
+
+        if os.path.exists(pickle_filename):
+            with open(pickle_filename, 'rb') as data:
+                example_actions_dict = pickle.load(data)
+
+            print("main.py: loaded example_actions_dict")
+
+        else:
+            example_actions_dict = None
+
+
     # NOTE(adit98) HACK, make sure we set task_type to 'unstack' and not 'unstacking'
     if task_type is not None and 'unstack' in args.task_type:
         args.task_type = 'unstack'
@@ -230,6 +257,16 @@ def main(args):
         args.unstack = True
         print('--unstack is automatically enabled')
 
+        if args.task_type is not None and args.task_type != 'stack':
+            # don't do auto unstacking
+            save_history = False
+        else:
+            # do auto unstacking
+            save_history = True
+
+    else:
+        save_history = False
+
     # ------ Pre-loading and logging options ------
     snapshot_file, multi_task_snapshot_files, continue_logging, logging_directory = parse_resume_and_snapshot_file_args(args)
 
@@ -262,29 +299,22 @@ def main(args):
     # which defines where place actions are permitted. Units are in meters.
     if check_row:
         place_dilation = 0.05
+    elif task_type == 'stack':
+        place_dilation = 0.00
     elif task_type is not None:
-        # TODO(adit98) think about how we set different place dilations
-        stack_place_dilation = 0.00
         place_dilation = 0.05
     else:
         place_dilation = 0.00
 
     # Initialize trainer(s)
     if use_demo:
-        print("main.py stacking place dilation:", stack_place_dilation, "place_dilation:", place_dilation)
         assert task_type is not None, ("Must provide task_type if using demo")
         assert is_testing, ("Must run in testing mode if using demo")
+        trainer = None
         stack_trainer, row_trainer, unstack_trainer, vertical_square_trainer = None, None, None, None
-        if 'stack' in multi_task_snapshot_files:
-            stack_trainer = Trainer(method, push_rewards, future_reward_discount,
-                              is_testing, multi_task_snapshot_files['stack'], force_cpu,
-                              goal_condition_len, place, pretrained, flops,
-                              network=neural_network_name, common_sense=common_sense,
-                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
-                              place_dilation=stack_place_dilation, common_sense_backprop=common_sense_backprop,
-                              trial_reward='discounted' if discounted_reward else 'spot',
-                              num_dilation=num_dilation)
 
+        # store list of trainers
+        trainers = []
         if 'row' in multi_task_snapshot_files:
             row_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['row'], force_cpu,
@@ -294,6 +324,30 @@ def main(args):
                               place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
+
+            # add row trainer to list of trainers
+            trainers.append(row_trainer)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = row_trainer
+
+        if 'stack' in multi_task_snapshot_files:
+            stack_trainer = Trainer(method, push_rewards, future_reward_discount,
+                              is_testing, multi_task_snapshot_files['stack'], force_cpu,
+                              goal_condition_len, place, pretrained, flops,
+                              network=neural_network_name, common_sense=common_sense,
+                              place_common_sense=place_common_sense, show_heightmap=show_heightmap,
+                              place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
+                              trial_reward='discounted' if discounted_reward else 'spot',
+                              num_dilation=num_dilation)
+
+            # add stack trainer to list of trainers
+            trainers.append(stack_trainer)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = stack_trainer
 
         if 'unstack' in multi_task_snapshot_files:
             unstack_trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -305,6 +359,13 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
+            # add unstack trainer to list of trainers
+            trainers.append(unstack_trainer)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = unstack_trainer
+
         if 'vertical_square' in multi_task_snapshot_files:
             vertical_square_trainer = Trainer(method, push_rewards, future_reward_discount,
                               is_testing, multi_task_snapshot_files['vertical_square'], force_cpu,
@@ -315,8 +376,12 @@ def main(args):
                               trial_reward='discounted' if discounted_reward else 'spot',
                               num_dilation=num_dilation)
 
-        # set trainer reference to stack_trainer to get metadata (e.g. iteration)
-        trainer = stack_trainer
+            # add vertical_square trainer to list of trainers
+            trainers.append(vertical_square_trainer)
+
+            # set trainer if not already set
+            if trainer is None:
+                trainer = vertical_square_trainer
 
     else:
         trainer = Trainer(method, push_rewards, future_reward_discount,
@@ -326,7 +391,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask) 
+                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -358,8 +423,12 @@ def main(args):
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
                           'language_metadata': {},
-                          'color_partial_stack_success': None
-                          }
+                          'color_partial_stack_success': None,
+                          'best_trainer_log': []}
+
+    # load example_actions_dict if it exists
+    if use_demo:
+        nonlocal_variables['example_actions_dict'] = example_actions_dict
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
@@ -411,7 +480,10 @@ def main(args):
     prev_grasp_success = False
 
     if check_z_height:
-        is_goal_conditioned = False
+        if place:
+            is_goal_conditioned = True
+        else:
+            is_goal_conditioned = False
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
@@ -488,7 +560,7 @@ def main(args):
         nonlocal_variables['place_color_success'] = False
         nonlocal_variables['partial_stack_success'] = False
 
-    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None):
+    def check_stack_update_goal(place_check=False, top_idx=-1, depth_img=None, use_imitation=False, task_type=None, check_z_height=False):
         """ Check nonlocal_variables for a good stack and reset if it does not match the current goal.
 
         # Params
@@ -518,30 +590,51 @@ def main(args):
             current_stack_goal = current_stack_goal[:-1]
             stack_shift = 0
 
+        if check_z_height:
+            max_workspace_height = ' (see max_workspace_height printout above) '
+
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
-            if task_type == 'vertical_square':
-                # NOTE(adit98) explicitly set a lower distance threshold for vertical square
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.vertical_square_partial_success(current_stack_goal,
-                                check_z_height=check_z_height, stack_dist_thresh=0.04)
+            if human_annotation:
+                stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+            elif task_type == 'vertical_square':
+                if check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+                else:
+                    # NOTE(adit98) explicitly set a lower distance threshold for vertical square
+                    stack_matches_goal, nonlocal_variables['stack_height'] = \
+                            robot.vertical_square_partial_success(current_stack_goal,
+                                    check_z_height=check_z_height, stack_dist_thresh=0.04)
             elif task_type == 'unstack':
                 # structure size (stack_height) is 1 + # of blocks removed from stack (1, 2, 3, 4)
                 stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'])
+                        robot.unstacking_partial_success(nonlocal_variables['prev_stack_height'],
+                                check_z_height=check_z_height, depth_img=depth_img)
 
             elif task_type == 'stack':
-                # TODO(adit98) make sure we have path for real robot here
-                stack_matches_goal, nonlocal_variables['stack_height'] = \
-                        robot.check_stack(current_stack_goal, check_z_height=check_z_height,
-                                top_idx=top_idx)
+                if check_z_height:
+                    # decrease_threshold = None  # None means decrease_threshold will be disabled
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
+                    # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
+                    # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
+
+                else:
+                    # TODO(adit98) make sure we have path for real robot here
+                    stack_matches_goal, nonlocal_variables['stack_height'] = \
+                            robot.check_stack(current_stack_goal, top_idx=top_idx)
 
             elif task_type == 'row':
-                # TODO(adit98) make sure we have path for real robot here
-                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                        num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap, separation_threshold=separation_threshold, distance_threshold=distance_threshold,
-                        prev_z_height=nonlocal_variables['prev_stack_height'])
+                if not check_z_height:
+                    stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
+                            check_z_height=check_z_height, valid_depth_heightmap=depth_img,
+                            num_obj=num_obj, separation_threshold=separation_threshold, distance_threshold=distance_threshold,
+                            prev_z_height=nonlocal_variables['prev_stack_height'])
+
+                    # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
+                    stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+                else:
+                    stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
 
             else:
                 # TODO(adit98) trigger graceful exit here
@@ -549,17 +642,18 @@ def main(args):
 
         elif check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                    num_obj=num_obj,distance_threshold=distance_threshold, separation_threshold=separation_threshold, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap,
+                    num_obj=num_obj,distance_threshold=distance_threshold, separation_threshold=separation_threshold, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0],
                     prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
             if not check_z_height and not static_language_mask:
                 stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
+
         elif check_z_height:
             # decrease_threshold = None  # None means decrease_threshold will be disabled
             stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.check_z_height(depth_img, nonlocal_variables['prev_stack_height'])
-            max_workspace_height = ' (see max_workspace_height printout above) '
             # TODO(ahundt) add a separate case for incremental height where continuous heights are converted back to height where 1.0 is the height of a block.
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
+
         else:
             if static_language_mask:
                 # current_stack_goal = nonlocal_variables['stack'].object_color_sequence[0:4]
@@ -608,8 +702,8 @@ def main(args):
                                                                 nonlocal_variables['language_metadata']['prev_color_heightmap'],
                                                                 nonlocal_variables['language_metadata']['next_color_heightmap'])
 
-                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
-                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
+                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
+                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
                 nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
 
@@ -665,9 +759,11 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap, separation_threshold=separation_threshold, distance_threshold=distance_threshold)
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0], separation_threshold=separation_threshold, distance_threshold=distance_threshold)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
             else:
+                # not resetting, so set stack goal to proper value
+                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
                 print(mismatch_str)
 
         return needed_to_reset
@@ -821,11 +917,21 @@ def main(args):
 
                     # check if embeddings for demo for progress n and primitive action p_a already exists
                     task_progress = nonlocal_variables['stack_height']
+                    if check_z_height:
+                        # NOTE(adit98) check if we should round or cut off float -> int
+                        task_progress = int(np.rint(task_progress))
 
-                    # in unstacking task, max task_progress at 3 (final place has progress 4 technically but we could have reversal)
-                    if task_type == 'unstack':
+                        # NOTE(adit98) HACK, make sure task_progress starts at 1 when stack_height is initialized to 0.0
+                        if task_progress == 0:
+                            task_progress = 1
+
+                    if task_type in ['row', 'vertical_square', 'unstack']:
+                        # HACK: max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
+                        if task_progress > 3:
+                            print('WARNING: main.py +Activating HACK workaround, limiting max task progress value to 3.')
                         task_progress = min(3, task_progress)
 
+                    # NOTE(adit98) add is in dict checks to trigger graceful exits
                     action = nonlocal_variables['primitive_action']
                     if task_progress not in nonlocal_variables['example_actions_dict']:
                         nonlocal_variables['example_actions_dict'][task_progress] = {}
@@ -835,12 +941,12 @@ def main(args):
                     for ind, d in enumerate(example_demos):
                         # get action embeddings from example demo
                         if ind not in nonlocal_variables['example_actions_dict'][task_progress][action]:
-                            demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id = \
-                                d.get_action(workspace_limits, action, task_progress, stack_trainer,
+                            demo_row_action, demo_stack_action, demo_unstack_action, demo_vertical_square_action, action_id, demo_action_ind = \
+                                d.get_action(sim_workspace_limits, action, task_progress, stack_trainer,
                                         row_trainer, unstack_trainer, vertical_square_trainer, use_hist=depth_channels_history,
                                         cycle_consistency=cycle_consistency)
                             nonlocal_variables['example_actions_dict'][task_progress][action][ind] = [demo_row_action,
-                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action]
+                                    demo_stack_action, demo_unstack_action, demo_vertical_square_action, demo_action_ind]
 
                     print("main.py nonlocal_variables['executing_action']: got demo actions")
 
@@ -912,23 +1018,33 @@ def main(args):
                     if use_demo:
                         # get parameters of current action to do dict lookup
                         task_progress = nonlocal_variables['stack_height']
-                        action = nonlocal_variables['primitive_action']
+                        if check_z_height:
+                            # NOTE(adit98) check if we should round or cut off float -> int
+                            task_progress = int(np.rint(task_progress))
 
-                        # clamp task_progress at 3 if task_type is unstack
-                        if task_type == 'unstack':
+                            # NOTE(adit98) HACK, make sure task_progress starts at 1 when stack_height is initialized to 0.0
+                            if task_progress == 0:
+                                task_progress = 1
+
+                        if task_type in ['row', 'vertical_square', 'unstack']:
+                            # HACK: max task_progress at 3 (in case of simulator bugs or for the final place in unstacking)
+                            if task_progress > 3:
+                                print('WARNING: main.py +Activating HACK workaround, limiting max task progress value to 3.')
                             task_progress = min(3, task_progress)
 
-                        # TODO(adit98) implement
-                        if cycle_consistency:
-                            raise NotImplementedError("Need to test if below line works with different array shape!!!")
+                        action = nonlocal_variables['primitive_action']
+
                         # rearrange example actions dictionary into (P, D) array where P is number of policies, D # of demos
                         example_actions = np.array([*nonlocal_variables['example_actions_dict'][task_progress][action].values()],
                                 dtype=object).T
 
+                        # extract demo action inds
+                        demo_action_inds = example_actions[-1].tolist()
+
                         # construct preds and example_actions based on task type ("Leave One Out")
                         if task_type == 'row':
                             preds = preds[1:]
-                            example_actions = example_actions[1:].tolist()
+                            example_actions = example_actions[1:-1].tolist()
                         elif task_type == 'stack':
                             inds = [0, 2, 3]
                             preds = [preds[i] for i in inds]
@@ -946,13 +1062,17 @@ def main(args):
 
                         # select preds based on primitive action selected in demo (theta, y, x)
                         if cycle_consistency:
-                            correspondences, nonlocal_variables['best_pix_ind'] = \
-                                    compute_cc_dist(preds, example_actions, metric=primitive_distance_method)
+                            correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
+                                    compute_cc_dist(preds, example_actions, demo_action_inds,
+                                            metric=primitive_distance_method, neighborhood_match=False, cc_match=False)
                         else:
-                            correspondences, nonlocal_variables['best_pix_ind'] = \
+                            correspondences, nonlocal_variables['best_pix_ind'], best_trainer_ind = \
                                     compute_demo_dist(preds, example_actions, metric=primitive_distance_method)
 
                         predicted_value = correspondences[nonlocal_variables['best_pix_ind']]
+
+                        # append best_trainer_ind to nonlocal_variables['best_trainer_log']
+                        nonlocal_variables['best_trainer_log'].append(best_trainer_ind)
 
                     else:
                         # Get pixel location and rotation with highest affordance prediction from the neural network algorithms (rotation, y, x)
@@ -964,13 +1084,13 @@ def main(args):
                 # NOTE: typically not necessary and can reduce final performance.
                 if heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'push' and no_change_count[0] >= 2:
                     print('Change not detected for more than two pushes. Running heuristic pushing.')
-                    nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap)
+                    nonlocal_variables['best_pix_ind'] = trainer.push_heuristic(valid_depth_heightmap[:, :, 0])
                     no_change_count[0] = 0
                     predicted_value = push_predictions[nonlocal_variables['best_pix_ind']]
                     use_heuristic = True
                 elif heuristic_bootstrap and nonlocal_variables['primitive_action'] == 'grasp' and no_change_count[1] >= 2:
                     print('Change not detected for more than two grasps. Running heuristic grasping.')
-                    nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap)
+                    nonlocal_variables['best_pix_ind'] = trainer.grasp_heuristic(valid_depth_heightmap[:, :, 0])
                     no_change_count[1] = 0
                     predicted_value = grasp_predictions[nonlocal_variables['best_pix_ind']]
                     use_heuristic = True
@@ -984,6 +1104,21 @@ def main(args):
                 trainer.predicted_value_log.append([predicted_value])
                 logger.write_to_log('predicted-value', trainer.predicted_value_log)
 
+                if use_demo:
+                    # Save selected policy NOTE(adit98) this is not a great method of doing this...
+                    if task_type == 'row':
+                        policy_names = {0: 'stack', 1: 'unstack', 2: 'vertical_square'}
+                    elif task_type == 'stack':
+                        policy_names = {0: 'row', 1: 'unstack', 2: 'vertical_square'}
+                    elif task_type == 'unstack':
+                        policy_names = {0: 'row', 1: 'stack', 2: 'vertical_square'}
+                    elif task_type == 'vertical_square':
+                        policy_names = {0: 'row', 1: 'stack', 2: 'unstack'}
+
+                    # TODO(adit98) store selected policy log
+                    selected_policy_log = [[policy_names[i]] for i in nonlocal_variables['best_trainer_log']]
+                    logger.write_to_log('selected-policy', selected_policy_log, fmt='%s')
+
                 # NOTE(zhe) compute the best (rotAng, x, y)
                 # Compute 3D position of pixel
                 print('Action: %s at (%d, %d, %d)' % (nonlocal_variables['primitive_action'], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]))
@@ -993,10 +1128,12 @@ def main(args):
 
                 # NOTE(zhe) calculate the action in terms of the robot pose
                 # Adjust start position of all actions, and make sure z value is safe and not too low
-                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x, best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap)
+                primitive_position, push_may_contact_something = robot.action_heightmap_coordinate_to_3d_robot_pose(best_pix_x,
+                        best_pix_y, nonlocal_variables['primitive_action'], valid_depth_heightmap[:, :, 0])
 
                 # Save executed primitive where [0, 1, 2] corresponds to [push, grasp, place]
-                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']], nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
+                trainer.executed_action_log.append([ACTION_TO_ID[nonlocal_variables['primitive_action']],
+                    nonlocal_variables['best_pix_ind'][0], nonlocal_variables['best_pix_ind'][1], nonlocal_variables['best_pix_ind'][2]])
                 logger.write_to_log('executed-action', trainer.executed_action_log)
 
                 # TODO(adit98) set this up to work with demos
@@ -1033,6 +1170,7 @@ def main(args):
                     # check if task is complete
                     if place and (check_row or task_type is not None):
                         # add for annotation process if we're not in the sim
+                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
                         try:
                             nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
                             nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
@@ -1041,28 +1179,32 @@ def main(args):
                             nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                             nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
-                        needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type)
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
-                                nonlocal_variables['stack'].next()
+                                # instead of calling next, set progress
+                                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
+
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                                 print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
                                 # print('nonlocal_variables[stack].goal_num_obj: ' + str(nonlocal_variables['stack'].goal_num_obj))
 
                             elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
-                                nonlocal_variables['stack'].next()
+                                # instead of calling next, set progress
+                                nonlocal_variables['stack'].set_progress(int(nonlocal_variables['stack_height']))
+
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
+
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj:
                                 if check_row and static_language_mask:
                                     secondary_check = nonlocal_variables['partial_stack_success']
-                                else: 
+                                else:
                                     secondary_check = True
-                                if secondary_check: 
+                                if secondary_check:
                                     print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                     if is_testing:
                                         # we are in testing mode which is frequently recorded,
@@ -1093,6 +1235,8 @@ def main(args):
                         # Check if the push caused a topple, size shift zero because
                         # place operations expect increased height,
                         # while push expects constant height.
+                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push[:, :, 0],
+                                use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
                         # add for annotation process if we're not in the sim
                         try:
                             nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
@@ -1101,8 +1245,6 @@ def main(args):
                             print(f"Threading issue: cannot set language metadata")
                             nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                             nonlocal_variables['language_metadata']['next_color_heightmap'] = None
-                        needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push,
-                                use_imitation=use_demo, task_type=task_type)
 
 
                 elif nonlocal_variables['primitive_action'] == 'grasp':
@@ -1113,8 +1255,8 @@ def main(args):
                         #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
 
-                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x]) or
-                            valid_depth_heightmap[best_pix_y][best_pix_x] < 0.01)):
+                    if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x][0]) or
+                            valid_depth_heightmap[best_pix_y][best_pix_x][0] < 0.01)):
                         # Skip noncontact actions we don't bother actually grasping if there is nothing there to grasp
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
                         print('Grasp action failure, heuristics determined grasp would not contact anything.')
@@ -1127,7 +1269,7 @@ def main(args):
                             object_color = grasp_color_name
                         else:
                             object_color = nonlocal_variables['stack'].object_color_index
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color) 
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
@@ -1143,7 +1285,8 @@ def main(args):
                         print('running check_stack_update_goal for grasp action')
                         nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
-                                depth_img=valid_depth_heightmap_grasp, task_type=task_type, use_imitation=use_demo)
+                                depth_img=valid_depth_heightmap_grasp[:, :, 0], task_type=task_type, use_imitation=use_demo,
+                                check_z_height=check_z_height)
 
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
@@ -1174,12 +1317,14 @@ def main(args):
                         over_block = not check_row
 
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block, intended_position=nonlocal_variables['intended_position'])
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block, save_history=save_history, intended_position=nonlocal_variables['intended_position'])
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
                     valid_depth_heightmap_place, color_heightmap_place, depth_heightmap_place, color_img_place, depth_img_place = get_and_save_images(robot, workspace_limits,
                             heightmap_resolution, logger, trainer, '2')
+                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place[:, :, 0],
+                            task_type=task_type, use_imitation=use_demo, check_z_height=check_z_height)
 
                     # TODO(elias) confirm this doesn't break anything
                     # add for annotation process if we're not in the sim
@@ -1191,8 +1336,6 @@ def main(args):
                         nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                         nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
-                    needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place,
-                            task_type=task_type, use_imitation=use_demo)
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
@@ -1206,16 +1349,16 @@ def main(args):
                             nonlocal_variables['stack'].next()
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
-                        if ((check_z_height and nonlocal_variables['stack_height'] > check_z_height_goal) or
+                        if ((check_z_height and nonlocal_variables['stack_height'] >= check_z_height_goal) or
                                 (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj))):
 
                             if check_row and static_language_mask:
                                 # make sure row actually matches goal, not just any row of 4
                                 secondary_check = nonlocal_variables['partial_stack_success']
-                            else: 
+                            else:
                                 secondary_check = True
 
-                            if secondary_check: 
+                            if secondary_check:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
                                     # we are in testing mode which is frequently recorded,
@@ -1410,10 +1553,6 @@ def main(args):
         robot.shutdown()
         return
 
-    if use_demo:
-        example_demos = load_all_demos(demo_path=args.demo_path, check_z_height=check_z_height,
-                task_type=args.task_type)
-
     num_trials = trainer.num_trials()
     do_continue = False
     best_dict = {}
@@ -1543,7 +1682,7 @@ def main(args):
             f = plt.figure()
             f.suptitle(str(trainer.iteration))
             f.add_subplot(1,3, 1)
-            plt.imshow(valid_depth_heightmap)
+            plt.imshow(valid_depth_heightmap[:, :, 0])
             f.add_subplot(1,3, 2)
             # f.add_subplot(1,2, 1)
             if robot.background_heightmap is not None:
@@ -1963,15 +2102,15 @@ def main(args):
             # Backpropagate
             if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop and not is_testing:
                 print('Running two step backprop()')
-                #if use_demo:
-                #    demo_color_heightmap, demo_depth_heightmap = \
-                #            demo.get_heightmaps(prev_primitive_action, prev_stack_height)
-                #    trainer.backprop(demo_color_heightmap, demo_depth_heightmap,
-                #            prev_primitive_action, prev_best_dict, label_value,
-                #            goal_condition=prev_goal_condition)
+                # NOTE(adit98) this is a WIP
+                if use_demo:
+                    backprop_trainer = trainers[prev_best_trainer_ind]
+                    backprop_trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
+                        prev_primitive_action, prev_best_pix_ind, label_value,
+                        goal_condition=prev_goal_condition)
                 trainer.backprop(prev_color_heightmap, prev_valid_depth_heightmap,
                         prev_primitive_action, prev_best_pix_ind, label_value,
-                        goal_condition=prev_goal_condition, use_demo=use_demo)
+                        goal_condition=prev_goal_condition)
 
         # While in simulated mode we need to keep count of simulator problems,
         # because the simulator's physics engine is pretty buggy. For example, solid
@@ -2078,8 +2217,12 @@ def main(args):
                 # Choose the next color block to grasp, or None if not running in goal conditioned mode
                 nonlocal_variables['stack'].next()
                 print('NEW GOAL COLOR: ' + str(robot.color_names[nonlocal_variables['stack'].object_color_index]) + ' GOAL CONDITION ENCODING: ' + str(nonlocal_variables['stack'].current_one_hot()))
+
         else:
             prev_color_success = None
+
+        if use_demo:
+            prev_best_trainer_ind = nonlocal_variables['best_trainer_log'][-1]
 
         # TODO(elias) this is where we check for trial completion nonlocal_variables['train_complete]
         #if nonlocal_variables['trial_complete']:
@@ -2158,11 +2301,11 @@ def parse_resume_and_snapshot_file_args(args):
     if args.stack_snapshot_file: multi_task_snapshot_files['stack'] = os.path.abspath(args.stack_snapshot_file)
     if args.row_snapshot_file: multi_task_snapshot_files['row'] = os.path.abspath(args.row_snapshot_file)
     if args.unstack_snapshot_file: multi_task_snapshot_files['unstack'] = os.path.abspath(args.unstack_snapshot_file)
-    if args.vertical_square_snapshot_file: multi_task_snapshot_files['vertical'] = os.path.abspath(args.vertical_square_snapshot_file)
+    if args.vertical_square_snapshot_file: multi_task_snapshot_files['vertical_square'] = os.path.abspath(args.vertical_square_snapshot_file)
 
     # if neither snapshot file is provided
     if continue_logging:
-        if (not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file):
+        if ((not args.check_row and not args.stack_snapshot_file) or (args.check_row and not args.row_snapshot_file)) and (args.task_type is None):
             snapshot_file = os.path.join(logging_directory, 'models', 'snapshot.reinforcement.pth')
             print('loading snapshot file: ' + snapshot_file)
             if not os.path.isfile(snapshot_file):
@@ -2237,9 +2380,7 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
     if robot.is_sim:
         # Dump scene state information to a file for analysis, training, and language models.
-        # TODO (elias) Uncomment
-        pass
-        #dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
+        dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 

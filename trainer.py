@@ -237,7 +237,11 @@ class Trainer(object):
         self.use_heuristic_log = np.loadtxt(os.path.join(transitions_directory, 'use-heuristic.log.txt'), **kwargs)
         self.use_heuristic_log = self.use_heuristic_log[0:self.iteration]
         self.use_heuristic_log = self.use_heuristic_log.tolist()
-        self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), **kwargs)
+        try:
+            self.is_exploit_log = np.loadtxt(os.path.join(transitions_directory, 'is-exploit.log.txt'), **kwargs)
+        except IOError as identifier:
+            print('WARNING: HACK TO WORKAROUND MISSING is-exploit log')
+            self.is_exploit_log = np.array([[0]]*self.iteration, dtype=int)
         self.is_exploit_log = self.is_exploit_log[0:self.iteration]
         self.is_exploit_log = self.is_exploit_log.tolist()
         if os.path.exists(os.path.join(transitions_directory, 'clearance.log.txt')):
@@ -776,7 +780,7 @@ class Trainer(object):
             print(reward_str)
             return expected_reward, current_reward
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, use_demo=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -794,7 +798,7 @@ class Trainer(object):
             f = plt.figure()
             # f.suptitle(str(trainer.iteration))
             f.add_subplot(1,3, 1)
-            plt.imshow(depth_heightmap)
+            plt.imshow(depth_heightmap[:, :, 0])
             f.add_subplot(1,3, 2)
             # f.add_subplot(1,2, 1)
             # if contactable_regions is not None:
@@ -895,10 +899,6 @@ class Trainer(object):
             self.optimizer.step()
 
         elif self.method == 'reinforcement':
-            # TODO(adit98) figure out backprop for use_demo
-            if use_demo:
-                raise NotImplementedError
-
             self.optimizer.zero_grad()
             # Compute labels
             label = np.zeros((1,self.buffered_heightmap_pixels,self.buffered_heightmap_pixels))
@@ -926,17 +926,9 @@ class Trainer(object):
                 # If the current argmax is masked, the geometry indicates the action would not contact anything.
                 # Therefore, we know the action would fail so train the argmax value with 0 reward.
                 # This new common sense reward will have the same weight as the actual historically executed action.
-
-                # TODO(adit98) figure out common sense backprop for use_demo
-                if use_demo:
-                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
-                            demo_space_argmax(primitive_action, best_pix_ind, push_predictions,
-                                    grasp_predictions, place_predictions)
-                    raise NotImplementedError
-                else:
-                    new_best_pix_ind, each_action_max_coordinate, predicted_value = \
-                            action_space_argmax(primitive_action, push_predictions,
-                                    grasp_predictions, place_predictions)
+                new_best_pix_ind, each_action_max_coordinate, predicted_value = \
+                        action_space_argmax(primitive_action, push_predictions,
+                                grasp_predictions, place_predictions)
 
                 predictions = {0:push_predictions, 1: grasp_predictions, 2: place_predictions}
                 if predictions[action_id].mask[each_action_max_coordinate[primitive_action]]:

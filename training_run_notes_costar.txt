@@ -1947,17 +1947,62 @@ GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab
 DEPTH CHANNEL HISTORY, DENSENET - SIM 2x2 VERTICAL SQUARE - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-08
 ----------------------------------------------------------------------------------------
 
-± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_iter 40000 --random_actions --task_type vertical_square --depth_channels_history 
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type vertical_square --depth_channels_history 
 CANCELLED due to place mask bug: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-12-47-05_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
 CANCELLED due to place mask bug: Commit: d7a2e679edfdae0a0a7534fae0bb4ac1397f77ca
 CANCELLED Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-19-21_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
 Commit: a98b11806fcd3e007b13daae66ed343badc9a94f
 # we found a bug
 CANCELLED RESUME: Commit: f67622f4d3ed5dbe24e4ff74646ccf425e8a71e5
-CANCELLED RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_iter 40000 --random_actions --task_type vertical_square --depth_channels_history --resume '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-19-21_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History' 
+CANCELLED RESUME: ± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19990 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type vertical_square --depth_channels_history --resume '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-19-21_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History' 
 Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
 Commit: 1f61699ac1a29f00fcfd787fe5e4ce39b0fb46d0
 GPU 0, Tab 0, port 19990, left v-rep window, v-rep tab 7
+
+> STACK:  trial: 101 actions/partial: 4.437246963562753  actions/full stack: 12.744186046511627 (lower is better)  Grasp Count: 584, grasp success rate: 0.8801369863013698 place_on_stack_rate: 0.482421875 place_attempts: 512  partial_stack_successes: 247  stack_successes: 86 trial_success_rate: 0.8514851485148515 stack goal: [3 0] current_height: 2
+> trial_complete_indices: [   4.   10.   14.   23.   27.   49.   57.   87.   95.   99.  106.  114.
+>   120.  134.  138.  157.  161.  171.  177.  183.  213.  243.  247.  251.
+>   255.  270.  280.  310.  326.  330.  334.  338.  354.  363.  369.  391.
+>   398.  412.  442.  451.  474.  480.  510.  538.  542.  569.  573.  603.
+>   611.  620.  624.  629.  635.  644.  648.  672.  676.  681.  687.  691.
+>   695.  711.  719.  728.  732.  738.  742.  746.  760.  774.  804.  820.
+>   826.  848.  854.  860.  868.  873.  881.  887.  893.  899.  907.  932.
+>   936.  952.  956.  969.  998. 1005. 1009. 1013. 1018. 1024. 1030. 1034.
+>  1052. 1058. 1069. 1091. 1095.]
+> Max trial success rate: 0.85, at action iteration: 1092. (total of 1094 actions, max excludes first 1092 actions)
+> Max grasp success rate: 0.8814432989690721, at action iteration: 1092. (total of 1094 actions, max excludes first 1092 actions)
+> Max place success rate: 0.45401174168297453, at action iteration: 1092. (total of 1095 actions, max excludes first 1092 actions)
+> Max action efficiency: 0.4725274725274725, at action iteration: 1092. (total of 1095 actions, max excludes first 1092 actions)
+> saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History-Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:438: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:440: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History/best_stats.json
+> Random Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History
+> Random Testing results:
+>  {'trial_success_rate_best_value': 0.85, 'trial_success_rate_best_index': 1092, 'grasp_success_rate_best_value': 0.8814432989690721, 'grasp_success_rate_best_index': 1092, 'place_success_rate_best_value': 0.45401174168297453, 'place_success_rate_best_index': 1092, 'action_efficiency_best_value': 0.4725274725274725, 'action_efficiency_best_index': 1092}
+> Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+> Training results:
+>  {'action_efficiency_best_index': 16788, 'action_efficiency_best_value': 0.612, 'grasp_success_rate_best_index': 38828, 'grasp_success_rate_best_value': 0.908745247148289, 'place_success_rate_best_index': 16829, 'place_success_rate_best_value': 0.5770925110132159, 'trial_success_rate_best_index': 28806, 'trial_success_rate_best_value': 0.7916666666666666}
+
+VERTICAL SQUARE 2021-02-09-22-31-35 BEST TEST RUN: {"ablation": null, "check_row": false, "check_z_height": false, "check_z_height_goal": 4.0, "check_z_height_max": 6.0, "common_sense": true, "demo_path": null, "depth_channels_history": true, "disable_situation_removal": false, "disable_two_step_backprop": false, "discounted_reward": false, "evaluate_random_objects": false, "experience_replay": true, "explore_rate_decay": true, "flops": false, "force_cpu": false, "future_reward_discount": 0.65, "grasp_color_task": false, "grasp_only": false, "heightmap_resolution": 0.002, "heuristic_bootstrap": false, "is_sim": true, "is_testing": true, "max_iter": -1, "max_test_trials": 100, "max_train_actions": 40000, "method": "reinforcement", "nn": "densenet", "no_common_sense_backprop": false, "no_height_reward": false, "num_dilation": 0, "num_extra_obj": 0, "num_obj": 4, "obj_mesh_dir": "objects/blocks", "place": true, "plot_window": 500, "push_rewards": true, "random_actions": true, "random_seed": 1238, "random_trunk_weights_max": 0, "random_trunk_weights_min_success": 4, "random_trunk_weights_reset_iters": 0, "random_weights": false, "resume": null, "row_snapshot_file": "", "rtc_host_ip": "192.168.1.155", "rtc_port": 30003, "save_visualizations": true, "show_heightmap": false, "show_preset_cases_then_exit": false, "skip_noncontact_actions": false, "snapshot_file": "/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/models/snapshot.reinforcement_trial_success_rate_best_value.pth", "stack_snapshot_file": "", "static_language_mask": false, "task_type": "vertical_square", "tcp_host_ip": "192.168.1.155", "tcp_port": 19990, "test_preset_cases": false, "test_preset_dir": "simulation/test-cases/", "test_preset_file": "", "timeout": 60, "transfer_grasp_to_place": false, "trial_reward": false, "unstack": false, "unstack_snapshot_file": "", "use_demo": false, "vertical_square_snapshot_file": ""}
+> {"action_efficiency_best_index": 4514, "action_efficiency_best_value": 0.11835106382978723, "grasp_success_rate_best_index": 4512, "grasp_success_rate_best_value": 0.8905660377358491, "place_success_rate_best_index": 4512, "place_success_rate_best_value": 0.45112781954887216, "trial_success_rate_best_index": 4512, "trial_success_rate_best_value": 0.88}
+> total trials: 101 (clearance_length, total number of trials)
+> num trials evaluated: 100 start trial: 0
+> avg max height: 3.88 (higher is better, find max height for each trial, then average those values)
+> avg max progress: 0.97 (higher is better,  (avg(round(max_heights))/4.0))
+> avg reversals: 0.44 (lower is better)
+> avg recoveries: 0.7272727272727273 (higher is better, no need for recovery attempts is best)
+> avg logged trial success: 0.88 (successful trials according to trial_success_log.txt)
+> avg trial success: 0.88 (higher is better,  (success_height - epsilon) height or higher)
+> action efficiency with 6 action per trial optimum: 0.13315579227696406 action efficiency with 4 action per trial optimum: 0.0887705281846427
+> data dir: /home/costar/src/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-18-17-40-48_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History
 
 
 
@@ -1966,7 +2011,7 @@ X ------------------------------------------------------------------------------
 X 
 X cancelled due to unstacking reset bugs
 X 
-X ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_iter 40000 --random_actions --task_type unstacking --depth_channels_history 
+X ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type unstacking --depth_channels_history 
 X CANCELLED DUE TO PLACE COUNT BUG: Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-15-11-28_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
 X CANCELLED DUE TO PLACE COUNT BUG: Commit: a98b11806fcd3e007b13daae66ed343badc9a94f
 X Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-37-32_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
@@ -1978,17 +2023,313 @@ X Commit : 8c1f7c1ea7032b4743a75520af6d6bc697c77f12
 X GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
-DEPTH CHANNEL HISTORY, DENSENET - SIM UNSTACKING - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-11
+x DEPTH CHANNEL HISTORY, DENSENET - SIM UNSTACKING - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-11
+x ----------------------------------------------------------------------------------------
+x 
+x cancelled due to place + topple -> success bug.
+x 
+X ± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type unstacking --depth_channels_history 
+X Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-11-17-11-57_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
+X PUSH BUG: Commit : 3576829f60c047d4d5b2465e144d12e0ff7fc950
+X RESUME: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type unstacking --depth_channels_history --resume '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-11-20-52-14_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History'
+X First resume Commit: 0cd323c2ec8509e3b5f1240897c7c1360824368c
+X Commit: 81b1e73a4b6248ebedc5443fed0520ff0bebd777
+X GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
+
+
+DEPTH CHANNEL HISTORY, DENSENET - SIM 2x2 VERTICAL SQUARE - SPOT-Q-MASKED SPOT FRAMEWORK - COMMON SENSE - PROGRESS REWARD - FULL FEATURED RUN - REWARD SCHEDULE 0.1, 1, 1 - costar 2020-02-07
 ----------------------------------------------------------------------------------------
 
-± export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_iter 40000 --random_actions --task_type unstacking --depth_channels_history 
-Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-11-17-11-57_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History
-Commit : 3576829f60c047d4d5b2465e144d12e0ff7fc950
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type vertical_square --depth_channels_history 
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-17-13-30-05_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+Commit: c989e94999ed44eba3835c4a1d8bca3a7b5dec18
+Resume after 850 actions
+Resume: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type vertical_square --depth_channels_history --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-17-13-30-05_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+Commit: 59f321193e852e9927a81aace7dc47a62b7b4b08
+
+resume due to some tweaks for detecting simulator errors
+Resume2: export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --random_seed 1238 --max_train_actions 40000 --random_actions --task_type vertical_square --depth_channels_history --resume /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-17-13-30-05_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History
+Commit: 82b571830ee5ae6da5630d12b9e3c649f075f8d0
 GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 
 
 
 
+SIM STACK - SPOT STANDARD - TRIAL REWARD - RANDOM ACTIONS - REWARD SCHEDULE 0.1, 1, 1 - workstation named costar 2021-07-20
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --tcp_port 19990 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --trial_reward --common_sense
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-20-16-41-11_Sim-Stack-SPOT-Trial-Reward-Masked-Training
+Commit: b8798ea07167dff5c8fcf5cd11c3ace2b4a0e22d  
+Resume Commit: 61758dd9f669e57245160a3e1aad4017bafb88df (stopped to try a separate experiment, not due to a problem with this run)
+GPU 0, Tab 0, port 19990, left center v-rep window, v-rep tab 7
+
+
+
+
+config mistake - SIM TO REAL stacking - load multiple time step model, run with single time step
+----------------------------------------------------------------------------------------
+
+Commit: 8d08a160efc75f91dc358a88cfa61334b799b06c
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --save_visualizations --random_actions --common_sense --trial_reward --snapshot_file '/home/costar/Downloads/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History-brst-model/snapshot.reinforcement_action_efficiency_best_value.pth'
+Creating data logging session: '/home/costar/src/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing' 
+
+Note: one successful trial was incorrectly marked as a failure, I believe trial 6 or 7.
+The trial success rate of this is actually 100%, the trial detector made an error.
+
+> WARNING: get_heightmap() depth_heightmap contains negative heights with min -0.02579273700402497, saved depth heightmap png files may be invalid! See README.md for instructions to collect the depth heightmap again. Clipping the minimum to 0 for now.
+> prev_height: 0.0 max_z: 0.03368447387620977 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> prev_height: 1.0 max_z: 0.7410584252766149 goal_success: False needed to reset: False max_workspace_height: 0.56 <<<<<<<<<<<
+> check_stack() stack_height: 0.7410584252766149 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 11 actions/partial: 3.4285714285714284  actions/full stack: 14.4 (lower is better)  Grasp Count: 85, grasp success rate: 0.6941176470588235 place_on_stack_rate: 0.711864406779661 place_attempts: 59  partial_stack_successes: 42  stack_successes: 10 trial_success_rate: 0.9090909090909091 stack goal: None current_height: 0.7410584252766149
+> Move to Home Position Complete
+> tcp port: 192.168.1.155
+> Move to Home Position Complete
+> trial_complete_indices: [ 13.  20.  28.  48.  65.  71.  96. 105. 113. 124. 143.]
+> Max trial success rate: 0.9, at action iteration: 140. (total of 142 actions, max excludes first 140 actions)
+> Max grasp success rate: 0.7108433734939759, at action iteration: 141. (total of 142 actions, max excludes first 140 actions)
+> Max place success rate: 0.8305084745762712, at action iteration: 142. (total of 143 actions, max excludes first 140 actions)
+> Max action efficiency: 0.5142857142857142, at action iteration: 142. (total of 143 actions, max excludes first 140 actions)
+> saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/grasp-success-rate.log.csv
+> saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/place-success-rate.log.csv
+> saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing-Real-Stack-SPOT-Trial-Reward-Masked-Testing_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/data/best_stats.json
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing/best_stats.json
+> Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-17-26-27_Real-Stack-SPOT-Trial-Reward-Masked-Testing
+> Training results:
+>  {'trial_success_rate_best_value': 0.9, 'trial_success_rate_best_index': 140, 'grasp_success_rate_best_value': 0.7108433734939759, 'grasp_success_rate_best_index': 141, 'place_success_rate_best_value': 0.8305084745762712, 'place_success_rate_best_index': 142, 'action_efficiency_best_value': 0.5142857142857142, 'action_efficiency_best_index': 142}
+
+
+
+SIM TO REAL stacking - load multiple time step model
+----------------------------------------------------------------------------------------
+
+Commit: 8d08a160efc75f91dc358a88cfa61334b799b06c
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8 --push_rewards --experience_replay --explore_rate_decay --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --save_visualizations --random_actions --common_sense --trial_reward --depth_channels_history --snapshot_file '/home/costar/Downloads/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History-brst-model/snapshot.reinforcement_action_efficiency_best_value.pth'
+TODO(ahundt) run this
+
+=================================================================
+good robot, watch this!
+
+Commit ID: `c5e37aca2d66f31099be3dc0d3eda5b7cc0d621b`
+
+Stack:
+ python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
+
+Row:
+ python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
+
+Unstacking:
+ python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
+
+Vertical Square:
+ python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/best_stack/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --cycle_consistency --no_common_sense_backprop --timeout 120
+
+
+
+SIM WATCH THIS VERTICAL SQUARE - GLOBAL CYCLE CONSISTENCY - with backprop - 2021-02-27
+----------------------------------------------------------------------------------------
+
+
+export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file 'logs/base_models/best_stack/snapshot.reinforcement_trial_success_rate_best_index.pth' --unstack_snapshot_file logs/base_models/best_unstacking/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/best_rows/snapshot.reinforcement_trial_success_rate_best_value.pth --grasp_only --cycle_consistency --no_common_sense_backprop --timeout 120 --tcp_port 19998
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-27-16-36-11_Sim-Vertical-Square-Imitation-Masked-Testing
+Commit: 8d08a160efc75f91dc358a88cfa61334b799b06c
+
+
+
+X SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+X ----------------------------------------------------------------------------------------
+X killed because of human error, removing all blocks from scene during a run.
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --timeout 120
+X Commit: 8eed6ccdc21d8be3b1ce4f387805e19766226709
+
+
+
+SIM TO REAL WATCH THIS - UNSTACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-28
+----------------------------------------------------------------------------------------
+± export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop             
+Commit: 5a02e9f1755db8ea78b944b78a7c9a06424a6143
+Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/
+
+On trial 5, ignore the first two actions, I didn't restack right away.
+Note: 1 trial was counted as successful but was actually a failure.
+Trial success rate: 90%
+Action efficiencey: 82% (60/73)
+
+> Max trial success rate: 1.0, at action iteration: 73. (total of 75 actions, max excludes first 73 actions)
+> Max grasp success rate: 0.8974358974358975, at action iteration: 73. (total of 75 actions, max excludes first 73 actions)
+> Max place success rate: 0.9714285714285714, at action iteration: 73. (total of 76 actions, max excludes first 73 actions)
+> Max action efficiency: 1.9726027397260273, at action iteration: 75. (total of 76 actions, max excludes first 73 actions)
+> saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History-Real-Unstacking-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Testing Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-14-27-07_Real-Unstacking-Imitation-Masked-Testing-Three-Step-History
+> Testing results:
+>  {'trial_success_rate_best_value': 1.0, 'trial_success_rate_best_index': 73, 'grasp_success_rate_best_value': 0.8974358974358975, 'grasp_success_rate_best_index': 73, 'place_success_rate_best_value': 0.9714285714285714, 'place_success_rate_best_index': 73, 'action_efficiency_best_value': 1.9726027397260273, 'action_efficiency_best_index': 75}
+
+
+
+
+
+SIM TO REAL WATCH THIS - STACKING - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos/ --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --disable_two_step_backprop
+Commit: 14e709dcd2089f10491049de7f16a7918480b1e6
+X CRASH (cancelled) Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-09-05_Real-Stack-Imitation-Masked-Testing-Three-Step-History
+Creating data logging session: '/media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History' 
+
+
+Trial 6 had a problem and might not have been reset before starting, skip that trial's score.
+The final trial succeeded, for a total of 3/10 trial success
+Efficiency: 25% 60/(269-30)
+
+> Move to Home Position Complete
+> Grasp successful: False
+> Move to Home Position Complete
+> WARNING: get_heightmap() depth_heightmap contains negative heights with min -0.02440699668561084, saved depth heightmap png files may be invalid! See README.md for instructions to collect the depth heightmap again. Clipping the minimum to 0 for now.
+> prev_height: 0.0 max_z: 0.033565873317433235 goal_success: True needed to reset: False max_workspace_height: -0.02 <<<<<<<<<<<
+> running check_stack_update_goal for grasp action
+> prev_height: 1.0 max_z: 0.7384492129835312 goal_success: False needed to reset: False max_workspace_height: 0.56 <<<<<<<<<<<
+> check_stack() stack_height: 0.7384492129835312 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+> main.py() process_actions: place_success: False
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 11 actions/partial: 4.285714285714286  actions/full stack: 90.0 (lower is better)  Grasp Count: 156, grasp success rate: 0.7307692307692307 place_on_stack_rate: 0.5526315789473685 place_attempts: 114  partial_stack_successes: 63  stack_successes: 3 trial_success_rate: 0.2727272727272727 stack goal: [3 1] current_height: 0.7384492129835312
+> Move to Home Position Complete
+> Move to Home Position Complete
+> trial_complete_indices: [ 29.  42.  53.  83. 113. 143. 173. 203. 233. 263. 269.]
+> Max trial success rate: 0.2, at action iteration: 266. (total of 268 actions, max excludes first 266 actions)
+> Max grasp success rate: 0.7402597402597403, at action iteration: 267. (total of 268 actions, max excludes first 266 actions)
+> Max place success rate: 0.7280701754385965, at action iteration: 268. (total of 269 actions, max excludes first 266 actions)
+> Max action efficiency: 0.06766917293233082, at action iteration: 268. (total of 269 actions, max excludes first 266 actions)
+> saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History-Real-Stack-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-28-17-19-14_Real-Stack-Imitation-Masked-Testing-Three-Step-History
+> XX Training results: 
+> XX {'trial_success_rate_best_value': 0.2, 'trial_success_rate_best_index': 266, 'grasp_success_rate_best_value': 0.7402597402597403, 'grasp_success_rate_best_index': 267, 'place_success_rate_best_value': 0.7280701754385965, 'place_success_rate_best_index': 268, 'action_efficiency_best_value': 0.06766917293233082, 'action_efficiency_best_index': 268}
+
+With corrections from human observation:
+
+> Testing results: 
+>  {'trial_success_rate_best_value': 0.3, 'trial_success_rate_best_index': 266, 'grasp_success_rate_best_value': 0.7402597402597403, 'grasp_success_rate_best_index': 267, 'place_success_rate_best_value': 0.7280701754385965, 'place_success_rate_best_index': 268, 'action_efficiency_best_value': 0.2510460251, 'action_efficiency_best_index': 268}
+
+
+
+SIM TO REAL WATCH THIS - ROWS - GLOBAL CYCLE CONSISTENCY - no backprop - 2021-02-27
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type row --is_testing --use_demo --demo_path demos/row_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --vertical_square_snapshot_file logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --depth_channels_history --cycle_consistency --disable_two_step_backprop
+Creating data logging session: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/
+Commit: 1bd62ebd45e7c35bca0f9fda6323213bd4852593
+
+> main.py() process_actions: partial_stack_success: False
+> STACK:  trial: 12 actions/partial: 3.5135135135135136  actions/full stack: 21.666666666666668 (lower is better)  Grasp Count: 78, grasp success rate: 0.6666666666666666 place_on_stack_rate: 0.7115384615384616 place_attempts: 52  partial_stack_successes: 37  stack_successes: 6 trial_success_rate: 0.5 stack goal: [3 1 2] current_height: 1.0
+> Move to Home Position Complete
+> Move to Home Position Complete
+> trial_complete_indices: [  4.  10.  12.  20.  25.  25.  40.  70.  74.  79. 105. 129.]
+> Max trial success rate: 0.5454545454545454, at action iteration: 126. (total of 128 actions, max excludes first 126 actions)
+> Max grasp success rate: 0.6842105263157895, at action iteration: 126. (total of 128 actions, max excludes first 126 actions)
+> Max place success rate: 0.7115384615384616, at action iteration: 127. (total of 129 actions, max excludes first 126 actions)
+> Max action efficiency: 0.2857142857142857, at action iteration: 126. (total of 129 actions, max excludes first 126 actions)
+> saving trial success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/trial-success-rate.log.csv
+> saving grasp success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/grasp-success-rate.log.csv
+> saving place success rate: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/place-success-rate.log.csv
+> saving action efficiency: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/transitions/action-efficiency.log.csv
+> saving plot: 2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History-Real-Row-Imitation-Masked-Testing-Three-Step-History_success_plot.png
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+> /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+>   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+> saving best stats to: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+> saving best stats to: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+> Training Complete! Dir: /home/costar/src/real_good_robot/logs/2021-03-02-18-33-42_Real-Row-Imitation-Masked-Testing-Three-Step-History
+> Training results:
+>  {'trial_success_rate_best_value': 0.5454545454545454, 'trial_success_rate_best_index': 126, 'grasp_success_rate_best_value': 0.6842105263157895, 'grasp_success_rate_best_index': 126, 'place_success_rate_best_value': 0.7115384615384616, 'place_success_rate_best_index': 127, 'action_efficiency_best_value': 0.2857142857142857, 'action_efficiency_best_index': 126}
+
+We looked at the images from above and manually counted, this left the trial success rate at 30%.
+There were also two trials where there was a code crash due to a typo, two of trials 4, 5, 6, and we removed the relevant two trials from being counted.
+
+
+
+
+
+X SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - NO backprop - with cycle consistency - 2021-03-03
+X ----------------------------------------------------------------------------------------
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency --disable_two_step_backprop
+X Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+X GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
+X 
+X STOPPED to run config below (limited time)
+
+
+
+W WARNING SINGLE TIME STEP INPUT WITH THREE TIME STEP MODEL - SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - NO backprop - with cycle consistency - 2021-03-03
+W ----------------------------------------------------------------------------------------
+W export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency
+W Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing
+W Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+W GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
+W 
+W > For task VERTICAL_SQUARE input current structure size: 1
+W > check_stack() stack_height: 1.0 stack matches current goal: False partial_stack_success: False Does the code think a reset is needed: False Does the code think the stack toppled: None
+W > main.py() process_actions: place_success: False
+W > main.py() process_actions: partial_stack_success: False
+W > STACK:  trial: 11 actions/partial: 4.8936170212765955  actions/full stack: 230.0 (lower is better)  Grasp Count: 136, grasp success rate: 0.6911764705882353 place_on_stack_rate: 0.5 place_attempts: 94  partial_stack_successes: 47  stack_successes: 1 trial_success_rate: 0.09090909090909091 stack goal: [3 1 2] current_height: 1.0
+W > Move to Home Position Complete
+W > Move to Home Position Complete
+W > trial_complete_indices: [ 29.  38.  68.  81. 111. 134. 164. 184. 196. 217. 229.]
+W > Max trial success rate: 0.1, at action iteration: 226. (total of 228 actions, max excludes first 226 actions)
+W > Max grasp success rate: 0.7014925373134329, at action iteration: 227. (total of 228 actions, max excludes first 226 actions)
+W > Max place success rate: 0.5053763440860215, at action iteration: 226. (total of 229 actions, max excludes first 226 actions)
+W > Max action efficiency: 0.02654867256637168, at action iteration: 226. (total of 229 actions, max excludes first 226 actions)
+W > saving trial success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/trial-success-rate.log.csv
+W > saving grasp success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/grasp-success-rate.log.csv
+W > saving place success rate: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/place-success-rate.log.csv
+W > saving action efficiency: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/transitions/action-efficiency.log.csv
+W > saving plot: 2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing-Real-Vertical-Square-Imitation-Masked-Testing_success_plot.png
+W > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:439: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+W >   plt.savefig(save_file + file_format, dpi=300, optimize=True)
+W > /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/plot.py:441: MatplotlibDeprecationWarning: savefig() got unexpected keyword argument "optimize" which is no longer supported as of 3.3 and will become an error two minor releases later
+W >   plt.savefig(log_dir_fig_file + file_format, dpi=300, optimize=True)
+W > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/data/best_stats.json
+W > saving best stats to: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing/best_stats.json
+W > Training Complete! Dir: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-03-03-16-59-18_Real-Vertical-Square-Imitation-Masked-Testing
+W > Training results: 
+W >  {'trial_success_rate_best_value': 0.1, 'trial_success_rate_best_index': 226, 'grasp_success_rate_best_value': 0.7014925373134329, 'grasp_success_rate_best_index': 227, 'place_success_rate_best_value': 0.5053763440860215, 'place_success_rate_best_index': 226, 'action_efficiency_best_value': 0.02654867256637168, 'action_efficiency_best_index': 226}
+W 
+W Efficiency correction: (10*6)/226
+
+
+
+
+SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watch this imitation - WITH backprop - with cycle consistency - 2021-03-03
+----------------------------------------------------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
+Commit: 5b738b22f279e862dde5df914421d0dd7436f026
+GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
 
 
 
@@ -1996,7 +2337,15 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 2021-06-10 LANGUAGE MODEL tests
 ================================
 
-SIM BASELINE TEST
+LANGUAGE SIM BASELINE TEST, REAL MODEL
 
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --end_on_incorrect_order --is_sim --human_annotation
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --grasp_color_task --task_type stack
 Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+LANGUAGE SIM BASELINE TEST, SIM MODEL
+
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/sim_stacks/config.yaml --language_model_weights language_models/sim_stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --grasp_color_task --task_type stack
+Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+
+

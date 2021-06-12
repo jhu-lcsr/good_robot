@@ -42,10 +42,6 @@ class Demonstration():
                     'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
 
     def get_heightmaps(self, action_str, stack_height, use_hist=False, history_len=3):
-        # e.g. initial rgb filename is 000000.orig.color.png, only for stack demos
-        if action_str != 'orig' and self.task_type == 'stack':
-            action_str = str(stack_height) + action_str
-
         rgb_filename = os.path.join(self.rgb_dir,
                 '%06d.%s.%d.color.png' % (stack_height, action_str, self.demo_num))
         depth_filename = os.path.join(self.depth_dir,
@@ -198,11 +194,12 @@ class Demonstration():
         # if we aren't using cycle consistency, return best action's embedding
         if not cycle_consistency:
             # return best action for each model, primitive_action
-            return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action]
+            return best_action_row, best_action_stack, best_action_unstack, best_action_vertical_square, ACTION_TO_ID[primitive_action], None
 
         # otherwise, return the entire 16x224x224 embedding space (only for selected primitive action)
         else:
-            return stack_feat, row_feat, unstack_feat, vertical_square_feat, ACTION_TO_ID[primitive_action]
+            action_ind = (best_rot_ind, best_action_xy[1], best_action_xy[0])
+            return row_feat, stack_feat, unstack_feat, vertical_square_feat, ACTION_TO_ID[primitive_action], action_ind
 
 def load_all_demos(demo_path, check_z_height, task_type):
     """

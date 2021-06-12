@@ -52,8 +52,10 @@ data/*
 
 figures/
 
-.vscode
+**/.ipynb_checkpoints
 .vscode/*
 
 tune_files
 tune_files/*
+
+language_models/

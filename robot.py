@@ -159,6 +159,7 @@ class Robot(object):
 
         # task type (defaults to None)
         self.task_type = task_type
+        # self.capture_logoblock_dataset = capture_logoblock_dataset
 
         # If in simulation...
         if self.is_sim:
@@ -741,66 +742,70 @@ class Robot(object):
             goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
-            print("------- UNSTACKING --------")
+            print("------- SCENE RESET --------")
 
             if len(self.place_pose_history) == 0:
                 print("NO PLACE HISTORY TO UNSTACK YET.")
                 print("HUMAN, PLEASE MOVE BLOCKS AROUND")
                 print("SLEEPING FOR 10 SECONDS")
-
+                # play a sound to get the human's attention.
+                print('\a')
                 for i in range(10):
                     print("SLEEPING FOR %d" % (10 - i))
                     time.sleep(1)
 
-                print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
+                print("-------- RESUMING AFTER MANUAL SCENE RESET --------")
 
-            place_pose_history = self.place_pose_history.copy()
-            place_pose_history.reverse()
-
-            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
-            place_pose_history.append(place_pose_history[-1])
-
-            holding_object = not(self.close_gripper())
-            # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
-            if holding_object:
-                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
-                rand_angle = rand_orientation[0]
-
-                self.place(rand_position, rand_angle, save_history=False)
             else:
-                self.open_gripper()
+                # note, this can be run in simulation so we can test the real robot unstacking operations in the simulator
+                place_pose_history = self.place_pose_history.copy()
+                place_pose_history.reverse()
 
-            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
-            for pose in place_pose_history:
-                x, y, z, angle = pose
+                # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
+                place_pose_history.append(place_pose_history[-1])
 
-                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
-
-                # get depth_heightmap pixel_coordinates of where the previous place was
-                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
-
-                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                y_pixel = min(y_pixel, 223)
-
-                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
-
-                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
-                # plus an offset. There
-                z = primitive_position[2]
-
-                grasp_success, color_success = self.grasp([x, y, z], angle)
-                if grasp_success:
+                holding_object = not(self.close_gripper())
+                # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
+                if holding_object:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle, save_history=False)
+                else:
+                    self.open_gripper()
 
-            # clear the place hisory after unstacking
-            self.place_pose_history = []
-            print("------- UNSTACKING COMPLETE --------")
+                # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+                for pose in place_pose_history:
+                    x, y, z, angle = pose
+
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+
+                    # get depth_heightmap pixel_coordinates of where the previous place was
+                    x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                    x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+
+                    y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                    y_pixel = min(y_pixel, 223)
+
+                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
+
+                    # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                    # plus an offset. There
+                    z = primitive_position[2]
+
+                    grasp_success, color_success = self.grasp([x, y, z], angle)
+                    if grasp_success:
+                        _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                        rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
+                        rand_angle = rand_orientation[0]
+
+                        self.place(rand_position, rand_angle, save_history=False)
+
+                # clear the place hisory after unstacking
+                self.place_pose_history = []
+
+            print("------- SCENE RESET COMPLETE --------")
 
         else:
             if self.is_sim:
@@ -2462,7 +2467,7 @@ class Robot(object):
         # success if we match or exceed current stack goal, also return structure size
         return structure_size >= len(current_stack_goal), structure_size
 
-    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1):
+    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1, check_z_height=False, depth_img=None):
         """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
 
         # Arguments
@@ -2476,18 +2481,22 @@ class Robot(object):
         success: will be True if the stack matches the specified order from bottom to top, False otherwise.
         stack_height: number of blocks in stack
         """
-        # get object positions (array with each object position)
-        pos = np.asarray(self.get_obj_positions())
+        if check_z_height:
+            _, stack_height, _ = self.check_z_height(depth_img, prev_structure_progress)
+            stack_height = int(np.rint(stack_height))
+        else:
+            # get object positions (array with each object position)
+            pos = np.asarray(self.get_obj_positions())
 
-        # sort indices of blocks by z value
-        low2high_idx = np.array(pos[:, 2]).argsort()
+            # sort indices of blocks by z value
+            low2high_idx = np.array(pos[:, 2]).argsort()
 
-        # check if we are currently holding a block, then we need to use -2 for top_idx
-        if pos[low2high_idx[-1], 2] > 0.2:
-            top_idx = -2
+            # check if we are currently holding a block, then we need to use -2 for top_idx
+            if pos[low2high_idx[-1], 2] > 0.2:
+                top_idx = -2
 
-        # run check stack to get height of stack
-        _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
+            # run check stack to get height of stack
+            _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
 
         # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
         structure_progress = 5 - stack_height
@@ -2499,6 +2508,33 @@ class Robot(object):
                 goal_success)
 
         return goal_success, structure_progress
+
+    def manual_progress_check(self, prev_structure_progress, task_type):
+
+        # play a sound to get the human's attention.
+        print('\a')
+        while True:
+            try:
+                progress = float(input(" ".join(["For task", task_type.upper(),
+                    "input current structure size: "])))
+                break
+            except ValueError:
+                print("ENTER AN INTEGER!!!!")
+                continue
+
+        if progress < prev_structure_progress:
+            needed_to_reset = True
+        else:
+            needed_to_reset = False
+
+        if progress > prev_structure_progress:
+            stack_matches_goal = True
+        elif task_type == 'unstack' and progress >= prev_structure_progress:
+            stack_matches_goal = True
+        else:
+            stack_matches_goal = False
+
+        return stack_matches_goal, progress, needed_to_reset
 
     def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
