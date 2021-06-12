@@ -358,7 +358,8 @@ def main(args):
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
                           'language_metadata': {},
-                          'color_partial_stack_success': None}
+                          'color_partial_stack_success': None
+                          }
 
     # Ignore these nonlocal_variables when saving/loading and resuming a run.
     # They will always be initialized to their default values
