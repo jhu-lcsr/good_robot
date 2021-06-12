@@ -183,9 +183,9 @@ class Robot(object):
             #                                [176, 122, 161], # purple
             #                                [118, 183, 178], # cyan
             #                                [255, 157, 167]])/255.0 #pink
-            if grasp_color_task:
+            if grasp_color_task or language:
                 self.color_space = np.asarray( [
-                                [255.0, 87.0, 89.0] # red
+                                [255.0, 87.0, 89.0], # red
                                 [78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
@@ -586,13 +586,14 @@ class Robot(object):
             # check sim, but we are already in the restart loop so don't recurse
             sim_ok = sim_started == vrep.simx_return_ok and self.check_sim(restart_if_not_ok=False)
 
-    def check_obj_in_scene(self, obj_handle, workspace_limits=None, buffer_meters=0.1):
+    def check_obj_in_scene(self, obj_handle, workspace_limits=None, buffer_meters=0.1, gripper_buffer_meters=0.1):
         """
-        Check if object/gripper specified by CoppeliaSim handle is in scene
+        Check if object/gripper specified by CoppeliaSim handle is in workspace limits or within a certain distance of the gripper
         Arguments:
             obj_handle: CoppeliaSim object handle
             workspace_limits: Workspace limit coordinates, defaults to self.workspace_limits
             buffer_meters: Amount of buffer to allow, defaults to 0.1
+            gripper_buffer_meters:  Amount of buffer to allow for gripper, defaults to 0.1, not checked if None
         """
 
         if workspace_limits is None:
@@ -601,7 +602,9 @@ class Robot(object):
         # get object position
         sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, -1, vrep.simx_opmode_blocking)
         sim_ok = pos[0] > workspace_limits[0][0] - buffer_meters and pos[0] < workspace_limits[0][1] + buffer_meters and pos[1] > workspace_limits[1][0] - buffer_meters and pos[1] < workspace_limits[1][1] + buffer_meters and pos[2] > workspace_limits[2][0] and pos[2] < workspace_limits[2][1]
-
+        if gripper_buffer_meters is not None:
+            sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, self.UR5_handle, vrep.simx_opmode_blocking)
+            sim_ok = sim_ok or np.linalg.norm(pos) < gripper_buffer_meters
         return sim_ok
 
     def check_sim(self, restart_if_not_ok=True):
