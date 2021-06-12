@@ -2287,7 +2287,7 @@ class Robot(object):
                 # print('distance_threshold: ', distance_threshold)
                 if top_pos[2] < (bottom_pos[2] + vert_distance_threshold / 2.0):
                     if not self.grasp_color_task:
-                        print('check_stack(): top object z pos ' + str(top_pos[2]) + ' not high enough for object idx: ' + str(idx) + ' possibly color: ' + self.color_names[min(idx, len(self.color_names)-1)])
+                        print('check_stack(): top object z pos ' + str(top_pos[2]) + ' not high enough for object idx: ' + str(idx) + ' possibly color: ' + self.color_names[idx % len(self.color_names)])
                     working_seq_found=False
                     max_height=max(max_height, idx + 1)
 

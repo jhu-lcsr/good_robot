@@ -26,9 +26,11 @@ class Pair:
         self.next_image = next_image
         self.next_location = next_location 
         self.w = w 
-        self.source_code = None 
+        self.source_code = None
+        self.source_num = None
         self.source_location = None
         self.target_code = None
+        self.target_num = None
         self.target_location = None
         self.relation_code = None
         self.resolution = resolution
@@ -181,28 +183,30 @@ class Pair:
                         print("label set to red")
                         flag = 1
                         pygame.quit()
-                        return "red"
+                        return 1, "red"
                     elif event.key in [pygame.K_2, pygame.K_g]: 
                         print("label set to green")
                         flag = 1
                         pygame.quit()
-                        return "green"
+                        return 3, "green"
                     elif event.key in [pygame.K_3, pygame.K_b]: 
                         print("label set to blue")
                         flag = 1
                         pygame.quit()
-                        return "blue"
+                        return 2, "blue"
                     elif event.key in [pygame.K_4, pygame.K_y]: 
                         print("label set to yellow")
                         flag = 1
                         pygame.quit()
-                        return "yellow"
+                        return 4, "yellow"
 
     def annotate_source_target(self, is_row):
-        source_color = self.annotate_one_color()
-        target_color = self.annotate_one_color() 
-        self.source_code = source_color 
+        source_num, source_color = self.annotate_one_color()
+        target_num, target_color = self.annotate_one_color() 
+        self.source_code = source_color
+        self.source_num = source_num
         self.target_code = target_color 
+        self.target_num = target_num
         return source_color, target_color 
 
     def infer_from_stacksequence(self, stack_sequence):
