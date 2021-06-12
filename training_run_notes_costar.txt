@@ -1996,7 +1996,15 @@ GPU 1, Tab 1, port 19998, right v-rep window, v-rep tab 8
 2021-06-10 LANGUAGE MODEL tests
 ================================
 
-SIM BASELINE TEST
+LANGUAGE SIM BASELINE TEST, REAL MODEL
 
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --end_on_incorrect_order --is_sim --human_annotation
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --grasp_color_task
 Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+LANGUAGE SIM BASELINE TEST, SIM MODEL
+
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/sim_stacks/config.yaml --language_model_weights language_models/sim_stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --grasp_color_task
+Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+
+
