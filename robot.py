@@ -159,7 +159,7 @@ class Robot(object):
 
         # task type (defaults to None)
         self.task_type = task_type
-        self.capture_logoblock_dataset = capture_logoblock_dataset
+        # self.capture_logoblock_dataset = capture_logoblock_dataset
 
         # If in simulation...
         if self.is_sim:

@@ -596,7 +596,9 @@ def main(args):
         # TODO(ahundt) BUG Figure out why a real stack of size 2 or 3 and a push which touches no blocks does not pass the stack_check and ends up a MISMATCH in need of reset. (update: may now be fixed, double check then delete when confirmed)
         if task_type is not None:
             # based on task type, call partial success function from robot, 'stack_height' represents task progress in these cases
-            if task_type == 'vertical_square':
+            if human_annotation:
+                stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
+            elif task_type == 'vertical_square':
                 if check_z_height:
                     stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
                 else:
@@ -704,7 +706,6 @@ def main(args):
                 nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
                 nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
-                stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
 
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
