@@ -391,7 +391,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask) 
+                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask)
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -700,10 +700,11 @@ def main(args):
                                                                 nonlocal_variables['language_metadata']['prev_color_heightmap'],
                                                                 nonlocal_variables['language_metadata']['next_color_heightmap'])
 
-                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
-                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
+                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
+                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
                 nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
+                stack_matches_goal, nonlocal_variables['stack_height'], needed_to_reset = robot.manual_progress_check(nonlocal_variables['prev_stack_height'], task_type)
 
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
@@ -1200,9 +1201,9 @@ def main(args):
                             if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj:
                                 if check_row and static_language_mask:
                                     secondary_check = nonlocal_variables['partial_stack_success']
-                                else: 
+                                else:
                                     secondary_check = True
-                                if secondary_check: 
+                                if secondary_check:
                                     print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                     if is_testing:
                                         # we are in testing mode which is frequently recorded,
@@ -1267,7 +1268,7 @@ def main(args):
                             object_color = grasp_color_name
                         else:
                             object_color = nonlocal_variables['stack'].object_color_index
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color) 
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color)
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
@@ -1353,10 +1354,10 @@ def main(args):
                             if check_row and static_language_mask:
                                 # make sure row actually matches goal, not just any row of 4
                                 secondary_check = nonlocal_variables['partial_stack_success']
-                            else: 
+                            else:
                                 secondary_check = True
 
-                            if secondary_check: 
+                            if secondary_check:
                                 print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
                                 if is_testing:
                                     # we are in testing mode which is frequently recorded,
