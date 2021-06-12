@@ -183,7 +183,7 @@ class Robot(object):
             #                                [176, 122, 161], # purple
             #                                [118, 183, 178], # cyan
             #                                [255, 157, 167]])/255.0 #pink
-            if grasp_color_task or language:
+            if grasp_color_task or num_obj == 4:
                 self.color_space = np.asarray( [
                                 [255.0, 87.0, 89.0], # red
                                 [78.0, 121.0, 167.0], # blue
