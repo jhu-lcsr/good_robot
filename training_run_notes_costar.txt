@@ -2351,4 +2351,4 @@ Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
 ROW LANGUAGE SIM TEST, SIM MODEL 2021-06-12
 ---------------------------------------------
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --static_language_mask --language_model_config language_models/sim_rows/config.yaml --language_model_weights language_models/sim_rows/best.th --snapshot_file logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_index.pth --end_on_incorrect_order --check_row --timeout 100000 --place --separation_threshold 0.08 --distance_threshold 0.04 --is_sim --human_annotation --task_type row --common_sense
-Commit: 01ae7236711d579be57b464534d7c6a0e5aa3f71
+Commit: 6116224e54c28697f378c8a867d10cad8f054d34
