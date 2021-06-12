@@ -506,7 +506,7 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        print(f"CURRENT STACK GOAL: {current_stack_goal}")
+        print(f'CURRENT STACK GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]))
         # no need to reset by default
         needed_to_reset = False
         toppled = None
@@ -601,7 +601,7 @@ def main(args):
                     needed_to_reset = True
                     insufficient_objs_in_scene = True
 
-        if human_annotation and grasp_color_task:
+        if human_annotation and static_language_mask:
             if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
                 nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None:
                 success_code, comment = annotate_success_manually(" ".join(nonlocal_variables['language_metadata']['command']),
@@ -611,6 +611,7 @@ def main(args):
                 # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
                 nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
                 nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
+                nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
 
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
@@ -1497,6 +1498,7 @@ def main(args):
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+
                 #print(nonlocal_variables['stack'].object_color_sequence, nonlocal_variables['stack'].object_color_index)
                 #pair = Pair.from_main_idxs(color_heightmap,
                 #                           valid_depth_heightmap,
@@ -1525,6 +1527,10 @@ def main(args):
 
                 # batchify a single example
                 language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+                # set the current top block color in the stack sequence
+                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index-1] = pair.target_num - 1
+                # set the future top block color in the stack sequence
+                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index] = pair.source_num - 1
 
         else:
             language_data_instance = None
