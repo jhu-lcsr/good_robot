@@ -4,6 +4,7 @@ import time
 import pickle
 import bz2
 import os
+import pdb
 import signal
 import sys
 import random
@@ -23,6 +24,7 @@ from utils import ACTION_TO_ID
 from utils import ID_TO_ACTION
 from utils import StackSequence
 from utils import compute_demo_dist, compute_cc_dist
+from utils import annotate_success_manually
 from utils_torch import action_space_argmax
 from utils_torch import action_space_explore_random
 from demo import Demonstration, load_all_demos
@@ -32,6 +34,9 @@ import copy
 import shutil
 import matplotlib
 import matplotlib.pyplot as plt
+from data import DatasetReader, GoodRobotDatasetReader
+from generate_logoblocks_images import BlockSetter
+from annotate_data import Pair
 
 def run_title(args):
     """
@@ -94,6 +99,7 @@ def main(args):
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
     num_obj = args.num_obj if is_sim or args.check_row or args.use_demo else None # Number of objects to add to simulation
     num_extra_obj = args.num_extra_obj if is_sim or args.check_row or args.use_demo else None
+    goal_num_obj = args.goal_num_obj
     timeout = args.timeout # time to wait before simulator reset
     if num_obj is not None:
         num_obj += num_extra_obj
@@ -166,6 +172,16 @@ def main(args):
     random_actions = args.random_actions
     # TODO(zhe) Added static language mask option
     static_language_mask = args.static_language_mask
+    baseline_language_mask = args.baseline_language_mask
+    is_bisk = args.is_bisk
+    human_annotation = args.human_annotation
+    randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
+    obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
+    language_model_config = args.language_model_config
+    language_model_weights = args.language_model_weights
+    end_on_incorrect_order = args.end_on_incorrect_order
+    separation_threshold = args.separation_threshold
+    distance_threshold = args.distance_threshold
 
     # -------------- Demo options -----------------------
     use_demo = args.use_demo
@@ -276,7 +292,8 @@ def main(args):
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, None,
                   place, grasp_color_task, unstack=unstack,
-                  heightmap_resolution=heightmap_resolution, task_type=task_type)
+                  heightmap_resolution=heightmap_resolution, randomized=randomized, obj_scale=obj_scale, task_type=task_type,
+                  language=static_language_mask)
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
@@ -374,7 +391,7 @@ def main(args):
                           place_common_sense=place_common_sense, show_heightmap=show_heightmap,
                           place_dilation=place_dilation, common_sense_backprop=common_sense_backprop,
                           trial_reward='discounted' if discounted_reward else 'spot',
-                          num_dilation=num_dilation)
+                          num_dilation=num_dilation, static_language_mask=static_language_mask, check_row = check_row, baseline_language_mask = baseline_language_mask) 
 
     if transfer_grasp_to_place:
         # Transfer pretrained grasp weights to the place action.
@@ -405,6 +422,8 @@ def main(args):
                           'prev_stack_height': 1,
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
+                          'language_metadata': {},
+                          'color_partial_stack_success': None,
                           'best_trainer_log': []}
 
     # load example_actions_dict if it exists
@@ -468,10 +487,13 @@ def main(args):
     else:
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
+    # color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
+    color_names = robot.object_colors
     if num_obj is not None:
-        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
+        nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, goal_num_obj=goal_num_obj, is_goal_conditioned_task=is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
     else:
-        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration)
+        nonlocal_variables['stack'] = StackSequence(20, is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
+
 
     num_trials = 0
     if continue_logging:
@@ -556,6 +578,7 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
+        print(f'CURRENT STACK GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]))
         # no need to reset by default
         needed_to_reset = False
         toppled = None
@@ -603,6 +626,7 @@ def main(args):
                 if not check_z_height:
                     stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
                             check_z_height=check_z_height, valid_depth_heightmap=depth_img,
+                            num_obj=num_obj, separation_threshold=separation_threshold, distance_threshold=distance_threshold,
                             prev_z_height=nonlocal_variables['prev_stack_height'])
 
                     # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
@@ -616,10 +640,10 @@ def main(args):
 
         elif check_row:
             stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                    num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0],
+                    num_obj=num_obj,distance_threshold=distance_threshold, separation_threshold=separation_threshold, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0],
                     prev_z_height=nonlocal_variables['prev_stack_height'])
             # Note that for rows, a single action can make a row (horizontal stack) go from size 1 to a much larger number like 4.
-            if not check_z_height:
+            if not check_z_height and not static_language_mask:
                 stack_matches_goal = nonlocal_variables['stack_height'] >= len(current_stack_goal)
 
         elif check_z_height:
@@ -629,7 +653,11 @@ def main(args):
             # stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_incremental_height(input_img, current_stack_goal)
 
         else:
-            stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx)
+            if static_language_mask:
+                # current_stack_goal = nonlocal_variables['stack'].object_color_sequence[0:4]
+                stack_matches_goal, nonlocal_variables['stack_height'], pred_stack_goal = robot.check_stack(current_stack_goal, top_idx=top_idx, goal_num_obj=goal_num_obj, return_inds=True)
+            else:
+                stack_matches_goal, nonlocal_variables['stack_height'] = robot.check_stack(current_stack_goal, top_idx=top_idx, goal_num_obj=goal_num_obj)
 
         nonlocal_variables['partial_stack_success'] = stack_matches_goal
 
@@ -665,9 +693,47 @@ def main(args):
                     needed_to_reset = True
                     insufficient_objs_in_scene = True
 
+        if human_annotation and static_language_mask:
+            if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
+                nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None:
+                success_code, comment = annotate_success_manually(" ".join(nonlocal_variables['language_metadata']['command']),
+                                                                nonlocal_variables['language_metadata']['prev_color_heightmap'],
+                                                                nonlocal_variables['language_metadata']['next_color_heightmap'])
+
+                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log 
+                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False 
+                nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
+                nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
+
+
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
                 str(toppled))
+
+        if static_language_mask and end_on_incorrect_order and not check_row:
+            # check order, if it is the right length and bad then kill this trial
+            # if there is a mistake further down in the stack than the top-most block, there's no way to recover
+            # but if it's the top-most one, we can still unstack it, so don't kill the trial quite yet
+            if len(pred_stack_goal) == 2:
+                # if there are only 2 blocks and it places it on the wrong block, it can recover
+                # pred_matches_goal_up_to_top = pred_stack_goal[-1] == current_stack_goal[-1]
+                # just check that it isn't buried
+                pred_matches_goal_up_to_top = pred_stack_goal[0] != current_stack_goal[1]
+            else:
+                pred_matches_goal_up_to_top = np.array_equal(pred_stack_goal, current_stack_goal)
+            # only check for this if the predicted stack and goal stack are the same height
+            lens_match = len(pred_stack_goal) >= len(current_stack_goal)
+            # also check for toppling, but only if the previous stack was more than 2 block high
+            was_over_one = nonlocal_variables['prev_stack_height'] > 1
+            decreased_height = len(pred_stack_goal) < nonlocal_variables['prev_stack_height']
+            # conditions for ending a trial:
+            # either a mistake is made in the bottom of the stack, or the stack has toppled
+            if (not pred_matches_goal_up_to_top and lens_match) or (was_over_one and decreased_height):
+                print('ERROR: Stack is irreparably misordered or has toppled, trial is a failure. Ending...')
+                needed_to_reset = True
+                toppled = True
+        else:
+            pass
         # if place and needed_to_reset:
         # TODO(ahundt) BUG may reset push/grasp success too aggressively. If statement above and below for debugging, remove commented line after debugging complete
         if needed_to_reset or evaluate_random_objects or (toppled is not None and toppled):
@@ -691,8 +757,7 @@ def main(args):
                 nonlocal_variables['trial_complete'] = True
                 if check_row or (task_type is not None and ((task_type == 'row') or (task_type == 'vertical_square'))):
                     # on reset get the current row state
-                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal,
-                            num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0])
+                    _, nonlocal_variables['stack_height'] = robot.check_row(current_stack_goal, num_obj=num_obj, check_z_height=check_z_height, valid_depth_heightmap=valid_depth_heightmap[:, :, 0], separation_threshold=separation_threshold, distance_threshold=distance_threshold)
                     nonlocal_variables['prev_stack_height'] = copy.deepcopy(nonlocal_variables['stack_height'])
             else:
                 # not resetting, so set stack goal to proper value
@@ -903,7 +968,7 @@ def main(args):
                         print('Strategy: exploit (exploration probability: %f)' % (explore_prob))
 
                 if not use_demo:
-                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action. 
+                    # NOTE(zhe) Designate action type (grasp vs place) based on previous action.
                     # If we just did a successful grasp, we always need to place
                     if place and nonlocal_variables['primitive_action'] == 'grasp' and nonlocal_variables['grasp_success']:
                         nonlocal_variables['primitive_action'] = 'place'
@@ -1102,7 +1167,16 @@ def main(args):
 
                     # check if task is complete
                     if place and (check_row or task_type is not None):
+                        # add for annotation process if we're not in the sim
                         needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
+                        try:
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                        except NameError:
+                            print(f"Threading issue: cannot set language metadata")
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
+
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
                             if check_row and nonlocal_variables['stack_height'] > nonlocal_variables['prev_stack_height']:
@@ -1112,6 +1186,7 @@ def main(args):
                                 # TODO(ahundt) create a push to partial stack count separate from the place to partial stack count
                                 partial_stack_count += 1
                                 print('nonlocal_variables[stack].num_obj: ' + str(nonlocal_variables['stack'].num_obj))
+                                # print('nonlocal_variables[stack].goal_num_obj: ' + str(nonlocal_variables['stack'].goal_num_obj))
 
                             elif nonlocal_variables['stack_height'] >= len(current_stack_goal):
                                 # instead of calling next, set progress
@@ -1122,24 +1197,29 @@ def main(args):
 
                             next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
-                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj:
-                                print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                                if is_testing:
-                                    # we are in testing mode which is frequently recorded,
-                                    # so sleep for 10 seconds to show off our results!
-                                    time.sleep(10)
-                                nonlocal_variables['stack_success'] = True
-                                stack_count += 1
-                                # full stack complete! reset the scene
-                                successful_trial_count += 1
-                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                                robot.reposition_objects()
-                                if len(next_stack_goal) > 1:
-                                    # if multiple parts of a row are completed in one action, we need to reset the trial counter.
-                                    nonlocal_variables['stack'].reset_sequence()
-                                # goal is 2 blocks in a row
-                                nonlocal_variables['stack'].next()
-                                nonlocal_variables['trial_complete'] = True
+                            if nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj:
+                                if check_row and static_language_mask:
+                                    secondary_check = nonlocal_variables['partial_stack_success']
+                                else: 
+                                    secondary_check = True
+                                if secondary_check: 
+                                    print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                                    if is_testing:
+                                        # we are in testing mode which is frequently recorded,
+                                        # so sleep for 10 seconds to show off our results!
+                                        time.sleep(10)
+                                    nonlocal_variables['stack_success'] = True
+                                    stack_count += 1
+                                    # full stack complete! reset the scene
+                                    successful_trial_count += 1
+                                    get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                    robot.reposition_objects()
+                                    if len(next_stack_goal) > 1:
+                                        # if multiple parts of a row are completed in one action, we need to reset the trial counter.
+                                        nonlocal_variables['stack'].reset_sequence()
+                                    # goal is 2 blocks in a row
+                                    nonlocal_variables['stack'].next()
+                                    nonlocal_variables['trial_complete'] = True
 
                     elif not place or not needed_to_reset:
                         print('Push motion successful (no crash, need not move blocks): %r' % (nonlocal_variables['push_success']))
@@ -1155,13 +1235,22 @@ def main(args):
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push[:, :, 0],
                                 use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
+                        # add for annotation process if we're not in the sim
+                        try:
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                        except NameError:
+                            print(f"Threading issue: cannot set language metadata")
+                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
 
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
+                    if nonlocal_variables['stack'].object_color_index is not None and (grasp_color_task or static_language_mask):
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
+                        #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
 
                     if(skip_noncontact_actions and (np.isnan(valid_depth_heightmap[best_pix_y][best_pix_x][0]) or
@@ -1170,7 +1259,15 @@ def main(args):
                         nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = False, False
                         print('Grasp action failure, heuristics determined grasp would not contact anything.')
                     else:
-                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=nonlocal_variables['stack'].object_color_index)
+                        if static_language_mask:
+                            #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
+                            stack_idx = nonlocal_variables['stack'].object_color_index
+                            grasp_color_idx = nonlocal_variables['stack'].object_color_sequence[stack_idx]
+                            grasp_color_name = robot.color_names[grasp_color_idx]
+                            object_color = grasp_color_name
+                        else:
+                            object_color = nonlocal_variables['stack'].object_color_index
+                        nonlocal_variables['grasp_success'], nonlocal_variables['grasp_color_success'] = robot.grasp(primitive_position, best_rotation_angle, object_color=object_color) 
                     print('Grasp successful: %r' % (nonlocal_variables['grasp_success']))
                     # Get image after executing grasp action.
                     # TODO(ahundt) save also? better place to put?
@@ -1184,6 +1281,7 @@ def main(args):
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print('running check_stack_update_goal for grasp action')
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
                                 depth_img=valid_depth_heightmap_grasp[:, :, 0], task_type=task_type, use_imitation=use_demo,
                                 check_z_height=check_z_height)
@@ -1191,14 +1289,13 @@ def main(args):
                     if nonlocal_variables['grasp_success']:
                         # robot.restart_sim()
                         successful_grasp_count += 1
-                        if grasp_color_task:
+                        if grasp_color_task or static_language_mask:
                             if nonlocal_variables['grasp_color_success']:
                                 successful_color_grasp_count += 1
-                            if not place:
+                            if not place and not static_language_mask:
                                 # reposition the objects if we aren't also attempting to place correctly.
                                 robot.reposition_objects()
                                 nonlocal_variables['trial_complete'] = True
-
                             print('Successful color-specific grasp: %r intended target color: %s' % (nonlocal_variables['grasp_color_success'], grasp_color_name))
 
                     grasp_rate = float(successful_grasp_count) / float(grasp_count)
@@ -1218,7 +1315,7 @@ def main(args):
                         over_block = not check_row
 
                     place_count += 1
-                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block, save_history=save_history)
+                    nonlocal_variables['place_success'] = robot.place(primitive_position, best_rotation_angle, over_block=over_block, save_history=save_history, intended_position=nonlocal_variables['intended_position'])
 
                     # Get image after executing place action.
                     # TODO(ahundt) save also? better place to put?
@@ -1226,6 +1323,17 @@ def main(args):
                             heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place[:, :, 0],
                             task_type=task_type, use_imitation=use_demo, check_z_height=check_z_height)
+
+                    # TODO(elias) confirm this doesn't break anything
+                    # add for annotation process if we're not in the sim
+                    try:
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
+                    except NameError:
+                        print(f"Threading issue: cannot set language metadata")
+                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
+                        nonlocal_variables['language_metadata']['next_color_heightmap'] = None
+
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
@@ -1240,30 +1348,41 @@ def main(args):
                         next_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
 
                         if ((check_z_height and nonlocal_variables['stack_height'] >= check_z_height_goal) or
-                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].num_obj))):
-                            print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                            if is_testing:
-                                # we are in testing mode which is frequently recorded,
-                                # so sleep for 10 seconds to show off our results!
-                                time.sleep(10)
-                            nonlocal_variables['stack_success'] = True
-                            nonlocal_variables['place_success'] = True
-                            nonlocal_variables['partial_stack_success'] = True
-                            stack_count += 1
-                            # full stack complete! reset the scene
-                            successful_trial_count += 1
-                            get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
-                            robot.reposition_objects()
-                            # We don't need to reset here because the algorithm already reset itself
-                            # nonlocal_variables['stack'].reset_sequence()
-                            nonlocal_variables['stack'].next()
-                            nonlocal_variables['trial_complete'] = True
+                                (not check_z_height and (len(next_stack_goal) < len(current_stack_goal) or nonlocal_variables['stack_height'] >= nonlocal_variables['stack'].goal_num_obj))):
+
+                            if check_row and static_language_mask:
+                                # make sure row actually matches goal, not just any row of 4
+                                secondary_check = nonlocal_variables['partial_stack_success']
+                            else: 
+                                secondary_check = True
+
+                            if secondary_check: 
+                                print('TRIAL ' + str(nonlocal_variables['stack'].trial) + ' SUCCESS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                                if is_testing:
+                                    # we are in testing mode which is frequently recorded,
+                                    # so sleep for 10 seconds to show off our results!
+                                    time.sleep(10)
+                                nonlocal_variables['stack_success'] = True
+                                nonlocal_variables['place_success'] = True
+                                nonlocal_variables['partial_stack_success'] = True
+                                stack_count += 1
+                                # full stack complete! reset the scene
+                                successful_trial_count += 1
+                                get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, trainer, '1')
+                                robot.reposition_objects()
+                                # We don't need to reset here because the algorithm already reset itself
+                                if static_language_mask:
+                                    nonlocal_variables['stack'].reset_sequence()
+                                nonlocal_variables['stack'].next()
+                                nonlocal_variables['trial_complete'] = True
                     # TODO(ahundt) perhaps reposition objects every time a partial stack step fails (partial_stack_success == false) to avoid weird states?
 
                 # NOTE(zhe) Update logs with success/failures in the trainer object
                 trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
                 if grasp_color_task:
                     trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
+                if static_language_mask:
+                    trainer.grasp_color_success_log.append([int(nonlocal_variables['grasp_color_success'])])
                 if place:
                     # place trainer logs are updated in process_actions()
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
@@ -1355,7 +1474,11 @@ def main(args):
                 if 'vertical_square' in multi_task_snapshot_files:
                     vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
             else:
-                trainer.model.load_state_dict(torch.load(snapshot_file))
+                print(f"Snapshot file: {snapshot_file}")
+                try:
+                    trainer.model.load_state_dict(torch.load(snapshot_file))
+                except FileNotFoundError:
+                    pass
 
             if test_preset_cases:
                 case_file = preset_files[min(len(preset_files)-1, int(float(num_trials+1)/float(trials_per_case)))]
@@ -1370,7 +1493,7 @@ def main(args):
 
     def sim_problem_end_trial(num_problems_detected=0):
         ''' Call when trials must be ended due to an exceptional situation from the main training loop.
-        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner, 
+        Currently it is called when the simulator is unresponsive for more than 60 seconds and when training progress drops or jumps in an implausible manner,
         which often means the simulator entered a physically impossible state.
         The existing code should already call the regular end_trial() function when the next iteration starts.
         '''
@@ -1434,9 +1557,46 @@ def main(args):
     prev_best_dict = {}
     backprop_enabled = None  # will be a dictionary indicating if specific actions have backprop enabled
 
+    # Instantiate the DatasetReader in order to provide language commands during training
+    language_data = None
+    blockMover = None
+    language_model = None
+    if static_language_mask:
+        if is_sim and not is_bisk:
+            # define a dataset reader closure so that we can pass individual objects at a time
+            # TODO(elias) turn these into command-line args
+            dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x,
+                                                    split_type="none",
+                                                    task_type="rows",
+                                                    augment_by_flipping=False,
+                                                    augment_language = False,
+                                                    augment_by_rotating=False,
+                                                    leave_out_color=None,
+                                                    batch_size=1,
+                                                    max_seq_length=40,
+                                                    resolution = 64,
+                                                    is_bert = True,
+                                                    overfit=False)
+
+        # if dealing with Bisk data, do as before
+        if is_sim and is_bisk:
+            dataset_reader = DatasetReader(args.train_language_inputs,
+                                        None,
+                                        None,
+                                        batch_by_line=True,
+                                        batch_size = 1)
+            print(f"Reading data from {args.train_language_inputs}, this may take a few minutes.")
+            language_data = dataset_reader.data['train']
+            # END IF
+
+        if is_sim and is_bisk:
+            blockMover = BlockSetter(num_obj, [0.15, 0.0, 0.0], robot, side_len=0.027)
+
+        language_model = utils.load_language_model_from_config(configYamlPath=language_model_config, weightsPath=language_model_weights)
+        language_model.eval()
+
     # Start main training/testing loop, max_iter == 0 or -1 goes forever.
-    # TODO(zhe) Figure out how to input a sentence. We need a dataloader to load each image, and a scene reset at each iter.
-    # TODO(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
+    # NOTE(zhe) We may not be able to simply use the common sense filter for placing since we need to place in "empty space" sometimes.
     while max_iter < 0 or trainer.iteration < max_iter:
         # end trial if signaled by process_actions thread
         if nonlocal_variables['trial_complete']:
@@ -1448,13 +1608,69 @@ def main(args):
         # Record the current trial number
         trainer.trial_log.append([trainer.num_trials()])
 
+        # Get latest RGB-D image
+        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
+            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=depth_channels_history)
+
         # Make sure simulation is still stable (if not, reset simulation)
         if is_sim:
             robot.check_sim()
 
-        # Get latest RGB-D image
-        valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img = get_and_save_images(
-            robot, workspace_limits, heightmap_resolution, logger, trainer, depth_channels_history=depth_channels_history)
+        # If using the language map, get the command sentence and set up the scene
+        nonlocal_variables['intended_position'] = None
+        if static_language_mask:
+            # TODO(elias) ensure prev_primitive_action is thread-safe
+            # TODO(elias) what about unsuccessful grasp actions that move the block
+            if is_sim and not human_annotation and (prev_primitive_action == "place" or prev_primitive_action is None):
+                json_data = sim_object_state_to_json(robot)
+                # TODO(elias) add depthmap
+                #plt.imshow(color_heightmap)
+                #plt.show(block=True)
+                #plt.figure()
+                #plt.imshow(valid_depth_heightmap)
+                #plt.show(block=True)
+                pair = Pair.from_nonsim_main_idxs(color_heightmap,
+                                           valid_depth_heightmap,
+                                           is_row = check_row)
+
+                # batchify a single example
+                language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+
+                #print(nonlocal_variables['stack'].object_color_sequence, nonlocal_variables['stack'].object_color_index)
+                #pair = Pair.from_main_idxs(color_heightmap,
+                #                           valid_depth_heightmap,
+                #                           json_data,
+                #                           nonlocal_variables['stack'],
+                #                           is_row = check_row)
+
+                ## batchify a single example
+                #language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+            # TODO(elias) add if statement for unsuccessful grasp, the command should stay the same
+            #if is
+
+            # only set up the scene if working with Bisk (2018) data
+            elif is_sim and not human_annotation and is_bisk:
+                # Update nonlocal variables with bisk goal here
+                nonlocal_variables['intended_position'] = [language_data_instance.next_positions[0], language_data_instance.next_rotations[0]]
+                # RESET THE SCENE to match the "previous" state if we are in the simulator
+                # NOTE(zhe) This currently requires the dynamics to be turned off. TODO(zhe) Allow dynamics in future.
+                pos = language_data_instance.previous_positions[0]
+                rot = language_data_instance.previous_rotations[0]
+                blockMover.load_setup(pos, rot)
+            elif (human_annotation or not is_sim) and (prev_primitive_action == "place" or prev_primitive_action is None):
+                pair = Pair.from_nonsim_main_idxs(color_heightmap,
+                                           valid_depth_heightmap,
+                                           is_row = check_row)
+
+                # batchify a single example
+                language_data_instance = dataset_reader_fxn(pair).data['train'][0]
+                # set the current top block color in the stack sequence
+                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index-1] = pair.target_num - 1
+                # set the future top block color in the stack sequence
+                nonlocal_variables['stack'].object_color_sequence[nonlocal_variables['stack'].object_color_index] = pair.source_num - 1
+
+        else:
+            language_data_instance = None
 
         # Reset simulation or pause real-world training if table is empty
         stuff_count = np.zeros(valid_depth_heightmap.shape[:2])
@@ -1485,7 +1701,7 @@ def main(args):
             empty_threshold = 300 * (num_empty_obj + num_extra_obj)
         print('Current count of pixels with stuff: ' + str(stuff_sum) + ' threshold below which the scene is considered empty: ' + str(empty_threshold))
 
-        # NOTE(zhe) The pushing & grasping only task is to move items into a bin outside of the workspace.
+        # NOTE(zhe) The pushing & grasping only task is to pick up items and teleport them to a bin outside of the workspace.
         if not place and stuff_sum < empty_threshold:
             print('Pushing And Grasping Trial Successful!')
             num_trials = trainer.num_trials()
@@ -1519,7 +1735,11 @@ def main(args):
                             vertical_square_trainer.model.load_state_dict(torch.load(multi_task_snapshot_files['vertical_square']))
 
                     else:
-                        trainer.model.load_state_dict(torch.load(snapshot_file))
+                        try:
+                            trainer.model.load_state_dict(torch.load(snapshot_file))
+                        except FileNotFoundError:
+                            # TODO(elias) make sure this is OK
+                            pass
                 if place:
                     set_nonlocal_success_variables_false()
                     nonlocal_variables['stack'].reset_sequence()
@@ -1657,10 +1877,32 @@ def main(args):
                                 push_predictions_vertical_square, grasp_predictions_vertical_square, place_predictions_vertical_square
 
             else:
-                # TODO(zhe) Need to ensure that "predictions" also have language mask
+                # DONE(zhe) Need to ensure that "predictions" also have language mask
+                # TODO(zhe) Goal condition needs to be false for grasp color task and language stacking.
+                # TODO(elias) add check for if we're using language instruction
+                # Generate the language mask using the language model.
+                language_output = None # 4 ndarrays with shape (batch_size, 256, 2, 1) where each pixel has two options (block is present, block is not present)
+                if static_language_mask and language_data_instance is not None:
+                    with torch.no_grad():
+                        language_output = language_model.forward(language_data_instance)
+                if language_data_instance is not None:
+                    command = [x for x in language_data_instance['command'][0] if x != "<PAD>"]
+                    nonlocal_variables['language_metadata']['command'] = command
+                    print(f"Command: {' '.join(command)}")
+
                 push_predictions, grasp_predictions, place_predictions, state_feat, output_prob = \
                         trainer.forward(color_heightmap, valid_depth_heightmap,
-                                is_volatile=True, goal_condition=goal_condition)
+                                is_volatile=True, goal_condition=goal_condition, language_output=language_output)
+
+                # min of 5 active pixels or we kill the sim
+                # if np.sum(1-grasp_predictions.mask) < 5:
+                #     print(f"Grasp action '{command}' cannot be executed because of missing blocks, exiting!")
+                #     no_change_count = end_trial()
+                #     nonlocal_pause['exit_called'] = True
+                # if np.sum(1-place_predictions.mask) < 5:
+                #     print(f"Place action '{command}' cannot be executed because of missing blocks, exiting!")
+                #     no_change_count = end_trial()
+                #     nonlocal_pause['exit_called'] = True
 
             if not nonlocal_variables['finalize_prev_trial_log']:
                 # Execute best primitive action on robot in another thread
@@ -1670,6 +1912,7 @@ def main(args):
                 nonlocal_variables['executing_action'] = True
 
         # Run training iteration in current thread (aka training thread)
+        # NOTE(zhe) First time the loop doesn't run.
         if 'prev_color_img' in locals():
 
             # Detect changes
@@ -1684,6 +1927,8 @@ def main(args):
             # Compute training labels, returns are:
             # label_value == expected_reward (with future rewards)
             # prev_reward_value == current_reward (without future rewards)
+            # NOTE(zhe) label_value is y_t, prev_reward_value is R_P
+            # TODO(zhe) Edit label_value to include bisk stacking rewards.
             label_value, prev_reward_value = trainer.get_label_value(
                 prev_primitive_action, prev_push_success, prev_grasp_success, change_detected,
                 prev_push_predictions, prev_grasp_predictions, color_heightmap, valid_depth_heightmap,
@@ -1702,6 +1947,8 @@ def main(args):
                 trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
                 logger.write_to_log('color-success', trainer.color_success_log)
+            if static_language_mask:
+                logger.write_to_log('grasp-color-success', trainer.grasp_color_success_log)
             if place:
                 logger.write_to_log('stack-height', trainer.stack_height_log)
                 logger.write_to_log('partial-stack-success', trainer.partial_stack_success_log)
@@ -1851,7 +2098,7 @@ def main(args):
             # Backprop is enabled on a per-action basis, or if the current iteration is over a certain threshold
             backprop_enabled = trainer.randomize_trunk_weights(backprop_enabled, random_trunk_weights_max, random_trunk_weights_reset_iters, random_trunk_weights_min_success)
             # Backpropagate
-            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop:
+            if prev_primitive_action is not None and backprop_enabled[prev_primitive_action] and not disable_two_step_backprop and not is_testing:
                 print('Running two step backprop()')
                 # NOTE(adit98) this is a WIP
                 if use_demo:
@@ -1939,6 +2186,7 @@ def main(args):
             robot.shutdown()
             break
 
+
         # If we don't have any successes reinitialize model
         # Save information for next training step
         prev_color_img = color_img.copy()
@@ -1974,6 +2222,12 @@ def main(args):
         if use_demo:
             prev_best_trainer_ind = nonlocal_variables['best_trainer_log'][-1]
 
+        # TODO(elias) this is where we check for trial completion nonlocal_variables['train_complete]
+        #if nonlocal_variables['trial_complete']:
+            # load next image of the task
+            # use trial number variable as the index to pick out the image
+            # use that also to get/save the string
+
         iteration_time_1 = time.time()
         print('Time elapsed: %f' % (iteration_time_1-iteration_time_0))
 
@@ -2003,15 +2257,23 @@ def main(args):
         shutil.copyfile(best_stats_path, best_stats_backup_path)
     return logger.base_directory, best_dict
 
-def dump_sim_object_state_to_json(robot, logger, filename):
+def sim_object_state_to_json(robot):
     # Dump scene state information to a file.
     sim_positions, sim_orientations = robot.get_obj_positions_and_orientations()
+    to_ret = {'positions': sim_positions,
+              'orientations': sim_orientations,
+              'color_names': robot.color_names,
+              'num_obj': robot.num_obj}
+    return to_ret
+
+def dump_sim_object_state_to_json(robot, logger, filename):
+    # Dump scene state information to a file.
+    to_dump = sim_object_state_to_json(robot)
     save_location = os.path.join(logger.base_directory, 'data', 'variables')
     if not os.path.exists(save_location):
         os.mkdir(save_location)
     with open(os.path.join(save_location, filename), 'w') as f:
-            json.dump({'positions': sim_positions, 'orientations': sim_orientations, 'color_names': robot.color_names, 'num_obj': robot.num_obj}, f, cls=utils.NumpyEncoder, sort_keys=True)
-
+            json.dump(to_dump, f, cls=utils.NumpyEncoder, sort_keys=True)
 
 def parse_resume_and_snapshot_file_args(args):
     if args.resume == 'last':
@@ -2116,7 +2378,9 @@ def get_and_save_images(robot, workspace_limits, heightmap_resolution, logger, t
 
     if robot.is_sim:
         # Dump scene state information to a file for analysis, training, and language models.
-        dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
+        # TODO (elias) Uncomment
+        pass
+        #dump_sim_object_state_to_json(robot, logger, 'object_positions_and_orientations_' + str(trainer.iteration) + '_' + filename_poststring + '.json')
 
     return valid_depth_heightmap, color_heightmap, depth_heightmap, color_img, depth_img
 
@@ -2420,7 +2684,7 @@ def ablation(args):
 
 if __name__ == '__main__':
     # workaround matplotlib plotting thread crash https://stackoverflow.com/a/29172195
-    matplotlib.use('Agg')
+    # matplotlib.use('Agg')
 
     # Parse arguments
     parser = argparse.ArgumentParser(description='Train robotic agents to learn how to plan complementary pushing, grasping, and placing as well as multi-step tasks for manipulation with deep reinforcement learning in PyTorch.')
@@ -2430,6 +2694,7 @@ if __name__ == '__main__':
     parser.add_argument('--obj_mesh_dir', dest='obj_mesh_dir', action='store', default='objects/blocks',                  help='directory containing 3D mesh files (.obj) of objects to be added to simulation')
     parser.add_argument('--num_obj', dest='num_obj', type=int, action='store', default=10,                                help='number of objects to add to simulation')
     parser.add_argument('--num_extra_obj', dest='num_extra_obj', type=int, action='store', default=0,                     help='number of secondary objects, like distractors, to add to simulation')
+    parser.add_argument('--goal_num_obj', dest='goal_num_obj', type=int, action='store', default=4,                       help='max height of the desired stack. Set when not using extra objects with language command')
     parser.add_argument('--tcp_host_ip', dest='tcp_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as TCP client (UR5)')
     parser.add_argument('--tcp_port', dest='tcp_port', type=int, action='store', default=30002,                           help='port to robot arm as TCP client (UR5)')
     parser.add_argument('--rtc_host_ip', dest='rtc_host_ip', action='store', default='192.168.1.155',                     help='IP address to robot arm as real-time client (UR5)')
@@ -2478,8 +2743,16 @@ if __name__ == '__main__':
     # TODO(adit98) clarify argument name?
     parser.add_argument('--cycle_consistency', dest='cycle_consistency', action='store_true', default=False, help='Use cycle consistency for action matching')
 
-    # TODO(zhe) Added command line argument to use the static language mask
+    # Language Mask Options
+    parser.add_argument('--is_bisk', dest = 'is_bisk', action='store_true', default = False,                                help='running on bisk (2018) AAAI dataset')
     parser.add_argument('--static_language_mask', dest='static_language_mask', action='store_true', default=False,          help='enable usage of a static transformer model to inform robot grasp and place.')
+    parser.add_argument('--baseline_language_mask', dest='baseline_language_mask', action='store_true', default=False,      help='set to true to run random baseline for language experiments, where language mask allows everything')
+    parser.add_argument('--train_language_inputs', dest='train_language_inputs', type=str, default='blocks_data/trainset_v2.json',                   help='specify the language data file to use during reinforcement learning')
+    parser.add_argument('--language_model_config', dest='language_model_config', type=str, default='blocks_data/config.yaml', help='relative path to the yaml file containing the model hyperparameters')
+    parser.add_argument('--language_model_weights', dest='language_model_weights', type=str, default='blocks_data/best.th', help='file containing the language model weights (*.th) as a state dict.')
+    parser.add_argument('--separation_threshold', dest='separation_threshold', type=float, default=0.02, help = "threshold distance between blocks to consider them in a row")
+    parser.add_argument('--distance_threshold', dest='distance_threshold', type=float, default=0.02, help = "vertical threshold distance between blocks to consider them in a row")
+    parser.add_argument('--human_annotation', dest='human_annotation', action='store_true', default=False,                           help='During language mask execution only, ask humans for annotations of the action to take and if it succeeded before and after each action.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)
@@ -2494,7 +2767,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_preset_dir', dest='test_preset_dir', action='store', default='simulation/test-cases/')
     parser.add_argument('--show_preset_cases_then_exit', dest='show_preset_cases_then_exit', action='store_true', default=False,    help='just show all the preset cases so you can have a look, then exit')
     parser.add_argument('--ablation', dest='ablation', nargs='?', default=None, const='new',    help='Do a preconfigured ablation study of different algorithms. If not specified, no ablation, if --ablation, a new ablation is run, if --ablation <path> an existing ablation is resumed.')
-
+    parser.add_argument('--end_on_incorrect_order', action='store_true', default=False,          help='set if trial should end immediately whenever blocks are placed in incorrect order')
     # ------ Pre-loading and logging options ------
     parser.add_argument('--snapshot_file', dest='snapshot_file', action='store', default='',                              help='snapshot file to load for the model')
     parser.add_argument('--stack_snapshot_file', dest='stack_snapshot_file', action='store', default='',                  help='multi model stacking snapshot file to load for the model (use --snapshot_file if you are training one model)')
