@@ -2176,7 +2176,7 @@ def main(args):
                           'WARNING: The robot will attempt to go home again in a few seconds.')
             elif is_sim and int(time_elapsed) > timeout:
                 # The simulator can experience catastrophic physics instability, so here we detect that and reset.
-                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER 60 SECONDS, RESETTING THE OBJECTS TO RECOVER...')
+                print('ERROR: PROBLEM DETECTED IN SCENE, NO CHANGES FOR OVER ' + str(timeout) + ' SECONDS, RESETTING THE OBJECTS TO RECOVER...')
                 num_problems_detected = sim_problem_end_trial(num_problems_detected)
                 # don't reset again for 20 more seconds
                 iteration_time_0 = time.time()
