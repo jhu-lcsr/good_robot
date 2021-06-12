@@ -1562,18 +1562,21 @@ def annotate_success_manually(command, prev_image, next_image):
         for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit()
+            to_ret = (None, None)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_1:
                     print("label set to success")
-                    flag = 1
-                    pygame.quit()
-                    return "success", comment
+                    to_ret = ("success", comment)
                 elif event.key == pygame.K_2:
                     print("label set to stack/grasp failure")
-                    flag = 1
-                    pygame.quit()
-                    return "failure", comment
+                    to_ret = ("failure", comment)
                 elif event.key == pygame.K_3:
+                    print("Label set to Skip") 
+                    to_ret = ('skip', comment)
+                elif event.key == pygame.K_ESCAPE:
+                    to_ret = ('quit', comment) 
+                elif event.key == pygame.K_ENTER: 
+                    print(f"recording result: {to_ret[0]}") 
                     flag = 1
-                    pygame.quit()
-                    return 'skip', comment
+                    pygame.quit() 
+                    return to_ret 
