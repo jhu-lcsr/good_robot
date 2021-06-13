@@ -423,7 +423,6 @@ def main(args):
                           'save_state_this_iteration': False,
                           'example_actions_dict': None,
                           'language_metadata': {},
-                          'color_partial_stack_success': None,
                           'best_trainer_log': []}
 
     # load example_actions_dict if it exists
@@ -705,7 +704,7 @@ def main(args):
 
             # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
             nonlocal_variables['grasp_color_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'grasp'  else False
-            nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'place' else False
+            nonlocal_variables['color_success'] = True if success_code == "success" else False
             nonlocal_variables['partial_stack_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'place' else False
 
 
@@ -1354,10 +1353,9 @@ def main(args):
 
                 # NOTE(zhe) Update logs with success/failures in the trainer object
                 trainer.grasp_success_log.append([int(nonlocal_variables['grasp_success'])])
-                if grasp_color_task:
-                    trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
-                if static_language_mask:
+                if static_language_mask or grasp_color_task:
                     trainer.grasp_color_success_log.append([int(nonlocal_variables['grasp_color_success'])])
+                    trainer.color_success_log.append([int(nonlocal_variables['color_success'])])
                 if place:
                     # place trainer logs are updated in process_actions()
                     trainer.stack_height_log.append([float(nonlocal_variables['stack_height'])])
