@@ -1546,22 +1546,18 @@ def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_height
 
     return im_mask, match_ind, best_ind
 
-def annotate_success_manually(command, prev_image, next_image):
+def annotate_success_manually(command, prev_image=None, next_image=None):
     """
     # Returns
 
       description, comment.
     """
     print(
-        "\nPress a key to label the file: 1. success, 2. grasp success only, 3. full failure, 4. skip \n"
-        "Grasp success is when the gripper successfully picks up the right block but does not place it correctly\n"
-        "Full failure is when it fails to pick up the correct block\n"
+        "\nPress a key to label the file: 1. success 2. failure, 3. skip, then enter. esc: quit \n"
+        "Grasp success is when the gripper successfully picks up the correct block, scroll up in terminal to see the expected order in the order of construction.\n"
+        "failure is when it fails to pick up the correct block or to place it at the right spot, depending on the action.\n"
         "What to look for:\n"
-        " - A successful stack is 3 blocks tall or 4 blocks tall with the gripper completely removed from the field of view.\n"
-        " - If the tower is 3 blocks tall and blocks will clearly slide off if not for the wall press 2 for 'failure',\n"
-        "   if it is merely in contact with a wall, press 1 for 'success'.\n"
-        " - When the robot doesn't move but there is already a visible successful stack, that's an error.failure.falsely_appears_correct, so press 1 for 'success'!\n"
-        " - If you can see the gripper, the example is a failure even if the stack is tall enough!\n")
+        " - A successful task typically involves 4 blocks.\n")
     if pygame is None:
         raise ImportError('pygame is required but not installed, cannot do manual annotations')
     # , 3: error.failure
@@ -1575,11 +1571,15 @@ def annotate_success_manually(command, prev_image, next_image):
     text_rect.center = (350, 16)
     screen = pygame.display.set_mode((700, 500))
     screen.blit(textsurface, text_rect)
-    prev_image =  pygame.surfarray.make_surface(prev_image)
-    next_image =  pygame.surfarray.make_surface(next_image)
-    screen.blit(prev_image, (200,33))
-    w = prev_image.get_size()[0]
-    screen.blit(next_image, (200, 33 + w+1))
+    if prev_image is not None:
+        prev_image =  pygame.surfarray.make_surface(prev_image)
+        screen.blit(prev_image, (200,33))
+        w = prev_image.get_size()[0]
+    else:
+        w = 0
+    if next_image is not None:
+        next_image =  pygame.surfarray.make_surface(next_image)
+        screen.blit(next_image, (200, 33 + w+1))
     pygame.display.update()
     while flag == 0:
         events = pygame.event.get()
@@ -1599,7 +1599,7 @@ def annotate_success_manually(command, prev_image, next_image):
                     to_ret = ('skip', comment)
                 elif event.key == pygame.K_ESCAPE:
                     to_ret = ('quit', comment) 
-                elif event.key == pygame.K_ENTER: 
+                elif event.key == pygame.K_RETURN: 
                     print(f"recording result: {to_ret[0]}") 
                     flag = 1
                     pygame.quit() 

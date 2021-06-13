@@ -698,16 +698,15 @@ def main(args):
                     insufficient_objs_in_scene = True
 
         if human_annotation and static_language_mask:
-            if 'prev_color_heightmap' in nonlocal_variables['language_metadata'].keys() and \
-                nonlocal_variables['language_metadata']['prev_color_heightmap'] is not None:
-                success_code, comment = annotate_success_manually(" ".join(nonlocal_variables['language_metadata']['command']),
-                                                                nonlocal_variables['language_metadata']['prev_color_heightmap'],
-                                                                nonlocal_variables['language_metadata']['next_color_heightmap'])
+            if trainer.iteration == 0:
+                success_code, comment = annotate_success_manually(" ".join(command), None, color_heightmap)
+            else:
+                success_code, comment = annotate_success_manually(" ".join(command), prev_color_heightmap, color_heightmap)
 
-                # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
-                nonlocal_variables['grasp_color_success'] = True if success_code == "success" else False
-                nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" else False
-                nonlocal_variables['partial_stack_success'] = True if success_code == "success" else False
+            # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
+            nonlocal_variables['grasp_color_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'grasp'  else False
+            nonlocal_variables['color_partial_stack_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'place' else False
+            nonlocal_variables['partial_stack_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'place' else False
 
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
@@ -1173,13 +1172,6 @@ def main(args):
                     if place and (check_row or task_type is not None):
                         # add for annotation process if we're not in the sim
                         needed_to_reset = check_stack_update_goal(use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
-                        try:
-                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
-                        except NameError:
-                            print(f"Threading issue: cannot set language metadata")
-                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
-                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
 
                         if (not needed_to_reset and nonlocal_variables['partial_stack_success']):
                             # TODO(ahundt) HACK clean up this if check_row elif, it is pretty redundant and confusing
@@ -1239,15 +1231,6 @@ def main(args):
                         # while push expects constant height.
                         needed_to_reset = check_stack_update_goal(depth_img=valid_depth_heightmap_push[:, :, 0],
                                 use_imitation=use_demo, task_type=task_type, check_z_height=check_z_height)
-                        # add for annotation process if we're not in the sim
-                        try:
-                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                            nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
-                        except NameError:
-                            print(f"Threading issue: cannot set language metadata")
-                            nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
-                            nonlocal_variables['language_metadata']['next_color_heightmap'] = None
-
 
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
@@ -1285,7 +1268,6 @@ def main(args):
                         # check if a failed grasp led to a topple, or if the top block was grasped
                         # TODO(ahundt) in check_stack() support the check after a specific grasp in case of successful grasp topple. Perhaps allow the top block to be specified?
                         print('running check_stack_update_goal for grasp action')
-                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
                         needed_to_reset = check_stack_update_goal(top_idx=top_idx,
                                 depth_img=valid_depth_heightmap_grasp[:, :, 0], task_type=task_type, use_imitation=use_demo,
                                 check_z_height=check_z_height)
@@ -1327,17 +1309,6 @@ def main(args):
                             heightmap_resolution, logger, trainer, '2')
                     needed_to_reset = check_stack_update_goal(place_check=True, depth_img=valid_depth_heightmap_place[:, :, 0],
                             task_type=task_type, use_imitation=use_demo, check_z_height=check_z_height)
-
-                    # TODO(elias) confirm this doesn't break anything
-                    # add for annotation process if we're not in the sim
-                    try:
-                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = prev_color_heightmap
-                        nonlocal_variables['language_metadata']['next_color_heightmap'] = color_heightmap
-                    except NameError:
-                        print(f"Threading issue: cannot set language metadata")
-                        nonlocal_variables['language_metadata']['prev_color_heightmap'] = None
-                        nonlocal_variables['language_metadata']['next_color_heightmap'] = None
-
 
                     # NOTE(adit98) sometimes place is unsuccessful but can lead to task progress when task type is set, so added check for this
                     if (not needed_to_reset and
