@@ -1913,11 +1913,18 @@ def main(args):
             trainer.change_detected_log.append([change_detected])
             logger.write_to_log('change-detected', trainer.change_detected_log)
             logger.write_to_log('grasp-success', trainer.grasp_success_log)
-            if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
-                trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
+            if static_language_mask or (nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task):
+                if static_language_mask:
+                    # save the whole expected final sequence for the whole trial. The actual trial goal might just be a part of the sequence,
+                    # and the action goal will be a single color in the sequence, typically indexed by the current task progress.
+                    # To convert the numerical sequence to strings, make sure StackSequence is initialized with robot.color_names,
+                    # then call StackSequence.color_idx_sequence_to_string_list(trainer.goal_condition_log[trainer.iteration]).
+                    trainer.goal_condition_log.append(nonlocal_variables['stack'].object_color_sequence)
+                elif (nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task):
+                    # old style log, save the one hot encoding for the current action
+                    trainer.goal_condition_log.append(nonlocal_variables['stack'].current_one_hot())
                 logger.write_to_log('goal-condition', trainer.goal_condition_log)
                 logger.write_to_log('color-success', trainer.color_success_log)
-            if static_language_mask:
                 logger.write_to_log('grasp-color-success', trainer.grasp_color_success_log)
             if place:
                 logger.write_to_log('stack-height', trainer.stack_height_log)
