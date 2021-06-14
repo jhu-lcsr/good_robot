@@ -577,7 +577,7 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        if static_language mask or grasp_color_task:
+        if static_language_mask or grasp_color_task:
             print(f'CURRENT ACTION GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]) + ' FINAL GOAL: ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
         # no need to reset by default
         needed_to_reset = False
