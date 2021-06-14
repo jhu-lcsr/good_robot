@@ -1052,7 +1052,7 @@ class StackSequence(object):
             # Choose a random sequence to stack
             self.object_color_sequence = np.random.permutation(self.num_obj)
             if self.human_annotation:
-                get_color_order_from_human
+                self.object_color_sequence_names, self.object_color_sequence = get_color_order_from_human(num_obj,'Input the goal color order for the whole trial', color_names)
             # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
             self.object_color_one_hot_encodings = []
             for color in self.object_color_sequence:
