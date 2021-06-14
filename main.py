@@ -1003,9 +1003,6 @@ def main(args):
 
                 trainer.is_exploit_log.append([0 if explore_actions else 1])
                 logger.write_to_log('is-exploit', trainer.is_exploit_log)
-                    # TODO(ahundt) remove if this has been working for a while, the trial log is now updated in the main thread rather than the robot control thread.
-                    # trainer.trial_log.append([nonlocal_variables['stack'].trial])
-                    # logger.write_to_log('trial', trainer.trial_log)
 
                 # NOTE(zhe) Choose the argmax of the predictions, returns the coordinate of the max and the max value.
                 if random_actions and explore_actions and not is_testing and np.random.uniform() < 0.5:
