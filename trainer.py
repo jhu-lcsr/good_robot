@@ -412,8 +412,9 @@ class Trainer(object):
         else:
             sample_depth_heightmap = np.stack([sample_depth_heightmap] * 3, axis=-1)
 
-        # Compute forward pass with sample
-        if self.goal_condition_len > 0:
+        # Compute forward pass with sample, note this log can contain different format data depending on static_language_mask or goal_condition_len. 
+        if self.goal_condition_len > 0 and not self.static_language_mask:
+            # The goal condition case, where the design is pixelnet will determine how to take the action, and there is no language model.
             exp_goal_condition = [self.goal_condition_log[sample_iteration]]
             next_goal_condition = [self.goal_condition_log[sample_iteration+1]]
         else:
