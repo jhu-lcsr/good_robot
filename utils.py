@@ -1110,7 +1110,6 @@ class StackSequence(object):
 
             if no params are specificed, it will make the list for self.object_color_sequence.
         '''
-        # print('DELETEME: ' + str(self.object_color_sequence))
         if color_index_list is None:
             color_index_list = self.object_color_sequence
         input_names = []
@@ -1553,10 +1552,10 @@ def annotate_success_manually(command, prev_image=None, next_image=None):
       description, comment.
     """
     print(
-        "\nPress a key to label the file: 1. success 2. failure, 3. skip, then enter. esc: quit \n"
+        "\nPress a key to label the most recent action: 1. success 2. failure, 3. skip, esc: quit. Then enter.\n"
         "Grasp success is when the gripper successfully picks up the correct block, scroll up in terminal to see the expected order in the order of construction.\n"
-        "failure is when it fails to pick up the correct block or to place it at the right spot, depending on the action.\n"
-        "What to look for:\n"
+        "failure includes when the robot fails to pick up the correct color block or to place it at the right spot, depending on the action.\n"
+        "What to look for the end of a trial:\n"
         " - A successful task typically involves 4 blocks.\n")
     if pygame is None:
         raise ImportError('pygame is required but not installed, cannot do manual annotations')
