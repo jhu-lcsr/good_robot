@@ -1580,18 +1580,18 @@ def annotate_success_manually(command, prev_image=None, next_image=None):
         next_image =  pygame.surfarray.make_surface(next_image)
         screen.blit(next_image, (200, 33 + w+1))
     pygame.display.update()
+    to_ret = (None, None)
     while flag == 0:
         events = pygame.event.get()
         for event in events:
             if event.type == pygame.QUIT:
                 pygame.quit()
-            to_ret = (None, None)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_1:
                     print("label set to success")
                     to_ret = ("success", comment)
                 elif event.key == pygame.K_2:
-                    print("label set to stack/grasp failure")
+                    print("label set to failure")
                     to_ret = ("failure", comment)
                 elif event.key == pygame.K_3:
                     print("Label set to Skip") 

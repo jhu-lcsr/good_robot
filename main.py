@@ -706,8 +706,11 @@ def main(args):
             # TODO: all place successes will have this  set to True, but can be postprocessed out, since we can match to action by line in the log
             nonlocal_variables['grasp_color_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'grasp'  else False
             nonlocal_variables['color_success'] = True if success_code == "success" else False
-            nonlocal_variables['partial_stack_success'] = True if success_code == "success" and nonlocal_variables['primitive_action'] == 'place' else False
-
+            if nonlocal_variables['color_success'] == False:
+                nonlocal_variables['partial_stack_success'] = False
+            if success_code == 'quit':
+                needed_to_reset = True
+            print('human_annotation: color_success: ' + str(nonlocal_variables['color_success']) + ' grasp_color_success: ' + str(nonlocal_variables['grasp_color_success']))
 
         print('check_stack() stack_height: ' + str(nonlocal_variables['stack_height']) + ' stack matches current goal: ' + str(stack_matches_goal) + ' partial_stack_success: ' +
                 str(nonlocal_variables['partial_stack_success']) + ' Does the code think a reset is needed: ' + str(needed_to_reset) + ' Does the code think the stack toppled: ' +
