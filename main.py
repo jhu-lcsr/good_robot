@@ -577,7 +577,8 @@ def main(args):
         needed_to_reset boolean which is True if a reset was needed and False otherwise.
         """
         current_stack_goal = nonlocal_variables['stack'].current_sequence_progress()
-        print(f'CURRENT TASK GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]) + ' FINAL GOAL: ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
+        if static_language mask or grasp_color_task:
+            print(f'CURRENT ACTION GOAL: {current_stack_goal}, associated colors: ' + str(np.array(robot.color_names)[np.array(current_stack_goal).astype(int)]) + ' FINAL GOAL: ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
         # no need to reset by default
         needed_to_reset = False
         toppled = None
@@ -1231,7 +1232,8 @@ def main(args):
                 elif nonlocal_variables['primitive_action'] == 'grasp':
                     grasp_count += 1
                     # TODO(ahundt) this probably will cause threading conflicts, add a mutex
-                    if nonlocal_variables['stack'].object_color_index is not None and (grasp_color_task or static_language_mask):
+                    if nonlocal_variables['stack'].object_color_index is not None and grasp_color_task:
+                        # note this print is not accurate for the static_language_mask case, which prints elsewhere
                         grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         #grasp_color_name = robot.color_names[int(nonlocal_variables['stack'].object_color_index)]
                         print('Attempt to grasp color: ' + grasp_color_name)
