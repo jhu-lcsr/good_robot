@@ -150,7 +150,7 @@ class Robot(object):
         #
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
-        if grasp_color_task:
+        if grasp_color_task or not is_sim:
             #self.color_names = ['blue', 'green', 'yellow', 'red']
             self.color_names = ['red', 'blue', 'green','yellow']
         else:

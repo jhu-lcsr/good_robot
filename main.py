@@ -487,7 +487,16 @@ def main(args):
         is_goal_conditioned = grasp_color_task or place
     # Choose the first color block to grasp, or None if not running in goal conditioned mode
     # color_names = ["red","blue","green","yellow", "brown", "orange", "gray", "purple", "cyan", "pink"]
-    color_names = robot.object_colors
+    if is_sim:
+        color_names = robot.object_colors
+    else:
+        color_names = ['red', 'blue', 'green','yellow']
+        # TODO(ahundt) allow command line setting of block colors for real experiments
+        if task_type == 'stack':
+            # in the real stacking case we have two of each color
+            color_names += color_names
+        print('Real robot mode, setting color names as follows, edit color_names in the code in main.py and robot.py if this is not correct: ' + str(color_names))
+
     if num_obj is not None:
         nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, goal_num_obj=goal_num_obj, is_goal_conditioned_task=is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
     else:
