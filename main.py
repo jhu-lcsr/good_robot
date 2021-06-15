@@ -494,6 +494,7 @@ def main(args):
         color_names = ['red', 'blue', 'green','yellow']
         print('Real robot mode, setting color names as follows, edit color_names in the code in main.py and robot.py if this is not correct: ' + str(color_names))
 
+    print('num_obj: ' + str(num_obj) + ' num_extra_obj: ' + str(num_extra_obj) + ' goal_num_obj: ' + str(goal_num_obj))
     if num_obj is not None:
         nonlocal_variables['stack'] = StackSequence(num_obj - num_extra_obj, goal_num_obj=goal_num_obj, is_goal_conditioned_task=is_goal_conditioned, trial=num_trials, total_steps=trainer.iteration, color_names=color_names)
     else:
