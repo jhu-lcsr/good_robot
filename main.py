@@ -1717,18 +1717,20 @@ def main(args):
                     else:
                         try:
                             trainer.model.load_state_dict(torch.load(snapshot_file))
-                        except FileNotFoundError:
+                        except FileNotFoundError e:
+                            print(e)
                             # TODO(elias) make sure this is OK
                             pass
-                if place:
-                    set_nonlocal_success_variables_false()
-                    nonlocal_variables['stack'].reset_sequence()
-                    nonlocal_variables['stack'].next()
             else:
                 # print('Not enough stuff on the table (value: %d)! Pausing for 30 seconds.' % (np.sum(stuff_count)))
                 # time.sleep(30)
                 print('Not enough stuff on the table (value: %d)! Moving objects to reset the real robot scene...' % (stuff_sum))
                 robot.restart_real()
+
+            if place:
+                set_nonlocal_success_variables_false()
+                nonlocal_variables['stack'].reset_sequence()
+                nonlocal_variables['stack'].next()
 
             # fill trial success log with 0s if we had a no activity-caused reset, do for both real and sim
             if not place:
@@ -1778,7 +1780,7 @@ def main(args):
         if not nonlocal_pause['exit_called']:
             # NOTE(zhe) setting the ordered stack goal.
             # Run forward pass with network to get affordances
-            if nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
+            if not static_language_mask and nonlocal_variables['stack'].is_goal_conditioned_task and grasp_color_task:
                 goal_condition = np.array([nonlocal_variables['stack'].current_one_hot()])
             else:
                 goal_condition = None
