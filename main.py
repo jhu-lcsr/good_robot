@@ -1717,7 +1717,7 @@ def main(args):
                     else:
                         try:
                             trainer.model.load_state_dict(torch.load(snapshot_file))
-                        except FileNotFoundError e:
+                        except FileNotFoundError as e:
                             print(e)
                             # TODO(elias) make sure this is OK
                             pass
