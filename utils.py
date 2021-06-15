@@ -1114,7 +1114,7 @@ class StackSequence(object):
             color_index_list = self.object_color_sequence
         input_names = []
         for idx in color_index_list:
-            input_names += [self.color_names[int(idx)]]
+            input_names += [self.color_names[int(idx) % len(self.color_names)]]
         return input_names
 
 
