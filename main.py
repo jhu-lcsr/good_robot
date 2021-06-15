@@ -1546,7 +1546,7 @@ def main(args):
     blockMover = None
     language_model = None
     if static_language_mask:
-        if is_sim and not is_bisk:
+        if not is_bisk:
             # define a dataset reader closure so that we can pass individual objects at a time
             # TODO(elias) turn these into command-line args
             dataset_reader_fxn = lambda x: GoodRobotDatasetReader(path_or_obj=x,
