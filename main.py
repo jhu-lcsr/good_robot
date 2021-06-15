@@ -137,6 +137,7 @@ def main(args):
     flops = args.flops
     show_heightmap = args.show_heightmap
     max_train_actions = args.max_train_actions
+    human_reset = args.human_reset
 
     # ------------- Algorithm options -------------
     method = args.method # 'reactive' (supervised learning) or 'reinforcement' (reinforcement learning ie Q-learning)
@@ -293,7 +294,7 @@ def main(args):
                   is_testing, test_preset_cases, test_preset_file, None,
                   place, grasp_color_task, unstack=unstack,
                   heightmap_resolution=heightmap_resolution, randomized=randomized, obj_scale=obj_scale, task_type=task_type,
-                  language=static_language_mask)
+                  language=static_language_mask, human_reset=human_reset)
 
     # Set the "common sense" dynamic action space region around objects,
     # which defines where place actions are permitted. Units are in meters.
@@ -2737,6 +2738,7 @@ if __name__ == '__main__':
     parser.add_argument('--separation_threshold', dest='separation_threshold', type=float, default=0.02, help = "threshold distance between blocks to consider them in a row")
     parser.add_argument('--distance_threshold', dest='distance_threshold', type=float, default=0.02, help = "vertical threshold distance between blocks to consider them in a row")
     parser.add_argument('--human_annotation', dest='human_annotation', action='store_true', default=False,                           help='During language mask execution only, ask humans for annotations of the action to take and if it succeeded before and after each action.')
+    parser.add_argument('--human_reset', dest='human_reset', action='store_true', default=False,                           help='Humans reset the scene in between real robot trials, rather than the automated reset.')
 
     # -------------- Testing options --------------
     parser.add_argument('--is_testing', dest='is_testing', action='store_true', default=False)

@@ -111,7 +111,7 @@ class Robot(object):
                  is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None,
                  place=False, grasp_color_task=False, real_gripper_ip='192.168.1.11', calibrate=False,
                  unstack=False, heightmap_resolution=0.002, randomized=True, obj_scale=1,
-                 task_type=None, language=False):
+                 task_type=None, language=False, human_reset=False):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -137,6 +137,7 @@ class Robot(object):
         self.place_pose_history_limit = 6
         self.grasp_color_task = grasp_color_task
         self.language = language
+        self.human_reset = human_reset
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
         # self.gripper_ee_offset = 0.15
@@ -747,15 +748,16 @@ class Robot(object):
         if self.place_task and self.unstack:
             print("------- SCENE RESET --------")
 
-            if len(self.place_pose_history) == 0:
+            if self.human_reset or len(self.place_pose_history) == 0:
+                print('\a')
                 print("NO PLACE HISTORY TO UNSTACK YET.")
                 print("HUMAN, PLEASE MOVE BLOCKS AROUND")
-                print("SLEEPING FOR 10 SECONDS")
-                # play a sound to get the human's attention.
-                print('\a')
-                for i in range(10):
-                    print("SLEEPING FOR %d" % (10 - i))
-                    time.sleep(1)
+                input('press enter to continue...')
+                # print("SLEEPING FOR 10 SECONDS")
+                # # play a sound to get the human's attention.
+                # for i in range(10):
+                #     print("SLEEPING FOR %d" % (10 - i))
+                #     time.sleep(1)
 
                 print("-------- RESUMING AFTER MANUAL SCENE RESET --------")
 
