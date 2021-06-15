@@ -1639,7 +1639,7 @@ def main(args):
                 pos = language_data_instance.previous_positions[0]
                 rot = language_data_instance.previous_rotations[0]
                 blockMover.load_setup(pos, rot)
-            elif (human_annotation or not is_sim) and (nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height'] or (prev_primitive_action == "place" or prev_primitive_action is None)):
+            elif (human_annotation or not is_sim) and (not nonlocal_variables['grasp_success'] or nonlocal_variables['stack_height'] < nonlocal_variables['prev_stack_height'] or (prev_primitive_action == "place" or prev_primitive_action is None)):
                 print('FINAL GOAL COLOR ORDER ' + str(nonlocal_variables['stack'].color_idx_sequence_to_string_list()))
                 pair = Pair.from_nonsim_main_idxs(color_heightmap,
                                            valid_depth_heightmap,
