@@ -935,7 +935,7 @@ class Robot(object):
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
 
                 # If just manipulating blocks for dataset image generation, no need to check height.
-                if self.logoblock_dataset:
+                if self.is_sim and self.logoblock_dataset:
                     break
 
                 if max_z_height > z_height_retake_threshold:
