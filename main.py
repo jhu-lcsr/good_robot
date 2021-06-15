@@ -97,8 +97,8 @@ def main(args):
     # --------------- Setup options ---------------
     is_sim = args.is_sim # Run in simulation?
     obj_mesh_dir = os.path.abspath(args.obj_mesh_dir) if is_sim else None # Directory containing 3D mesh files (.obj) of objects to be added to simulation
-    num_obj = args.num_obj if is_sim or args.check_row or args.use_demo else None # Number of objects to add to simulation
-    num_extra_obj = args.num_extra_obj if is_sim or args.check_row or args.use_demo else None
+    num_obj = args.num_obj if is_sim or args.check_row or args.use_demo or args.static_language_mask else None # Number of objects to add to simulation
+    num_extra_obj = args.num_extra_obj if is_sim or args.check_row or args.use_demo or args.static_language_mask else None
     goal_num_obj = args.goal_num_obj
     timeout = args.timeout # time to wait before simulator reset
     if num_obj is not None:
