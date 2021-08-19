@@ -2490,3 +2490,41 @@ export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objec
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-03-04-09-15-28_Sim-Vertical-Square-Imitation-Masked-Testing-Three-Step-History
 Commit: 5b738b22f279e862dde5df914421d0dd7436f026
 GPU 1, Tab 1, port 20000, top right v-rep window, v-rep tab 8
+
+
+
+test_stats run records
+----------------------
+  318  python test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History -t 50
+  321  python test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+  323  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-03-01-16-52-28_Sim-Vertical-Square-Imitation-Masked-Testing
+  324  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History 
+  325  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-03-01-15-17-30_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+  327  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-28-12-33-20_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
+  330  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-03-01-15-18-53_Sim-Unstacking-Imitation-Masked-Testing-Three-Step-History
+  331  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-28-12-16-20_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+  332  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-28-12-18-15_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+  333  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-28-12-19-41_Sim-Vertical-Square-Imitation-Masked-Testing
+  334  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-03-01-15-32-14_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+  335  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-03-01-16-52-28_Sim-Vertical-Square-Imitation-Masked-Testing 
+  336  python test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2020-12-27-15-03-09_Sim-Rows-Two-Step-Reward-Masked-Training-Sim-Rows-Two-Step-Reward-Masked-Training_success_plot
+  337  python3 test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2020-12-27-15-03-09_Sim-Rows-Two-Step-Reward-Masked-Training-Sim-Rows-Two-Step-Reward-Masked-Training_success_plot
+  338  python3 test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing
+  339  python3 test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing -t 50
+  342  python3 test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History -t 50
+  343  python3 test_stats.py -d  /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-25-23-26-50_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History -t 50
+  344  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-00-05-05_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History
+  345  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-02-58-11_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History
+  346  python3 test_stats.py -t 50 -d /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-20-01-25-00_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History
+  352  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2020-06-03-15-46-00_Sim-Rows-Two-Step-Reward-Testing
+  353  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2020-06-03-23-18-31_Sim-Rows-Two-Step-Reward-Masked-Training/2020-06-07-17-17-16_Sim-Rows-Two-Step-Reward-Masked-Testing
+  354  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-13-16-43-06_Sim-Rows-Two-Step-Reward-Masked-Testing-Three-Step-History/2021-02-13-21-06-05_Sim-Rows-Two-Step-Reward-Masked-Testing-Three-Step-History
+  355  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-18-17-27-35_Sim-Stack-SPOT-Trial-Reward-Masked-Training-Three-Step-History/2021-02-26-05-14-20_Sim-Stack-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+  357  python3 test_stats.py -t 50 -d '/home/costar/src/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-18-17-40-48_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History' 
+  358  python3 test_stats.py -t 50 -d /home/costar/src/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-18-17-40-48_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History'
+  359  python3 test_stats.py -t 50 -d /home/costar/src/real_good_robot/logs/2021-02-09-22-31-35_Sim-Vertical-Square-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-18-17-40-48_Sim-Vertical-Square-Two-Step-Reward-Masked-Testing-Three-Step-History
+  361  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-23-02-23-36_Sim-Unstacking-SPOT-Trial-Reward-Masked-Training
+  362  python3 test_stats.py -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-02-58-11_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History/
+  363  python3 test_stats.py -T 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-02-58-11_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History/
+  365  python3 test_stats.py -t 50 -s 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-02-58-11_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History/
+  366  python3 test_stats.py -t 50 -d /home/ahundt/src/real_good_robot/logs/2021-02-17-12-27-29_Sim-Unstacking-Two-Step-Reward-Masked-Training-Three-Step-History/2021-02-22-02-58-11_Sim-Unstacking-Two-Step-Reward-Masked-Testing-Three-Step-History/
