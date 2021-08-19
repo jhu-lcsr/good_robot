@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', dest='num_trials', type=int, action='store', default=None,                                help='Number of trials to evaluate from start, default is all trials.')
     parser.add_argument('-v', dest='success_height', type=float, action='store', default=4.0,                                help='Max height (number of task progress steps) for considering a trial successful, default is 4, such as a stack of 4 blocks.')
     parser.add_argument('-e', dest='epsilon', type=float, action='store', default=0.1,                                help='Permissible height error margin, i.e. default .1 will count 3.9 as a full stack of 4 when success_height is 4.')
+    parser.add_argument('-i', dest='ignore_trial', type=int, action='store', default=None,                                help='Trial to ignore, default is None, first trial will be 0 (beware! live run printouts start at 1 in main.py).')
     args = parser.parse_args()
 
     # load executed actions
@@ -81,6 +82,9 @@ if __name__ == '__main__':
         if trial_start == trial_end:
             print('TRIAL ' + str(i) + ' IS EMPTY, skipping')
             continue
+        if args.ignore_trial is not None and i == args.ignore_trial:
+            print('TRIAL ' + str(i) + ' IS BEING IGNORED, skipping')
+            continue
         trial_heights = np.array(stack_height_log[trial_start: trial_end])
         print(trial_heights)
         if unstack and len(trial_heights) == 1:
@@ -97,6 +101,9 @@ if __name__ == '__main__':
                 print('trial ' + str(i) + ' progress reversal at overall step: ' + str(j) + ' (this trial step: ' + str(j - trial_start) + ') because ' + 
                     str(stack_height_log[j][0] ) + ' - ' + str(epsilon) + ' > ' + str(stack_height_log[j+1][0]))
         progress_reversals += [progress_reversal]
+        if trial_end == len(trial_success_log):
+            # workaround for when the very last trial would be indexed past the end
+            trial_end -= 1 
         trial_successful = trial_success_log[trial_end] > trial_success_log[trial_start]
         print('log indicates trial success') if trial_successful else print('log indicates trial failure')
         if unstack and not trial_successful and len(trial_heights) > 1 and max_heights[-1] == 4.:
@@ -125,6 +132,8 @@ if __name__ == '__main__':
     print('recoveries: ' + str(recoveries))
     print('total trials: ' + str(clearance_length) + ' (clearance_length, total number of trials)')
     print('num trials evaluated: ' + str(num_trials) + ' start trial: ' + str(start_trial))
+    if args.ignore_trial is not None:
+        print('Trial ' + str(args.ignore_trial) + ' ignored, typically due to a simulator or physical robot problem.')
     print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better, find max height for each trial, then average those values)')
     print('avg max progress: ' + str(np.mean(max_heights_rounded)/success_height) + ' (higher is better,  (avg(round(max_heights))/' + str(success_height) + '))')
     print('standard deviation of max progress normalized to 0 to 1: ' + str(np.std(max_heights_rounded)/success_height))
