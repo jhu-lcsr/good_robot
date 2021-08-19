@@ -4,6 +4,7 @@ import os
 import re
 import argparse
 import numpy as np
+from scipy import stats
 from utils import get_prediction_vis
 
 from logger import Logger
@@ -124,6 +125,8 @@ if __name__ == '__main__':
     print('num trials evaluated: ' + str(num_trials) + ' start trial: ' + str(start_trial))
     print('avg max height: ' + str(np.mean(max_heights)) + ' (higher is better, find max height for each trial, then average those values)')
     print('avg max progress: ' + str(np.mean(np.rint(max_heights))/success_height) + ' (higher is better,  (avg(round(max_heights))/' + str(success_height) + '))')
+    print('standard deviation of max progress normalized to 0 to 1: ' + str(np.std(np.rint(max_heights))/success_height))
+    print('standard error of max progress normalized to 0 to 1: ' + str(stats.sem(np.rint(max_heights))/success_height))
     print('avg reversals: ' + str(np.mean(progress_reversals)) + ' (lower is better)')
     print('avg recoveries: ' + str(np.mean(recoveries)) + ' (higher is better, no need for recovery attempts is best)')
     print('avg logged trial success: ' + str(np.mean(successful_trials)) + " (successful trials according to trial_success_log.txt)")
