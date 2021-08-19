@@ -2382,12 +2382,12 @@ X Commit: bd67b2f14d5f91b5ecbbf0fd7ef118aa86f7ce79
 X Logged 3 trials, but goal color order didn't reshuffle correctly
 X /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-06-15-11-47-04_Real-Stack-Two-Step-Reward-Masked-Testing
 
-STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-15
+STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-16
 -----------------------------------------------
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_reset --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1238 --max_test_trials 10
-Commit: bd67b2f14d5f91b5ecbbf0fd7ef118aa86f7ce79
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_reset --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1239 --max_test_trials 10
+Commit: bbc134835e782cf711a2c626328072f1c2653453
 
-ROW LANGUAGE REAL TEST, SIM MODEL 2021-06-15
+ROW LANGUAGE REAL TEST, SIM MODEL 2021-06-16
 --------------------------------------------
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --static_language_mask --language_model_config language_models/rows/config.yaml --language_model_weights language_models/rows/best.th --snapshot_file logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_index.pth --check_row --timeout 100000 --place --separation_threshold 0.08 --distance_threshold 0.04 --human_reset --human_annotation --task_type row --common_sense --timeout 6000  --random_seed 1238 --max_test_trials 10 
-Commit: bd67b2f14d5f91b5ecbbf0fd7ef118aa86f7ce79
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --static_language_mask --language_model_config language_models/rows/config.yaml --language_model_weights language_models/rows/best.th --snapshot_file logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_index.pth --check_row --timeout 100000 --place --separation_threshold 0.08 --distance_threshold 0.04 --human_reset --human_annotation --task_type row --common_sense --timeout 6000  --random_seed 1239 --max_test_trials 10 
+Commit: bbc134835e782cf711a2c626328072f1c2653453
