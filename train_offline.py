@@ -123,6 +123,7 @@ if __name__ == '__main__':
     model_name = '_'.join(['base', base_name, 'finetune', args.task_type])
 
     if args.out_dir is not None:
+        print("Finetuned", base_name, "model on", args.task_type)
         print("Saving model at", best_model_ind + 1, "iterations with loss of", str(min_loss) + "...")
         if not os.path.exists(args.out_dir):
             os.makedirs(args.out_dir)
