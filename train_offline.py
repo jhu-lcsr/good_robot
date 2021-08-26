@@ -124,4 +124,4 @@ if __name__ == '__main__':
 
     if args.out_dir is not None:
         print("Saving model at", best_model_ind + 1, "iterations with loss of", str(min_loss) + "...")
-        torch.save(models[best_model_ind], os.path.join(args.out_dir, model_name))
+        torch.save(models[best_model_ind], os.path.join(args.out_dir, model_name + '.pth'))
