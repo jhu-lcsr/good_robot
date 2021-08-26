@@ -9,6 +9,20 @@ finetune=0;
 embed=0;
 ssr=0;
 
+# help function
+Help()
+{
+   # Display Help
+   echo "Syntax: ./finetune.sh [-f|e|t|h]"
+   echo "options:"
+   echo "-f     Finetune policies from base_models. Other options will break if this hasn't been run at least once."
+   echo "-e     Precompute demo embeddings. If you do not already have embed.pickle files in the demo folders, this is highly recommended."
+   echo "-t     Run SSR Simulation Experiments."
+   echo "-h     Print help menu."
+   echo
+   echo "Note that running without any of the options set will result in no action."
+}
+
 # get cmd line options
 while getopts ":hf:" option; do
     case $option in
@@ -18,6 +32,9 @@ while getopts ":hf:" option; do
             embed=1;;
         t) # run ssr?
             ssr=1;;
+        h) # help
+            Help
+            exit;;
         \?) # Invalid option
             echo "Error: Invalid option"
             exit;;
