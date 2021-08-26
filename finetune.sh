@@ -105,25 +105,25 @@ then
     export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19997 --random_seed 1238 \
     --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos --stack_snapshot_file logs/finetuned_models/base_stack_finetune_row.pth \
     --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_row.pth \
-    --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
+    --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65 &
 
     # stack
     export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19998 --random_seed 1238 \
     --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos --row_snapshot_file logs/finetuned_models/base_row_finetune_stack.pth \
     --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_stack.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_stack.pth \
-    --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
+    --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65 &
 
     # unstack
     export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19999 --random_seed 1238 \
     --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos --stack_snapshot_file \
     logs/finetuned_models/base_stack_finetune_unstack.pth --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_unstack.pth \
     --row_snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth --grasp_only --depth_channels_history --cycle_consistency \
-    --no_common_sense_backprop --future_reward_discount 0.65
+    --no_common_sense_backprop --future_reward_discount 0.65 &
 
     # vertical square
     export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 \
     --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos --stack_snapshot_file \
     logs/finetuned_models/base_stack_finetune_vertical_square.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_vertical_square.pth \
     --row_snapshot_file logs/finetuned_models/base_row_finetune_vertical_square.pth --grasp_only --depth_channels_history --cycle_consistency \
-    --no_common_sense_backprop --future_reward_discount 0.65
+    --no_common_sense_backprop --future_reward_discount 0.65 &
 fi
