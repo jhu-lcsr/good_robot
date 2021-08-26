@@ -1,5 +1,10 @@
 #!/bin/sh
 
+#    Suggested commands:
+#        export CUDA_VISIBLE_DEVICES="0" && ./finetune.sh -f -e -s -t row
+#        export CUDA_VISIBLE_DEVICES="0" && ./finetune.sh -f -e -s -t stack
+#        export CUDA_VISIBLE_DEVICES="0" && ./finetune.sh -f -e -s -t unstack
+#        export CUDA_VISIBLE_DEVICES="0" && ./finetune.sh -f -e -s -t vertical_square
 # don't finetune by default (assume it hasn't been done)
 finetune=0;
 embed=0;
@@ -14,12 +19,19 @@ Help()
 {
    # Display Help
    echo "Syntax: ./finetune.sh [-f|e|t|h]"
+   echo ""
    echo "options:"
    echo "-f     Finetune policies from base_models. Other options will break if this hasn't been run at least once."
    echo "-t     Which task? [row|stack|unstack|vertical_square]"
    echo "-e     Precompute demo embeddings. If you do not already have embed.pickle files in the demo folders, this is highly recommended."
    echo "-s     Run SSR Simulation Experiments."
    echo "-h     Print help menu."
+   echo
+   echo "Suggested commands:"
+   echo "    export CUDA_VISIBLE_DEVICES=\"0\" && ./finetune.sh -f -e -s -t row"
+   echo "    export CUDA_VISIBLE_DEVICES=\"0\" && ./finetune.sh -f -e -s -t stack"
+   echo "    export CUDA_VISIBLE_DEVICES=\"0\" && ./finetune.sh -f -e -s -t unstack"
+   echo "    export CUDA_VISIBLE_DEVICES=\"0\" && ./finetune.sh -f -e -s -t vertical_square"
    echo
    echo "Note that running without any of the options set will result in no action."
 }
@@ -44,6 +56,7 @@ while getopts ":t:f:e:s:h:" option; do
     esac
 done
 
+echo "Checking for -f"
 if [ $finetune -eq 1 ]
 then
     echo "Running Finetuning..."
@@ -81,6 +94,8 @@ fi
 
 # regenerate embedding pickles
 
+
+echo "Checking for -e"
 if [ $embed -eq 1 ]
 then
     echo "Computing and Saving Embeddings..."
@@ -117,6 +132,8 @@ then
 fi
 
 
+
+echo "Checking for -d"
 if [ $ssr -eq 1 ]
 then
     ./ssr.sh -t $task
