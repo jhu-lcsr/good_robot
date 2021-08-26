@@ -29,12 +29,12 @@ if __name__ == '__main__':
     parser.add_argument('--save_neighborhood', dest='save_neighborhood', default=False, action='store_true', help='save neighborhood around demo action')
     parser.add_argument('--neighborhood_size', dest='neighborhood_size', default=5, type=int, help='size of neighborhood to save')
 
+    args = parser.parse_args()
+
     # if we want to save neighborhood, make sure some other args are set
     if args.save_neighborhood:
         args.cycle_consistency = True
         args.write_embed = True
-
-    args = parser.parse_args()
 
     # TODO(adit98) may need to make this variable
     # Cols: min max, Rows: x y z (define workspace limits in robot coordinates)
