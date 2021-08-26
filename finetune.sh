@@ -133,7 +133,7 @@ fi
 
 
 
-echo "Checking for -d"
+echo "Checking for -s"
 if [ $ssr -eq 1 ]
 then
     ./ssr.sh -t $task

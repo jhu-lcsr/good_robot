@@ -1,6 +1,6 @@
 # NOTE This is what to modify if your paths are different.
-PATH_TO_COPPELIA_SIM="~/src/CoppeliaSim_Edu_V4_1_0_Ubuntu18_04/coppeliaSim.sh";
-PATH_TO_RGR="~/src/real_good_robot";
+PATH_TO_COPPELIA_SIM="$HOME/src/CoppeliaSim_Edu_V4_1_0_Ubuntu18_04/";
+PATH_TO_RGR="$HOME/src/real_good_robot";
 task="";
 
 set -e
@@ -14,6 +14,7 @@ Help()
    echo "Syntax: ./ssr.sh [-t|h]"
    echo "options:"
    echo "-t     Which task? [row|stack|unstack|vertical_square]"
+   echo "-c     launch coppeliasim"
    echo "-h     Print help menu."
    echo
    echo "Note that running without any of the options set will result in no action."
@@ -36,7 +37,7 @@ done
 if [ "$task" = "row" ]
 then
     # NOTE change ports here AND in commands below if sims need to be run on different ports. 19997-20000 used by default
-    $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt
+    # $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt
 
     # row
     export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19997 --random_seed 1238 \
@@ -46,7 +47,7 @@ then
 
 elif [ "$task" = "stack" ]
 then
-    $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
+    # $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # stack
     export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19998 --random_seed 1238 \
     --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path demos/stack_demos --row_snapshot_file logs/finetuned_models/base_row_finetune_stack.pth \
@@ -56,7 +57,7 @@ then
 
 elif [ "$task" = "unstack" ]
 then
-    $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19999_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
+    # $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19999_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # unstack
     export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19999 --random_seed 1238 \
     --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path demos/unstacking_demos --stack_snapshot_file \
@@ -66,7 +67,7 @@ then
 
 elif [ "$task" = "vertical_square" ]
 then
-    $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_20000_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
+    # $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_20000_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # vertical square
     export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 \
     --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos --stack_snapshot_file \
