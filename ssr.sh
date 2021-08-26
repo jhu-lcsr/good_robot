@@ -1,7 +1,11 @@
 # NOTE This is what to modify if your paths are different.
-PATH_TO_COPPELIA_SIM="~/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh";
-PATH_TO_RGR="~/real_good_robot";
+PATH_TO_COPPELIA_SIM="~/src/CoppeliaSim_Edu_V4_1_0_Ubuntu18_04/coppeliaSim.sh";
+PATH_TO_RGR="~/src/real_good_robot";
 task="";
+
+set -e
+set -u
+set -x
 
 # help function
 Help()
@@ -16,7 +20,7 @@ Help()
 }
 
 # get cmd line options
-while getopts ":ht:" option; do
+while getopts ":h:t:" option; do
     case $option in
         t) # which task?
             task=${OPTARG};;
@@ -29,7 +33,7 @@ while getopts ":ht:" option; do
     esac
 done
 
-if [ "$task" == "row" ]
+if [ "$task" = "row" ]
 then
     # NOTE change ports here AND in commands below if sims need to be run on different ports. 19997-20000 used by default
     $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt
@@ -40,7 +44,7 @@ then
     --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_row.pth \
     --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 
-elif [ "$task" == "stack" ]
+elif [ "$task" = "stack" ]
 then
     $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19998_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # stack
@@ -50,7 +54,7 @@ then
     --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 
 
-elif [ "$task" == "unstack" ]
+elif [ "$task" = "unstack" ]
 then
     $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19999_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # unstack
@@ -60,7 +64,7 @@ then
     --row_snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth --grasp_only --depth_channels_history --cycle_consistency \
     --no_common_sense_backprop --future_reward_discount 0.65
 
-elif [ "$task" == "vertical_square" ]
+elif [ "$task" = "vertical_square" ]
 then
     $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_20000_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # vertical square
