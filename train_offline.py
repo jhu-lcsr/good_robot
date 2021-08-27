@@ -12,11 +12,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--base_model', required=True)
     parser.add_argument('-d', '--demo_dir', required=True, help='path to dir with demos')
-    parser.add_argument('-i', '--iterations', default=250, type=int, help='how many training steps')
+    parser.add_argument('-i', '--iterations', default=333, type=int, help='how many training steps')
     parser.add_argument('-s', '--seed', default=1234, type=int)
     parser.add_argument('-t', '--task_type', default='stack', help='stack/row/unstack/vertical_square')
     parser.add_argument('-o', '--out_dir', default=None, help='where to write finetuned model, WILL NOT SAVE IF BLANK')
-    parser.add_argument('-l', '--learning_rate', default=1e-4, help="What learning rate to use?")
+    parser.add_argument('-l', '--learning_rate', default=1e-5, help="What learning rate to use?")
     parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store', default=0.65)
     args = parser.parse_args()
 
