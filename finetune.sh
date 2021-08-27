@@ -9,16 +9,13 @@
 finetune=0;
 embed=0;
 ssr=0;
-
-set -e
-set -u
-set -x
+task="";
 
 # help function
 Help()
 {
    # Display Help
-   echo "Syntax: ./finetune.sh [-f|e|t|h]"
+   echo "Syntax: ./finetune.sh [-f|t|e|s|h]"
    echo ""
    echo "options:"
    echo "-f     Finetune policies from base_models. Other options will break if this hasn't been run at least once."
@@ -37,12 +34,13 @@ Help()
 }
 
 # get cmd line options
-while getopts ":t:f:e:s:h:" option; do
-    case $option in
-        t) # which task?
-            task=${OPTARG};;
+while getopts "t:fesh" flag
+do
+    case $flag in
         f) # run finetuning?
             finetune=1;;
+        t) # which task?
+            task=${OPTARG};;
         e) # compute embeddings?
             embed=1;;
         s) # run ssr?
@@ -56,7 +54,6 @@ while getopts ":t:f:e:s:h:" option; do
     esac
 done
 
-echo "Checking for -f"
 if [ $finetune -eq 1 ]
 then
     echo "Running Finetuning..."
@@ -94,8 +91,6 @@ fi
 
 # regenerate embedding pickles
 
-
-echo "Checking for -e"
 if [ $embed -eq 1 ]
 then
     echo "Computing and Saving Embeddings..."
@@ -131,9 +126,7 @@ then
     fi
 fi
 
-
-
-echo "Checking for -s"
+# Run SSR
 if [ $ssr -eq 1 ]
 then
     ./ssr.sh -t $task

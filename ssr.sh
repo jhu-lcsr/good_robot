@@ -2,10 +2,8 @@
 PATH_TO_COPPELIA_SIM="$HOME/src/CoppeliaSim_Edu_V4_1_0_Ubuntu18_04/";
 PATH_TO_RGR="$HOME/src/real_good_robot";
 task="";
-
-set -e
-set -u
-set -x
+coppelia=0;
+# TODO implement coppelia flag
 
 # help function
 Help()
@@ -21,13 +19,15 @@ Help()
 }
 
 # get cmd line options
-while getopts ":h:t:" option; do
+while getopts "t:hc" option; do
     case $option in
         t) # which task?
             task=${OPTARG};;
         h) # help
             Help
             exit;;
+        c) # launch coppelia_sim
+            coppelia=1;;
         \?) # Invalid option
             echo "Error: Invalid option"
             exit;;
