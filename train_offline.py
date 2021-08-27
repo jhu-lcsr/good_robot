@@ -49,7 +49,7 @@ if __name__ == '__main__':
             trial_reward='discounted', num_dilation=0, lr=args.learning_rate)
 
     # next compute the rewards for the trial (all steps successful)
-    prog_rewards = np.array([1.0, 1.0, 2.0, 2.0, 3.0, 3.0])
+    prog_rewards = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 4.0])
 
     # compute trial_rewards
     trial_rewards = prog_rewards.copy()
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     models = {} # dict {iter: model_weights}
 
     for i in tqdm(range(args.iterations)):
-        # generate random number between 0 and 1, and another between 0 and 5 (inclusive)
+        # generate random number between 0 and 1, and another between 0 and 1 (inclusive)
         demo_num = np.random.randint(0, 2)
         progress = np.random.randint(1, 4)
         action_str = ['grasp', 'place'][np.random.randint(0, 2)]
