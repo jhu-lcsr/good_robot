@@ -175,7 +175,7 @@ def main(args):
     baseline_language_mask = args.baseline_language_mask
     is_bisk = args.is_bisk
     human_annotation = args.human_annotation
-    randomized = static_language_mask # If we are using the language mask, we are using the logoblock_dataset
+    randomized = static_language_mask or not args.place # If we are using the language mask, we are using the logoblock_dataset. randomized refers to the object meshes
     obj_scale = 0.00018 if args.is_bisk else 1 # Hard coded value based on logoblock mesh size.
     language_model_config = args.language_model_config
     language_model_weights = args.language_model_weights

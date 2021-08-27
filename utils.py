@@ -258,6 +258,8 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
         if color_heightmap is not None:
             plt.imshow(color_heightmap)
         plt.show(block=True)
+    if place_predictions is None:
+        return push_predictions, grasp_predictions
     return push_predictions, grasp_predictions, place_predictions
 
 
