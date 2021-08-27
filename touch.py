@@ -333,6 +333,16 @@ class HumanControlOfRobot(object):
                 self.logger.write_to_log('executed-actions-' + str(self.trial),
                         self.successful_action_log)
                 self.logger.write_to_log('all-actions-' + str(self.trial), self.all_action_log)
+
+                # write current heightmap
+                depth_heightmap, color_heightmap, _, color_img, depth_img = get_and_save_images(self.click_count,
+                        self.robot, self.logger, self.action, save_image=False)
+                self.logger.save_heightmaps(self.click_count + 1, color_heightmap,
+                        depth_heightmap, 'end', poststring=self.trial)
+                if self.save_img:
+                    self.logger.save_images(self.click_count + 1, color_grasp_img,
+                            depth_grasp_img, 'end')
+
             self.trial += 1
 
             # clear logs
@@ -355,10 +365,10 @@ class HumanControlOfRobot(object):
                 # write current heightmap
                 depth_heightmap, color_heightmap, _, color_img, depth_img = get_and_save_images(self.click_count,
                         self.robot, self.logger, self.action, save_image=False)
-                self.logger.save_heightmaps(self.click_count, color_heightmap,
+                self.logger.save_heightmaps(self.click_count + 1, color_heightmap,
                         depth_heightmap, 'end', poststring=self.trial)
                 if self.save_img:
-                    self.logger.save_images(self.click_count, color_grasp_img,
+                    self.logger.save_images(self.click_count + 1, color_grasp_img,
                             depth_grasp_img, 'end')
 
             self.stop = True
