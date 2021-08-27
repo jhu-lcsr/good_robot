@@ -2330,3 +2330,64 @@ SIM TO REAL WATCH THIS - VERTICAL SQUARE - depth time fix - SIM-TO-REAL now watc
 export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos/ --stack_snapshot_file logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --unstack_snapshot_file logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --row_snapshot_file logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth --grasp_only --cycle_consistency --depth_channels_history --no_common_sense_backprop --future_reward_discount 0.65
 Commit: 5b738b22f279e862dde5df914421d0dd7436f026
 GPU 0, Tab 0, port 20000, bottom right v-rep window, v-rep tab 10
+
+
+
+================================
+2021-06-10 LANGUAGE MODEL tests
+================================
+
+STACK LANGUAGE SIM TEST, REAL MODEL 2021-06-11
+----------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --task_type stack --timeout 6000
+Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+STACK LANGUAGE SIM TEST, SIM MODEL 2021-06-11
+----------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 8 --common_sense --place --static_language_mask --language_model_config language_models/sim_stacks/config.yaml --language_model_weights language_models/sim_stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --is_sim --human_annotation --task_type stack --timeout 6000
+Commit: 75cd6b81d8e1e8c616a2b3e6ade1cdfc31f66765
+
+
+ROW LANGUAGE SIM TEST, SIM MODEL 2021-06-12
+---------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --static_language_mask --language_model_config language_models/sim_rows/config.yaml --language_model_weights language_models/sim_rows/best.th --snapshot_file logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_index.pth --end_on_incorrect_order --check_row --timeout 100000 --place --separation_threshold 0.08 --distance_threshold 0.04 --is_sim --human_annotation --task_type row --common_sense --timeout 6000
+Commit: 6116224e54c28697f378c8a867d10cad8f054d34
+
+
+
+X STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-14
+X -----------------------------------------------
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1238 --max_test_trials 10 
+X Commit: cf83d58f2414cfa99cfbedd3dfbe45282914d289
+X Logged 2 trials, useful for reference but not for results. Killed bc the human lables could not be set on progress reversal, i.e. it would keep trying to place red on green if a stack toppled and the command needed to change.
+X Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-06-14-21-18-09_Real-Stack-Two-Step-Reward-Masked-Testing
+
+X Killed bc num_obj and num_extra_obj was misconfigured
+X Creating data logging session: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-06-14-21-09-41_Real-Stack-Two-Step-Reward-Masked-Testing
+
+
+X STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-15
+X -----------------------------------------------
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1238 --max_test_trials 10 
+X Commit: 0f450b75097a3a1d079905fc4476a7a1405dfa36
+X
+X Logged 2 trials, useful for reference but not for results. Killed bc the human lables could not be set on progress reversal, i.e. it would keep trying to place red on green if a stack toppled and the command needed to change.
+X Snapshot file: /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/
+
+
+X STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-15
+X -----------------------------------------------
+X export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_reset --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1238 --max_test_trials 10
+X Commit: bd67b2f14d5f91b5ecbbf0fd7ef118aa86f7ce79
+X Logged 3 trials, but goal color order didn't reshuffle correctly
+X /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2021-06-15-11-47-04_Real-Stack-Two-Step-Reward-Masked-Testing
+
+STACK LANGUAGE REAL TEST, REAL MODEL 2021-06-16
+-----------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --common_sense --place --static_language_mask --language_model_config language_models/stacks/config.yaml --language_model_weights language_models/stacks/best.th --snapshot_file logs/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training/2020-06-07-21-42-16_Sim-Stack-SPOT-Trial-Reward-Masked-Training-best-model-good-robot-paper/snapshot.reinforcement_trial_success_rate_best_index.pth --goal_num_obj=4 --human_reset --human_annotation --task_type stack  --common_sense --timeout 6000  --random_seed 1239 --max_test_trials 10
+Commit: bbc134835e782cf711a2c626328072f1c2653453
+
+ROW LANGUAGE REAL TEST, SIM MODEL 2021-06-16
+--------------------------------------------
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_testing --obj_mesh_dir objects/blocks --num_obj 4 --static_language_mask --language_model_config language_models/rows/config.yaml --language_model_weights language_models/rows/best.th --snapshot_file logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_index.pth --check_row --timeout 100000 --place --separation_threshold 0.08 --distance_threshold 0.04 --human_reset --human_annotation --task_type row --common_sense --timeout 6000  --random_seed 1239 --max_test_trials 10 
+Commit: bbc134835e782cf711a2c626328072f1c2653453

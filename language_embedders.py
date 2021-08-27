@@ -2,8 +2,10 @@ import torch
 import numpy as np
 from spacy.tokenizer import Tokenizer 
 from transformers import BertTokenizer, BertModel
-import pdb 
+import pdb
 
+np.random.seed(12) 
+torch.manual_seed(12) 
 
 class RandomEmbedder(torch.nn.Module):
     def __init__(self, 
@@ -25,6 +27,7 @@ class RandomEmbedder(torch.nn.Module):
         self.word_to_idx["<PAD>"] = 1
 
         self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
+        self.output_dim = embedding_dim 
 
     def set_device(self, device):
         self.device = device
@@ -64,6 +67,7 @@ class GloveEmbedder(torch.nn.Module):
         self.word_to_idx["<PAD>"] = 1
 
         self.embeddings = torch.nn.Embedding(len(self.vocab) + 2, embedding_dim)
+        self.output_dim = embedding_dim 
 
         fake_weight = torch.clone(self.embeddings.weight)
 
@@ -109,6 +113,7 @@ class BERTEmbedder(torch.nn.Module):
 
         self.tokenizer = BertTokenizer.from_pretrained(self.model_name) 
         self.bert_model = BertModel.from_pretrained(self.model_name) 
+        self.output_dim = 768
         self.bert_model.eval() 
 
     def set_device(self, device):
@@ -119,7 +124,12 @@ class BERTEmbedder(torch.nn.Module):
     def forward(self, words):
         words = [x if x != "<PAD>" else "[PAD]" for x  in words]
         text = " ".join(words)
-        tokenized_text = self.tokenizer.tokenize(text)[0:self.max_seq_len]
+        tokenized_text = self.tokenizer.tokenize(text)[0:self.max_seq_len ]
+        if len(tokenized_text) < self.max_seq_len:
+            # happens when there is weird whitepsace in the command 
+            pads = ["[PAD]" for i in range(self.max_seq_len - len(tokenized_text))]
+            tokenized_text += pads 
+
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokenized_text)
         tokens_tensor = torch.tensor([indexed_tokens]).to(self.device) 
         
@@ -127,6 +137,7 @@ class BERTEmbedder(torch.nn.Module):
             with torch.no_grad():
                 outputs = self.bert_model(tokens_tensor) 
         else:
+            self.bert_model.train()
             outputs = self.bert_model(tokens_tensor, token_type_ids=segments_tensors)
 
         # use top layer 

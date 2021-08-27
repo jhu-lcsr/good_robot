@@ -448,7 +448,8 @@ class UNetWithAttention(BaseUNet):
                 num_blocks: int = 20,
                 dropout: float = 0.20, 
                 depth: int = 7,
-                device: torch.device = "cpu"):
+                device: torch.device = "cpu",
+                do_reconstruction: bool = False):
         super(UNetWithAttention, self).__init__(in_channels=in_channels,
                                                out_channels=out_channels,
                                                hc_large=hc_large,
@@ -467,6 +468,7 @@ class UNetWithAttention(BaseUNet):
         self.lang_encoder = lang_encoder
         self.lang_embedder.set_device(self.device) 
         self.lang_encoder.set_device(self.device) 
+        self.do_reconstruction = do_reconstruction
 
         self.lang_projections = [] 
         self.lang_attentions = []
@@ -495,6 +497,9 @@ class UNetWithAttention(BaseUNet):
         self.upconv_modules.append(penult_upconv) 
         final_upconv = torch.nn.ConvTranspose2d(2*hc_large + hc_small, out_channels, kernel_size, stride=stride, padding=pad) 
         self.upconv_modules.append(final_upconv) 
+
+        if self.do_reconstruction:
+            self.recon_layer = FinalClassificationLayer(int(out_channels/self.depth), out_channels, 8, depth = self.depth) 
 
 
     def forward(self, data_batch):
@@ -574,9 +579,16 @@ class UNetWithAttention(BaseUNet):
                 out = upnorm(out)
             out = self.dropout(out) 
 
-        out = self.final_layer(out) 
+        pre_final = out
+        out = self.final_layer(pre_final) 
+        if self.do_reconstruction:
+            recon_out = self.recon_layer(pre_final) 
+        else:
+            recon_out = None 
+
 
         to_ret = {"next_position": out,
+                  "reconstruction": recon_out, 
                  "pred_block_logits": None}
         return to_ret 
 
