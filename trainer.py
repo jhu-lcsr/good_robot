@@ -33,7 +33,7 @@ class Trainer(object):
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
                  common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True,
-                 apply_language_mask=False):
+                 apply_language_mask=False, lr=1e-4):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
@@ -138,7 +138,7 @@ class Trainer(object):
         # Set model to training mode
         self.model.train()
 
-        lr = 1e-4
+        lr = lr
         momentum = 0.9
         weight_decay = 2e-5
         if is_testing:
@@ -754,7 +754,7 @@ class Trainer(object):
             print(reward_str)
             return expected_reward, current_reward
 
-    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False):
+    def backprop(self, color_heightmap, depth_heightmap, primitive_action, best_pix_ind, label_value, goal_condition=None, symmetric=False, return_loss=False, silent=False):
         """ Compute labels and backpropagate
         """
         # contactable_regions = None
@@ -869,7 +869,8 @@ class Trainer(object):
                 #loss_value += loss.cpu().data.numpy()[0] Commented because the result could be 0 dimensional. Next try/catch will solve that
                 loss_value += loss.cpu().data.numpy()
 
-            print('Training loss: %f' % (loss_value))
+            if not silent:
+                print('Training loss: %f' % (loss_value))
             self.optimizer.step()
 
         elif self.method == 'reinforcement':
@@ -955,8 +956,12 @@ class Trainer(object):
 
                 loss_value = loss_value/2
 
-            print('Training loss: %f' % (loss_value))
+            if not silent:
+                print('Training loss: %f' % (loss_value))
             self.optimizer.step()
+
+        if return_loss:
+            return loss
 
     def get_prediction_vis(self, predictions, color_heightmap, best_pix_ind, scale_factor=8):
         # TODO(ahundt) once the reward function is back in the 0 to 1 range, make the scale factor 1 again

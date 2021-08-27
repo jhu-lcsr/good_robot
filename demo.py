@@ -78,6 +78,7 @@ class Demonstration():
         if stack_trainer is None and row_trainer is None and unstack_trainer is None and vertical_square_trainer is None:
             raise ValueError("Must provide at least one trainer")
 
+        # TODO(adit98) make the call to action_dict in get_heightmaps instead of here! Bad code...
         if primitive_action == 'grasp':
             color_heightmap, valid_depth_heightmap = self.get_heightmaps(primitive_action,
                     self.action_dict[stack_height]['grasp_image_ind'], use_hist=use_hist)
