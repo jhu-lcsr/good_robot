@@ -16,6 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--seed', default=1234, type=int)
     parser.add_argument('-t', '--task_type', default='stack', help='stack/row/unstack/vertical_square')
     parser.add_argument('-o', '--out_dir', default=None, help='where to write finetuned model, WILL NOT SAVE IF BLANK')
+    parser.add_argument('-l', '--learning_rate', default=1e-4, help="What learning rate to use?")
     parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store', default=0.65)
     args = parser.parse_args()
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
             flops=False, network='densenet', common_sense=True,
             place_common_sense=place_common_sense, show_heightmap=False,
             place_dilation=place_dilation, common_sense_backprop=True,
-            trial_reward='discounted', num_dilation=0)
+            trial_reward='discounted', num_dilation=0, lr=args.learning_rate)
 
     # next compute the rewards for the trial (all steps successful)
     prog_rewards = np.array([1.0, 1.0, 2.0, 2.0, 3.0, 3.0])

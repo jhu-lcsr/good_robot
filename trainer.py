@@ -33,7 +33,7 @@ class Trainer(object):
                  is_testing, snapshot_file, force_cpu, goal_condition_len=0, place=False, pretrained=False,
                  flops=False, network='efficientnet', common_sense=False, show_heightmap=False, place_dilation=0.03,
                  common_sense_backprop=True, trial_reward='spot', num_dilation=0, place_common_sense=True,
-                 apply_language_mask=False):
+                 apply_language_mask=False, lr=1e-4):
 
         self.heightmap_pixels = 224
         self.buffered_heightmap_pixels = 320
