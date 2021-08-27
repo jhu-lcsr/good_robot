@@ -89,8 +89,34 @@ if __name__ == '__main__':
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
         best_pix_ind = [best_rot_ind, best_action_xy[1], best_action_xy[0]]
 
-        # get reward
-        #reward = trial_rewards[progress + ACTION_TO_ID[action_str] - 1]
+        # get next set of heightmaps for reward computation
+        if action_str == 'grasp':
+            next_action_str = 'place'
+            next_progress = progress
+        else:
+            next_action_str = 'grasp'
+            next_progress = progress + 1
+
+        # if we finished trial, set next action str to 'end'
+        if next_progress > 3:
+            next_action_str = 'end'
+
+        # get next set of heightmaps then compute reward
+        next_color_heightmap, next_depth_heightmap = d.get_heightmaps(next_action_str,
+                d.action_dict[next_progress][action_str + '_image_ind'], use_hist=True)
+
+        # compute reward
+        grasp_success = (action_str == 'grasp')
+        place_success = (action_str == 'place')
+
+        # multiplier is progress for grasp, progress + 1 (next_progress) for place
+        multiplier = progress if grasp_success else next_progress
+        reward, old_reward = trainer.get_label_value(action_str, push_success=False,
+                grasp_success=grasp_success, change_detected=True, prev_push_predictions=None,
+                prev_grasp_predictions=None, next_color_heightmap=next_color_heightmap,
+                next_depth_heightmap=next_depth_heightmap, color_success=None,
+                goal_condition=None, place_success=place_success, prev_place_predictions=None,
+                reward_multiplier=multiplier)
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,
