@@ -90,7 +90,7 @@ if __name__ == '__main__':
         best_pix_ind = [best_rot_ind, best_action_xy[1], best_action_xy[0]]
 
         # get reward
-        reward = trial_rewards[progress + ACTION_TO_ID[action_str] - 1]
+        #reward = trial_rewards[progress + ACTION_TO_ID[action_str] - 1]
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,
