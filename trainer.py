@@ -138,7 +138,7 @@ class Trainer(object):
         # Set model to training mode
         self.model.train()
 
-        lr = 1e-4
+        lr = lr
         momentum = 0.9
         weight_decay = 2e-5
         if is_testing:
