@@ -105,6 +105,11 @@ if __name__ == '__main__':
             # workaround for when the very last trial would be indexed past the end
             trial_end -= 1 
         trial_successful = trial_success_log[trial_end] > trial_success_log[trial_start]
+        # if i == 6: # special one-time workaround for 2021-02-28-14-27-07_Real-Unstacking-Imitation trial 6 (one indexed trial 7), to correct saved results typo to match video results
+        #     progress_reversal = 1.
+        #     max_heights[-1] = 3
+        #     trial_successful = 0
+
         print('log indicates trial success') if trial_successful else print('log indicates trial failure')
         if unstack and not trial_successful and len(trial_heights) > 1 and max_heights[-1] == 4.:
             # special case for unstack failures, sometimes progress of 4 gets logged after a topple
