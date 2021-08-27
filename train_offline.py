@@ -65,7 +65,7 @@ if __name__ == '__main__':
     models = {} # dict {iter: model_weights}
 
     for i in tqdm(range(args.iterations)):
-        # generate random number between 0 and 1, and another between 0 and 1 (inclusive)
+        # generate random number between 0 and 1, and another between 1 and 3 (inclusive)
         demo_num = np.random.randint(0, 2)
         progress = np.random.randint(1, 4)
         action_str = ['grasp', 'place'][np.random.randint(0, 2)]
