@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
         # multiplier is progress for grasp, progress + 1 (next_progress) for place
         multiplier = progress if grasp_success else next_progress
-        if not trial_reward:
+        if not args.trial_reward:
             reward, old_reward = trainer.get_label_value(action_str, push_success=False,
                     grasp_success=grasp_success, change_detected=True, prev_push_predictions=None,
                     prev_grasp_predictions=None, next_color_heightmap=next_color_heightmap,
@@ -120,7 +120,8 @@ if __name__ == '__main__':
                     goal_condition=None, place_success=place_success, prev_place_predictions=None,
                     reward_multiplier=multiplier)
         else:
-            reward = trial_rewards[progress]
+            # index into trial_rewards to get reward
+            reward = trial_rewards[(progress - 1) * 2 + ACTION_TO_ID[action_str] - 1] # e.g. if progress is 1, grasp reward is trial_rewards[0]
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,
