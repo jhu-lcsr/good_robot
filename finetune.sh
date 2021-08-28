@@ -11,6 +11,11 @@ embed=0;
 ssr=0;
 task="";
 
+# make sure script will print where it is and exit on errors
+set -e
+set -u
+set -x
+
 # help function
 Help()
 {

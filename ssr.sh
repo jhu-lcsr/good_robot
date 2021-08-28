@@ -5,6 +5,11 @@ task="";
 coppelia=0;
 # TODO implement coppelia flag
 
+# make sure script will print where it is and exit on errors
+set -e
+set -u
+set -x
+
 # help function
 Help()
 {
