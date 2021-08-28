@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task_type', default='stack', help='stack/row/unstack/vertical_square')
     parser.add_argument('-o', '--out_dir', default=None, help='where to write finetuned model, WILL NOT SAVE IF BLANK')
     parser.add_argument('-l', '--learning_rate', default=1e-5, help="What learning rate to use?")
+    parser.add_argument('--trial_reward', default=False, aciton='store_true', help='use trial reward?')
     parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store', default=0.65)
     args = parser.parse_args()
 
@@ -111,12 +112,16 @@ if __name__ == '__main__':
 
         # multiplier is progress for grasp, progress + 1 (next_progress) for place
         multiplier = progress if grasp_success else next_progress
-        reward, old_reward = trainer.get_label_value(action_str, push_success=False,
-                grasp_success=grasp_success, change_detected=True, prev_push_predictions=None,
-                prev_grasp_predictions=None, next_color_heightmap=next_color_heightmap,
-                next_depth_heightmap=next_depth_heightmap, color_success=None,
-                goal_condition=None, place_success=place_success, prev_place_predictions=None,
-                reward_multiplier=multiplier)
+        if not args.trial_reward:
+            reward, old_reward = trainer.get_label_value(action_str, push_success=False,
+                    grasp_success=grasp_success, change_detected=True, prev_push_predictions=None,
+                    prev_grasp_predictions=None, next_color_heightmap=next_color_heightmap,
+                    next_depth_heightmap=next_depth_heightmap, color_success=None,
+                    goal_condition=None, place_success=place_success, prev_place_predictions=None,
+                    reward_multiplier=multiplier)
+        else:
+            # index into trial_rewards to get reward
+            reward = trial_rewards[(progress - 1) * 2 + ACTION_TO_ID[action_str] - 1] # e.g. if progress is 1, grasp reward is trial_rewards[0]
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,
