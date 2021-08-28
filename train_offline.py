@@ -56,7 +56,6 @@ if __name__ == '__main__':
     trainer.clearance_log = [[6]]
     trainer.reward_value_log = prog_rewards[:, None]
     trainer.trial_reward_value_log_update()
-    print(trainer.trial_reward_value_log)
 
     # store losses, checkpoint model every 25 iterations
     losses = []
