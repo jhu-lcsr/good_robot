@@ -49,14 +49,20 @@ if __name__ == '__main__':
             place_dilation=place_dilation, common_sense_backprop=True,
             trial_reward='spot', num_dilation=0, lr=args.learning_rate)
 
+    print('train_offline.py assumes all demos are optimal with perfect action choices and exactly 6 steps long. Update the code if this is not the case.')
     # next compute the rewards for the trial (all steps successful)
     prog_rewards = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 4.0])
+    print('Demo progress rewards: ' + str(prog_rewards))
 
     # compute trial_rewards
     trainer.clearance_log = [[6]]
     trainer.reward_value_log = prog_rewards[:, None]
     trainer.trial_reward_value_log_update()
-    print(trainer.trial_reward_value_log)
+    print('Demo trial rewards: ' + str(trainer.trial_reward_value_log))
+    if args.trial_reward:
+        print('Fine tuning ' + args.task_type + ' task with Trial Reward')
+    else:
+        print('Fine tuning ' + args.task_type + ' task with Progress Reward')
 
     # store losses, checkpoint model every 25 iterations
     losses = []
