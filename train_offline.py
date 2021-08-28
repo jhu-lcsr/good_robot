@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--task_type', default='stack', help='stack/row/unstack/vertical_square')
     parser.add_argument('-o', '--out_dir', default=None, help='where to write finetuned model, WILL NOT SAVE IF BLANK')
     parser.add_argument('-l', '--learning_rate', default=1e-5, help="What learning rate to use?")
-    parser.add_argument('--trial_reward', default=False, aciton='store_true', help='use trial reward?')
+    parser.add_argument('--trial_reward', default=False, action='store_true', help='use trial reward?')
     parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store', default=0.65)
     args = parser.parse_args()
 
@@ -47,19 +47,16 @@ if __name__ == '__main__':
             flops=False, network='densenet', common_sense=True,
             place_common_sense=place_common_sense, show_heightmap=False,
             place_dilation=place_dilation, common_sense_backprop=True,
-            trial_reward='discounted', num_dilation=0, lr=args.learning_rate)
+            trial_reward='spot', num_dilation=0, lr=args.learning_rate)
 
     # next compute the rewards for the trial (all steps successful)
     prog_rewards = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 4.0])
 
     # compute trial_rewards
-    trial_rewards = prog_rewards.copy()
-    for i in reversed(range(len(trial_rewards))):
-        if i == len(trial_rewards) - 1:
-            trial_rewards[i] *= 2
-            continue
-
-        trial_rewards[i] += args.future_reward_discount * trial_rewards[i+1]
+    trainer.clearance_log = [[6]]
+    trainer.reward_value_log = prog_rewards[:, None]
+    trainer.trial_reward_value_log_update()
+    print(trainer.trial_reward_value_log)
 
     # store losses, checkpoint model every 25 iterations
     losses = []
@@ -121,7 +118,8 @@ if __name__ == '__main__':
                     reward_multiplier=multiplier)
         else:
             # index into trial_rewards to get reward
-            reward = trial_rewards[(progress - 1) * 2 + ACTION_TO_ID[action_str] - 1] # e.g. if progress is 1, grasp reward is trial_rewards[0]
+            # e.g. if progress is 1, grasp reward is trial_rewards[0]
+            reward = trainer.trial_reward_value_log[(progress - 1) * 2 + ACTION_TO_ID[action_str] - 1]
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,
