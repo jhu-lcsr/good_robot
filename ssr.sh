@@ -69,11 +69,11 @@ elif [ "$task" = "vertical_square" ]
 then
     # $PATH_TO_COPPELIA_SIM/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_20001_FALSE_TRUE -s $PATH_TO_RGR/simulation/simulation.ttt &
     # vertical square
-    export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20001 --random_seed 1238 \
+    export CUDA_VISIBLE_DEVICES="3" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20002 --random_seed 1238 \
     --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path demos/vertical_square_demos --stack_snapshot_file \
     logs/finetuned_models/base_stack_finetune_vertical_square.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_vertical_square.pth \
     --row_snapshot_file logs/finetuned_models/base_row_finetune_vertical_square.pth --grasp_only --depth_channels_history --cycle_consistency \
-    --no_common_sense_backprop --future_reward_discount 0.65
+    --no_common_sense_backprop --future_reward_discount 0.65 --timeout 90
 
 else
     echo "Must pass one of [row | stack | unstack | vertical_square] to -t."
