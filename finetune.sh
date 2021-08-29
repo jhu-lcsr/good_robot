@@ -110,8 +110,10 @@ then
             --random_seed 1238 --is_testing --task_type stack --depth_channels_history --snapshot_file logs/finetuned_models/base_vertical_square_finetune_stack.pth
     elif [ "$task" = "unstack" ]
     then
+        # python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 20000 --max_test_trials 50 \
+        #     --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth
         python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 20000 --max_test_trials 50 \
-            --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth
+            --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_stack_finetune_unstack.pth
 
     elif [ "$task" = "vertical_square" ]
     then
