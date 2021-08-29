@@ -3089,7 +3089,7 @@ X Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-2
 
 
 =====================================================
-IMITATION SIM WATCH THIS! - FINE TUNE - STACK TRIAL REWARD TUNING BUGFIX - After demo update to include final image 2021-08-28
+IMITATION SIM WATCH THIS! - FINE TUNE - STACK TRIAL REWARD TUNING BUGFIX - After demo update to include final image 2021-08-28 (for watch this paper)
 Commit: 35629e432d439f0d59a255ccfb657a96f6959659
 =====================================================
 
@@ -3311,110 +3311,110 @@ vertical_square: 0.0192  [3. 3. 4. 4. 4. 4. 3. 3. 3. 3. 3. 3. 3. 3. 4. 3. 4. 3. 
 recoveries:
 (0.416 + 0.244 + 0 + 0.262)/3 = 0.307 = 30.7%
 
-===========
-Extra runs below
-===========
-
-
-
-===========
-Extra finetune row run, with added 0.025m allowable object area buffer
-
-+ python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos --stack_snapshot_file logs/finetuned_models/base_stack_finetune_row.pth --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_row.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
-main.py using common sense: True using place common sense: True
-main.py: loaded example_actions_dict
-Testing mode detected, automatically disabling situation removal.
-Connected to simulation.
-sim started 1: 0
-sim started 2: 0
-moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
-self.is_testing True self.test_preset_cases False
-CUDA detected. Running with GPU acceleration.
-/home/ahundt/.local/lib/python3.6/site-packages/torch/nn/_reduction.py:43: UserWarning: size_average and reduce args will be deprecated, please use reduction='none' instead.
-  warnings.warn(warning.format(ret))
-Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_stack_finetune_row.pth
-CUDA detected. Running with GPU acceleration.
-Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_unstack_finetune_row.pth
-CUDA detected. Running with GPU acceleration.
-Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_vertical_square_finetune_row.pth
-Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
-
-sving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
-saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
-Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
-Training results:
- {'trial_success_rate_best_value': 0.32, 'trial_success_rate_best_index': 1254, 'grasp_success_rate_best_value': 0.772027972027972, 'grasp_success_rate_best_index': 1255, 'place_success_rate_best_value': 0.4510166358595194, 'place_success_rate_best_index': 1256, 'action_efficiency_best_value': 0.0861244019138756, 'action_efficiency_best_index': 1254}
-------------------------------
-data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
-max_heights, the highest height in each trial: [4. 2. 4. 3. 4. 3. 3. 3. 2. 3. 4. 3. 3. 3. 3. 4. 3. 3. 3. 3. 3. 4. 4. 4.
- 3. 3. 3. 3. 3. 3. 3. 3. 3. 4. 3. 4. 3. 4. 3. 3. 4. 3. 4. 4. 3. 3. 4. 4.
- 4. 3.]
-max_heights_rounded, the highest height in each trial: [4. 2. 4. 3. 4. 3. 3. 3. 2. 3. 4. 3. 3. 3. 3. 4. 3. 3. 3. 3. 3. 4. 4. 4.
- 3. 3. 3. 3. 3. 3. 3. 3. 3. 4. 3. 4. 3. 4. 3. 3. 4. 3. 4. 4. 3. 3. 4. 4.
- 4. 3.]
-logged trial success in trial_success_log.txt: [True, False, True, False, True, False, False, False, False, False, True, False, False, False, False, True, False, False, False, False, False, True, True, True, False, False, False, False, False, False, False, False, False, True, False, True, False, True, False, False, True, False, True, False, False, False, True, True, True, False]
-trials (success_height - epsilon) height or higher, another way of counting trial successes: [ True False  True False  True False False False False False  True False
- False False False  True False False False False False  True  True  True
- False False False False False False False False False  True False  True
- False  True False False  True False  True  True False False  True  True
-  True False]
-reversals: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0]
-recoveries: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
-total trials: 51 (clearance_length, total number of trials)
-num trials evaluated: 50 start trial: 0
-avg max height: 3.3 (higher is better, find max height for each trial, then average those values)
-avg max progress: 0.825 (higher is better,  (avg(round(max_heights))/4.0))
-standard deviation of max progress normalized to 0 to 1: 0.1346291201783626
-standard error of max progress normalized to 0 to 1: 0.0192327314540518
-avg reversals: 0.9 (lower is better)
-avg recoveries: 0.24444444444444444 (higher is better, no need for recovery attempts is best)
-avg logged trial success: 0.32 (successful trials according to trial_success_log.txt)
-avg trial success: 0.34 (higher is better,  (success_height - epsilon) height or higher)
-action efficiency with 6 action per trial optimum: 0.24449877750611246 action efficiency with 4 action per trial optimum: 0.16299918500407498
-data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
-
-
-
-
-===========
-Extra stack run: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
-
-saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
-saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/best_stats.json
-Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
-Training results:
- {'trial_success_rate_best_value': 0.54, 'trial_success_rate_best_index': 1087, 'grasp_success_rate_best_value': 0.8375209380234506, 'grasp_success_rate_best_index': 1087, 'place_success_rate_best_value': 0.5763747454175153, 'place_success_rate_best_index': 1089, 'action_efficiency_best_value': 0.1545538178472861, 'action_efficiency_best_index': 1089}
-
-
-------------------------------
-data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
-max_heights, the highest height in each trial: [2. 4. 4. 3. 4. 4. 4. 3. 3. 4. 3. 4. 3. 4. 4. 3. 4. 2. 3. 4. 3. 4. 4. 4.
- 3. 3. 3. 3. 4. 4. 4. 3. 4. 4. 4. 4. 2. 4. 4. 4. 3. 4. 4. 3. 4. 3. 3. 3.
- 3. 3.]
-max_heights_rounded, the highest height in each trial: [2. 4. 4. 3. 4. 4. 4. 3. 3. 4. 3. 4. 3. 4. 4. 3. 4. 2. 3. 4. 3. 4. 4. 4.
- 3. 3. 3. 3. 4. 4. 4. 3. 4. 4. 4. 4. 2. 4. 4. 4. 3. 4. 4. 3. 4. 3. 3. 3.
- 3. 3.]
-logged trial success in trial_success_log.txt: [False, True, True, False, True, True, True, False, False, True, False, True, False, True, True, False, True, False, False, True, False, True, True, True, False, False, False, False, True, True, True, False, True, True, True, True, False, True, True, True, False, True, True, False, True, False, False, False, False, False]
-trials (success_height - epsilon) height or higher, another way of counting trial successes: [False  True  True False  True  True  True False False  True False  True
- False  True  True False  True False False  True False  True  True  True
- False False False False  True  True  True False  True  True  True  True
- False  True  True  True False  True  True False  True False False False
- False False]
-reversals: [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-recoveries: [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-total trials: 51 (clearance_length, total number of trials)
-num trials evaluated: 50 start trial: 0
-avg max height: 3.48 (higher is better, find max height for each trial, then average those values)
-avg max progress: 0.87 (higher is better,  (avg(round(max_heights))/4.0))
-standard deviation of max progress normalized to 0 to 1: 0.15198684153570663
-standard error of max progress normalized to 0 to 1: 0.021712405933672376
-avg reversals: 0.74 (lower is better)
-avg recoveries: 0.40540540540540543 (higher is better, no need for recovery attempts is best)
-avg logged trial success: 0.54 (successful trials according to trial_success_log.txt)
-avg trial success: 0.54 (higher is better,  (success_height - epsilon) height or higher)
-action efficiency with 6 action per trial optimum: 0.2767527675276753 action efficiency with 4 action per trial optimum: 0.18450184501845018
-data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
-ahundt@spot|~/src/real_good_robot on ssr_with_finetuning!?
+X ===========
+X Extra runs below (testing a config change, prob don't use, otherwise ok)
+X ===========
+X 
+X 
+X 
+X ===========
+X Extra finetune row run, with added 0.025m allowable object area buffer
+X 
+X + python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path demos/row_demos --stack_snapshot_file logs/finetuned_models/base_stack_finetune_row.pth --vertical_square_snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth --unstack_snapshot_file logs/finetuned_models/base_unstack_finetune_row.pth --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
+X main.py using common sense: True using place common sense: True
+X main.py: loaded example_actions_dict
+X Testing mode detected, automatically disabling situation removal.
+X Connected to simulation.
+X sim started 1: 0
+X sim started 2: 0
+X moving to home joint config [0.5888036489486694, -0.04610097035765648, 0.2750997841358185, -0.40353187918663025, -0.8726646304130554]
+X self.is_testing True self.test_preset_cases False
+X CUDA detected. Running with GPU acceleration.
+X /home/ahundt/.local/lib/python3.6/site-packages/torch/nn/_reduction.py:43: UserWarning: size_average and reduce args will be deprecated, please use reduction='none' instead.
+X   warnings.warn(warning.format(ret))
+X Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_stack_finetune_row.pth
+X CUDA detected. Running with GPU acceleration.
+X Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_unstack_finetune_row.pth
+X CUDA detected. Running with GPU acceleration.
+X Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_vertical_square_finetune_row.pth
+X Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+X 
+X sving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+X saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+X Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+X Training results:
+X  {'trial_success_rate_best_value': 0.32, 'trial_success_rate_best_index': 1254, 'grasp_success_rate_best_value': 0.772027972027972, 'grasp_success_rate_best_index': 1255, 'place_success_rate_best_value': 0.4510166358595194, 'place_success_rate_best_index': 1256, 'action_efficiency_best_value': 0.0861244019138756, 'action_efficiency_best_index': 1254}
+X ------------------------------
+X data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+X max_heights, the highest height in each trial: [4. 2. 4. 3. 4. 3. 3. 3. 2. 3. 4. 3. 3. 3. 3. 4. 3. 3. 3. 3. 3. 4. 4. 4.
+X  3. 3. 3. 3. 3. 3. 3. 3. 3. 4. 3. 4. 3. 4. 3. 3. 4. 3. 4. 4. 3. 3. 4. 4.
+X  4. 3.]
+X max_heights_rounded, the highest height in each trial: [4. 2. 4. 3. 4. 3. 3. 3. 2. 3. 4. 3. 3. 3. 3. 4. 3. 3. 3. 3. 3. 4. 4. 4.
+X  3. 3. 3. 3. 3. 3. 3. 3. 3. 4. 3. 4. 3. 4. 3. 3. 4. 3. 4. 4. 3. 3. 4. 4.
+X  4. 3.]
+X logged trial success in trial_success_log.txt: [True, False, True, False, True, False, False, False, False, False, True, False, False, False, False, True, False, False, False, False, False, True, True, True, False, False, False, False, False, False, False, False, False, True, False, True, False, True, False, False, True, False, True, False, False, False, True, True, True, False]
+X trials (success_height - epsilon) height or higher, another way of counting trial successes: [ True False  True False  True False False False False False  True False
+X  False False False  True False False False False False  True  True  True
+X  False False False False False False False False False  True False  True
+X  False  True False False  True False  True  True False False  True  True
+X   True False]
+X reversals: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0]
+X recoveries: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+X total trials: 51 (clearance_length, total number of trials)
+X num trials evaluated: 50 start trial: 0
+X avg max height: 3.3 (higher is better, find max height for each trial, then average those values)
+X avg max progress: 0.825 (higher is better,  (avg(round(max_heights))/4.0))
+X standard deviation of max progress normalized to 0 to 1: 0.1346291201783626
+X standard error of max progress normalized to 0 to 1: 0.0192327314540518
+X avg reversals: 0.9 (lower is better)
+X avg recoveries: 0.24444444444444444 (higher is better, no need for recovery attempts is best)
+X avg logged trial success: 0.32 (successful trials according to trial_success_log.txt)
+X avg trial success: 0.34 (higher is better,  (success_height - epsilon) height or higher)
+X action efficiency with 6 action per trial optimum: 0.24449877750611246 action efficiency with 4 action per trial optimum: 0.16299918500407498
+X data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-59-52_Sim-Row-Imitation-Masked-Testing-Three-Step-History
+X 
+X 
+X 
+X 
+X ===========
+X Extra stack run: Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+X 
+X saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/data/best_stats.json
+X saving best stats to: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History/best_stats.json
+X Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+X Training results:
+X  {'trial_success_rate_best_value': 0.54, 'trial_success_rate_best_index': 1087, 'grasp_success_rate_best_value': 0.8375209380234506, 'grasp_success_rate_best_index': 1087, 'place_success_rate_best_value': 0.5763747454175153, 'place_success_rate_best_index': 1089, 'action_efficiency_best_value': 0.1545538178472861, 'action_efficiency_best_index': 1089}
+X 
+X 
+X ------------------------------
+X data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+X max_heights, the highest height in each trial: [2. 4. 4. 3. 4. 4. 4. 3. 3. 4. 3. 4. 3. 4. 4. 3. 4. 2. 3. 4. 3. 4. 4. 4.
+X  3. 3. 3. 3. 4. 4. 4. 3. 4. 4. 4. 4. 2. 4. 4. 4. 3. 4. 4. 3. 4. 3. 3. 3.
+X  3. 3.]
+X max_heights_rounded, the highest height in each trial: [2. 4. 4. 3. 4. 4. 4. 3. 3. 4. 3. 4. 3. 4. 4. 3. 4. 2. 3. 4. 3. 4. 4. 4.
+X  3. 3. 3. 3. 4. 4. 4. 3. 4. 4. 4. 4. 2. 4. 4. 4. 3. 4. 4. 3. 4. 3. 3. 3.
+X  3. 3.]
+X logged trial success in trial_success_log.txt: [False, True, True, False, True, True, True, False, False, True, False, True, False, True, True, False, True, False, False, True, False, True, True, True, False, False, False, False, True, True, True, False, True, True, True, True, False, True, True, True, False, True, True, False, True, False, False, False, False, False]
+X trials (success_height - epsilon) height or higher, another way of counting trial successes: [False  True  True False  True  True  True False False  True False  True
+X  False  True  True False  True False False  True False  True  True  True
+X  False False False False  True  True  True False  True  True  True  True
+X  False  True  True  True False  True  True False  True False False False
+X  False False]
+X reversals: [1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+X recoveries: [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+X total trials: 51 (clearance_length, total number of trials)
+X num trials evaluated: 50 start trial: 0
+X avg max height: 3.48 (higher is better, find max height for each trial, then average those values)
+X avg max progress: 0.87 (higher is better,  (avg(round(max_heights))/4.0))
+X standard deviation of max progress normalized to 0 to 1: 0.15198684153570663
+X standard error of max progress normalized to 0 to 1: 0.021712405933672376
+X avg reversals: 0.74 (lower is better)
+X avg recoveries: 0.40540540540540543 (higher is better, no need for recovery attempts is best)
+X avg logged trial success: 0.54 (successful trials according to trial_success_log.txt)
+X avg trial success: 0.54 (higher is better,  (success_height - epsilon) height or higher)
+X action efficiency with 6 action per trial optimum: 0.2767527675276753 action efficiency with 4 action per trial optimum: 0.18450184501845018
+X data dir: /home/ahundt/src/real_good_robot/logs/2021-08-28-21-55-42_Sim-Stack-Imitation-Masked-Testing-Three-Step-History
+X ahundt@spot|~/src/real_good_robot on ssr_with_finetuning!?
 
 
 
