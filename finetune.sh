@@ -103,20 +103,20 @@ then
     if [ "$task" = "row" ]
     then
         python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 \
-            --random_seed 1238 --is_testing --task_type row --depth_channels_history --load_snapshot --snapshot_file logs/finetuned_models/base_vertical_square_finetune_row
+            --random_seed 1238 --is_testing --task_type row --depth_channels_history --snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth
     elif [ "$task" = "stack" ]
     then
         python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19999 \
-            --random_seed 1238 --is_testing --task_type stack --depth_channels_history --load_snapshot --snapshot_file logs/finetuned_models/base_vertical_square_finetune_stack
+            --random_seed 1238 --is_testing --task_type stack --depth_channels_history --snapshot_file logs/finetuned_models/base_vertical_square_finetune_stack.pth
     elif [ "$task" = "unstack" ]
     then
         python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 20000 \
-            --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --load_snapshot --snapshot_file logs/finetuned_models/base_row_finetune_unstack
+            --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth
 
     elif [ "$task" = "vertical_square" ]
     then
         python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port 20002 \
-            --random_seed 1238 --is_testing --task_type vertical_square --depth_channels_history --load_snapshot --snapshot_file logs/finetuned_models/base_stack_finetune_vertical_square
+            --random_seed 1238 --is_testing --task_type vertical_square --depth_channels_history --snapshot_file logs/finetuned_models/base_stack_finetune_vertical_square.pth
 
     else
         echo "Must pass one of [row | stack | unstack | vertical_square] to -t."
