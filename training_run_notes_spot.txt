@@ -3629,6 +3629,37 @@ export CUDA_VISIBLE_DEVICES="1" && python3 main.py --is_sim --obj_mesh_dir objec
 Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_row_finetune_stack.pth
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-29-17-38-30_Sim-Stack-Two-Step-Reward-Masked-Testing-Three-Step-History
 Commit: 9f13f1bb1d2aad12171b7342fd71aa93e1c4662c
+Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-17-38-30_Sim-Stack-Two-Step-Reward-Masked-Testing-Three-Step-History
+Training results:
+ {'trial_success_rate_best_value': 0.0, 'trial_success_rate_best_index': 1507, 'grasp_success_rate_best_value': 0.8646341463414634, 'grasp_success_rate_best_index': 1507, 'place_success_rate_best_value': 0.14534883720930233, 'place_success_rate_best_index': 1507, 'action_efficiency_best_value': 0.0, 'action_efficiency_best_index': 1507}
+------------------------------
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-17-38-30_Sim-Stack-Two-Step-Reward-Masked-Testing-Three-Step-History
+max_heights, the highest height in each trial: [2. 2. 2. 1. 2. 1. 2. 2. 2. 2. 2. 1. 2. 2. 3. 2. 2. 3. 2. 2. 1. 1. 1. 2.
+ 1. 2. 2. 2. 1. 1. 2. 3. 2. 2. 1. 1. 2. 2. 2. 2. 2. 2. 1. 3. 2. 2. 2. 2.
+ 2. 2.]
+max_heights_rounded, the highest height in each trial: [2. 2. 2. 1. 2. 1. 2. 2. 2. 2. 2. 1. 2. 2. 3. 2. 2. 3. 2. 2. 1. 1. 1. 2.
+ 1. 2. 2. 2. 1. 1. 2. 3. 2. 2. 1. 1. 2. 2. 2. 2. 2. 2. 1. 3. 2. 2. 2. 2.
+ 2. 2.]
+logged trial success in trial_success_log.txt: [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+trials (success_height - epsilon) height or higher, another way of counting trial successes: [False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False]
+reversals: [1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0]
+recoveries: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+total trials: 51 (clearance_length, total number of trials)
+num trials evaluated: 50 start trial: 0
+avg max height: 1.84 (higher is better, find max height for each trial, then average those values)
+avg max progress: 0.46 (higher is better,  (avg(round(max_heights))/4.0))
+standard deviation of max progress normalized to 0 to 1: 0.13564659966250536
+standard error of max progress normalized to 0 to 1: 0.019378085666072197
+avg reversals: 0.74 (lower is better)
+avg recoveries: 0.0 (higher is better, no need for recovery attempts is best)
+avg logged trial success: 0.0 (successful trials according to trial_success_log.txt)
+avg trial success: 0.0 (higher is better,  (success_height - epsilon) height or higher)
+action efficiency with 6 action per trial optimum: 0.20270270270270271 action efficiency with 4 action per trial optimum: 0.13513513513513514
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-17-38-30_Sim-Stack-Two-Step-Reward-Masked-Testing-Three-Step-History
 
 
 
@@ -3640,9 +3671,38 @@ export CUDA_VISIBLE_DEVICES="2" && python3 main.py --is_sim --obj_mesh_dir objec
 Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_row_finetune_vertical_square.pth                                                                                                                                                               
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-37-44_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History  
 Commit: 9f13f1bb1d2aad12171b7342fd71aa93e1c4662c
+------------------------------
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-37-44_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+max_heights, the highest height in each trial: [2. 2. 2. 2. 2. 2. 2. 3. 2. 2. 2. 3. 2. 2. 2. 3. 3. 2. 2. 2. 2. 3. 2. 2.
+ 2. 2. 2. 3. 2. 2. 2. 2. 2. 2. 2. 2. 3. 2. 2. 3. 2. 3. 3. 2. 3. 2. 2. 3.
+ 2. 2.]
+max_heights_rounded, the highest height in each trial: [2. 2. 2. 2. 2. 2. 2. 3. 2. 2. 2. 3. 2. 2. 2. 3. 3. 2. 2. 2. 2. 3. 2. 2.
+ 2. 2. 2. 3. 2. 2. 2. 2. 2. 2. 2. 2. 3. 2. 2. 3. 2. 3. 3. 2. 3. 2. 2. 3.
+ 2. 2.]
+logged trial success in trial_success_log.txt: [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+trials (success_height - epsilon) height or higher, another way of counting trial successes: [False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False]
+reversals: [0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+recoveries: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+total trials: 51 (clearance_length, total number of trials)
+num trials evaluated: 50 start trial: 0
+avg max height: 2.24 (higher is better, find max height for each trial, then average those values)
+avg max progress: 0.56 (higher is better,  (avg(round(max_heights))/4.0))
+standard deviation of max progress normalized to 0 to 1: 0.10677078252031312
+standard error of max progress normalized to 0 to 1: 0.015252968931473303
+avg reversals: 0.26 (lower is better)
+avg recoveries: 0.0 (higher is better, no need for recovery attempts is best)
+avg logged trial success: 0.0 (successful trials according to trial_success_log.txt)
+avg trial success: 0.0 (higher is better,  (success_height - epsilon) height or higher)
+action efficiency with 6 action per trial optimum: 0.36101083032490977 action efficiency with 4 action per trial optimum: 0.24479804161566707
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-37-44_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
 
 
-X Wrong model loaded, cancelled run below:
+
+X Wrong model loaded, cancelled run below (correct run above):
 X Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/finetuned_models/base_stack_finetune_vertical_square.pth
 X Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-29-42_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
 
@@ -3656,9 +3716,74 @@ Pre-trained model snapshot loaded from: /home/ahundt/src/real_good_robot/logs/fi
 Creating data logging session: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-40-57_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
 Commit: 9f13f1bb1d2aad12171b7342fd71aa93e1c4662c
 
+Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-40-57_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+Training results: 
+ {'trial_success_rate_best_value': 0.06, 'trial_success_rate_best_index': 1245, 'grasp_success_rate_best_value': 0.7189631650750341, 'grasp_success_rate_best_index': 1245, 'place_success_rate_best_value': 0.11306042884990253, 'place_success_rate_best_index': 1245, 'action_efficiency_best_value': 0.014457831325301205, 'action_efficiency_best_index': 1245}
+------------------------------
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-40-57_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+max_heights, the highest height in each trial: [3. 2. 3. 3. 2. 2. 4. 2. 2. 2. 2. 2. 2. 2. 3. 3. 2. 3. 2. 2. 2. 3. 2. 2.
+ 3. 2. 3. 3. 2. 2. 2. 2. 3. 2. 2. 4. 3. 3. 2. 2. 3. 4. 3. 2. 3. 2. 3. 3.
+ 3. 3.]
+max_heights_rounded, the highest height in each trial: [3. 2. 3. 3. 2. 2. 4. 2. 2. 2. 2. 2. 2. 2. 3. 3. 2. 3. 2. 2. 2. 3. 2. 2.
+ 3. 2. 3. 3. 2. 2. 2. 2. 3. 2. 2. 4. 3. 3. 2. 2. 3. 4. 3. 2. 3. 2. 3. 3.
+ 3. 3.]
+logged trial success in trial_success_log.txt: [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, True, False, False, False, False, False, False, False, False]
+trials (success_height - epsilon) height or higher, another way of counting trial successes: [False False False False False False  True False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False False False  True
+ False False False False False  True False False False False False False
+ False False]
+reversals: [1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0]
+recoveries: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+total trials: 51 (clearance_length, total number of trials)
+num trials evaluated: 50 start trial: 0
+avg max height: 2.52 (higher is better, find max height for each trial, then average those values)
+avg max progress: 0.63 (higher is better,  (avg(round(max_heights))/4.0))
+standard deviation of max progress normalized to 0 to 1: 0.15198684153570663
+standard error of max progress normalized to 0 to 1: 0.021712405933672376
+avg reversals: 0.5 (lower is better)
+avg recoveries: 0.0 (higher is better, no need for recovery attempts is best)
+avg logged trial success: 0.06 (successful trials according to trial_success_log.txt)
+avg trial success: 0.06 (higher is better,  (success_height - epsilon) height or higher)
+action efficiency with 6 action per trial optimum: 0.242914979757085 action efficiency with 4 action per trial optimum: 0.16299918500407498
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-40-57_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+
+
 
 ===========
 finetune stack -> vertical_square (rerun, same as one a bit above, started to confirm 0 trial success result)
 ± export CUDA_VISIBLE_DEVICES="3" && ./finetune.sh -g -t vertical_square
 + python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port 20002 --random_seed 1238 --is_testing --task_type vertical_square --depth_channels_history --snapshot_file logs/finetuned_models/base_stack_finetune_vertical_square.pth                                          
 Commit: 9f13f1bb1d2aad12171b7342fd71aa93e1c4662c
+Training Complete! Dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-44-59_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+Training results:                                                                                                                    
+ {'trial_success_rate_best_value': 0.02, 'trial_success_rate_best_index': 1090, 'grasp_success_rate_best_value': 0.8322259136212624, 'grasp_success_rate_best_index': 1090, 'place_success_rate_best_value': 0.19631901840490798, 'place_success_rate_best_index': 1090, 'action_efficiency_best_value': 0.005504587155
+963303, 'action_efficiency_best_index': 1090}         
+------------------------------
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-44-59_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
+max_heights, the highest height in each trial: [3. 3. 3. 3. 3. 3. 2. 3. 3. 3. 3. 3. 3. 2. 2. 3. 3. 3. 2. 3. 2. 3. 3. 3.
+ 3. 3. 3. 3. 2. 3. 3. 3. 3. 4. 2. 3. 3. 2. 3. 3. 3. 3. 3. 3. 3. 3. 2. 3.
+ 3. 3.]
+max_heights_rounded, the highest height in each trial: [3. 3. 3. 3. 3. 3. 2. 3. 3. 3. 3. 3. 3. 2. 2. 3. 3. 3. 2. 3. 2. 3. 3. 3.
+ 3. 3. 3. 3. 2. 3. 3. 3. 3. 4. 2. 3. 3. 2. 3. 3. 3. 3. 3. 3. 3. 3. 2. 3.
+ 3. 3.]
+logged trial success in trial_success_log.txt: [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+trials (success_height - epsilon) height or higher, another way of counting trial successes: [False False False False False False False False False False False False
+ False False False False False False False False False False False False
+ False False False False False False False False False  True False False
+ False False False False False False False False False False False False
+ False False]
+reversals: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+recoveries: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+total trials: 51 (clearance_length, total number of trials)
+num trials evaluated: 50 start trial: 0
+avg max height: 2.84 (higher is better, find max height for each trial, then average those values)
+avg max progress: 0.71 (higher is better,  (avg(round(max_heights))/4.0))
+standard deviation of max progress normalized to 0 to 1: 0.10440306508910552
+standard error of max progress normalized to 0 to 1: 0.01491472358415793
+avg reversals: 0.84 (lower is better)
+avg recoveries: 0.023809523809523808 (higher is better, no need for recovery attempts is best)
+avg logged trial success: 0.02 (successful trials according to trial_success_log.txt)
+avg trial success: 0.02 (higher is better,  (success_height - epsilon) height or higher)
+action efficiency with 6 action per trial optimum: 0.2798507462686567 action efficiency with 4 action per trial optimum: 0.18796992481203006
+data dir: /home/ahundt/src/real_good_robot/logs/2021-08-29-18-44-59_Sim-Vertical-Square-SPOT-Trial-Reward-Masked-Testing-Three-Step-History
