@@ -23,6 +23,7 @@
 #  
 
 import os
+import sys
 import math
 import json
 import argparse
@@ -30,8 +31,9 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm 
 import cv2
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from scipy.spatial.transform import Rotation as R
+import pdb
 
 from robot import Robot
 from data import DatasetReader, SimpleTrajectory
@@ -40,17 +42,28 @@ from data import DatasetReader, SimpleTrajectory
 class BlockSetter(object):
     """ Class to manipulate logo blocks and capture images used for training. """
 
+    # Initialization Function. You either have to input a robot or {pos, rot, and block_path}
     def __init__(self,
-                 pos: List[Tuple[float]], 
-                 rot: List[Tuple[float]], 
-                 blocks_path: str,
                  num_obj: int,
-                 shift: List[float]):
+                 shift: List[float]=None,
+                 pos: Optional[List[Tuple[float]]]=None, 
+                 rot: Optional[List[Tuple[float]]]=None, 
+                 blocks_path: Optional[str]=None,
+                 robot=None,
+                 side_len=0.035):
         """
         Load an initial setup, returns a new instance of the Robot 
         object. If robot class is already initialized, run "load_setup"
         instead.
         """
+        if robot is not None and (pos is None and rot is None and blocks_path is None):
+            init_using_robot_obj = True
+        elif robot is None and (pos is not None and rot is not None and blocks_path is not None):
+            init_using_robot_obj = False
+        else:
+            sys.exit("ERROR: the BlockSetter object needs either a robot object or three lists (pos, rot, and blocks_path)")
+
+        
         self.num_obj = num_obj
         self.shift = shift
         
@@ -68,18 +81,27 @@ class BlockSetter(object):
         # Reordering JSON values (y axis is up in sim, z axis is up in JSON)
         self.ordering = [2,0,1]
         # 5cm Blocks
-        self.side_len = 0.035
+        self.side_len = side_len
         self.scale = self.side_len*0.001/0.15
+        print(f'Object scale is {self.scale}')
         # 14x14 grid
         self.grid_dim = 14
         self.grid_len = self.grid_dim*self.side_len
+
+        # If we are passing in a Robot object as an initialization argument, we can return early.
+        if robot is not None:
+            # If num blocks is mismatched, throw error.
+            if robot.num_obj != self.num_obj:
+                sys.exit("ERROR in Blocksetter: The argument num_obj does not match the number of objects in the robot argument.")
+            else:
+                self.robot = robot
         
         # Create array to pass initial position of blocks
-        for i in range(len(pos[0])):
+        for i in range(len(pos)):
             # Convert values from dataset to match vrep axes
-            state = [(pos[0][i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]
+            state = [(pos[i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]
             state[1] = -state[1]
-            orient = rot[0][i]
+            orient = rot[i]
             
             # Convert quaternion to euler angles
             if len(orient)==4:
@@ -88,7 +110,7 @@ class BlockSetter(object):
             test_preset_arr.append([state, orient])
         
         # Move unused objects out of the camera frame
-        for i in range(self.num_obj-len(pos[0])):
+        for i in range(self.num_obj-len(pos)):
             out_state, out_ori = [-0.75 - i*(self.side_len+0.01), 0, self.side_len], [0, 0, 0]
             test_preset_arr.append([out_state, out_ori])
         
@@ -97,7 +119,7 @@ class BlockSetter(object):
         self.robot = Robot(is_sim, self.obj_mesh_dir, self.num_obj, workspace_limits,
                   tcp_host_ip, tcp_port, rtc_host_ip, rtc_port,
                   is_testing, test_preset_cases, test_preset_file, test_preset_arr, 
-                  capture_logoblock_dataset=True, obj_scale=self.scale, textured=True)
+                  randomized=False, obj_scale=self.scale)
 
 
     def quat2euler(self, quatArr):
@@ -107,11 +129,12 @@ class BlockSetter(object):
         return [r.item() for r in temp]
 
 
-    def load_setup(self, positions, orientations, prevPositions, prevOrientations):
+    # TODO(zhe) To make this function work with physics, we must make sure that the stacking order reflects the current history.
+    def load_setup(self, positions, orientations, prevPositions=None, prevOrientations=None):
         """ Teleports the blocks into a specified position / orientation """
         for i in range(len(positions)):
             # If the position/orientation did not change, skip moving this block
-            if len(positions)==len(prevPositions) and np.abs((np.array(positions[i])-np.array(prevPositions[i]))).sum() < 1e-6:
+            if prevPositions is not None and prevOrientations is not None and len(positions)==len(prevPositions) and np.abs((np.array(positions[i])-np.array(prevPositions[i]))).sum() < 1e-6:
                 continue
             
             state = [(positions[i][j] + self.shift[k]) * (self.grid_len/2) for k, j in enumerate(self.ordering)]
@@ -212,36 +235,37 @@ def main(args):
             if len(pos[0])==len(ppos[0]) and np.abs((np.array(pos)-np.array(ppos))).sum() < 1e-6:
                 continue
         
+        pdb.set_trace() 
         # Load the setup
         if imc is None:
-            imc = BlockSetter(pos, rot, args.blocks_path, args.num_blocks, args.offset)
+            imc = BlockSetter(args.num_blocks, args.offset, pos=pos[0], rot=rot[0], blocks_path=args.blocks_path, side_len=args.side_length)
         else:
-            imc.load_setup(pos[0], rot[0], ppos[0], prot[0])
-        
+            imc.load_setup(pos[0], rot[0], prevPositions=ppos[0], prevOrientations=prot[0])
+
         # Capture the image and save it
         imc.captureAndSaveImages(trajectory.images[0], args.colorimg_folder, args.depthimg_folder, args.colorHm_folder, args.depthHm_folder)
         
         # Repeat the process with the next state
         npos = trajectory.next_positions
         nrot = trajectory.next_rotations
-        imc.load_setup(npos[0], nrot[0], pos[0], rot[0])
+        imc.load_setup(npos[0], nrot[0], prevPositions=pos[0], prevOrientations=rot[0])
         imc.captureAndSaveImages(trajectory.images[1], args.colorimg_folder, args.depthimg_folder, args.colorHm_folder, args.depthHm_folder)
 
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train-path", type=str, default = "blocks_data/trainset_v2.json", help="path to train data")
-    parser.add_argument("--val-path", default = "blocks_data/devset.json", type=str, help = "path to dev data")
-    parser.add_argument("--num-blocks", type=int, default=20)
-    parser.add_argument("--simulator", default="CoppeliaSim", help="simulator software name")
-    # parser.add_argument("--trajectory-path", type=str, default = "blocks_data/singleset.json", help="trajectory motion of blocks")
-    parser.add_argument("--blocks-path", type=str, default = "objects/bisk_blocks", help="trajectory values")
-    parser.add_argument("--colorimg-folder", type=str, default = "data/color-images", help="output folder for color images")
-    parser.add_argument("--depthimg-folder", type=str, default = "data/depth-images", help="output folder for depth images")
-    parser.add_argument("--colorHm-folder", type=str, default = "data/color-heightmaps", help="output folder for color heightmaps")
-    parser.add_argument("--depthHm-folder", type=str, default = "data/depth-heightmaps", help="output folder for depth heightmaps")
-    parser.add_argument("--quaternions", action='store_true')
-    parser.add_argument("--offset", type=float, nargs=3, default=[0.15, 0.0, 0.0],  help="enter three float values to shift blocks on plane")
+    parser.add_argument("--train-path",         type=str,   default = "blocks_data/trainset_v2.json",   help="path to train data")
+    parser.add_argument("--val-path",           type=str,   default="blocks_data/devset.json",          help = "path to dev data")
+    parser.add_argument("--num-blocks",         type=int,   default=20)
+    parser.add_argument("--simulator",          type=str,   default="CoppeliaSim",                      help="simulator software name")
+    parser.add_argument("--blocks-path",        type=str,   default="objects/bisk_blocks",              help="trajectory values")
+    parser.add_argument("--colorimg-folder",    type=str,   default="data/color-images",                help="output folder for color images")
+    parser.add_argument("--depthimg-folder",    type=str,   default="data/depth-images",                help="output folder for depth images")
+    parser.add_argument("--colorHm-folder",     type=str,   default="data/color-heightmaps",            help="output folder for color heightmaps")
+    parser.add_argument("--depthHm-folder",     type=str,   default="data/depth-heightmaps",            help="output folder for depth heightmaps")
+    parser.add_argument("--quaternions",        action='store_true')
+    parser.add_argument("--side-length",        type=float, default=0.035,                              help='side length of the cubes in meters (approximate)')
+    parser.add_argument("--offset",             type=float, nargs=3, default=[0.0, 0.0, 0.0],           help="enter three float values to shift blocks on plane")
     args = parser.parse_args()
     main(args)

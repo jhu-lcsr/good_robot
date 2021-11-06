@@ -36,8 +36,9 @@ real_good_robot_logs_2020_02
 
 paper_figures/
 
-CoppeliaSim_Edu_V4_0_0_Mac
-CoppeliaSim_Edu_V4_0_0_Mac/*
+CoppeliaSim_Edu_*
+CoppeliaSim_Edu_*/*
+
 
 grid_scripts
 grid_scripts/*
@@ -52,5 +53,9 @@ data/*
 figures/
 
 **/.ipynb_checkpoints
+.vscode/*
+
+tune_files
+tune_files/*
 
 language_models/
