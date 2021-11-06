@@ -660,7 +660,10 @@ def main(args):
             if task_type == 'unstack' and is_testing:
                 pass
             else:
-                objs = robot.get_objects_in_scene()
+                buffer_meters = 0.0
+                if task_type == 'row' and is_testing:
+                    buffer_meters = 0.025
+                objs = robot.get_objects_in_scene(buffer_meters=buffer_meters)
                 if len(objs) < nonlocal_variables['stack'].num_obj:
                     needed_to_reset = True
                     insufficient_objs_in_scene = True

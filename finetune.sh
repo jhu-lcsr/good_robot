@@ -10,12 +10,18 @@ finetune=0;
 embed=0;
 ssr=0;
 task="";
+gr_baseline=0;
+
+# make sure script will print where it is and exit on errors
+set -e
+set -u
+set -x
 
 # help function
 Help()
 {
    # Display Help
-   echo "Syntax: ./finetune.sh [-f|t|e|s|h]"
+   echo "Syntax: ./finetune.sh [-f|g|t|e|s|h]"
    echo ""
    echo "options:"
    echo "-f     Finetune policies from base_models. Other options will break if this hasn't been run at least once."
@@ -34,11 +40,13 @@ Help()
 }
 
 # get cmd line options
-while getopts "t:fesh" flag
+while getopts "t:fgesh" flag
 do
     case $flag in
         f) # run finetuning?
             finetune=1;;
+        g) # good robot finetuned baseline?
+            gr_baseline=1;;
         t) # which task?
             task=${OPTARG};;
         e) # compute embeddings?
@@ -60,7 +68,7 @@ then
     if [ "$task" = "row" ]
     then
         # row finetunes
-        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/row_demos/ -t row -o logs/finetuned_models/
+        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/row_demos/ -t row -o logs/finetuned_models/ --trial_reward
         python3 train_offline.py -m logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/row_demos/ -t row -o logs/finetuned_models/
         python3 train_offline.py -m logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth -d demos/row_demos/ -t row -o logs/finetuned_models/
     elif [ "$task" = "stack" ]
@@ -74,15 +82,43 @@ then
     then
         # unstack finetunes
         python3 train_offline.py -m logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/unstacking_demos/ -t unstack -o logs/finetuned_models/
-        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/unstacking_demos/ -t unstack -o logs/finetuned_models/
+        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/unstacking_demos/ -t unstack -o logs/finetuned_models/ --trial_reward
         python3 train_offline.py -m logs/base_models/vertical_square_hist_densenet/snapshot.reinforcement_trial_success_rate_best_value.pth -d demos/unstacking_demos/ -t unstack -o logs/finetuned_models/
 
     elif [ "$task" = "vertical_square" ]
     then
         # vertical square finetunes
         python3 train_offline.py -m logs/base_models/rows_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/vertical_square_demos/ -t vertical_square -o logs/finetuned_models/
-        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/vertical_square_demos/ -t vertical_square -o logs/finetuned_models/
+        python3 train_offline.py -m logs/base_models/stacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/vertical_square_demos/ -t vertical_square -o logs/finetuned_models/ --trial_reward
         python3 train_offline.py -m logs/base_models/unstacking_hist_densenet/snapshot.reinforcement_action_efficiency_best_value.pth -d demos/vertical_square_demos/ -t vertical_square -o logs/finetuned_models/
+
+    else
+        echo "Must pass one of [row | stack | unstack | vertical_square] to -t."
+    fi
+fi
+
+if [ $gr_baseline -eq 1 ]
+then
+    echo "Running Good Robot Few-Shot Finetuning Baseline..."
+    if [ "$task" = "row" ]
+    then
+        python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19998 --max_test_trials 50 \
+            --random_seed 1238 --is_testing --task_type row --depth_channels_history --snapshot_file logs/finetuned_models/base_vertical_square_finetune_row.pth
+    elif [ "$task" = "stack" ]
+    then
+        python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 19999 --max_test_trials 50 \
+            --random_seed 1238 --is_testing --task_type stack --depth_channels_history --snapshot_file logs/finetuned_models/base_vertical_square_finetune_stack.pth
+    elif [ "$task" = "unstack" ]
+    then
+        # python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 20000 --max_test_trials 50 \
+        #     --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_row_finetune_unstack.pth
+        python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --common_sense --place --future_reward_discount 0.65 --tcp_port 20000 --max_test_trials 50 \
+            --random_seed 1238 --is_testing --task_type unstack --depth_channels_history --snapshot_file logs/finetuned_models/base_stack_finetune_unstack.pth
+
+    elif [ "$task" = "vertical_square" ]
+    then
+        python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port 20002 --max_test_trials 50 \
+            --random_seed 1238 --is_testing --task_type vertical_square --depth_channels_history --snapshot_file logs/finetuned_models/base_stack_finetune_vertical_square.pth
 
     else
         echo "Must pass one of [row | stack | unstack | vertical_square] to -t."

@@ -1,3 +1,4 @@
+import errno
 import struct
 import math
 import numpy as np

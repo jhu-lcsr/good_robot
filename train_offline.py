@@ -12,11 +12,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--base_model', required=True)
     parser.add_argument('-d', '--demo_dir', required=True, help='path to dir with demos')
-    parser.add_argument('-i', '--iterations', default=250, type=int, help='how many training steps')
+    parser.add_argument('-i', '--iterations', default=333, type=int, help='how many training steps')
     parser.add_argument('-s', '--seed', default=1234, type=int)
     parser.add_argument('-t', '--task_type', default='stack', help='stack/row/unstack/vertical_square')
     parser.add_argument('-o', '--out_dir', default=None, help='where to write finetuned model, WILL NOT SAVE IF BLANK')
-    parser.add_argument('-l', '--learning_rate', default=1e-4, help="What learning rate to use?")
+    parser.add_argument('-l', '--learning_rate', default=1e-5, help="What learning rate to use?")
+    parser.add_argument('--trial_reward', default=False, action='store_true', help='use trial reward?')
     parser.add_argument('--future_reward_discount', dest='future_reward_discount', type=float, action='store', default=0.65)
     args = parser.parse_args()
 
@@ -46,26 +47,29 @@ if __name__ == '__main__':
             flops=False, network='densenet', common_sense=True,
             place_common_sense=place_common_sense, show_heightmap=False,
             place_dilation=place_dilation, common_sense_backprop=True,
-            trial_reward='discounted', num_dilation=0, lr=args.learning_rate)
+            trial_reward='spot', num_dilation=0, lr=args.learning_rate)
 
+    print('train_offline.py assumes all demos are optimal with perfect action choices and exactly 6 steps long. Update the code if this is not the case.')
     # next compute the rewards for the trial (all steps successful)
     prog_rewards = np.array([1.0, 2.0, 2.0, 3.0, 3.0, 4.0])
+    print('Demo progress rewards: ' + str(prog_rewards))
 
     # compute trial_rewards
-    trial_rewards = prog_rewards.copy()
-    for i in reversed(range(len(trial_rewards))):
-        if i == len(trial_rewards) - 1:
-            trial_rewards[i] *= 2
-            continue
-
-        trial_rewards[i] += args.future_reward_discount * trial_rewards[i+1]
+    trainer.clearance_log = [[6]]
+    trainer.reward_value_log = prog_rewards[:, None]
+    trainer.trial_reward_value_log_update()
+    print('Demo trial rewards: ' + str(trainer.trial_reward_value_log))
+    if args.trial_reward:
+        print('Fine tuning ' + args.task_type + ' task with Trial Reward')
+    else:
+        print('Fine tuning ' + args.task_type + ' task with Progress Reward')
 
     # store losses, checkpoint model every 25 iterations
     losses = []
     models = {} # dict {iter: model_weights}
 
     for i in tqdm(range(args.iterations)):
-        # generate random number between 0 and 1, and another between 0 and 1 (inclusive)
+        # generate random number between 0 and 1, and another between 1 and 3 (inclusive)
         demo_num = np.random.randint(0, 2)
         progress = np.random.randint(1, 4)
         action_str = ['grasp', 'place'][np.random.randint(0, 2)]
@@ -89,8 +93,39 @@ if __name__ == '__main__':
         best_action_xy = ((workspace_pixel_offset + 1000 * action_vec[:2]) / 2).astype(int)
         best_pix_ind = [best_rot_ind, best_action_xy[1], best_action_xy[0]]
 
-        # get reward
-        reward = trial_rewards[progress + ACTION_TO_ID[action_str] - 1]
+        # get next set of heightmaps for reward computation
+        if action_str == 'grasp':
+            next_action_str = 'place'
+            next_progress = progress
+        else:
+            next_action_str = 'grasp'
+            next_progress = progress + 1
+
+        # if we finished trial, set next action str to 'end'
+        if next_progress > 3:
+            next_action_str = 'end'
+
+        # get next set of heightmaps then compute reward
+        next_color_heightmap, next_depth_heightmap = d.get_heightmaps(next_action_str,
+                d.action_dict[next_progress][action_str + '_image_ind'], use_hist=True)
+
+        # compute reward
+        grasp_success = (action_str == 'grasp')
+        place_success = (action_str == 'place')
+
+        # multiplier is progress for grasp, progress + 1 (next_progress) for place
+        multiplier = progress if grasp_success else next_progress
+        if not args.trial_reward:
+            reward, old_reward = trainer.get_label_value(action_str, push_success=False,
+                    grasp_success=grasp_success, change_detected=True, prev_push_predictions=None,
+                    prev_grasp_predictions=None, next_color_heightmap=next_color_heightmap,
+                    next_depth_heightmap=next_depth_heightmap, color_success=None,
+                    goal_condition=None, place_success=place_success, prev_place_predictions=None,
+                    reward_multiplier=multiplier)
+        else:
+            # index into trial_rewards to get reward
+            # e.g. if progress is 1, grasp reward is trial_rewards[0]
+            reward = trainer.trial_reward_value_log[(progress - 1) * 2 + ACTION_TO_ID[action_str] - 1]
 
         # training step
         loss = trainer.backprop(color_heightmap, valid_depth_heightmap, action_str,

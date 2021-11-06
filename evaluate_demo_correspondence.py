@@ -120,7 +120,8 @@ if __name__ == '__main__':
         raise ValueError("Must provide at least one trained model")
 
     # iterate through action_dict and visualize example signal on imitation heightmaps
-    action_keys = sorted(example_demos[0].action_dict.keys())
+    # skip last key because there is no grasp/place action associated with it
+    action_keys = sorted(example_demos[0].action_dict.keys())[:-1]
     example_actions_dict = {}
     for k in action_keys:
         if k not in example_actions_dict:

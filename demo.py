@@ -24,8 +24,8 @@ class Demonstration():
         # get number of actions in demo
         self.num_actions = len(self.action_log)
 
-        # check to make sure action log and image_names line up
-        if len(self.image_names) != self.num_actions:
+        # check to make sure action log and image_names line up (+1 included to account for final img)
+        if len(self.image_names) != (self.num_actions + 1):
             raise ValueError("MISMATCH: Number of images does not match number of actions in demo for demo number:", demo_num)
 
         # populate actions in dict keyed by action_pair number {action_pair : {action : (x, y, z, theta)}}
@@ -33,13 +33,18 @@ class Demonstration():
         self.action_dict = {}
 
         # start at 1 since the structure starts with size 1
-        for action_pair in range(1, (self.num_actions // 2) + 1):
-            demo_ind = (action_pair - 1) * 2
+        for progress in range(1, (self.num_actions // 2) + 1):
+            demo_ind = (progress - 1) * 2
             grasp_image_ind = int(self.image_names[demo_ind].split('.')[0])
             place_image_ind = int(self.image_names[demo_ind + 1].split('.')[0])
-            self.action_dict[action_pair] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
+            self.action_dict[progress] = {ACTION_TO_ID['grasp'] : self.action_log[demo_ind],
                     ACTION_TO_ID['place'] : self.action_log[demo_ind + 1],
                     'grasp_image_ind': grasp_image_ind, 'place_image_ind': place_image_ind}
+
+        # for last progress val, grasp_image_ind and place_image_ind are both the same
+        image_ind = int(self.image_names[-1].split('.')[0])
+        self.action_dict[(self.num_actions // 2) + 1] = {'grasp_image_ind': image_ind,
+                'place_image_ind': image_ind}
 
     def get_heightmaps(self, action_str, stack_height, use_hist=False, history_len=3):
         rgb_filename = os.path.join(self.rgb_dir,

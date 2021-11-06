@@ -123,9 +123,9 @@ for stack in range(num_stacks):
             stack_goal = np.random.permutation(stack_goal)
             print('fake stack goal to test any stack order: ' + str(stack_goal))
         if check_row:
-            stack_success, height_count = robot.check_row(stack_goal, distance_threshold=distance_threshold)
+            stack_success, height_count = robot.check_row(stack_goal, vert_distance_threshold=distance_threshold)
         else:
-            stack_success, height_count = robot.check_stack(stack_goal, distance_threshold=distance_threshold)
+            stack_success, height_count = robot.check_stack(stack_goal, vert_distance_threshold=distance_threshold)
             print('stack success part ' + str(i+1) + ' of ' + str(blocks_to_move) + ': ' + str(stack_success))
     # reset scene
     robot.reposition_objects()
