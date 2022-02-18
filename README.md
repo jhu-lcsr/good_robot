@@ -73,7 +73,7 @@ Furthermore, we demonstrate direct sim to real transfer. We are able to create r
 
 ## Key Components
 
-Additional instructions for natural language capabilities [README_LANGUAGE.md](README_good_robot.md) and Good Robot! capabilities are in [README_good_robot.md](README_good_robot.md).
+Additional instructions for setup and Good Robot! capabilities are in [README_good_robot.md](README_good_robot.md), and natural language capabilities are documented in [README_LANGUAGE.md](README_good_robot.md).
 
 **`demo.py`**
 
