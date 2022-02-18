@@ -1,6 +1,8 @@
-# Good Robot Projects
+# "Good Robot!" Projects
 
-## "Good Robot! Now Watch This!": Building Generalizable Embeddings via Reinforcement Learning
+
+## "Good Robot! Now Watch This!": Repurposing Reinforcement Learning for Task-to-Task Transfer
+
 
 ```
 @inproceedings{hundt2021good,
@@ -48,7 +50,7 @@ Enabling human operators to interact with robotic agents using natural language 
     year="2020"
 }
 ```
-
+[Paper](https://arxiv.org/abs/1909.11730)
 [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
 Click the image to watch the video:
@@ -64,7 +66,7 @@ Furthermore, we demonstrate direct sim to real transfer. We are able to create r
 
 ## Key Components
 
-Additional instructions for natural language capabilities README_LANGUAGE.md](README_good_robot.md) and Good Robot! capabilities are in [README_good_robot.md](README_good_robot.md).
+Additional instructions for natural language capabilities [README_LANGUAGE.md](README_good_robot.md) and Good Robot! capabilities are in [README_good_robot.md](README_good_robot.md).
 
 **`demo.py`**
 
