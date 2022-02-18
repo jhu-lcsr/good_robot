@@ -56,8 +56,9 @@ Enabling human operators to interact with robotic agents using natural language 
     year="2020"
 }
 ```
-[Paper](https://arxiv.org/abs/1909.11730)
-[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+[Paper](https://arxiv.org/abs/1909.11730), [Technical Talk Video (20 mins)](https://youtu.be/SROcf0yTcRE)
+
+Authors: [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
 Click the image to watch the video:
 
