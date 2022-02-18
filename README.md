@@ -1,6 +1,6 @@
 # "Good Robot!" Research
 
-Click the image to watch our press release video on the "Good Robot" aper (3 min):
+Click the image to watch our press release video on the "Good Robot" paper (3 min):
 [![Press Release for first "Good Robot!" Paper](https://img.youtube.com/vi/dvxqjJBWFD4/0.jpg)](https://youtu.be/dvxqjJBWFD4)
 
 Click the image to watch an depth talk covering all three papers (48 min):
