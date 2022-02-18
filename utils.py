@@ -1,3 +1,4 @@
+import errno
 import struct
 import math
 import numpy as np
@@ -7,6 +8,31 @@ from scipy import ndimage
 import datetime
 import os
 import json
+import yaml
+import torch
+from scipy.special import softmax
+import pathlib
+import matplotlib.pyplot as plt
+import pdb
+
+try:
+    import pygame
+except ImportError as e:
+    print(e)
+    print('pygame not available, some features may be disabled, try pip install pygame --user -upgrade')
+    pygame = None
+
+# Import necessary packages
+#try:
+from spacy.lang.en import English
+from spacy.tokenizer import Tokenizer
+from encoders import LSTMEncoder
+from language_embedders import RandomEmbedder, GloveEmbedder, BERTEmbedder
+from unet_shared import SharedUNet
+from transformer import TransformerEncoder, tiles_to_image
+from train_language_encoder import get_free_gpu, load_data, get_vocab, LanguageTrainer, FlatLanguageTrainer
+#except ImportError:
+#    print('Unable to import the language embedder, language trainer, or transformer encoder. This is OK if you are not using the language model.')
 
 # to convert action names to the corresponding ID number and vice-versa
 ACTION_TO_ID = {'push': 0, 'grasp': 1, 'place': 2}
@@ -103,7 +129,11 @@ def get_pointcloud(color_img, depth_img, camera_intrinsics):
     return cam_pts, rgb_pts
 
 
-def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5):
+def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limits, heightmap_resolution, background_heightmap=None, median_filter_pixels=5, color_median_filter_pixels=5):
+    """ Note:
+    Arg median_filter_pixels is used for the depth image.
+    Arg color_median_filter_pixels is used for the color image.
+    """
 
     if median_filter_pixels > 0:
         depth_img = ndimage.median_filter(depth_img, size=median_filter_pixels)
@@ -157,10 +187,10 @@ def get_heightmap(color_img, depth_img, cam_intrinsics, cam_pose, workspace_limi
     color_heightmap_r[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[0]]
     color_heightmap_g[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[1]]
     color_heightmap_b[heightmap_pix_y,heightmap_pix_x] = color_pts[:,[2]]
-    if median_filter_pixels > 0:
-        color_heightmap_r = ndimage.median_filter(color_heightmap_r, size=median_filter_pixels)
-        color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=median_filter_pixels)
-        color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=median_filter_pixels)
+    if color_median_filter_pixels > 0:
+        color_heightmap_r = ndimage.median_filter(color_heightmap_r, size=color_median_filter_pixels)
+        color_heightmap_b = ndimage.median_filter(color_heightmap_b, size=color_median_filter_pixels)
+        color_heightmap_g = ndimage.median_filter(color_heightmap_g, size=color_median_filter_pixels)
     color_heightmap = np.concatenate((color_heightmap_r, color_heightmap_g, color_heightmap_b), axis=2)
 
 
@@ -176,8 +206,8 @@ def common_sense_action_failure_heuristic(heightmap, heightmap_resolution=0.002,
 
     if push_length > 0.0:
         # For push, skip regions where the gripper would be too high
-        reigonal_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
-        block_pixels = (heightmap > (reigonal_maximums - z_buffer)).astype(np.uint8)
+        regional_maximums = ndimage.maximum_filter(heightmap, (pixels_to_dilate, pixels_to_dilate))
+        block_pixels = (heightmap > (regional_maximums - z_buffer)).astype(np.uint8)
         # set all the pixels where the push would be too high to zero,
         # meaning it is not an action which would contact any object
         # the blocks and the gripper width around them are set to zero.
@@ -192,8 +222,8 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
     """ Convert predictions to a masked array indicating if tasks may make progress in this region, based on depth_heightmap.
 
     The masked arrays will indicate 0 where progress may be possible (no mask applied), and 1 where our model confidently indicates no progress will be made.
-    Note the mask values here are the opposite of the common_sense_failure_heuristic() function, so where that function has a mask value of 0, this function has a value of 1. 
-    In other words the mask values returned here are equivalent to 1-common_sense_action_failure_heuristic(). 
+    Note the mask values here are the opposite of the common_sense_failure_heuristic() function, so where that function has a mask value of 0, this function has a value of 1.
+    In other words the mask values returned here are equivalent to 1-common_sense_action_failure_heuristic().
     This is because in the numpy MaksedArray a True value inticates the data at the corresponding location is INVALID.
 
     # Returns
@@ -229,7 +259,315 @@ def common_sense_action_space_mask(depth_heightmap, push_predictions=None, grasp
         if color_heightmap is not None:
             plt.imshow(color_heightmap)
         plt.show(block=True)
+    if place_predictions is None:
+        return push_predictions, grasp_predictions
     return push_predictions, grasp_predictions, place_predictions
+
+
+def process_prediction_language_masking(language_data, predictions, show_heightmap=False, color_heightmap=None, tile_size = 4, threshold = 0.9, single_max = True, abs_threshold = 0.10, from_transformer = True, baseline_language_mask = False):
+    """
+    Adds a language mask to the predictions array.
+
+    language_data: an array with shape [1, 256, 2, 1] which will be processed into a mask
+    predictions: masked array or ndarray with prediction values for a specific action
+    """
+
+    # Convert inputs to np.ma.masked_array objects if they are inputted as np.ndarrays
+    if not np.ma.is_masked(predictions):
+        if isinstance(predictions, np.ndarray):
+            predictions = np.ma.masked_array(predictions, mask=False)
+        else:
+            raise TypeError("predictions passed into the process_prediction_language_masking function should be np.ma.masked_array or np.ndarray objects.")
+
+    # Extract current masks
+    curr_mask = np.ma.getmask(predictions).copy()
+
+    # Peform data processing on the language model output to convert float values to logits
+    # NOTE(zhe) should the function be more generic and take in a reformatted list?
+    # language_data should have shape torch([1, 256, 2, 1])
+    if from_transformer:
+        language_data = tiles_to_image(language_data, tile_size = tile_size, output_type="per-patch")
+
+    language_data = softmax(language_data, axis = 1)
+    # take prob yes
+    language_mask = language_data[:,1,:,:]
+    language_mask = np.float32(language_mask).reshape(64,64, 1).copy()
+    new_w = curr_mask.shape[1]
+    if single_max:
+        language_mask_before = language_mask.copy()
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+
+        language_mask *= 1 - curr_mask[0,:,:]
+        language_mask = torch.tensor(language_mask)
+        # get max pixel
+        row_values, row_indices = torch.max(language_mask, axis=0)
+        col_values, col_idx = torch.max(row_values, dim=0)
+        row_idx = row_indices[col_idx]
+        threshold = None
+        # abs_threshold = 0.10
+        language_mask *= 0
+        language_mask[row_idx, col_idx] = 1
+        language_mask[language_mask != 1] = 0
+        language_mask = language_mask.detach().cpu().numpy()
+    else:
+        language_mask_before = language_mask.copy()
+        # mask out non-blocks
+        language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
+
+    if threshold is not None:
+
+        language_mask[language_mask > threshold] = 1
+        language_mask[language_mask <= threshold] = 0
+
+    # largest_four = np.argpartition(language_mask_before, -64, axis=None)[-64:]
+    # largest_four_values = language_mask_before.reshape(-1)[largest_four]
+    # threshold = np.min(largest_four_values) - 0.00001
+    # language_mask_before[language_mask_before >= threshold] = 1
+    # language_mask_before[language_mask_before < threshold] = 0
+
+    # TODO(zhe) Should we erode/dilate the mask array? The current mask lets the whole block pass. We may want to increase or decrease the mask area.
+    # Scale language masks to match the prediction array sizes
+
+    language_mask = cv2.resize(language_mask, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+    language_mask = np.broadcast_to(language_mask, predictions.shape, subok=True)
+    language_mask_before = cv2.resize(language_mask_before, (new_w, new_w), interpolation=cv2.INTER_NEAREST)
+
+    # Catching errors
+    assert language_mask.shape == curr_mask.shape and language_mask.shape == predictions.shape, print("ERROR: Shape missmatch in language masking")
+
+    # Combine language mask with existing masks if necessary
+    if curr_mask is np.ma.nomask:
+        predictions.mask = language_mask
+    else:
+        # TODO (elias) why not just multiply probs in with the mask
+        if (threshold is not None or single_max) and not baseline_language_mask:
+            # intersection_mask = 1 - np.logical_and(1 - curr_mask,  language_mask)
+            # expand out: if any pixel of a block is yes under language mask, then whole block is yes
+            predictions.mask = infect_mask(language_mask.astype(bool), curr_mask.copy().astype(bool))
+
+    if show_heightmap:
+        # visualize the common sense function results
+        # show the heightmap
+        fig, ax = plt.subplots(2,3)
+        ax[0,0].imshow(curr_mask[0,:,:])
+        ax[0,1].imshow(1 - language_mask_before)
+        ax[0,2].imshow(predictions.mask[0,:,:])
+        # ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask[0,:,:])/2)
+        ax[1,0].imshow((curr_mask[0,:,:] + 1 - language_mask_before)/2)
+
+        if color_heightmap is not None:
+            ax[1,1].imshow(color_heightmap)
+
+        plt.show(block=True)
+    return predictions
+
+def infect_mask(language_mask, curr_mask, block_width = 16):
+    # expand out from intersection: if any pixel of a block is yes under language mask, then whole block should be yes
+    curr_mask = 1 - curr_mask
+    intersection_mask = np.logical_and(curr_mask,  language_mask).astype(float)
+    # use inf as sentinel value
+    orig_intersection_mask = intersection_mask.copy()
+    intersection_mask *= 1000
+    # top-down, left to right across mask
+    language_mask = language_mask[0]
+    curr_mask = curr_mask[0]
+    intersection_mask = intersection_mask[0]
+    curr_mask[intersection_mask == 1000] = 1000
+
+    def get_neighbors(idxs):
+        neighbors = []
+        for (x,y) in idxs:
+            neighbors.append((x-1, y))
+            neighbors.append((x+1, y))
+            neighbors.append((x, y-1))
+            neighbors.append((x, y+1))
+            neighbors.append((x-1, y-1))
+            neighbors.append((x+1, y+1))
+            neighbors.append((x-1, y+1))
+            neighbors.append((x-1, y+1))
+        return neighbors
+
+    total_infected = 0
+    total_it = 0
+    max_it = block_width * 2
+    # for it in range(block_width * 2):
+    while total_infected < (2*block_width)**2 and total_it < max_it:
+        # get selected indices
+
+        curr_idxs = np.where(curr_mask == 1000)
+        curr_idxs = list(zip(curr_idxs[0], curr_idxs[1]))
+        total_infected = len(curr_idxs)
+        # look one pix in each direction
+        neighbors = get_neighbors(curr_idxs)
+        done = []
+        for x,y in neighbors:
+            try:
+                if curr_mask[x,y] == 1000:
+                    continue
+                if curr_mask[x,y] == 1:
+                    curr_mask[x,y] = 1000
+                else:
+                    # if you hit a zero, that's the border
+                    continue
+            except IndexError:
+                continue
+        total_it += 1
+
+    curr_mask[curr_mask < 1000] = 0
+    curr_mask[curr_mask == 1000] = 1
+    curr_mask = curr_mask.astype(bool).reshape(1, 224, 224)
+    curr_mask = np.tile(curr_mask, (16, 1, 1))
+    # fig, ax = plt.subplots(1,2)
+    # ax[0].imshow(orig_intersection_mask[0,:,:])
+    # ax[1].imshow(curr_mask[0,:,:])
+    # plt.show(block=True)
+    return 1 - curr_mask
+
+
+# TODO(zhe) implement language model masking using language model output. The inputs should already be np.masked_arrays
+def common_sense_language_model_mask(language_output, push_predictions=None, grasp_predictions=None, place_predictions=None, color_heightmap=None, check_row = False, baseline_language_mask = False):
+    """
+    Processes the language output into a mask and combine it with existing masks in prediction arrays
+    """
+
+    # language masks are currently for grasp and place only. The push predictions will not be operated upon.
+    # TODO (elias) remove this after solving other problems, makes push illegal
+    #push_predictions = 1 - push_predictions * np.inf
+    push_predictions = np.ones_like(push_predictions) * -np.inf
+
+    #push_predictions = process_prediction_language_masking(language_output['prev_position'], push_predictions, color_heightmap=color_heightmap, threshold = 0.6)
+    # TODO (elias) tune these values
+    from_transformer = True 
+    if type(language_output) == tuple: 
+        next_pos, prev_pos = language_output
+        next_pos = next_pos['next_position']
+        prev_pos = prev_pos['next_position']
+        from_transformer = False
+    else:
+        prev_pos, next_pos = language_output['prev_position'], language_output['next_position']
+
+    if baseline_language_mask:
+        print(f"RUNNING RANDOM BASELINE FOR LANGUAGE")
+        prev_pos = torch.ones(prev_pos.shape).to(prev_pos.device)
+        next_pos = torch.ones(next_pos.shape).to(next_pos.device)
+
+    grasp_predictions = process_prediction_language_masking(prev_pos, grasp_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.03, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
+    place_predictions = process_prediction_language_masking(next_pos, place_predictions, color_heightmap=color_heightmap, threshold = 0.1, abs_threshold = 0.10, single_max = not check_row, from_transformer = from_transformer, baseline_language_mask=baseline_language_mask)
+
+
+    return push_predictions, grasp_predictions, place_predictions
+
+# Loads a transformer model from a config file
+def load_language_model_from_config(configYamlPath, weightsPath):
+
+    # Load config yaml file if possible
+    if os.path.exists(configYamlPath):
+        with open(configYamlPath) as file:
+            config=yaml.load(file, Loader=yaml.FullLoader)
+    else:
+        raise FileNotFoundError(f'unable to find {configYamlPath}')
+
+    # Move model to available gpu
+    device = "cpu"
+    if config["cuda"] is not None and config["cuda"] >= 0:
+        free_gpu_id = get_free_gpu()
+        if free_gpu_id > -1:
+            device = f"cuda:{free_gpu_id}"
+
+    device = torch.device(device)
+    print(f"Language Model on device {device}")
+    test = torch.ones((1))
+    test = test.to(device)
+
+    # Read the vocab from a json file.
+    checkpoint_dir = pathlib.Path(config["checkpoint_dir"])
+    print(f"Reading vocab from {checkpoint_dir}")
+    if os.path.exists(checkpoint_dir.joinpath('vocab.json')):
+        with open(checkpoint_dir.joinpath("vocab.json")) as f1:
+            train_vocab = json.load(f1)
+    else:
+        raise FileNotFoundError(f'unable to find {checkpoint_dir.joinpath("vocab.json")}')
+
+    # Load the embedder (type specified in the config.yaml)
+    nlp = English()
+    tokenizer = Tokenizer(nlp.vocab)
+    if config['embedder'] == "random":
+        embedder = RandomEmbedder(tokenizer, train_vocab, config["embedding_dim"], trainable=True)
+    elif config['embedder'] == "glove":
+        embedder = GloveEmbedder(tokenizer, train_vocab, config["embedding_file"], config["embedding_dim"], trainable=True)
+    elif config['embedder'].startswith("bert"):
+        embedder = BERTEmbedder(model_name = config["embedder"],  max_seq_len = config["max_seq_length"])
+    else:
+        raise NotImplementedError(f'No embedder {config["embedder"]}')
+
+    if "encoder_type" in config.keys() and config["encoder_type"] == "TransformerEncoder":
+        # Initiate the encoder
+        encoder = TransformerEncoder(image_size = config["resolution"],
+                                    patch_size = config["patch_size"],
+                                    language_embedder = embedder,
+                                    n_layers_shared = config["n_shared_layers"],
+                                    n_layers_split  = config["n_split_layers"],
+                                    n_classes = 2,
+                                    channels = config["channels"],
+                                    n_heads = config["n_heads"],
+                                    hidden_dim = config["hidden_dim"],
+                                    ff_dim = config["ff_dim"],
+                                    dropout = config["dropout"],
+                                    embed_dropout = config["embed_dropout"],
+                                    output_type = config["output_type"],
+                                    positional_encoding_type = config["pos_encoding_type"],
+                                    # device = device,
+                                    log_weights = config["test"],
+                                    do_reconstruction = config['do_reconstruction'])
+    else:
+        if config['embedder'] == "random":
+            embedder = RandomEmbedder(tokenizer, train_vocab, config['embedding_dim'], trainable=True)
+        elif config['embedder'] == "glove":
+            embedder = GloveEmbedder(tokenizer, train_vocab, config['embedding_file'], config['embedding_dim'], trainable=True) 
+        elif config['embedder'].startswith("bert"): 
+            embedder = BERTEmbedder(model_name = config['embedder'],  max_seq_len = config['max_seq_length']) 
+        else:
+            raise NotImplementedError(f"No embedder {config['embedder']}") 
+        # get the encoder from args  
+        if config['encoder'] == "lstm":
+            encoder = LSTMEncoder(input_dim = config['embedding_dim'],
+                                hidden_dim = config['encoder_hidden_dim'],
+                                num_layers = config['encoder_num_layers'],
+                                dropout = config['dropout'],
+                                bidirectional = config['bidirectional']) 
+        else:
+            raise NotImplementedError(f"No encoder {config['encoder']}") # construct the model  add UNet code here 
+        unet_kwargs = dict(in_channels = 6,
+                        out_channels = config["unet_out_channels"],
+                        lang_embedder = embedder,
+                        lang_encoder = encoder, 
+                        hc_large = config["unet_hc_large"],
+                        hc_small = config["unet_hc_small"],
+                        kernel_size = config["unet_kernel_size"],
+                        stride = config["unet_stride"],
+                        num_layers = config["unet_num_layers"],
+                        num_blocks = 1,
+                        unet_type = config["unet_type"],
+                        dropout = config["dropout"],
+                        depth = 1,
+                        #device=device,
+                        do_reconstruction=config['do_reconstruction'])
+
+        if config['compute_block_dist']:
+            unet_kwargs["mlp_num_layers"] = config['mlp_num_layers']
+
+        encoder = SharedUNet(**unet_kwargs) 
+
+
+    # Load weights
+    print(f'loading model weights from {config["checkpoint_dir"]}')
+    state_dict = torch.load(pathlib.Path(config["checkpoint_dir"]).joinpath("best.th"), map_location = device)
+    encoder.load_state_dict(state_dict, strict=True)
+
+    return encoder
 
 # Save a 3D point cloud to a binary .ply file
 def pcwrite(xyz_pts, filename, rgb_pts=None):
@@ -643,7 +981,7 @@ def calib_grid_cartesian(workspace_limits, calib_grid_step):
     return num_calib_grid_pts, calib_grid_pts
 
 
-def check_separation(values, distance_threshold):
+def check_separation(values, distance_threshold, small_distance_threshold = 0.05):
     """Checks that the separation among the values is close enough about distance_threshold.
 
     :param values: array of values to check, assumed to be sorted from low to high
@@ -656,10 +994,10 @@ def check_separation(values, distance_threshold):
         x = values[i]
         y = values[i + 1]
         assert x < y, '`values` assumed to be sorted'
-        if y < x + distance_threshold / 2.:
-            # print('check_separation(): not long enough for idx: {}'.format(i))
+        if y < x + small_distance_threshold / 2.:
+        #    # print('check_separation(): not long enough for idx: {}'.format(i))
             return False
-        if y - x > distance_threshold:
+        if abs(y - x) > distance_threshold:
             # print('check_separation(): too far apart')
             return False
     return True
@@ -681,7 +1019,7 @@ def is_jsonable(x):
 
 # killeen: this is defining the goal
 class StackSequence(object):
-    def __init__(self, num_obj, is_goal_conditioned_task=True, trial=0, total_steps=1):
+    def __init__(self, num_obj, goal_num_obj = None, is_goal_conditioned_task=True, trial=0, total_steps=1, color_names=None, human_annotation=False):
         """ Oracle to choose a sequence of specific color objects to interact with.
 
         Generates one hot encodings for a list of objects of the specified length.
@@ -695,10 +1033,15 @@ class StackSequence(object):
 
         """
         self.num_obj = num_obj
+        self.goal_num_obj = goal_num_obj if goal_num_obj is not None else num_obj
         self.is_goal_conditioned_task = is_goal_conditioned_task
         self.trial = trial
+        self.human_annotation = human_annotation
         self.reset_sequence()
         self.total_steps = total_steps
+        # TODO(zhe) add list of color names, as an optional argument
+        self.color_names = color_names
+        self.color_len = len(color_names) if color_names is not None else 0
 
     def reset_sequence(self):
         """ Generate a new sequence of specific objects to interact with.
@@ -706,10 +1049,13 @@ class StackSequence(object):
         if self.is_goal_conditioned_task:
             # 3 is currently the red block
             # object_color_index = 3
+            # start with 1st object fixed, move 2nd object onto it
             self.object_color_index = 0
 
             # Choose a random sequence to stack
             self.object_color_sequence = np.random.permutation(self.num_obj)
+            if self.human_annotation:
+                self.object_color_sequence_names, self.object_color_sequence = get_color_order_from_human(num_obj,'Input the goal color order for the whole trial', color_names)
             # TODO(ahundt) This might eventually need to be the size of robot.stored_action_labels, but making it color-only for now.
             self.object_color_one_hot_encodings = []
             for color in self.object_color_sequence:
@@ -747,16 +1093,36 @@ class StackSequence(object):
         else:
             return None
 
-    def next(self): 
+    def next(self):
         self.total_steps += 1
         if self.is_goal_conditioned_task:
             self.object_color_index += 1
             if not self.object_color_index < self.num_obj:
                 self.reset_sequence()
 
+    # NOTE(adit98) adding this function to modify goal if we see progress reversal in test mode
+    def set_progress(self, current_height):
+        # set object_color_index to current height
+        # if current height is 2, goal will be self.object_color_sequence[:3] which is 3 blocks
+        self.object_color_index = current_height
+        if not self.object_color_index < self.num_obj:
+            self.reset_sequence()
+    
+    def color_idx_sequence_to_string_list(self, color_index_list=None):
+        '''Simple helper function to take a list of indices and print a list of colors
+
+            if no params are specificed, it will make the list for self.object_color_sequence.
+        '''
+        if color_index_list is None:
+            color_index_list = self.object_color_sequence
+        input_names = []
+        for idx in color_index_list:
+            input_names += [self.color_names[int(idx) % len(self.color_names)]]
+        return input_names
+
 
 def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary_length=75, row_boundary_width=18, block_pixel_size=550, prev_z_height=None):
-    """ Return if the current arrangement of blocks in the heightmap is a valid row 
+    """ Return if the current arrangement of blocks in the heightmap is a valid row
     """
     heightmap_trans = np.copy(depth_heightmap)
     heightmap_trans = np.transpose(heightmap_trans)
@@ -768,10 +1134,11 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         # threshold pixels which contain a block
         block_pixels = heightmap > block_height_threshold
 
-        # get positions of all those pixels  
+        # get positions of all those pixels
         coords = np.nonzero(block_pixels)
         x = coords[1]
         y = coords[0]
+
         if x.size == 0 or y.size == 0:
             return False, 0
 
@@ -790,7 +1157,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
 
         # centroid of block_pixels
         centroid = (int(np.mean(x)), int(np.mean(y)))
-        
+
         # get row_boundary_rectangle points
         x1_r = int(centroid[0] - x_unit * row_boundary_length - y_unit * row_boundary_width)
         y1_r = int(centroid[1] - y_unit * row_boundary_length + x_unit * row_boundary_width)
@@ -808,7 +1175,7 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
         cv2.fillPoly(mask, [pts], (255,255,255))
         mask = mask > 0  # convert to bool
 
-        # get all block_pixels inside of row_boundary_rectangle and count them 
+        # get all block_pixels inside of row_boundary_rectangle and count them
         block_pixels_in_row = np.logical_and(mask, block_pixels)
         count = np.count_nonzero(block_pixels_in_row)
 
@@ -825,3 +1192,469 @@ def check_row_success(depth_heightmap, block_height_threshold=0.02, row_boundary
     print("ROW CHECK PIXEL COUNT: ", true_count, ", success: ", success, ", row size: ", row_size)
 
     return success, row_size
+
+# function to visualize prediction signal on heightmap (with rotations)
+def get_prediction_vis(predictions, heightmap, best_pix_ind, blend_ratio=0.5, \
+        prob_exp=1, specific_rotation=None, num_rotations=None):
+
+    best_rot_ind = best_pix_ind[0]
+    best_action_xy = best_pix_ind[1:]
+    canvas = None
+
+    # clip values <0 or >1
+    predictions = np.clip(predictions, 0, 1)
+
+    # apply exponential
+    predictions = predictions ** prob_exp
+
+    if specific_rotation is None:
+        num_rotations = predictions.shape[0]
+
+        # populate canvas
+        for canvas_row in range(int(num_rotations/4)):
+            tmp_row_canvas = None
+            for canvas_col in range(4):
+                rotate_idx = canvas_row*4+canvas_col
+                prediction_vis = predictions[rotate_idx,:,:].copy()
+
+                # reshape to 224x224 (or whatever image size is), and color
+                prediction_vis.shape = (predictions.shape[1], predictions.shape[2])
+                prediction_vis = cv2.applyColorMap((prediction_vis*255).astype(np.uint8), cv2.COLORMAP_JET)
+
+                # if this is the correct rotation, draw circle on action coord
+                if rotate_idx == best_rot_ind:
+                    # need to flip best_action_xy row and col since cv2.circle reads this as (x, y)
+                    prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]),
+                        int(best_action_xy[0])), 7, (221,211,238), 2)
+
+                # rotate probability map and image to gripper rotation
+                prediction_vis = ndimage.rotate(prediction_vis, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
+                background_image = ndimage.rotate(heightmap, rotate_idx*(360.0/num_rotations),
+                        reshape=False, order=0).astype(np.uint8)
+
+                # blend image and colorized probability heatmap
+                prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
+                        blend_ratio, prediction_vis, 1-blend_ratio, 0)
+
+                # add image to row canvas
+                if tmp_row_canvas is None:
+                    tmp_row_canvas = prediction_vis
+                else:
+                    tmp_row_canvas = np.concatenate((tmp_row_canvas,prediction_vis), axis=1)
+
+            # add row canvas to overall image canvas
+            if canvas is None:
+                canvas = tmp_row_canvas
+            else:
+                canvas = np.concatenate((canvas,tmp_row_canvas), axis=0)
+
+        return canvas
+
+    else:
+        if num_rotations is None:
+            raise ValueError("Must specify number of rotations if providing a specific rotation")
+
+        # reshape to 224x224 (or whatever image size is), and color
+        prediction_vis = cv2.applyColorMap((predictions*255).astype(np.uint8), cv2.COLORMAP_JET)
+
+        # need to flip best_pix_ind row and col since cv2.circle reads in as (x, y)
+        prediction_vis = cv2.circle(prediction_vis, (int(best_action_xy[1]), int(best_action_xy[0])),
+                7, (221,211,238), 2)
+
+        # rotate probability map and image to gripper rotation
+        prediction_vis = ndimage.rotate(prediction_vis, best_rot_ind*(360.0/num_rotations),
+                reshape=False, order=0).astype(np.uint8)
+        background_image = ndimage.rotate(heightmap, best_rot_ind*(360.0/num_rotations),
+                reshape=False, order=0).astype(np.uint8)
+
+        # blend image and colorized probability heatmap
+        prediction_vis = cv2.addWeighted(cv2.cvtColor(background_image, cv2.COLOR_RGB2BGR),
+                blend_ratio, prediction_vis, 1-blend_ratio, 0)
+
+        return prediction_vis
+
+# cos_sim distance metric
+def cos_sim(test_feat, demo_action_embed):
+    """
+    Helper function to compute cosine similarity.
+    Arguments:
+        test_feat: pixel-wise embeddings output by NN for test env
+        demo_action_embed: embedding of demo action
+    """
+    # no need to normalize since we are only concerned with relative values
+    cos_sim = np.sum(np.multiply(test_feat, demo_action_embed), axis=1)
+    norm_factor = np.linalg.norm(test_feat, axis=1) + 1e-4
+    return (cos_sim / norm_factor)
+
+def compute_demo_dist(preds, example_actions, metric='l2'):
+    """
+    Function to evaluate l2 distance and generate demo-signal mask
+    """
+    # reshape each example_action to 1 x 64 x 1 x 1
+    for i in range(len(example_actions)):
+        # check if policy was supplied (entry will be None if it wasn't)
+        if example_actions[i][0] is None:
+            continue
+
+        # get actions and expand dims
+        actions = np.expand_dims(np.stack(example_actions[i]), (1, 3, 4))
+
+        # reshape and update list
+        example_actions[i] = actions
+
+    # get mask
+    masks = []
+    mask_shape = None
+    exit = True
+    for pred in preds:
+        if pred is not None:
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask_shape = mask.shape
+            masks.append(mask)
+            exit = False
+
+        else:
+            masks.append(None)
+
+    # exit if no policies were provided
+    if exit:
+        raise ValueError("Must provide at least one model")
+
+    # calculate distance between example action embedding and preds for each policy and demo
+    dists = []
+    for ind, actions in enumerate(example_actions):
+        # check if policy was supplied (entry will be [None, None] if it wasn't)
+        if actions[0] is None:
+            # if policy not supplied, insert pixel-wise array of inf distance
+            dists.append(np.ones(mask_shape) * np.inf)
+            continue
+
+        for action in actions:
+            if metric == 'l2':
+                # calculate pixel-wise l2 distance (16x224x224)
+                dist = np.sum(np.square(action - preds[ind]), axis=1)
+                invert = True
+            elif metric == 'cos_sim':
+                dist = cos_sim(preds[ind], action)
+                invert = False
+            # TODO(adit98) UMAP distance?
+            else:
+                raise NotImplementedError
+
+            # set all masked spaces to have max l2 distance
+            # select appropriate mask from list of masks
+            dist[masks[ind]] = np.max(dist) * 1.1
+
+            # append to l2_dists list
+            dists.append(dist)
+
+    # stack pixel-wise distance array per policy (4x16x224x224)
+    dists = np.stack(dists)
+
+    # find overall minimum distance across all policies and get index
+    match_ind = np.unravel_index(np.argmin(dists), dists.shape)
+
+    # select distance array for policy which contained minimum distance index
+    dist = dists[match_ind[0]]
+
+    # make dist >=0 and max_normalize
+    dist = dist - np.min(dist)
+    dist = dist / np.max(dist)
+
+    # if our distance metric returns high values for values that are far apart, we need to invert (for viz)
+    if invert:
+        # invert values of dist so that large values indicate correspondence
+        im_mask = 1 - dist
+
+    else:
+        im_mask = dist
+
+    return im_mask, match_ind[1:], (match_ind[0] // 2)
+
+def compute_cc_dist(preds, example_actions, demo_action_inds, valid_depth_heightmap=None, metric='l2', neighborhood_match=True, cc_match=False):
+    """
+    Function to evaluate l2 distance and generate demo-signal mask
+    Arguments:
+        preds: 16x64x224x224 test env features for each policy
+        example_actions: list of 16x64x224x224 features for each policy and demo
+        demo_action_inds: indices of executed action in each demo D * (theta, y, x)
+        valid_depth_heightmap: heightmap of test scene
+        metric: primitive distance function to use for computing matches (defaults to l2 distance)
+        cc_match: use cycle consistency to find best action_ind for selected demo and policy
+    """
+    # get mask for each model
+    masks = []
+    mask_shape = None
+    exit = True
+    for pred in preds:
+        if pred is not None:
+            mask = (pred == np.zeros([1, 64, 1, 1])).all(axis=1)
+            mask_shape = mask.shape
+            masks.append(mask)
+            exit = False
+
+        else:
+            masks.append(None)
+
+    # exit if no policies were provided
+    if exit:
+        raise ValueError("Must provide at least one model")
+
+    # calculate distance between example action embedding and preds for each policy and demo
+    # also compute rematch from test space to demo space, then find xyz distance between demo action and rematch
+    # this value represents the cycle consistency distance, which we will append to the dists array in addition
+    # to the distance between each test pixel embedding and the optimal demo embedding
+    cc_dists = []
+    for ind, embeddings in enumerate(example_actions):
+        for i, embedding in enumerate(embeddings):
+            # get demo action (ind represents policy, i represents demo num)
+            demo_action = np.array(demo_action_inds[i])
+
+            # if policy not supplied, insert pixel-wise array of inf distance
+            if metric == 'l2':
+                if embedding is None:
+                    cc_dists.append((np.ones(mask_shape) * np.inf, np.inf))
+                    continue
+
+                # get embedding for best action
+                action_embedding = embedding[demo_action[0], :, demo_action[1], demo_action[2]]
+
+                # calculate pixel-wise l2 distance (16x224x224)
+                right_dist = np.sum(np.square(np.expand_dims(action_embedding,
+                    (0, 2, 3)) - preds[ind]), axis=1)
+
+                # smooth distance array and mask
+                right_dist = ndimage.filters.gaussian_filter(right_dist, sigma=(0, 3, 3))
+                right_dist[masks[ind]] = np.max(right_dist) * 1.1
+
+                # get embedding at best match (right_match)
+                match_ind = np.unravel_index(np.argmin(right_dist), right_dist.shape)
+                right_match = preds[ind][match_ind[0], :, match_ind[1], match_ind[2]]
+
+                if neighborhood_match:
+                    # now crop demo embedding to +/- 15 pixels around demo_action
+                    cropped_embedding = embedding[demo_action[0], :,
+                            (demo_action[1] - 15):(demo_action[1]+16),
+                            (demo_action[2] - 15):(demo_action[2]+16)]
+                    revised_match_ind = np.array([15, 15])
+                else:
+                    cropped_embedding = embedding[demo_action[0]]
+                    revised_match_ind = match_ind[1:]
+
+                # now rematch this with cropped demo_embedding array
+                left_dist = np.sum(np.square(cropped_embedding - right_match[:, None, None]), axis=0)
+
+                # smooth left_dist
+                left_dist = ndimage.filters.gaussian_filter(left_dist, sigma=(3, 3), mode='wrap')
+                rematch_ind = np.unravel_index(np.argmin(left_dist), left_dist.shape)
+
+                # TODO(adit98) dealing with rotation?
+                # TODO(adit98) project pixel coordinate BACK to robot coordinate and calculate distance there (figure out how to get depth value)
+                # compute cc_dist as l2_dist(match_ind[1:], rematch_ind[1:])
+                cc_dist = np.sum(np.square(revised_match_ind - np.array(rematch_ind)))
+                match_map = right_dist
+
+            else:
+                raise NotImplementedError
+
+            # append (match_map, cycle consistency distance, embedding, preds, and demo_action) to list of cc distances
+            cc_dists.append((match_map, cc_dist, embedding, preds[ind], demo_action, masks[ind], ind, i))
+
+    # select entry with min cycle consistency distance
+    best_match_map, best_cc_dist, best_embedding, best_preds, demo_action_ind, mask, best_ind, best_i = cc_dists[np.argmin([x[1] for x in cc_dists])]
+    print("Selected Policy #:", best_ind, "demo number:", best_i)
+
+    # find overall minimum distance across all policies and get index
+    initial_match_ind = np.unravel_index(np.argmin(best_match_map), best_match_map.shape)
+
+    if cc_match:
+        # when using cc_match, we already use the most cycle-consistent policy-demo pair, so we always operate in a cropped neighborhood
+        # if using cycle consistency to match actions in addition to domains, look at all match pairs in a neighborhood
+        # then select most consistent pair (min x,y dist)
+
+        # first crop preds around initial best match
+        cropped_preds = best_preds[initial_match_ind[0], :,
+                (initial_match_ind[1] - 10):(initial_match_ind[1]+11),
+                (initial_match_ind[2] - 10):(initial_match_ind[2]+11)]
+
+        # also crop mask
+        cropped_mask = mask[initial_match_ind[0], (initial_match_ind[1] - 10):(initial_match_ind[1]+11),
+                (initial_match_ind[2] - 10):(initial_match_ind[2]+11)]
+
+        # then crop embedding around demo action (choose a very conservative neighborhood here)
+        cropped_embedding = best_embedding[demo_action[0], :, (demo_action[1] - 2):(demo_action[1]+3),
+                (demo_action[2] - 2):(demo_action[2]+3)]
+
+        # now, flatten cropped preds, get match embeddings, then find rematch_inds, and unravel index
+        flat_preds = cropped_preds.reshape(-1, 64)[None, ...] # now this is 1 x N x 64
+        flat_embeds = cropped_embedding.reshape(-1, 64)[:, None, :] # now this is n x 1 x 64
+
+        # now find match dist
+        match_dist = np.sum(np.square(flat_preds - flat_embeds), axis=-1) # n x N
+
+        # reshape and smooth, and re-flatten
+        match_dist = match_dist.reshape((match_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
+        match_dist = ndimage.filters.gaussian_filter(match_dist, sigma=(0, 3, 3)).reshape(match_dist.shape[0], -1)
+
+        # mask
+        match_dist[:, cropped_mask.flatten()] = np.max(match_dist) * 1.1
+
+        # get match inds
+        match_inds = np.argmin(match_dist, axis=0) # N
+
+        # index with match_inds to get matched embeds
+        matched_embeds = flat_embeds[match_inds] # N x 1 x 64
+
+        # calculate rematch dist
+        rematch_dist = np.sum(np.square(flat_preds - matched_embeds), axis=-1) # N x N
+
+        # reshape and smooth, and re-flatten
+        rematch_dist = rematch_dist.reshape((rematch_dist.shape[0], cropped_preds.shape[1], cropped_preds.shape[2])) # n x neighb x neighb
+        rematch_dist = ndimage.filters.gaussian_filter(rematch_dist, sigma=(0, 3, 3)).reshape(rematch_dist.shape[0], -1) # n x N
+
+        # mask
+        rematch_dist[:, cropped_mask.flatten()] = np.max(rematch_dist) * 1.1
+
+        # get rematch inds
+        rematch_inds = np.argmin(rematch_dist, axis=1) # N
+
+        # convert rematch_inds and np.arange(N) to unraveled indices
+        orig_inds = np.vstack(np.unravel_index(np.arange(rematch_inds.shape[0]), cropped_preds.shape[-2:])) # N x 2
+        rematch_inds = np.vstack(np.unravel_index(rematch_inds, cropped_preds.shape[-2:])) # N x 2
+
+        # compute pixel-wise cc distance in test space
+        pixel_cc_dist = np.sum(np.square(orig_inds - rematch_inds), axis=0).astype(np.float32)
+
+        # mask cc_dist
+        pixel_cc_dist[cropped_mask.flatten()] = np.inf
+
+        # compute cc dist for each ind and pick min as best match
+        cropped_match_ind = np.unravel_index(np.argmin(pixel_cc_dist), cropped_preds.shape[-2:])
+
+        # pad match_ind to get original index
+        offset = np.array([initial_match_ind[1] - 10, initial_match_ind[2] - 10])
+        match_ind = (initial_match_ind[0], cropped_match_ind[0] + offset[0], cropped_match_ind[1] + offset[1])
+
+    else:
+        match_ind = initial_match_ind
+
+    # make best_match_map >=0 and max_normalize
+    best_match_map = best_match_map - np.min(best_match_map)
+    best_match_map = best_match_map / np.max(best_match_map)
+
+    # invert values of best_match_map so that large values indicate correspondence
+    im_mask = 1 - best_match_map
+
+    return im_mask, match_ind, best_ind
+
+def annotate_success_manually(command, prev_image=None, next_image=None):
+    """
+    # Returns
+
+      description, comment.
+    """
+    print(
+        "\nPress a key to label the most recent action: 1. success 2. failure, 3. skip, esc: quit. Then enter.\n"
+        "Grasp success is when the gripper successfully picks up the correct block, scroll up in terminal to see the expected order in the order of construction.\n"
+        "failure includes when the robot fails to pick up the correct color block or to place it at the right spot, depending on the action.\n"
+        "What to look for the end of a trial:\n"
+        " - A successful task typically involves 4 blocks.\n")
+    if pygame is None:
+        raise ImportError('pygame is required but not installed, cannot do manual annotations')
+    # , 3: error.failure
+    flag = 0
+    comment = 'none'
+    mark_previous_unconfirmed = None
+    pygame.init()
+    font = pygame.font.Font('freesansbold.ttf', 32)
+    textsurface = font.render(command, True, "black", "white")
+    text_rect = textsurface.get_rect()
+    text_rect.center = (350, 16)
+    screen = pygame.display.set_mode((700, 500))
+    screen.blit(textsurface, text_rect)
+    if prev_image is not None:
+        prev_image =  pygame.surfarray.make_surface(prev_image)
+        screen.blit(prev_image, (200,33))
+        w = prev_image.get_size()[0]
+    else:
+        w = 0
+    if next_image is not None:
+        next_image =  pygame.surfarray.make_surface(next_image)
+        screen.blit(next_image, (200, 33 + w+1))
+    pygame.display.update()
+    to_ret = (None, None)
+    while flag == 0:
+        events = pygame.event.get()
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    print("label set to success")
+                    to_ret = ("success", comment)
+                elif event.key == pygame.K_2:
+                    print("label set to failure")
+                    to_ret = ("failure", comment)
+                elif event.key == pygame.K_3:
+                    print("Label set to Skip") 
+                    to_ret = ('skip', comment)
+                elif event.key == pygame.K_ESCAPE:
+                    to_ret = ('quit', comment) 
+                elif event.key == pygame.K_RETURN: 
+                    print(f"recording result: {to_ret[0]}") 
+                    flag = 1
+                    pygame.quit() 
+                    return to_ret 
+
+def get_color_order_from_human(num_obj=4, input_description=None, color_names=None):
+    """ Read a command line sequence of color names
+
+        num_obj: the number of objects/actions to get colors for
+        input_description: what to print for the input
+        color_names: a list of strings which represents the map from index to numerical ids, ie red green blue would be 0 1 2.
+
+        returns:
+            color_names_out, object_color_sequence
+
+            color_names_out: strings for each color name
+            object_color_sequence: a list of numerical ids for each color
+
+    """
+    if color_names is None:
+        color_names = ['red', 'blue', 'green','yellow', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+    if input_description is None:
+        input_description = 'input the goal object color order'
+
+    # convert string or numerical object order from 
+    object_color_sequence = []
+    while True:
+        print('\a')
+        try:
+            object_order = input(" ".join([input_description + " for " + str(num_obj) + " objects, for example rgby or 1234 or [red green blue yellow] without brackets: "]))
+            if object_order.find(' ') != -1:
+                color_sequence = object_order.split(' ')
+                object_color_sequence = [color_names.index(color) for color in color_sequence]
+            else:
+                for i, c in enumerate(object_order):
+                    if c == 'r' or c == '1':
+                        object_color_sequence += [color_names.index('red')]
+                    elif c == 'g' or c == '2':
+                        object_color_sequence += [color_names.index('green')]
+                    elif c == 'b' or c == '3':
+                        object_color_sequence += [color_names.index('blue')]
+                    elif c == 'y' or c == '4':
+                        object_color_sequence += [color_names.index('yellow')]
+                    else:
+                        raise ValueError('unsupported input: ' + str(object_order))
+            if len(object_color_sequence) != num_obj:
+                raise ValueError('expected ' + str(num_obj) + ' objects, but read ' + str(len(object_color_sequence)))
+            # print('seq: ' + str(object_color_sequence))
+            color_names_out = [color_names[i] for i in object_color_sequence]
+            print('order received: colors: ' + str(color_names_out) +' color idxs:' + str(object_color_sequence))
+            break
+        except ValueError as e:
+            print(e)
+            print("Something went wrong with the input, try again, for example rgby or 1234 for [red green blue yellow]; or yrgb: ")
+            continue
+    return color_names_out, object_color_sequence

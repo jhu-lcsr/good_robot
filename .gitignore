@@ -15,10 +15,10 @@ realsense/Makefile
 realsense/cmake_install.cmake
 realsense/realsense
 
-*.png
 *.zip
 *.pdf
 *.pyc
+*.png
 *__pycache__*
 
 commands.txt
@@ -28,10 +28,34 @@ visualization.place.png
 calibration*/
 
 logs
-
+demos
 
 *calibration/
 
 real_good_robot_logs_2020_02
 
 paper_figures/
+
+CoppeliaSim_Edu_*
+CoppeliaSim_Edu_*/*
+
+
+grid_scripts
+grid_scripts/*
+grid_logs
+grid_logs/*
+models
+models/*
+
+data/
+data/*
+
+figures/
+
+**/.ipynb_checkpoints
+.vscode/*
+
+tune_files
+tune_files/*
+
+language_models/

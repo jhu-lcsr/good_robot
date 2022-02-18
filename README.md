@@ -1,28 +1,59 @@
-# "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer
+# Good Robot Projects
 
-[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Nicholas Greene, [Hongtao Wu](https://hongtaowu67.github.io), Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+## "Good Robot! Now Watch This!": Building Generalizable Embeddings via Reinforcement Learning
+
+```
+@inproceedings{hundt2021good,
+  title = {''{{Good}} {{Robot}}! {{Now}} {{Watch This!}}'': {{Repurposing Reinforcement Learning}} for {{Task-to-Task Transfer}}},
+  booktitle = {5th Annual Conference on Robot Learning},
+  author = {Hundt, Andrew and Murali, Aditya and Hubli, Priyanka and Liu, Ran and Gopalan, Nakul and Gombolay, Matthew and Hager, Gregory D.},
+  url = {https://openreview.net/forum?id=Pxs5XwId51n},
+  year = {2021}
+}
+```
+
+[Paper](https://openreview.net/forum?id=Pxs5XwId51n), [Poster](https://openreview.net/attachment?id=Pxs5XwId51n&name=poster)
+
+Abstract- Modern Reinforcement Learning (RL) algorithms are not sample efficient to train on multi-step tasks in complex domains, impeding their wider deployment in the real world. We address this problem by leveraging the insight that RL models trained to complete one set of tasks can be repurposed to complete related tasks when given just a handful of demonstrations. Based upon this insight, we propose See-SPOT-Run (SSR), a new computational approach to robot learning that enables a robot to complete a variety of real robot tasks in novel problem domains without task-specific training. SSR uses pretrained RL models to create vectors that represent model, task, and action relevance in demonstration and test scenes. SSR then compares these vectors via our Cycle Consistency Distance (CCD) metric to determine the next action to take. SSR completes 58% more task steps and 20% more trials than a baseline few-shot learning method that requires task-specific training. SSR also achieves a four order of magnitude improvement in compute efficiency and a 20% to three order of magnitude improvement in sample efficiency compared to the baseline and to training RL models from scratch. To our knowledge, we are the first to address multi-step tasks from demonstration on a real robot without task-specific training, where both the visual input and action space output are high dimensional.
+
+## Guiding Multi-Step Rearrangement Tasks with Natural Language Instructions
+
+```
+@inproceedings{
+stengel-eskin2021guiding,
+    title={Guiding Multi-Step Rearrangement Tasks with Natural Language Instructions},
+    author={Elias Stengel-Eskin and Andrew Hundt and Zhuohong He and Aditya Murali and Nakul Gopalan and Matthew Gombolay and Gregory D. Hager},
+    booktitle={5th Annual Conference on Robot Learning },
+    year={2021},
+    url={https://openreview.net/forum?id=-QJ__aPUTN2}
+}
+```
+
+[Paper](https://openreview.net/forum?id=-QJ__aPUTN2), [Poster](https://openreview.net/attachment?id=-QJ__aPUTN2&name=poster)
+
+Enabling human operators to interact with robotic agents using natural language would allow non-experts to intuitively instruct these agents. Towards this goal, we propose a novel Transformer-based model which enables a user to guide a robot arm through a 3D multi-step manipulation task with natural language commands. Our system maps images and commands to masks over grasp or place locations, grounding the language directly in perceptual space. In a suite of block rearrangement tasks, we show that these masks can be combined with an existing manipulation framework without re-training, greatly improving learning efficiency. Our masking model is several orders of magnitude more sample efficient than typical Transformer models, operating with hundreds, not millions, of examples. Our modular design allows us to leverage supervised and reinforcement learning, providing an easy interface for experimentation with different architectures. Our model completes block manipulation tasks with synthetic commands 530% more often than a UNet-based baseline, and learns to localize actions correctly while creating a mapping of symbols to perceptual input that supports compositional reasoning. We provide a valuable resource for 3D manipulation instruction following research by porting an existing 3D block dataset with crowdsourced language to a simulated environment. Our method's 25.3% absolute improvement in identifying the correct block on the ported dataset demonstrates its ability to handle syntactic and lexical variation.
+## "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping
+
+
+
+```
+@inproceedings{hundt2020good,
+    title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
+    author="Andrew {Hundt} and Benjamin {Killeen} and Nicholas {Greene} and Hongtao {Wu} and Heeyeon {Kwon} and Chris {Paxton} and Gregory D.    {Hager}",
+    booktitle="IEEE Robotics and Automation Letters",
+    volume="5",
+    number="4",
+    pages="6724--6731",
+    url={https://arxiv.org/abs/1909.11730},
+    year="2020"
+}
+```
+
+[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
 Click the image to watch the video:
 
 [!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/MbCuEZadkIw/0.jpg)](https://youtu.be/MbCuEZadkIw)
-
-## Paper, Abstract, and Citations
-
-[Good Robot! Paper on IEEE Xplore](http://doi.org/10.1109/LRA.2020.3015448), 
-[Good Robot! Paper on ArXiV](https://arxiv.org/abs/1909.11730)
-
-```
-@article{hundt2020good,
-	title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
-	author="Andrew {Hundt} and Benjamin {Killeen} and Nicholas {Greene} and Hongtao {Wu} and Heeyeon {Kwon} and Chris {Paxton} and Gregory D. {Hager}",
-	journal="IEEE Robotics and Automation Letters (RA-L)",
-	volume="5",
-	number="4",
-	pages="6724--6731",
-	year="2020",
-	url={https://arxiv.org/abs/1909.11730}
-}
-```
 
 Abstract— Current Reinforcement Learning (RL) algorithms struggle with long-horizon tasks where time can be wasted exploring dead ends and task progress may be easily reversed. We develop the SPOT framework, which explores within action safety zones, learns about unsafe regions without exploring them, and prioritizes experiences that reverse earlier progress to learn with remarkable efficiency.
 
@@ -30,204 +61,274 @@ The SPOT framework successfully completes simulated trials of a variety of tasks
 
 Furthermore, we demonstrate direct sim to real transfer. We are able to create real stacks in 100% of trials with 61% efficiency and real rows in 100% of trials with 59% efficiency by directly loading the simulation-trained model on the real robot with no additional real-world fine-tuning. To our knowledge, this is the first instance of reinforcement learning with successful sim to real transfer applied to long term multi-step tasks such as block-stacking and row-making with consideration of progress reversal. Code is available at https://github.com/jhu-lcsr/good_robot.
 
-## Training Row Making, Stack Making, and Table Clearing Tasks
 
-Details of our specific training and test runs, command line commands, pre-trained models, and logged data with images are on the [good_robot github releases page](https://github.com/jhu-lcsr/good_robot/releases).
+## Key Components
+
+Additional instructions for natural language capabilities README_LANGUAGE.md](README_good_robot.md) and Good Robot! capabilities are in [README_good_robot.md](README_good_robot.md).
+
+**`demo.py`**
+
+This file defines the `Demonstration` class, which is a data structure to store task demonstrations. The `Demonstration` class reads demos from a parent folder. This parent folder contains subfolders for
+(1) color images, (2) color heightmaps, (3) depth images, and (4) depth heightmaps. It also contains a `transitions` directory which contains information on executed actions. It is compatible with any task
+demonstration generated with the `touch.py` script.
+
+**`touch.py`**
+
+This is a utility to generate task demonstrations by specifying actions with key presses and specifying action location by clicking on images of the simulated workspace. The saved demonstrations can be directly loaded in downstream scripts using the interface provided by `demo.py`. A description of how to use the script is provided below.
+
+**`models.py`**
+
+This file defines `PixelNet`, the architecture of the DQN RL policies we use in See-SPOT-Run. These
+policies are used to extract embedding functions *E*. The models defined here are instantiated,
+ trained, and evaluated in `trainer.py`.
+
+**`trainer.py`**
+
+This file defines the `Trainer` class, a wrapper for `PixelNet` that implements a training and
+ testing loop, Experience Replay, and loading and preprocessing data from demos and the live test
+ environment.
+
+We provide instructions to train these policies on each of 4 tasks (row, stack, unstack,
+ vertical square) below. Training these DQN RL policies is ***Step I. Before Demonstration***
+ in Reinforcement Learning Before Demonstration (RLBD).
+
+**`robot.py`**
+
+This file defines all simulation and real robot related code. It contains utilities to get data from
+the simulated sensors as well as information about the simulated state (*e.g.* positions,
+orientations, IDs, etc. of objects in the scene). It also contains analogous utilities to get data
+from the real robot sensors. Lastly, it contains functions to assess task progress for each task
+(row, stack, unstack, and vertical square). These functions are `check_row`, `check_stack`,
+`unstacking_partial_success`, and `vertical_square_partial_success`. We also provide a
+`manual_progress_check` function that is used in some of the real robot experiments where we did
+not implement a scripted observer to assess progress (don't have absolute positions and orientations
+of blocks during real experiments, and must estimate them from depth values, which can be
+inaccurate).
+
+**`utils.py`**
+
+This file defines various miscellaneous utility functions.
+
+The first important function, `compute_demo_dist`, has two steps: first, it computes a
+candidate test action by selecting the test action with minimal Euclidean distance to the
+target demo action (distance computed in embedding space). It does this for each Policy-Demonstration
+Pair (PDP, *M x N* total), then picks the action from the *M x N* total candidate actions by
+comparing their Euclidean match distance with the demo action. This Euclidean match distance is
+what we refer to as the L2 Consistency Distance (L2CD) in Algorithm 2, and this function is
+ our implementation of the first part of Algorithm 2.
+
+The next important function, `compute_cc_dist`, has the same first step as `compute_demo_dist`.
+However, instead of computing the L2CD, it instead iterates through each of the *M x N* candidate
+actions and computes the CCD. This is calculated by rematching the test action to the demo
+space, and computing the distance between the **coordinates** of the original target demo
+action and the **coordinates** of the rematched action. Finally, the action with minimal
+CCD is returned. This function is our implementation of the second part of Algorithm 2.
+
+In our experiments, we have 3 pretrained policies and 2 demonstrations of the test task.
+Thus, *M* = 3, *N* = 2, and *M x N* = 6.
+
+**`evaluate\_demo\_correspondence.py`**
+
+**`main.py`**
+
+This is the driver file from which all model trains and experiments are run. It makes all necessary
+calls to classes and functions from the other files listed above (aside from `touch.py`, which needs
+to be run separately to generate demonstrations). We provide commands to run each component of our
+experiments below.
+
+## To Run
 
 ### Starting the V-REP Simulation
 
-[Download CoppeliaSim](http://www.coppeliarobotics.com/index.html) (formerly V-REP) and run it to start the simulation. Uou may need to adjust the paths below to match your V-REP folder, and it should be run from the costar_visual_stacking repository directory:
+To pretrain RL policies, collect demonstrations, and run any of our simulation experiments,
+ we need to first start a CoppeliaSim instance, which will run in the background during training.
+
+[Download CoppeliaSim](http://www.coppeliarobotics.com/index.html) (formerly V-REP) and run it to start the simulation. You may need to adjust the paths below to match your V-REP folder.
+
+To start with the GUI on, use the below command.
 
 ```bash
-cd ~/src/real_good_robot
-~/src/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
+cd ~/real_good_robot
+~/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt
 ```
 
-### Cube Stacking
-
-![A stack of 4 cubes](https://user-images.githubusercontent.com/55744/64198714-cb032100-ce56-11e9-9f6d-acb3101ff786.png)
-
-#### Cube Stack Training
+To start in headless mode (no GUI), use the below command.
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense --trial_reward
+cd ~/real_good_robot
+~/CoppeliaSim_Edu_V4_0_0_Ubuntu18_04/coppeliaSim.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s ~/src/real_good_robot/simulation/simulation.ttt -h
 ```
 
-All training results will go in the `path/to/good_robot/logs/<training_run>` folder.
-To use SPOT Progress Reward remove `--trial_reward` from this command.
-To disable the "common sense" dynamic action space regions remove `--common_sense` from this command.
-This command will automatically run in test mode once training is complete, and the testing results directory will be moved into the training results directory.
+The number used in the `gREMOTEAPISERVERSERVICE` argument is the `TCP_PORT` to specify in the calls below. Note that the default value of `19997` is required for the `touch.py` script.
 
-#### Manual Cube Stack Testing
 
-Remember to first train the model or download the snapshot file from the release page (ex: [v0.12 release](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0)) and update the command line `--snapshot_file FILEPATH`:
+### Generating Demonstrations
+
+To generate demonstrations, use the below command. Note that this requires starting the simulator as described above.
+
+`python touch.py -t [TASK_TYPE] --save`, where `[TASK_TYPE]` is one of `[row, stack, unstack,
+vertical_square]`.
+
+This command opens two windows, a window with a depth image, and a window with a color image.
+At each step, the user must specify either a grasp or place action with a keypress: `g` for
+grasp, `p` for place. After specifying the action with a keypress, the user must then click on
+the **color image** at the location at which the grasp/place should be centered.
+
+Following this mouseclick, the gripper will execute the action, and after it is finished executing,
+the next action can be specified. Once a demonstration has been completed, the user has two options.
+(1) Pressing the `c` key to collect another demonstration, and (2) pressing the `q` key to
+exit. To reproduce our results, it is important to collect both demonstrations of the task in
+one run of `touch.py` so that the filestructure of the demonstrations is consistent.
+
+We recommend using `touch.py` without the `--save` flag set a couple times to get used to
+the workflow. Collected demonstrations should be ideal for our method to function optimally,
+and location of the keypress can appear to be different from the location that the gripper
+comes down (this is due to the angle of the camera and depth ambiguity).
+
+
+### Pretraining RL Policies
+
+We provide commands to pretrain RL policies for each task below. Note that this requires starting the simulator as described above.
+
+**Row**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --place --load_snapshot --snapshot_file ~/Downloads/snapshot.reinforcement-best-stack-rate.pth --random_seed 1238 --is_testing --save_visualizations --disable_situation_removal
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay
+ --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port [TCP_PORT] --random_seed 1238 --max_train_actions 40000
+ --random_actions --task_type row --depth_channels_history
 ```
 
-#### Sim to Real Stack Testing
-
-You will need a fully configured real robot, we have some instructions in this readme.
-You will also need to update the snapshot file path to wherever your version is:
+**Stack**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 8  --push_rewards --experience_replay --explore_rate_decay --trial_reward --common_sense --check_z_height --place --future_reward_discount 0.65 --is_testing --random_seed 1238 --max_test_trials 10 --save_visualizations --random_actions --snapshot_file /media/costar/f5f1f858-3666-4832-beea-b743127f1030/real_good_robot/logs/2020-05-13-12-51-39_Sim-Stack-SPOT-Trial-Reward-Masked-Training/models/snapshot.reinforcement_action_efficiency_best_value.pth
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 8 --push_rewards --experience_replay
+ --explore_rate_decay --trial_reward --common_sense --check_z_height --tcp_port [TCP_PORT] --place --future_reward_discount 0.65 --random_seed 1238
+ --max_train_actions 40000 --random_actions --task_type stack --depth_channels_history
 ```
 
-### Row of 4 Cubes
-
-![001057 1 color row](https://user-images.githubusercontent.com/55744/65455899-31f07600-de16-11e9-9808-bb75226fa58d.png)
-
-Row Testing Video:
-
-[![CoSTAR Visual Stacking v0.12 rows test run video](https://img.youtube.com/vi/Ti3mSGvbc7w/0.jpg)](https://youtu.be/Ti3mSGvbc7w)
-
-[Row v0.12 release page and pretrained models](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/v0.12.0).
-
-#### Row Training
+**Unstack**
 
 ```bash
-CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --tcp_port 19997 --place --future_reward_discount 0.65 --max_train_actions 20000 --random_actions --common_sense
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay
+ --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port [TCP_PORT] --random_seed 1238 --max_train_actions 40000
+ --random_actions --task_type unstack --trial_reward
 ```
 
-Testing will automatically run after training is complete.
-
-#### Manual Row Testing
+**Vertical Square**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/blocks' --num_obj 4  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --place --check_row --is_testing  --tcp_port 19996 --load_snapshot --snapshot_file '/home/costar/Downloads/snapshot-backup.reinforcement-best-stack-rate.pth' --random_seed 1238 --disable_situation_removal --save_visualizations
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --push_rewards --experience_replay
+ --explore_rate_decay --trial_reward --common_sense --place --future_reward_discount 0.65 --tcp_port [TCP_PORT] --random_seed 1238 --max_train_actions 40000
+ --random_actions --task_type vertical_square --depth_channels_history
 ```
 
-#### Sim to Real Row Testing
+We additionally provide pretrained model files with the code to allow running imitation experiments without the need for this time-consuming pretraining step.
 
-You will need a fully configured real robot, we have some instructions in this readme.
-You will also need to update the snapshot file path to wherever your version is:
+### Precomputing Demo Embeddings
+
+Once demonstrations have been generated, we recommend precomputing demo embeddings to speed up the imitation test runs.
+This is not a necessary step, but it greatly increases runtime, and particularly for simulated experiments, bugs
+can arise due to long periods of inactivity.
+
+Dictionary of demo embeddings are saved in `demos/<demo_folder>/embedding/embed_dict.pickle`. Note that this
+dictionary takes up significant disk space (~20 GB), so ensure that you have the requisite storage space available.
+
+**Row**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --num_obj 4 --push_rewards --experience_replay --explore_rate_decay --check_row --check_z_height --place --future_reward_discount 0.65  --is_testing --random_seed 1238 --max_test_trials 10 --random_actions --save_visualizations --common_sense --snapshot_file "/home/costar/src/real_good_robot/logs/2020-06-03-12-05-28_Sim-Rows-Two-Step-Reward-Masked-Training/models/snapshot.reinforcement_trial_success_rate_best_value.pth"
+python3 evaluate_demo_correspondence.py -e demos/PATH_TO_ROW_DEMOS -d demos/PATH_TO_ROW_DEMOS -t row --stack_snapshot_file logs/PATH_TO_STACK_TRAINED_POLICY
+--vertical_square_snapshot_file base_models/PATH_TO_VERT_SQUARE_TRAINED_POLICY --unstack_snapshot_file base_models/PATH_TO_UNSTACK_TRAINED_POLICY --write_embed
+ --depth_channels_history --cycle_consistency
 ```
 
-### Push + Grasp
-
-We provide backwards compatibility with the [Visual Pushing Grasping (VPG) GitHub Repository](https://github.com/andyzeng/visual-pushing-grasping), and evaluate on their pushing and grasping task as a baseline from which to compare our algorithms.
-
-#### Push + Grasp Training
+**Stack**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay
+python3 evaluate_demo_correspondence.py -e demos/PATH_TO_STACK_DEMOS -d demos/PATH_TO_STACK_DEMOS -t stack --row_snapshot_file logs/PATH_TO_ROW_TRAINED_POLICY
+--vertical_square_snapshot_file base_models/PATH_TO_VERT_SQUARE_TRAINED_POLICY --unstack_snapshot_file base_models/PATH_TO_UNSTACK_TRAINED_POLICY --write_embed
+ --depth_channels_history --cycle_consistency
 ```
 
-You can also run without `--trial_reward` and with the default `--future_reward_discount 0.5`.
-
-#### Push + Grasp Random Object Location Testing
-
-![000040 0 color heightmap](https://user-images.githubusercontent.com/55744/63808939-16fe1500-c8ef-11e9-9dfa-8dc5ed53cd00.png)
+**Unstacking**
 
 ```bash
- export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --load_snapshot --snapshot_file '/home/costar/src/costar_visual_stacking/logs/2019-08-17.20:54:32-train-grasp-place-split-efficientnet-21k-acc-0.80/models/snapshot.reinforcement.pth' --random_seed 1238 --is_testing --save_visualizations
+python3 evaluate_demo_correspondence.py -e demos/PATH_TO_UNSTACK_DEMOS -d demos/PATH_TO_UNSTACK_DEMOS -t unstack --stack_snapshot_file logs/PATH_TO_STACK_TRAINED_POLICY
+--vertical_square_snapshot_file base_models/PATH_TO_VERT_SQUARE_TRAINED_POLICY --row_snapshot_file base_models/PATH_TO_ROW_TRAINED_POLICY --write_embed
+ --depth_channels_history --cycle_consistency
 ```
 
-#### Push + Grasp Adversarial Object Location Testing
-
-![Push grasp adversarial viz](https://user-images.githubusercontent.com/55744/64275313-4aeec100-cf13-11e9-9a04-3f56e2de79d5.png)
-
-[Adversarial pushing and grasping release v0.3.2](https://github.com/jhu-lcsr/costar_visual_stacking/releases/tag/push_grasp_v0.3.2) video:
-
-[![CoSTAR Visual Stacking v0.3.2 test run video](https://img.youtube.com/vi/F85d9xGCDnY/0.jpg)](https://youtu.be/F85d9xGCDnY)
+**Vertical Square**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir 'objects/toys' --num_obj 10  --push_rewards --experience_replay --explore_rate_decay --trial_reward --future_reward_discount 0.65 --tcp_port 19996 --is_testing --random_seed 1238 --load_snapshot --snapshot_file '/home/ahundt/src/costar_visual_stacking/logs/2019-09-12.18:21:37-push-grasp-16k-trial-reward/models/snapshot.reinforcement.pth' --max_test_trials 10 --test_preset_cases
+python3 evaluate_demo_correspondence.py -e demos/PATH_TO_VERT_SQUARE_DEMOS -d demos/PATH_TO_VERT_SQUARE_DEMOS -t vertical_square
+ --row_snapshot_file logs/PATH_TO_ROW_TRAINED_POLICY --stack_snapshot_file base_models/PATH_TO_STACK_TRAINED_POLICY
+ --unstack_snapshot_file base_models/PATH_TO_UNSTACK_TRAINED_POLICY --write_embed --depth_channels_history --cycle_consistency
 ```
 
-After Running the test you need to summarize the results:
+### Running Imitation Experiments
+
+#### Simulation
+
+We first provide commands to run imitation experiments in simulation. The results of these experiments are enumerated in Table 2.
+Note that this requires starting the simulator as described above.
+
+**Row**
 
 ```bash
-python3 evaluate.py --session_directory /home/ahundt/src/costar_visual_stacking/logs/2019-09-16.02:11:25  --method reinforcement --num_obj_complete 6 --preset
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19998 --random_seed 1238 --max_test_trials 50 --task_type row --is_testing --use_demo --demo_path PATH_TO_ROW_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 ```
 
-### Troubleshooting
-
-During training, be sure to check the simulator doesn't encounter physics bugs, such as blocks permanently bonded to the gripper.
-If this happens, you will notice one action will never succeed, and the other might always succeed, and multi-step tasks will no longer progress.
-If you catch it quickly, you can directly remove the object in the simulator with the scene editing tools, or simply stop the simulation and the training function should detect the problem and reset.
-
-## Data Collection and Data Release Checklist (v0.1, checklist creation is in progress)
-
-This is a checklist for all the steps you should follow to collect data consistently.
-
-1. Save the following data about the run you are going to do into a txt file for your records:
-        1. Describe the configuration you are running
-        2. Git commit hash of the code version you will run
-        2. Exact command line command you will run
-        3. Current CoppeliaSim (aka V-REP) ip address port (if simulation mode)
-        4. GPU number you will use on the computer
-2. Start recording: If sim, start V-REP & Start V-REP Recording. If running the real robot, start a real camera recording the robot.
-3. Start the run.
-4. After the run completes:
-    1. Do a random testing run for a reasonable number of trials like 10-100.
-    2. If pushing and grasping do an adversarial scenario testing run.
-    3. Make note of the directories with results, and include dir path in your txt file.
-5. Create a github release.
-    1. Add the model file binary to the release binaries so it is easier to download and utilize.
-    2. Incorporate the log folder name in the release name.
-    3. Provide a good description in english of what the run was trying to achieve.
-    4. Find several representative images, and add them directly to the release page for easy viewing.
-    5. Zip visualization directory separately because they tend to be larger files & upload to the github release.
-    6. Move the visualization directory out and then zip the remainder of the log directory and upload to the github release.
-    7. Zip up the random testing directories and adversarial testing directories (if applicable) upload to the github release binaries.
-    8. Upload the video recording to a website such as youtube, and add a link to the github release.
-    9. Make sure the github release commit lines up with the commit you actually ran your experiment on.
-    10. Submit the github release.
-
-## Costar Visual Stacking Execution Details
-
-### Running Multiple Simulations in Parallel
-
-It is possible to do multiple runs on different GPUs on the same machine. First, start an instance of V-Rep as below,
+**Stack**
 
 ```bash
-~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19997_FALSE_TRUE -s simulation/simulation.ttt
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19990 --random_seed 1238 --max_test_trials 50 --task_type stack --is_testing --use_demo --demo_path PATH_TO_STACK_DEMOS --row_snapshot_file logs/PATH_TO_ROW_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 ```
 
-being careful to use V-Rep 3.6.2 wherever it is installed locally. The port number, here 19997 which is the usual default, is the important point, as we will cahnge it in subsequent runs.
-
-Start the simulation as usual, but now specify `--tcp_port 19997`.
-
-Start another V-Rep session.
+**Unstack**
 
 ```bash
-~/src/V-REP_PRO_EDU_V3_6_2_Ubuntu16_04/vrep.sh -gREMOTEAPISERVERSERVICE_19996_FALSE_TRUE -s simulation/simulation.ttt
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 19999 --random_seed 1238 --max_test_trials 50 --task_type unstack --is_testing --use_demo --demo_path PATH_TO_UNSTACK_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --row_snapshot_file logs/PATH_TO_ROW_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 ```
 
-For some reason, the port number is important here, and should be selected to be lower than already running sessions.
-
-When you start training, be sure to specify a different GPU. For example, if previously you set
+**Vertical Square**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="0"
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --is_sim --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --tcp_port 20000 --random_seed 1238 --max_test_trials 50 --task_type vertical_square --is_testing --use_demo --demo_path PATH_TO_VERT_SQUARE_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --row_snapshot_file logs/PATH_TO_ROW_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop --future_reward_discount 0.65
 ```
 
-then you should likely set
+#### Real
+
+Now we provide commands to run imitation experiments on the real robot. The results of these experiments are enumerated in Table 3.
+Note that this requires a calibrated UR5 as per the instructions in the below section.
+
+**Row**
 
 ```bash
-export CUDA_VISIBLE_DEVICES="1"
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type row --is_testing --use_demo --demo_path PATH_TO_ROW_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop
 ```
 
-and specify the corresponding tcp port `--tcp_port 19996`.
+**Stack**
 
-Additional runs in parallel should use ports 19995, 19994, etc.
-
-## Generating plots
-
-To generate plots run `python3 plot.py`, you can manually edit the bottom part of `plot.py` to call `plot_it()` for your folder.
-
-```python
-    log_dir = './logs/2020-02-03-16-57-28_Sim-Stack-Trial-Reward-Common-Sense-Training'
-    plot_it(log_dir,'Sim Stack, SPOT Reward, Common Sense, Training', window=window, max_iter=None)
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --obj_mesh_dir objects/blocks --num_obj 4 --num_extra_obj 4 --check_z_height --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type stack --is_testing --use_demo --demo_path PATH_TO_STACK_DEMOS --row_snapshot_file logs/PATH_TO_ROW_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop
 ```
 
-The configuration of the plot should be done automatically from the folder.
+**Unstack**
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --disable_two_step_backprop --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type unstack --is_testing --use_demo --demo_path PATH_TO_UNSTACK_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --vertical_square_snapshot_file logs/PATH_TO_VERT_SQUARE_POLICY --row_snapshot_file logs/PATH_TO_ROW_POLICY --grasp_only --depth_channels_history --cycle_consistency --no_common_sense_backprop
+```
+
+**Vertical Square**
+
+```bash
+export CUDA_VISIBLE_DEVICES="0" && python3 main.py --check_z_height --obj_mesh_dir objects/blocks --num_obj 4 --common_sense --place --random_seed 1238 --max_test_trials 10 --task_type vertical_square --is_testing --use_demo --demo_path PATH_TO_VERT_SQUARE_DEMOS --stack_snapshot_file logs/PATH_TO_STACK_POLICY --unstack_snapshot_file logs/PATH_TO_UNSTACK_POLICY --row_snapshot_file logs/PATH_TO_ROW_POLICY --grasp_only --cycle_consistency --no_common_sense_backprop
+```
+
+#### Files
+
+We provide both demonstration directories and pretrained model files in the `experiment_files` directory. These can be used rather than
+generating them yourself.
 
 ## Running on a Real UR5 with ROS Based Image Collection
 
@@ -262,12 +363,6 @@ Run the build and install.
 cd ~/ros_catkin_ws
 rosdep install --from-paths src --ignore-src --rosdistro melodic -y && ./src/catkin/bin/catkin_make_isolated --install
 ```
-<!--
-Then install the primesense image pipeline:
-
-```bash
-sudo apt-get install ros-melodic-openni2-launch ros-melodic-image-pipeline python3-rospkg python3-catkin-pkg
-``` -->
 
 Source the ros setup so you get access to the launch commands:
 ```
@@ -294,7 +389,7 @@ Running RVIZ to look at the images:
 rosrun rviz rviz
 ```
 
-The correct images, as done in the [JHU costar dataset](https://sites.google.com/site/costardataset) class [collector](https://github.com/jhu-lcsr/costar_plan/blob/d469d62d72cd405ed07b10c62eb24391c0af1975/ctp_integration/python/ctp_integration/collector.py), are from the following ROS topics:
+The correct images are from the following ROS topics:
 
 ```
 
@@ -346,7 +441,7 @@ You will need to generate and load a calibration yaml file which goes in a locat
 </launch>
 ```
 
-5. You must predefine the `workspace_limits` python variables in the `calibration_ros.py`, `touch.py`, and `main.py`, and `robot.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
+5. You must predefine the `workspace_limits` python variables in the `calibration_ros.py`, `touch.py`, `main.py`, `robot.py`, and `demo.py`. To modify these locations, change the variables `workspace_limits` at the end of `calibrate_ros.py`. You may define it in the `Calibrate` class or in the function `collect_data` for data collection.
 
 3. The code directly communicates with the robot via TCP. At the top of `calibrate_ros.py`, change variable `tcp_host_ip` to point to the network IP address of your UR5 robot controller.
 

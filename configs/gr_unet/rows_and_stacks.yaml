@@ -1,0 +1,45 @@
+# DATA 
+path: /srv/local1/estengel/gr_data_sim_small_w/
+batch_size: 32
+max_seq_length: 40
+resolution: 64
+split_type: "random"
+task_type: "rows-and-stacks" 
+overfit: False
+augment_by_flipping: True
+augment_with_noise: True
+augment_language: False 
+zero_weight: 0.05
+leave_out_color: None
+
+# LANGUAGE EMBEDDER
+embedder: "random" 
+embedding_dim: 300
+
+# language necoder
+encoder: "lstm"
+encoder_hidden_dim: 128
+encoder_num_layers: 2
+bidirectional: true 
+
+# UNET 
+compute_block_dist: true
+unet_type: "unet_with_attention"
+share_level: encoder
+unet_out_channels: 128
+unet_hc_large: 32
+unet_hc_small: 16
+unet_num_layers: 5
+unet_stride: 2
+unet_kernel_size: 5
+mlp_hidden_dim: 32
+mlp_num_layers: 2
+dropout: 0.3
+do_reconstruction: True
+
+# MISC
+cuda: 0
+learn_rate: 0.0001
+checkpoint_dir: "" 
+num_epochs: 200
+generate_after_n: 201

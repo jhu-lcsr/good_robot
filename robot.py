@@ -10,6 +10,8 @@ import traceback
 import copy
 from simulation import vrep
 from scipy import ndimage, misc
+from glob import glob
+import pdb
 try:
     from gripper.robotiq_2f_gripper_ctrl import RobotiqCGripper
 except ImportError:
@@ -38,7 +40,6 @@ def gripper_control_pose_to_arm_control_pose(gripper_translation, gripper_orient
         arm_orientation = arm_orientation_axis_angle[0]*np.asarray(arm_orientation_axis_angle[1:4])
         arm_translation = arm_pose[0:3,3]
         return arm_translation, arm_orientation
-
 
 def orientation_and_angle_to_push_direction(heightmap_rotation_angle, push_orientation=None):
     if push_orientation is None:
@@ -96,7 +97,6 @@ def push_poses(heightmap_rotation_angle, position, workspace_limits, push_orient
 
     return position, up_pos, push_endpoint, push_direction, tool_orientation, tilted_tool_orientation
 
-
 class Robot(object):
     """
     Key member variables:
@@ -108,8 +108,10 @@ class Robot(object):
     """
     def __init__(self, is_sim=True, obj_mesh_dir=None, num_obj=None, workspace_limits=None,
                  tcp_host_ip='192.168.1.155', tcp_port=502, rtc_host_ip=None, rtc_port=None,
-                 is_testing=False, test_preset_cases=None, test_preset_file=None, place=False, grasp_color_task=False,
-                 real_gripper_ip='192.168.1.11', calibrate=False, unstack=False, heightmap_resolution=0.002):
+                 is_testing=False, test_preset_cases=None, test_preset_file=None, test_preset_arr=None,
+                 place=False, grasp_color_task=False, real_gripper_ip='192.168.1.11', calibrate=False,
+                 unstack=False, heightmap_resolution=0.002, randomized=True, obj_scale=1,
+                 task_type=None, language=False, human_reset=False):
         '''
 
         real_gripper_ip: None to assume the gripper is connected via the UR5,
@@ -134,6 +136,8 @@ class Robot(object):
         self.unstack = unstack
         self.place_pose_history_limit = 6
         self.grasp_color_task = grasp_color_task
+        self.language = language
+        self.human_reset = human_reset
         self.sim_home_position = [-0.3, 0.0, 0.45]  # old value [-0.3, 0, 0.3]
         # self.gripper_ee_offset = 0.17
         # self.gripper_ee_offset = 0.15
@@ -147,7 +151,16 @@ class Robot(object):
         #
         # TODO: Change to random color not just red block using  (b = [0, 1, 2, 3] np.random.shuffle(b)))
         # after grasping, put the block back
-        self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+        if grasp_color_task or not is_sim:
+            #self.color_names = ['blue', 'green', 'yellow', 'red']
+            self.color_names = ['red', 'blue', 'green','yellow']
+        else:
+            #self.color_names = ['blue', 'green', 'yellow', 'red', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+            self.color_names = ['red', 'blue', 'green','yellow', 'brown', 'orange', 'gray', 'purple', 'cyan', 'pink']
+
+        # task type (defaults to None)
+        self.task_type = task_type
+        # self.capture_logoblock_dataset = capture_logoblock_dataset
 
         # If in simulation...
         if self.is_sim:
@@ -171,10 +184,19 @@ class Robot(object):
             #                                [176, 122, 161], # purple
             #                                [118, 183, 178], # cyan
             #                                [255, 157, 167]])/255.0 #pink
-            self.color_space = np.asarray([[78.0, 121.0, 167.0], # blue
+            if grasp_color_task:
+                self.color_space = np.asarray( [
+                                [255.0, 87.0, 89.0], # red
+                                [78.0, 121.0, 167.0], # blue
                                 [89.0, 161.0, 79.0], # green
                                 [237.0, 201.0, 72.0], # yellow
+                                ])/255.0 
+            else:
+                self.color_space = np.asarray([
                                 [255.0, 87.0, 89.0], # red
+                                [78.0, 121.0, 167.0], # blue
+                                [89.0, 161.0, 79.0], # green
+                                [237.0, 201.0, 72.0], # yellow
                                 [156, 117, 95], # brown
                                 [242, 142, 43], # orange
                                 [186, 176, 172], # gray
@@ -186,11 +208,14 @@ class Robot(object):
             self.obj_mesh_dir = obj_mesh_dir
             self.num_obj = num_obj
             # TODO(HK) specify which objects to load here from a command line parameter, should be able ot load one repeatedly
-            self.mesh_list = os.listdir(self.obj_mesh_dir)
+            #self.mesh_list = os.listdir(self.obj_mesh_dir)
+            # Restrict only the .obj files
+            self.mesh_list = sorted(glob(os.path.join(self.obj_mesh_dir, "*.obj")))
+            #print(f"self.meshlist: {self.mesh_list}")
 
             # Randomly choose objects to add to scene
             self.obj_mesh_ind = np.random.randint(0, len(self.mesh_list), size=self.num_obj)
-            self.obj_mesh_color = self.color_space[np.asarray(range(self.num_obj)) % 10, :]
+            self.obj_mesh_color = self.color_space[np.asarray(range(self.num_obj)) % self.color_space.shape[0], :]
 
             # Make sure to have the server side running in V-REP:
             # in a child script of a V-REP scene, add following command
@@ -208,7 +233,9 @@ class Robot(object):
             if tcp_port is None or tcp_port == 30002 or tcp_port == 502:
                 print("WARNING: default tcp port changed to 19997 for is_sim")
                 tcp_port = 19997
+
             self.tcp_port = tcp_port
+            #print(f"bp 1")
             self.restart_sim(connect=True)
             # initialize some startup state values and handles for
             # the joint configurations and home position
@@ -219,16 +246,27 @@ class Robot(object):
             self.go_home()
             # set the home joint config based on the initialized simulation
             self.home_joint_config = self.get_joint_position()
+            #print(f"got joints")
 
             self.is_testing = is_testing
             self.test_preset_cases = test_preset_cases
             self.test_preset_file = test_preset_file
+            self.test_preset_arr = test_preset_arr
 
             # Setup virtual camera in simulation
             self.setup_sim_camera()
 
+            # Scaling used when importing objects
+            self.obj_scale = obj_scale
+            self.png_list = sorted(glob(os.path.join(self.obj_mesh_dir, "*.png")))
+            self.textured = True if len(self.png_list) > 0 else False
+            self.logoblock_dataset = self.textured
+            self.randomized = randomized
+
             # If testing, read object meshes and poses from test case file
+            print(f"self.is_testing {is_testing} self.test_preset_cases {self.test_preset_cases}")
             if self.is_testing and self.test_preset_cases:
+                print(f"loading preset case")
                 self.load_preset_case()
 
             # Add objects to simulation environment
@@ -334,6 +372,7 @@ class Robot(object):
 
     def load_preset_case(self, test_preset_file=None):
         if test_preset_file is None:
+            #print(f"preset file is {self.test_preset_file}")
             test_preset_file = self.test_preset_file
         file = open(test_preset_file, 'r')
         file_content = file.readlines()
@@ -348,29 +387,35 @@ class Robot(object):
             self.test_obj_positions.append([float(file_content_curr_object[4]),float(file_content_curr_object[5]),float(file_content_curr_object[6])])
             self.test_obj_orientations.append([float(file_content_curr_object[7]),float(file_content_curr_object[8]),float(file_content_curr_object[9])])
         file.close()
+
         self.obj_mesh_color = np.asarray(self.test_obj_mesh_colors)
 
 
     def setup_sim_camera(self):
-
+        #print(f"getting camera data")
         # Get handle to camera
         sim_ret, self.cam_handle = vrep.simxGetObjectHandle(self.sim_client, 'Vision_sensor_persp', vrep.simx_opmode_blocking)
 
+        #print(f"camera bp 1")
         # Get camera pose and intrinsics in simulation
         sim_ret, cam_position = vrep.simxGetObjectPosition(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         sim_ret, cam_orientation = vrep.simxGetObjectOrientation(self.sim_client, self.cam_handle, -1, vrep.simx_opmode_blocking)
         cam_trans = np.eye(4,4)
         cam_trans[0:3,3] = np.asarray(cam_position)
         cam_orientation = [-cam_orientation[0], -cam_orientation[1], -cam_orientation[2]]
+        #print(f"camera bp 2")
         cam_rotm = np.eye(4,4)
         cam_rotm[0:3,0:3] = np.linalg.inv(utils.euler2rotm(cam_orientation))
         self.cam_pose = np.dot(cam_trans, cam_rotm) # Compute rigid transformation representating camera pose
         self.cam_intrinsics = np.asarray([[618.62, 0, 320], [0, 618.62, 240], [0, 0, 1]])
         self.cam_depth_scale = 1
 
+        #print(f"camera bp 3")
         # Get background image
         self.bg_color_img, self.bg_depth_img = self.get_camera_data()
         self.bg_depth_img = self.bg_depth_img * self.cam_depth_scale
+
+        #print(f"camera bp 4")
 
     def generate_random_object_pose(self):
         drop_x = (self.workspace_limits[0][1] - self.workspace_limits[0][0] - 0.2) * np.random.random_sample() + self.workspace_limits[0][0] + 0.1
@@ -388,10 +433,23 @@ class Robot(object):
         vrep.simxSetObjectPosition(self.sim_client, object_handle, -1, object_position, vrep.simx_opmode_blocking)
         vrep.simxSetObjectOrientation(self.sim_client, object_handle, -1, object_orientation, vrep.simx_opmode_blocking)
 
+        return object_position, object_orientation
 
     def reposition_object_at_list_index_randomly(self, list_index):
         object_handle = self.object_handles[list_index]
         self.reposition_object_randomly(object_handle)
+
+
+    def reposition_object_at_list_index_to_location(self, obj_pos, obj_ori, index):
+        """ Reposition the object to a specified position and orientation """
+        object_handle = self.object_handles[index]
+        # TODO(adit98) figure out significance of plane_handle, set to -1 for now
+        if self.task_type is not None and self.task_type == 'unstack':
+            plane_handle=-1
+        else:
+            success, plane_handle = vrep.simxGetObjectHandle(self.sim_client, "Plane", vrep.simx_opmode_blocking)
+        vrep.simxSetObjectPosition(self.sim_client, object_handle, plane_handle, obj_pos, vrep.simx_opmode_blocking)
+        vrep.simxSetObjectOrientation(self.sim_client, object_handle, plane_handle, obj_ori, vrep.simx_opmode_blocking)
 
 
     def add_objects(self):
@@ -416,29 +474,56 @@ class Robot(object):
                 self.vrep_names = []
                 self.object_colors = []
             for object_idx in range(len(self.obj_mesh_ind)):
-                curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+                # if setup for capture, no need for randomization / scrambling of the blocks.
+                if not self.randomized:
+                    curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[object_idx])
+                else:
+                    curr_mesh_file = os.path.join(self.obj_mesh_dir, self.mesh_list[self.obj_mesh_ind[object_idx]])
+
                 if self.is_testing and self.test_preset_cases:
                     curr_mesh_file = self.test_obj_mesh_files[object_idx]
                 # TODO(ahundt) define more predictable object names for when the number of objects is beyond the number of colors
+                #print(f"Currently Trying to Import: {curr_mesh_file}")
                 curr_shape_name = 'shape_%02d' % object_idx
                 self.vrep_names.append(curr_shape_name)
                 drop_x, drop_y, object_position, object_orientation = self.generate_random_object_pose()
                 if self.is_testing and self.test_preset_cases:
                     object_position = [self.test_obj_positions[object_idx][0], self.test_obj_positions[object_idx][1], self.test_obj_positions[object_idx][2]]
                     object_orientation = [self.test_obj_orientations[object_idx][0], self.test_obj_orientations[object_idx][1], self.test_obj_orientations[object_idx][2]]
+
+                # Loading object position and orientations from an array
+                if self.test_preset_arr is not None:
+                    object_position = self.test_preset_arr[object_idx][0]
+                    object_orientation = self.test_preset_arr[object_idx][1]
+
                 # Set the colors in order
+                #print(f"setting color at idx {object_idx} to {self.obj_mesh_color[object_idx]}")
                 object_color = [self.obj_mesh_color[object_idx][0], self.obj_mesh_color[object_idx][1], self.obj_mesh_color[object_idx][2]]
                 # If there are more objects than total colors this line will break,
                 # applies mod to loop back to the first color.
                 object_color_name = self.color_names[object_idx % len(self.color_names)]
                 # add the color of this object to the list.
                 self.object_colors.append(object_color_name)
-                print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
+                #print('Adding object: ' + curr_mesh_file + ' as ' + curr_shape_name)
                 do_break = False
                 ret_ints = []
+                ret_resp = 0
                 while len(ret_ints) == 0:
                     do_break = False
-                    ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShape',[0,0,255,0], object_position + object_orientation + object_color, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    #print(f"obj pos {object_position}")
+                    #print(f"obj ori {object_orientation}")
+                    #print(f"obj col {object_color}")
+                    #print(curr_mesh_file)
+                    #print(curr_shape_name)
+
+                    # TODO: ZH, We don't really need this, remove this if statement after testing
+                    scale = [self.obj_scale]
+                    # Adding the objects via Lua script. If we are dealing with texture, different call to script.
+                    if self.textured:
+                        ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWTextureWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+                    else:
+                        ret_resp,ret_ints,ret_floats,ret_strings,ret_buffer = vrep.simxCallScriptFunction(self.sim_client, 'remoteApiCommandServer',vrep.sim_scripttype_childscript,'importShapeWScale',[0, 0, 255, 0], object_position + object_orientation + object_color + scale, [curr_mesh_file, curr_shape_name], bytearray(), vrep.simx_opmode_blocking)
+
                     if ret_resp == 8:
                         print('Failed to add ' + curr_mesh_file + ' to simulation. Auto retry ' + str(failure_count))
                         failure_count += 1
@@ -460,6 +545,9 @@ class Robot(object):
         self.prev_obj_positions = []
         self.obj_positions = []
 
+        # now reposition objects if we are unstacking
+        if self.task_type == 'unstack':
+            self.reposition_objects()
 
     def restart_sim(self, connect=False):
         if connect:
@@ -499,19 +587,38 @@ class Robot(object):
             # check sim, but we are already in the restart loop so don't recurse
             sim_ok = sim_started == vrep.simx_return_ok and self.check_sim(restart_if_not_ok=False)
 
+    def check_obj_in_scene(self, obj_handle, workspace_limits=None, buffer_meters=0.1, gripper_buffer_meters=0.1):
+        """
+        Check if object/gripper specified by CoppeliaSim handle is in workspace limits or within a certain distance of the gripper
+        Arguments:
+            obj_handle: CoppeliaSim object handle
+            workspace_limits: Workspace limit coordinates, defaults to self.workspace_limits
+            buffer_meters: Amount of buffer to allow, defaults to 0.1
+            gripper_buffer_meters:  Amount of buffer to allow for gripper, defaults to 0.1, not checked if None
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # get object position
+        sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, -1, vrep.simx_opmode_blocking)
+        sim_ok = pos[0] > workspace_limits[0][0] - buffer_meters and pos[0] < workspace_limits[0][1] + buffer_meters and pos[1] > workspace_limits[1][0] - buffer_meters and pos[1] < workspace_limits[1][1] + buffer_meters and pos[2] > workspace_limits[2][0] and pos[2] < workspace_limits[2][1]
+        if gripper_buffer_meters is not None:
+            sim_ret, pos = vrep.simxGetObjectPosition(self.sim_client, obj_handle, self.UR5_handle, vrep.simx_opmode_blocking)
+            sim_ok = sim_ok or np.linalg.norm(pos) < gripper_buffer_meters
+        return sim_ok
 
     def check_sim(self, restart_if_not_ok=True):
         # buffer_meters = 0.1  # original buffer value
         buffer_meters = 0.1
         # Check if simulation is stable by checking if gripper is within workspace
-        sim_ret, gripper_position = vrep.simxGetObjectPosition(self.sim_client, self.UR5_tip_handle, -1, vrep.simx_opmode_blocking)
-        sim_ok = gripper_position[0] > self.workspace_limits[0][0] - buffer_meters and gripper_position[0] < self.workspace_limits[0][1] + buffer_meters and gripper_position[1] > self.workspace_limits[1][0] - buffer_meters and gripper_position[1] < self.workspace_limits[1][1] + buffer_meters and gripper_position[2] > self.workspace_limits[2][0] and gripper_position[2] < self.workspace_limits[2][1]
+        sim_ok = self.check_obj_in_scene(self.UR5_tip_handle)
+
         if restart_if_not_ok and not sim_ok:
             print('Simulation unstable. Restarting environment.')
             self.restart_sim(connect=True)
             self.add_objects()
         return sim_ok
-
 
     def get_task_score(self):
 
@@ -539,22 +646,22 @@ class Robot(object):
         return goal_reached
 
 
-    # def stop_sim(self):
-    #     if self.is_sim:
-    #         # Now send some data to V-REP in a non-blocking fashion:
-    #         # vrep.simxAddStatusbarMessage(sim_client,'Hello V-REP!',vrep.simx_opmode_oneshot)
+    def stop_sim(self):
+        if self.is_sim:
+            # Now send some data to V-REP in a non-blocking fashion:
+            # vrep.simxAddStatusbarMessage(sim_client,'Hello V-REP!',vrep.simx_opmode_oneshot)
 
-    #         # # Start the simulation
-    #         # vrep.simxStartSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
+            # # Start the simulation
+            # vrep.simxStartSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
 
-    #         # # Stop simulation:
-    #         # vrep.simxStopSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
+            # # Stop simulation:
+            # vrep.simxStopSimulation(sim_client,vrep.simx_opmode_oneshot_wait)
 
-    #         # Before closing the connection to V-REP, make sure that the last command sent out had time to arrive. You can guarantee this with (for example):
-    #         vrep.simxGetPingTime(self.sim_client)
+            # Before closing the connection to V-REP, make sure that the last command sent out had time to arrive. You can guarantee this with (for example):
+            vrep.simxGetPingTime(self.sim_client)
 
-    #         # Now close the connection to V-REP:
-    #         vrep.simxFinish(self.sim_client)
+            # Now close the connection to V-REP:
+            vrep.simxFinish(self.sim_client)
 
 
     def get_obj_positions(self, relative_to_handle=-1):
@@ -566,6 +673,19 @@ class Robot(object):
             obj_positions.append(object_position)
 
         return obj_positions
+
+    def get_objects_in_scene(self, workspace_limits=None, buffer_meters=0.0):
+        """
+        Function to iterate through all object positions and return number of objects within workspace_limits
+        Returns:
+            objs: list of CoppeliaSim object handles in scene
+        """
+
+        if workspace_limits is None:
+            workspace_limits = self.workspace_limits
+
+        # iterate through self.object_handles and check if in scene
+        return [obj for obj in self.object_handles if self.check_obj_in_scene(obj, workspace_limits=workspace_limits, buffer_meters=buffer_meters)]
 
     def get_obj_positions_and_orientations(self):
         if not self.is_sim:
@@ -622,70 +742,75 @@ class Robot(object):
         primitive_position = [x_pixel * self.heightmap_resolution + self.workspace_limits[0][0], y_pixel * self.heightmap_resolution + self.workspace_limits[1][0], safe_z_position]
         return primitive_position, push_may_contact_something
 
-    def reposition_objects(self, unstack_drop_height=0.05):
+    def reposition_objects(self, unstack_drop_height=0.05, action_log=None, logger=None,
+            goal_condition=None, workspace_limits=None):
         # grasp blocks from previously placed positions and place them in a random position.
         if self.place_task and self.unstack:
-            print("------- UNSTACKING --------")
+            print("------- SCENE RESET --------")
 
-            if len(self.place_pose_history) == 0:
+            if self.human_reset or len(self.place_pose_history) == 0:
+                print('\a')
                 print("NO PLACE HISTORY TO UNSTACK YET.")
                 print("HUMAN, PLEASE MOVE BLOCKS AROUND")
-                print("SLEEPING FOR 10 SECONDS")
+                input('press enter to continue...')
+                # print("SLEEPING FOR 10 SECONDS")
+                # # play a sound to get the human's attention.
+                # for i in range(10):
+                #     print("SLEEPING FOR %d" % (10 - i))
+                #     time.sleep(1)
 
-                for i in range(10):
-                    print("SLEEPING FOR %d" % (10 - i))
-                    time.sleep(1)
+                print("-------- RESUMING AFTER MANUAL SCENE RESET --------")
 
-                print("-------- RESUMING AFTER MANUAL UNSTACKING --------")
-                
-
-            place_pose_history = self.place_pose_history.copy()
-            place_pose_history.reverse()
-
-            # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot. 
-            place_pose_history.append(place_pose_history[-1])  
-
-            holding_object = not(self.close_gripper())
-            # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
-            if holding_object:
-                _, _, rand_position, rand_orientation = self.generate_random_object_pose()
-                rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
-                rand_angle = rand_orientation[0]
-
-                self.place(rand_position, rand_angle, save_history=False)
             else:
-                self.open_gripper()
+                # note, this can be run in simulation so we can test the real robot unstacking operations in the simulator
+                place_pose_history = self.place_pose_history.copy()
+                place_pose_history.reverse()
 
-            # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
-            for pose in place_pose_history:
-                x, y, z, angle = pose
+                # unstack the block on the bottom of the stack so that the robot doesn't keep stacking in the same spot.
+                place_pose_history.append(place_pose_history[-1])
 
-                valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
-
-                # get depth_heightmap pixel_coordinates of where the previous place was
-                x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
-                x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
-
-                y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
-                y_pixel = min(y_pixel, 223)
-
-                primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
-
-                # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
-                # plus an offset. There
-                z = primitive_position[2]
-
-                grasp_success, color_success = self.grasp([x, y, z], angle)
-                if grasp_success:
+                holding_object = not(self.close_gripper())
+                # if already has an object in the gripper when reposition objects gets called, place that object somewhere random
+                if holding_object:
                     _, _, rand_position, rand_orientation = self.generate_random_object_pose()
                     rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
                     rand_angle = rand_orientation[0]
 
                     self.place(rand_position, rand_angle, save_history=False)
+                else:
+                    self.open_gripper()
 
-            # clear the place hisory after unstacking
-            self.place_pose_history = []
-            print("------- UNSTACKING COMPLETE --------")
+                # go to x,y position of previous places and pick up the max_z height from the depthmap (top of the stack)
+                for pose in place_pose_history:
+                    x, y, z, angle = pose
+
+                    valid_depth_heightmap, color_heightmap, depth_heightmap, max_z_height, color_img, depth_img = self.get_camera_data(return_heightmaps=True)
+
+                    # get depth_heightmap pixel_coordinates of where the previous place was
+                    x_pixel = int((x - self.workspace_limits[0][0]) / self.heightmap_resolution)
+                    x_pixel = min(x_pixel, 223)  # prevent indexing outside the heightmap bounds
+
+                    y_pixel = int((y - self.workspace_limits[1][0]) / self.heightmap_resolution)
+                    y_pixel = min(y_pixel, 223)
+
+                    primitive_position, _ = self.action_heightmap_coordinate_to_3d_robot_pose(x_pixel, y_pixel, 'grasp', valid_depth_heightmap)
+
+                    # this z position is checked based on the x,y position of the robot. Previously, the z height was the max z_height in the depth_heightmap
+                    # plus an offset. There
+                    z = primitive_position[2]
+
+                    grasp_success, color_success = self.grasp([x, y, z], angle)
+                    if grasp_success:
+                        _, _, rand_position, rand_orientation = self.generate_random_object_pose()
+                        rand_position[2] = unstack_drop_height  # height from which to release blocks (0.05 m per block)
+                        rand_angle = rand_orientation[0]
+
+                        self.place(rand_position, rand_angle, save_history=False)
+
+                # clear the place hisory after unstacking
+                self.place_pose_history = []
+
+            print("------- SCENE RESET COMPLETE --------")
 
         else:
             if self.is_sim:
@@ -697,18 +822,51 @@ class Robot(object):
                 # vrep.simxSetObjectPosition(self.sim_client, UR5_target_handle, -1, (-0.5,0,0.3), vrep.simx_opmode_blocking)
                 # time.sleep(1)
 
-                for object_handle in self.object_handles:
+                # if not unstacking, place all objects randomly
+                if self.task_type is None or self.task_type != 'unstack':
+                    for object_handle in self.object_handles:
+                        # Drop object at random x,y location and random orientation in robot workspace
+                        self.reposition_object_randomly(object_handle)
+                        time.sleep(0.5)
 
-                    # Drop object at random x,y location and random orientation in robot workspace
-                    self.reposition_object_randomly(object_handle)
-                    time.sleep(0.5)
+                # if unstacking, need to create a stack at a random location
+                else:
+                    successful_stack = False
+                    while not successful_stack:
+                        # get random obj pose
+                        _, _, obj_pos, obj_ori = self.generate_random_object_pose()
+                        obj_ori[:2] = [0, 0]
+
+                        # iterate through remaining object handles and place them on top of existing stack (randomize order)
+                        obj_handles_rand = np.arange(len(self.object_handles))
+                        np.random.shuffle(obj_handles_rand)
+                        for ind, i in enumerate(obj_handles_rand):
+                            # reposition object as (x,y) position of first block, set z pos depending on stack height
+                            # same orientation (TODO(adit98) add noise later?)
+                            obj_pos[-1] = ind * 0.06 + 0.05
+
+                            # reposition object
+                            self.reposition_object_at_list_index_to_location(obj_pos, obj_ori, i)
+
+                            # regenerate object orientation and keep only the top block rotation
+                            _, _, _, obj_ori = self.generate_random_object_pose()
+                            obj_ori[:2] = [0, 0]
+
+                            # wait for objects to settle
+                            time.sleep(0.75)
+
+                        # continue to retry until we have a successful stack of 4 blocks
+                        successful_stack, stack_height = self.check_stack(np.ones(len(self.object_handles)))
+                        print('reposition_objects(): successful stack:', successful_stack, 'stack_height:', stack_height)
+                        if stack_height >= len(self.object_handles):
+                            successful_stack = True
+
                 # an extra half second so things settle down
                 time.sleep(0.5)
+
                 return True
 
-            # TODO(ahundt) add real robot support for reposition_objects
-
-    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3):
+    def get_camera_data(self, workspace_limits=None, heightmap_resolution=None, return_heightmaps=False, go_home=True, z_height_retake_threshold=0.3, median_filter_size=5, color_median_filter_size=5):
         """
         # Returns
 
@@ -726,7 +884,7 @@ class Robot(object):
             self.go_home(block_until_home=True)
 
         def get_color_depth():
-            """Get the raw color and depth images
+            """ Get the raw color and depth images
             """
             if self.is_sim:
                 sim_ret = None
@@ -770,12 +928,17 @@ class Robot(object):
             while max_z_height > z_height_retake_threshold:
                 scaled_depth_img = depth_img * self.cam_depth_scale  # Apply depth scale from calibration
                 color_heightmap, depth_heightmap = utils.get_heightmap(color_img, scaled_depth_img, self.cam_intrinsics, self.cam_pose,
-                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap)
+                                                                    workspace_limits, heightmap_resolution, background_heightmap=self.background_heightmap,
+                                                                    median_filter_pixels=median_filter_size, color_median_filter_pixels=color_median_filter_size)
                 # TODO(ahundt) switch to masked array, then only have a regular heightmap
                 valid_depth_heightmap = depth_heightmap.copy()
                 valid_depth_heightmap[np.isnan(valid_depth_heightmap)] = 0
 
                 _, max_z_height, _ = self.check_z_height(valid_depth_heightmap, reward_multiplier=1)
+
+                # If just manipulating blocks for dataset image generation, no need to check height.
+                if self.is_sim and self.logoblock_dataset:
+                    break
 
                 if max_z_height > z_height_retake_threshold:
                     if print_error > 3:
@@ -1255,6 +1418,7 @@ class Robot(object):
             else:
                 # hard set the joint position to the home position to work around IK choosing
                 # elbow down positions, which leads to physically impossible simulator states.
+                print(f"moving to home joint config {self.home_joint_config}")
                 return self.move_joints(self.home_joint_config)
         else:
             self.move_joints(self.home_joint_config)
@@ -1278,20 +1442,40 @@ class Robot(object):
         return tool_analog_input2 > 0.26
 
     # HK: added a function to check if the right color is grasped
+    # Done(zhe) handle duplicate object colors and real robot colors
     def check_correct_color_grasped(self, color_ind):
         '''
         color_ind: the index in color_names to grasp.
         '''
         object_positions = np.asarray(self.get_obj_positions())
         object_positions = object_positions[:,2]
+        # Get the index at the highest position (ie, the picked object)
         grasped_object_ind = np.argmax(object_positions)
         grasped_object_handle = self.object_handles[grasped_object_ind]
         # color_index = np.where(color==1)
         # if grasped_object_ind == color_index[0]:
+        if self.grasp_color_task or self.language:
+            color_ind = color_ind % self.color_space.shape[0]
+            grasped_object_ind = grasped_object_ind % self.color_space.shape[0]
+
         if grasped_object_ind == color_ind:
             return True
         else:
             return False
+
+    def check_correct_color_grasped_from_string(self, color_name):
+        '''
+        color_name: the name of the color to grasp.
+        '''
+        object_positions = np.asarray(self.get_obj_positions())
+        object_positions = object_positions[:,2]
+        # Get the index at the highest position (ie, the picked object)
+        grasped_object_ind = np.argmax(object_positions)
+        grasped_object_color = self.object_colors[grasped_object_ind]
+
+        if grasped_object_color == color_name:
+            return True
+        return False
 
 
     def get_highest_object_list_index_and_handle(self):
@@ -1309,7 +1493,7 @@ class Robot(object):
         return grasped_object_ind, grasped_object_handle
 
 
-    def reposition_objects_near_gripper(self, distance_threshold=0.07, put_inside_workspace=True):
+    def reposition_objects_near_gripper(self, distance_threshold=0.1, put_inside_workspace=True):
         """ Simulation only function to detect objects near the gripper.
 
             put_inside_workspace: True will select a random position inside workspace, false will select a specific position outside the workspace
@@ -1385,6 +1569,10 @@ class Robot(object):
             color_success = False
             if grasp_success and self.grasp_color_task:
                 color_success = self.check_correct_color_grasped(object_color)
+                print('Correct color was grasped: ' + str(color_success))
+
+            elif grasp_success and self.language:
+                color_success = self.check_correct_color_grasped_from_string(object_color)
                 print('Correct color was grasped: ' + str(color_success))
 
             # HK: Place grasped object at a random place
@@ -1487,7 +1675,6 @@ class Robot(object):
         # which leads to a security stop and an end to the program run.
         midpos = (np.array(actual_tool_pose[:3]) + pos) / 2.0
         return midpos
-
 
     def push(self, position, heightmap_rotation_angle, workspace_limits=None, go_home=True):
         if workspace_limits is None:
@@ -1658,11 +1845,11 @@ class Robot(object):
                 return True
             time.sleep(0.1)
 
-
-    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True):
+    def place(self, position, heightmap_rotation_angle, workspace_limits=None, distance_threshold=0.06, go_home=True, save_history=True, over_block=True, intended_position=None):
         """ Place an object, currently only tested for blocks.
 
         When in sim mode it assumes the current position of the robot and grasped object is higher than any other object.
+        intended_position   a python list containing a position array at index 0 and a rotation array at index 1.
         """
         if workspace_limits is None:
             workspace_limits = self.workspace_limits
@@ -1676,7 +1863,6 @@ class Robot(object):
                 self.place_pose_history.pop(0)
 
         if self.is_sim:
-
             # Ensure gripper is closed
             gripper_fully_closed = self.close_gripper()
             if gripper_fully_closed:
@@ -1739,7 +1925,10 @@ class Robot(object):
             print('current_position: ' + str(placed_object_position))
             current_obj_z_location = placed_object_position[2]
             print('current_obj_z_location: ' + str(current_obj_z_location+distance_threshold/2))
-            near_goal = np.linalg.norm(placed_object_position - position, axis=0) < (distance_threshold)
+            if intended_position is None:
+                near_goal = np.linalg.norm(placed_object_position - position, axis=0) < (distance_threshold)
+            else:
+                near_goal = np.linalg.norm(placed_object_position - intended_position[0], axis=0) < (distance_threshold)
             print('goal_position: ' + str(position[2]) + ' goal_position_margin: ' + str(position[2] + place_location_margin))
             place_success = has_moved and near_goal
             print('has_moved: ' + str(has_moved) + ' near_goal: ' + str(near_goal) + ' place_success: ' + str(place_success))
@@ -1814,7 +2003,6 @@ class Robot(object):
             else:
                 return move_to_result
 
-
     def check_row(self, object_color_sequence,
                   num_obj=4,
                   distance_threshold=0.02,
@@ -1851,7 +2039,7 @@ class Robot(object):
             # valid_depth_heightmap here used for row checking is delayed by one action
             # Figure out why.
             valid_depth_heightmap, _, _, _, _, _ = self.get_camera_data(return_heightmaps=True)
-            
+
             success, row_size = utils.check_row_success(valid_depth_heightmap, prev_z_height=prev_z_height)
             return success, row_size
 
@@ -1862,7 +2050,7 @@ class Robot(object):
 
             pos = np.asarray(self.get_obj_positions())
             posyx = copy.deepcopy(pos)
-            posyx[:, [0,1]] = posyx[:, [1,0]] 
+            posyx[:, [0,1]] = posyx[:, [1,0]]
             success = False
             row_size = 1
             row_length = len(object_color_sequence)
@@ -1874,15 +2062,21 @@ class Robot(object):
             # lists all the possible subsets of blocks to check, for each possible length of row (except 1).
             # So for 3 objects, this would be:
             # [[[0,1], [0,2], [1,2]], [[0,1,2]]]
-            all_block_indices = [map(list, itertools.combinations(np.arange(num_obj), length))
-                                    for length in range(1, num_obj+1)]
+            #all_block_indices = [map(list, itertools.permutations(np.arange(num_obj), length))
+            #                        for length in range(1, num_obj+1)]
+
+            # only check row size rows 
+            all_block_indices = [map(list, itertools.permutations(np.arange(num_obj), row_length))]
 
             successful_block_indices = []
             for block_indices_of_length in all_block_indices:
+                do_break = False
                 for block_indices in block_indices_of_length:
                     # check each rotation angle for a possible row
-                    # print('checking {}'.format(block_indices))
+                    #print('checking {}'.format(block_indices))
+                    #print('checking {}'.format(np.array(self.color_names)[block_indices]))
                     specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(pos, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                    #print(f"horizontal SUCCESS: {specific_success}")
                     if specific_row_size > row_size:
                         success = specific_success
                         row_size = max(row_size, specific_row_size)
@@ -1890,12 +2084,22 @@ class Robot(object):
                     else:
                         # TODO(ahundt) FIX HACK switch axis to yx order, to workaround the problem where it cannot check vertical lines for rows
                         specific_success, specific_row_size, specific_successful_block_indices = self.check_specific_blocks_for_row(posyx, block_indices, distance_threshold, separation_threshold, object_color_sequence, row_size, success)
+                        #print(f"vertical SUCCESS: {specific_success}")
                         if specific_row_size > row_size:
                             success = specific_success
                             row_size = max(row_size, specific_row_size)
                             successful_block_indices = specific_successful_block_indices
-                    
 
+                    if specific_success:
+                        success = specific_success
+                        successful_block_indices = specific_successful_block_indices
+                        row_size = len(successful_block_indices)
+                        do_break = True
+                        break
+
+                if do_break:
+                    break
+            print(successful_block_indices)
             print('check_row: {} | row_size: {} | blocks: {}'.format(
                 success, row_size, np.array(self.color_names)[successful_block_indices]))
             return success, row_size
@@ -1908,7 +2112,7 @@ class Robot(object):
         xs = pos[block_indices][:, 0]
         ys = pos[block_indices][:, 1]
         if xs.size == 0 or ys.size == 0:
-            # there is nothing to fit, 
+            # there is nothing to fit,
             # not successful, row size 0, and empty block indices
             return False, 0, successful_block_indices
         # print('xs: {}'.format(xs))
@@ -1926,27 +2130,86 @@ class Robot(object):
 
         aligned = True
         median_z = np.median(aligned_pos[:, 2])
+        print(f"pos: {aligned_pos} \n block_indices {block_indices} object_color_sequence {object_color_sequence}")
         for p in aligned_pos:
             # print('distance from line: {:.03f}'.format(p[1]))
             if abs(p[1]) > distance_threshold or abs(p[2] - median_z) > distance_threshold:
                 # too far from line on table, or blocks are not on the same Z plane
+                #print(f"distance is too far")
                 aligned = False
                 break
 
-        indices = aligned_pos[:, 0].argsort()
-        xs = aligned_pos[indices, 0]
-        if aligned and utils.check_separation(xs, separation_threshold):
+        #print(f"called check_specific_blocks_for_row with pos: {pos}, block_indices: {block_indices}, distance_threshold: {distance_threshold}, separation_threshold: {separation_threshold}, object_color_sequence: {object_color_sequence}, row_size: {row_size}, success: {success}") 
+
+        # if using language, don't sort them, just take them as is, should work since we're using permutations not combinations 
+        if self.language:
+            xs = aligned_pos[:,0]
+        else:
+            indices = aligned_pos[:, 0].argsort()
+            xs = aligned_pos[indices, 0]
+
+        try:
+            separation_p = utils.check_separation(xs, separation_threshold)
+        except AssertionError:
+            # blocks are not left-to-right
+            separation_p = False 
+
+        if aligned and separation_p:
             # print('valid row along', theta, 'with indices', block_indices)
-            if self.grasp_color_task:
-                success = np.equal(indices, object_color_sequence).all()
+            if self.grasp_color_task or self.language:
+                block_inds = np.array(block_indices)
+                min_len = min(len(block_inds), len(object_color_sequence))
+                detected_colors = np.array(self.color_names)[block_inds[0:min_len]]
+                detected_colors_reverse = np.array(self.color_names)[block_inds[::-1][0:min_len]]
+                expected_colors = np.array(self.color_names)[np.array(object_color_sequence[0:min_len])]
+                eq_forward = [detected_colors[i] == expected_colors[i] for i in range(len(detected_colors))] 
+                eq_backward = [detected_colors_reverse[i] == expected_colors[i] for i in range(len(detected_colors_reverse))] 
+                success = np.array(eq_forward).all() or np.array(eq_backward).all() 
+                print(f"detected: {detected_colors} expected {expected_colors} success {success}")
+                #success = np.equal(indices[0:min_len], object_color_sequence[0:min_len]).all() or \
+                #          np.equal(indices[0:min_len][::-1], object_color_sequence[0:min_len]).all()
             else:
                 success = True
             successful_block_indices = block_indices
-            row_size = max(len(block_indices), row_size)
+            #row_size = max(len(block_indices), row_size)
+            # if row_size > 1 and success:
+            if row_size == 4:
+                pass
+                # if detected row size is 4 and correct so far, then must have rest correct so return that 
+            #print(f"separation is too far")
+        # if we have found a candidate, make sure that it's the right color order 
+        if success:
+            print(f"predicted stack {successful_block_indices} matches color sequence {object_color_sequence}!!!!!!")
+            print(f"PLACE SUCCESS")
         return success, row_size, successful_block_indices
 
+    def detect_stack(self, pos, curr_sequence, horiz_distance_threshold=0.06, top_idx = -1):
+        # Automatically determine the color order.
+        # We don't worry about the colors, just the length of the sequence.
+        # This should even handle 2 stacks of 2 blocks after a single place success
+        # TODO(ahundt) See if there are any special failure cases common enough to warrant more code improvements
+        num_obj = len(curr_sequence)
+        # object_z_positions = np.array(pos[:,2])
+        # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
+        # object indices sorted highest to lowest
+        # low2high_idx = object_z_positions.argsort()
+        low2high_idx = np.array(pos[:, 2]).argsort()
+        high_idx = low2high_idx[top_idx]
+        low2high_pos = pos[low2high_idx, :]
+        # filter objects closest to the highest block in x, y based on the threshold
+        # ordered from low to high, boolean mask array
+        nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx, :2], axis=1) < \
+                (horiz_distance_threshold/2)
+        # print('nearby:', nearby_obj)
+        # take num_obj that are close enough from bottom to top
+        # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
+        object_color_sequence = low2high_idx[nearby_obj]
 
-    def check_stack(self, object_color_sequence, distance_threshold=0.06, top_idx=-1):
+        return object_color_sequence
+
+    def check_stack(self, object_color_sequence, crop_stack_sequence=True,
+            horiz_distance_threshold=0.06, vert_distance_threshold=0.06, top_idx=-1,
+            pos=None, return_inds=False, goal_num_obj = 4):
         """ Check for a complete stack in the correct order from bottom to top.
 
         Input: vector length of 1, 2, or 3
@@ -1955,7 +2218,8 @@ class Robot(object):
         # Arguments
 
         object_color_sequence: vector indicating the index order of self.object_handles we expect to grasp.
-        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+        horiz_distance_threshold: The max distance cutoff between blocks(horizontal) in meters for the stack to be considered complete.
+        vert_distance_threshold: The max distance cutoff between blocks(vertical) in meters for the stack to be considered complete.
 
 
         # Returns
@@ -1970,71 +2234,314 @@ class Robot(object):
         checks = len(object_color_sequence) - 1
         if checks <= 0:
             print('check_stack() object_color_sequence length is 0 or 1, so there is nothing to check and it passes automatically')
+            if return_inds:
+                return True, checks+1, []
             return True, checks+1
 
         # TODO(killeen) move grasp_color_task check to end, want to find stacks even if the order isn't right.
 
-        pos = np.asarray(self.get_obj_positions())
+        # if block positions aren't specified, call get_obj_positions
+        if pos is None:
+            print('regenerating pos')
+            pos = np.asarray(self.get_obj_positions())
+
         # Assume the stack will work out successfully
         # in the end until proven otherwise
         goal_success = True
-        if not self.grasp_color_task:
-            # Automatically determine the color order.
-            # We don't worry about the colors, just the length of the sequence.
-            # This should even handle 2 stacks of 2 blocks after a single place success
-            # TODO(ahundt) See if there are any special failure cases common enough to warrant more code improvements
-            num_obj = len(object_color_sequence)
-            # object_z_positions = np.array(pos[:,2])
-            # object_color_sequence = object_z_positions.argsort()[:num_obj][::-1]
-            # object indices sorted highest to lowest
-            # low2high_idx = object_z_positions.argsort()
-            low2high_idx = np.array(pos[:, 2]).argsort()
-            high_idx = low2high_idx[top_idx]
-            low2high_pos = pos[low2high_idx, :]
-            # filter objects closest to the highest block in x, y based on the threshold
-            nearby_obj = np.linalg.norm(low2high_pos[:, :2] - pos[high_idx][:2], axis=1) < (distance_threshold/2)
-            # print('nearby:', nearby_obj)
-            # take num_obj that are close enough from bottom to top
-            # TODO(ahundt) auto-generated object_color_sequence definitely has some special case failures, check if it is good enough
-            object_color_sequence = low2high_idx[nearby_obj]
+        if not self.grasp_color_task and not self.language:
+            object_color_sequence = self.detect_stack(pos, object_color_sequence, horiz_distance_threshold, top_idx)
             if len(object_color_sequence) < num_obj:
-                print('check_stack() False, not enough nearby objects for a successful stack! '
-                      'expected at least ' + str(num_obj) +
-                      ' nearby objects, but only counted: ' + str(len(object_color_sequence)))
+                print('check_stack() False, not enough nearby objects for a successful stack! ' \
+                        'expected at least ' + str(num_obj) + ' nearby objects, but only counted: ' + \
+                        str(len(object_color_sequence)))
                 # there aren't enough nearby objects for a successful stack!
                 checks = len(object_color_sequence) - 1
                 # We know the goal won't be met, so goal_success is False
                 # But we still need to count the actual stack height so set the variable for later
                 goal_success = False
-            else:
-                # cut out objects we don't need to check
+            elif crop_stack_sequence:
+                # cut out objects we don't need to check if crop_stack_sequence is set
                 object_color_sequence = object_color_sequence[:num_obj+1]
+            else:
+                checks = len(object_color_sequence) - 1
             # print('auto object_color_sequence: ' + str(object_color_sequence))
+
+        elif not self.grasp_color_task and self.language:
+            detected_object_color_sequence = self.detect_stack(pos, object_color_sequence, horiz_distance_threshold, top_idx)
+        else:
+            pass
+
+        # If we have duplicate colored blocks (ie, two reds), we need to generate all possible sequences
+        if self.grasp_color_task and self.num_obj > self.color_space.shape[0]:
+            sequences = []
+            # The following function fills in the sequences variable with possible sequences
+            self.generate_possible_color_stack_sequences(object_color_sequence, 0, [], sequences)
+        else:
+            sequences = [object_color_sequence]
 
         # print('bottom: ' + str(object_color_sequence[:-1]))
         # print('top: ' + str(object_color_sequence[1:]))
         idx = 0
-        for idx in range(checks):
-            bottom_pos = pos[object_color_sequence[idx]]
-            top_pos = pos[object_color_sequence[idx+1]]
-            # Check that Z is higher by at least half the distance threshold
-            # print('bottom_pos:', bottom_pos)
-            # print('top_pos:', top_pos)
-            # print('distance_threshold: ', distance_threshold)
-            if top_pos[2] < (bottom_pos[2] + distance_threshold / 2.0):
-                print('check_stack(): not high enough for idx: ' + str(idx))
-                return False, idx + 1
-            # Check that the blocks are near each other
-            dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
-            # print('distance: ', dist)
-            if dist > distance_threshold:
-                print('check_stack(): too far apart')
-                return False, idx + 1
+        working_seq_found = True
+        max_height = 0
+        # The outside for loop is to check all possible stacks that fit the color order.
+        # It is mainly used for grasp_color_task (color stacking)
+        for sequence in sequences:
+            working_seq_found = True
+            for idx in range(checks):
+                bottom_pos = pos[sequence[idx]]
+                top_pos = pos[sequence[idx+1]]
+                # Check that Z is higher by at least half the distance threshold
+                # print('bottom_pos:', bottom_pos)
+                # print('top_pos:', top_pos)
+                # print('distance_threshold: ', distance_threshold)
+                if top_pos[2] < (bottom_pos[2] + vert_distance_threshold / 2.0):
+                    if not self.grasp_color_task:
+                        print('check_stack(): top object z pos ' + str(top_pos[2]) + ' not high enough for object idx: ' + str(idx) + ' possibly color: ' + self.color_names[idx % len(self.color_names)])
+                    working_seq_found=False
+                    max_height=max(max_height, idx + 1)
+
+                # Check that the blocks are near each other
+                dist = np.linalg.norm(np.array(bottom_pos) - np.array(top_pos))
+                # print('distance: ', dist)
+                if dist > vert_distance_threshold:
+                    if not self.grasp_color_task:
+                        print('check_stack(): the vertical distance between block sequence ' + str(sequence) + ' colors is ' + str(dist) + 
+                              '. This is larger than the threshold ' + str(vert_distance_threshold) + '. marking this sequence as not successful.')
+                    working_seq_found=False
+                    max_height=max(max_height, idx + 1)
+
+            if working_seq_found:
+                break
+
+        pred = detected_object_color_sequence[0:goal_num_obj]
+        goal = object_color_sequence[0:goal_num_obj]
+
+
+        object_color_seq_to_ret = detected_object_color_sequence
+
+        if np.array_equal(pred,goal):
+            if return_inds:
+                return True, len(pred), object_color_seq_to_ret
+            return True, len(pred)
+
+        if not working_seq_found:
+            if return_inds:
+                return False, max_height, object_color_seq_to_ret
+            return False, max_height
+
+
         detected_height = min(idx + 2, len(object_color_sequence))
         print('check_stack() current detected stack height: ' + str(detected_height))
+
+        if return_inds:
+            return goal_success, detected_height, object_color_seq_to_ret
+
         return goal_success, detected_height
 
-    def check_incremental_height(self,input_img, current_stack_goal):
+
+    def generate_possible_color_stack_sequences(self, object_color_sequence, index, used_indicies, output):
+        # Recursive function to help check the stack
+        if index == len(object_color_sequence):
+            output.append(used_indicies)
+            return
+
+        bottom_color_index = object_color_sequence[index] % self.color_space.shape[0]
+        bottom_index_options = [i for i in range(bottom_color_index, self.num_obj, self.color_space.shape[0]) if i not in used_indicies]
+
+        for ib in bottom_index_options:
+            new_used_indicies = used_indicies.copy()
+            new_used_indicies.append(ib)
+            self.generate_possible_color_stack_sequences(object_color_sequence, index+1, new_used_indicies, output)
+
+        return
+
+    def vertical_square_partial_success(self, current_stack_goal, check_z_height,
+            row_dist_thresh=0.02, separation_threshold=0.1, stack_dist_thresh=0.06):
+        """
+            Checks if the last action was successful.
+            NOTE: could be bugs with this, need to use location of last action to be sure
+            current_stack_goal: array with current goal (length represents goal structure size)
+            Returns:
+                success: whether the previous action was successful
+                structure_progress: step of task we are on (e.g. 2 if structure has 2 blocks)
+        """
+
+        # initially no stacks or rows, 1 block in structure
+        num_stacks = 0
+        has_row = False
+        structure_size = 1
+
+        if check_z_height:
+            raise NotImplementedError
+
+        # partial success is true if we meet the current stack goal (# of blocks in structure)
+
+        # get object positions (array with each object position)
+        pos = np.asarray(self.get_obj_positions())
+
+        # sort indices of blocks by z value
+        low2high_idx = np.array(pos[:, 2]).argsort()
+
+        # check if we are currently holding a block, then we need to use -2 for top_idx
+        if pos[low2high_idx[-1], 2] > 0.2:
+            top_idx = -2
+        else:
+            top_idx = -1
+
+        # first check for any stacks
+        # NOTE if there isn't a first stack, then all blocks must be on the table so
+        # we don't need to check for a second stack
+
+        # for first stack, check if the highest block forms a stack, make sure to store inds of blocks in stack
+        # top_idx is set to the index of low2high_idx we want to check the stack at
+        _, stack_height, first_stack_inds = self.check_stack(np.ones(2), crop_stack_sequence=False,
+                top_idx=top_idx, horiz_distance_threshold=stack_dist_thresh, pos=pos, return_inds=True)
+        second_stack_inds = None
+
+        if stack_height > 1:
+            # we have at least 1 stack
+            num_stacks += 1
+
+            # iterate through all blocks except blocks in first stack to check for another stack
+            for i, block_ind in enumerate(low2high_idx[::-1]):
+                # skip blocks in first stack
+                if block_ind in first_stack_inds:
+                    continue
+
+                # check for 2nd stack (use index of block_ind in low2high_idx)
+                top_idx = len(low2high_idx) - 1 - i
+                _, stack_height, second_stack_inds = self.check_stack(np.ones(2),
+                        crop_stack_sequence=False, top_idx=top_idx, pos=pos, return_inds=True,
+                        horiz_distance_threshold=stack_dist_thresh)
+
+                if stack_height > 1:
+                    num_stacks += 1
+                    break
+
+        # now check for rows
+
+        # if we have 2 stacks, check the bottom blocks of each stack
+        if num_stacks == 2:
+            lowest_blocks = np.array([first_stack_inds[0], second_stack_inds[0]]).astype(int)
+            has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
+                    row_dist_thresh, separation_threshold, None, 1, False)
+
+            if has_row:
+                # we have 2 stacks and they form a row (structure is complete)
+                structure_size = 4
+            else:
+                structure_size = 2
+
+        # if we have 1 stack, check bottom block of stack with all other blocks
+        elif num_stacks == 1:
+            # structure_size is at least 2
+            structure_size = 2
+            lowest_block = first_stack_inds[0]
+            for block_ind in low2high_idx:
+                # skip blocks already in stack
+                if block_ind in first_stack_inds: continue
+
+                lowest_blocks = np.array([lowest_block, block_ind]).astype(int)
+                has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
+                        row_dist_thresh, separation_threshold, None, 1, False)
+
+                if has_row:
+                    # there is 1 stack and 1 row
+                    structure_size = 3
+                    break
+
+        # if we have 0 stacks, check all pairs of blocks
+        else:
+            for i in range(len(low2high_idx)):
+                for j in range(i+1, len(low2high_idx)):
+                    lowest_blocks = np.array([low2high_idx[i], low2high_idx[j]]).astype(int)
+                    has_row, _, _ = self.check_specific_blocks_for_row(pos, lowest_blocks,
+                            row_dist_thresh, separation_threshold, None, 1, False)
+
+                    if has_row:
+                        structure_size = 2
+                        break
+
+                if has_row:
+                    break
+
+        print("vertical square partial success: structure height:", structure_size, "has_row:",
+                has_row, "num stacks:", num_stacks)
+
+        # success if we match or exceed current stack goal, also return structure size
+        return structure_size >= len(current_stack_goal), structure_size
+
+    def unstacking_partial_success(self, prev_structure_progress, distance_threshold=0.06, top_idx=-1, check_z_height=False, depth_img=None):
+        """ Check stack height, set partial_stack_success flag to true if stack height decreases on grasp
+
+        # Arguments
+
+        prev_stack_height: height of stack before last action was taken
+        distance_threshold: The max distance cutoff between blocks in meters for the stack to be considered complete.
+
+        # Returns
+
+        List [success, stack_height].
+        success: will be True if the stack matches the specified order from bottom to top, False otherwise.
+        stack_height: number of blocks in stack
+        """
+        if check_z_height:
+            _, stack_height, _ = self.check_z_height(depth_img, prev_structure_progress)
+            stack_height = int(np.rint(stack_height))
+        else:
+            # get object positions (array with each object position)
+            pos = np.asarray(self.get_obj_positions())
+
+            # sort indices of blocks by z value
+            low2high_idx = np.array(pos[:, 2]).argsort()
+
+            # check if we are currently holding a block, then we need to use -2 for top_idx
+            if pos[low2high_idx[-1], 2] > 0.2:
+                top_idx = -2
+
+            # run check stack to get height of stack
+            _, stack_height = self.check_stack(np.ones(4), pos=pos, top_idx=top_idx, horiz_distance_threshold=distance_threshold)
+
+        # structure progress is 1 when stack is full, 2 when we unstack 1 block, and so on
+        structure_progress = 5 - stack_height
+
+        # check if we decreased or maintained last stack height
+        goal_success = (structure_progress >= prev_structure_progress)
+        print('unstacking_partial_success() structure_progress:', structure_progress,
+                'prev_structure_progress:', prev_structure_progress, 'goal_success:',
+                goal_success)
+
+        return goal_success, structure_progress
+
+    def manual_progress_check(self, prev_structure_progress, task_type):
+
+        # play a sound to get the human's attention.
+        print('\a')
+        while True:
+            try:
+                progress = float(input(" ".join(["For task", task_type.upper(),
+                    "input current structure size: "])))
+                break
+            except ValueError:
+                print("ENTER AN INTEGER!!!!")
+                continue
+
+        if progress < prev_structure_progress:
+            needed_to_reset = True
+        else:
+            needed_to_reset = False
+
+        if progress > prev_structure_progress:
+            stack_matches_goal = True
+        elif task_type == 'unstack' and progress >= prev_structure_progress:
+            stack_matches_goal = True
+        else:
+            stack_matches_goal = False
+
+        return stack_matches_goal, progress, needed_to_reset
+
+    def check_incremental_height(self, input_img, current_stack_goal):
         goal_success = False
         goal, max_z, decrease_threshold = self.check_z_height(input_img)
         #TODO(hkwon214) Double check this
@@ -2077,8 +2584,9 @@ class Robot(object):
         max_workspace_height = prev_height - (decrease_threshold * reward_multiplier)
         if decrease_threshold is not None and max_z < max_workspace_height:
             needed_to_reset = True
-        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) +
-              ' goal_success: ' + str(goal_success) + ' needed to reset: ' + str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
+        print('prev_height: ' + str(prev_height) + ' max_z: '  + str(max_z) + \
+              ' goal_success: ' + str(goal_success) + ' needed to reset: ' + \
+              str(needed_to_reset) + ' max_workspace_height: ' + str(max_workspace_height) + ' <<<<<<<<<<<')
         return goal_success, max_z, needed_to_reset
 
     def restart_real(self):
