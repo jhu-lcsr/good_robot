@@ -3,7 +3,7 @@
 Click the image to watch our press release video on the "Good Robot" paper (3 min):
 [![Press Release for first "Good Robot!" Paper](https://img.youtube.com/vi/dvxqjJBWFD4/0.jpg)](https://youtu.be/dvxqjJBWFD4)
 
-Click the image to watch an depth talk covering all three papers (48 min):
+Click the image to watch an in depth talk covering all three papers (48 min):
 [![Talk Covering The Three Papers in this Repository](https://img.youtube.com/vi/R3dv3ARXpco/0.jpg)](https://youtu.be/R3dv3ARXpco)
 
 ## "Good Robot! Now Watch This!": Repurposing Reinforcement Learning for Task-to-Task Transfer
