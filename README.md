@@ -45,15 +45,17 @@ Enabling human operators to interact with robotic agents using natural language 
 
 
 ```
-@inproceedings{hundt2020good,
-    title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
-    author="Andrew {Hundt} and Benjamin {Killeen} and Nicholas {Greene} and Hongtao {Wu} and Heeyeon {Kwon} and Chris {Paxton} and Gregory D.    {Hager}",
-    booktitle="IEEE Robotics and Automation Letters",
-    volume="5",
-    number="4",
-    pages="6724--6731",
-    url={https://arxiv.org/abs/1909.11730},
-    year="2020"
+
+@article{hundt2020good,
+  title = {``{{Good Robot}}!'': {{Efficient Reinforcement Learning}} for {{Multi}}-{{Step Visual Tasks}} with {{Sim}} to {{Real Transfer}}},
+  author = {Hundt, Andrew and Killeen, Benjamin and Greene, Nicholas and Wu, Hongtao and Kwon, Heeyeon and Paxton, Chris and Hager, Gregory D.},
+  year = {2020},
+  journal = {IEEE Robotics and Automation Letters (RA-L)},
+  volume = {5},
+  number = {4},
+  pages = {6724--6731},
+  doi={10.1109/LRA.2020.3015448},
+  url={https://arxiv.org/abs/1909.11730}
 }
 ```
 [Paper](https://arxiv.org/abs/1909.11730), [Technical Talk Video (20 mins)](https://youtu.be/SROcf0yTcRE)
