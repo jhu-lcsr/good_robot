@@ -60,7 +60,7 @@ Enabling human operators to interact with robotic agents using natural language 
 
 Authors: [Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
-Click the image to watch the video:
+Click the image to watch the supplementary video:
 
 [!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/MbCuEZadkIw/0.jpg)](https://youtu.be/MbCuEZadkIw)
 
