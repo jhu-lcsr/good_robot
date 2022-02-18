@@ -1,5 +1,6 @@
 # "Good Robot!" Projects
 
+[![Talk Covering The Three Papers in this Repository](https://img.youtube.com/vi/R3dv3ARXpco/0.jpg)](https://youtu.be/R3dv3ARXpco)
 
 ## "Good Robot! Now Watch This!": Repurposing Reinforcement Learning for Task-to-Task Transfer
 
