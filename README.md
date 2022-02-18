@@ -33,11 +33,7 @@ stengel-eskin2021guiding,
 
 ## "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping
 
-[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
 
-Click the image to watch the video:
-
-[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/MbCuEZadkIw/0.jpg)](https://youtu.be/MbCuEZadkIw)
 
 ```
 @misc{hundt2019good,
@@ -50,6 +46,12 @@ Click the image to watch the video:
     url={https://arxiv.org/abs/1909.11730}
 }
 ```
+
+[Andrew Hundt](http://ahundt.github.io/), Benjamin Killeen, Heeyeon Kwon, Chris Paxton, and Gregory D. Hager
+
+Click the image to watch the video:
+
+[!["Good Robot!": Efficient Reinforcement Learning for Multi Step Visual Tasks via Reward Shaping](https://img.youtube.com/vi/MbCuEZadkIw/0.jpg)](https://youtu.be/MbCuEZadkIw)
 
 Abstract— Current Reinforcement Learning (RL) algorithms struggle with long-horizon tasks where time can be wasted exploring dead ends and task progress may be easily reversed. We develop the SPOT framework, which explores within action safety zones, learns about unsafe regions without exploring them, and prioritizes experiences that reverse earlier progress to learn with remarkable efficiency.
 
