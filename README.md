@@ -1,4 +1,4 @@
-# "Good Robot!" Projects
+# "Good Robot!" Research
 
 [![Talk Covering The Three Papers in this Repository](https://img.youtube.com/vi/R3dv3ARXpco/0.jpg)](https://youtu.be/R3dv3ARXpco)
 
