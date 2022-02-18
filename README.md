@@ -12,7 +12,7 @@
 }
 ```
 
-![Good Robot Now Watch This Poster](https://openreview.net/attachment?id=Pxs5XwId51n&name=poster)
+[Paper](https://openreview.net/forum?id=Pxs5XwId51n), [Poster](https://openreview.net/attachment?id=Pxs5XwId51n&name=poster)
 
 Abstract- Modern Reinforcement Learning (RL) algorithms are not sample efficient to train on multi-step tasks in complex domains, impeding their wider deployment in the real world. We address this problem by leveraging the insight that RL models trained to complete one set of tasks can be repurposed to complete related tasks when given just a handful of demonstrations. Based upon this insight, we propose See-SPOT-Run (SSR), a new computational approach to robot learning that enables a robot to complete a variety of real robot tasks in novel problem domains without task-specific training. SSR uses pretrained RL models to create vectors that represent model, task, and action relevance in demonstration and test scenes. SSR then compares these vectors via our Cycle Consistency Distance (CCD) metric to determine the next action to take. SSR completes 58% more task steps and 20% more trials than a baseline few-shot learning method that requires task-specific training. SSR also achieves a four order of magnitude improvement in compute efficiency and a 20% to three order of magnitude improvement in sample efficiency compared to the baseline and to training RL models from scratch. To our knowledge, we are the first to address multi-step tasks from demonstration on a real robot without task-specific training, where both the visual input and action space output are high dimensional.
 
@@ -29,21 +29,23 @@ stengel-eskin2021guiding,
 }
 ```
 
-![Guiding Rearrangements Poster](https://openreview.net/attachment?id=-QJ__aPUTN2&name=poster)
+[Paper](https://openreview.net/forum?id=-QJ__aPUTN2), [Poster](https://openreview.net/attachment?id=-QJ__aPUTN2&name=poster)
 
+Enabling human operators to interact with robotic agents using natural language would allow non-experts to intuitively instruct these agents. Towards this goal, we propose a novel Transformer-based model which enables a user to guide a robot arm through a 3D multi-step manipulation task with natural language commands. Our system maps images and commands to masks over grasp or place locations, grounding the language directly in perceptual space. In a suite of block rearrangement tasks, we show that these masks can be combined with an existing manipulation framework without re-training, greatly improving learning efficiency. Our masking model is several orders of magnitude more sample efficient than typical Transformer models, operating with hundreds, not millions, of examples. Our modular design allows us to leverage supervised and reinforcement learning, providing an easy interface for experimentation with different architectures. Our model completes block manipulation tasks with synthetic commands 530% more often than a UNet-based baseline, and learns to localize actions correctly while creating a mapping of symbols to perceptual input that supports compositional reasoning. We provide a valuable resource for 3D manipulation instruction following research by porting an existing 3D block dataset with crowdsourced language to a simulated environment. Our method's 25.3% absolute improvement in identifying the correct block on the ported dataset demonstrates its ability to handle syntactic and lexical variation.
 ## "Good Robot!" Efficient Reinforcement Learning for Multi-Step Visual Tasks via Reward Shaping
 
 
 
 ```
-@misc{hundt2019good,
-    title={"Good Robot!": Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer},
-    author={Andrew Hundt and Benjamin Killeen and Nicholas Greene and Heeyeon Kwon and Chris Paxton and Gregory D. Hager},
-    year={2019},
-    eprint={1909.11730},
-    archivePrefix={arXiv},
-    primaryClass={cs.RO},
-    url={https://arxiv.org/abs/1909.11730}
+@inproceedings{hundt2020good,
+    title="“Good Robot!”: Efficient Reinforcement Learning for Multi-Step Visual Tasks with Sim to Real Transfer",
+    author="Andrew {Hundt} and Benjamin {Killeen} and Nicholas {Greene} and Hongtao {Wu} and Heeyeon {Kwon} and Chris {Paxton} and Gregory D.    {Hager}",
+    booktitle="IEEE Robotics and Automation Letters",
+    volume="5",
+    number="4",
+    pages="6724--6731",
+    url={https://arxiv.org/abs/1909.11730},
+    year="2020"
 }
 ```
 
